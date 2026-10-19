@@ -861,11 +861,12 @@ describe('PublicCatalogPage', () => {
       // en flujo normal, así que el marco medía N×alto y las flechas y los puntos quedaban
       // anclados al fondo de toda la pila.
       expect(carousel).toHaveClass('relative');
-      // La carta `default` pinta la portada A PANTALLA COMPLETA en móvil (`mobileFullBleed`):
-      // una caja de 224 px recortaba la foto que el dueño subió. Desde `sm` vuelve a su marco.
+      // La carta `default` pinta la portada A PANTALLA COMPLETA (`fullBleed`) en TODOS los
+      // breakpoints: una caja de 224 px recortaba la foto que el dueño subió. Ya no hay
+      // `sm:`/`lg:` que devuelvan el marco a su caja en escritorio.
       expect(carousel).toHaveClass('h-[calc(100svh-5rem)]');
-      expect(carousel).toHaveClass('sm:h-72');
-      expect(carousel).toHaveClass('lg:h-96');
+      expect(carousel).toHaveClass('w-full');
+      expect(carousel.className).not.toMatch(/(^|\s)(sm|lg):(h|max-w)-/);
 
       for (const position of [0, 1]) {
         const slide = within(carousel).getByTestId(`catalog-carousel-slide-${position}`);
@@ -888,18 +889,22 @@ describe('PublicCatalogPage', () => {
       );
     });
 
-    it('la portada ocupa la pantalla en móvil y la imagen se ve COMPLETA', async () => {
+    it('la portada ocupa la pantalla completa y la imagen se ve COMPLETA', async () => {
       catalogMock.getPublicOrderingConfig.mockResolvedValue(
         envelope(showcaseConfig({ carouselImages: CAROUSEL })),
       );
       renderPage();
 
       const carousel = await screen.findByTestId('catalog-carousel');
-      // El marco se va de borde a borde en móvil (`mobileFullBleed`) y vuelve a su caja en `sm`.
-      expect(carousel).toHaveClass('sm:max-w-5xl');
-      // Y la foto se ve ENTERA (`object-contain`): `object-cover` recortaba la portada —justo
-      // la imagen que el dueño eligió— para llenar una caja de 224 px.
-      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveClass('object-contain');
+      // El marco se va de borde a borde en TODOS los breakpoints (`fullBleed`): la misma portada
+      // en móvil y en escritorio, sin tope de ancho (`max-w-5xl`) ni caja de esquinas.
+      expect(carousel).toHaveClass('w-full');
+      expect(carousel.className).not.toContain('max-w-5xl');
+      // Y la foto se ve ENTERA (`object-contain`) en todos los anchos: `object-cover` recortaba
+      // la portada —justo la imagen que el dueño eligió— para llenar una caja.
+      const image = within(carousel).getByTestId('catalog-carousel-image-0');
+      expect(image).toHaveClass('object-contain');
+      expect(image.className).not.toContain('object-cover');
     });
 
     it('los destacados son fotos COMPLETAS en carrusel, dos por fila en móvil', async () => {

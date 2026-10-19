@@ -197,7 +197,7 @@ describe('ExportPage — smoke render', () => {
 // `navigator.share({ files })` on desktop (where `navigator.share` exists but
 // file-sharing is unsupported) throws and breaks the export.
 
-describe('ExportPage — delivery (Angular parity: always download, never share)', () => {
+describe('ExportPage — delivery (Angular parity: always download, never share)', { timeout: 15_000 }, () => {
   const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
   const revokeObjectURLMock = vi.fn();
   const originalCreateObjectURL = URL.createObjectURL;
@@ -241,7 +241,8 @@ describe('ExportPage — delivery (Angular parity: always download, never share)
     });
     fireEvent.click(screen.getByRole('button', { name: 'Exportar' }));
 
-    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    // Encryption + zip can stretch past the 1s waitFor default under full parallel load.
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled(), { timeout: 10_000 });
     expect(shareMock).not.toHaveBeenCalled();
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
   });

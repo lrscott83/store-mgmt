@@ -14,6 +14,9 @@ namespace Domain.Common.Utils
     ///   <list type="bullet">
     ///     <item>An INACTIVE module contributes nothing.</item>
     ///     <item>An INCLUDED (already paid / bundled) module contributes nothing.</item>
+    ///     <item>For a STORE SNAPSHOT, a row whose Module is globally inactive
+    ///     (<c>Module.IsActive == false</c>) contributes nothing either: a module switched off in
+    ///     the catalog is gone for every store (owner decision 2026-10-14).</item>
     ///     <item>Everything else contributes its EFFECTIVE price, i.e. exactly
     ///     <see cref="CurrentPriceServiceUtils.GetCurrentPrice"/> — that formula is never
     ///     re-implemented here.</item>
@@ -53,9 +56,44 @@ namespace Domain.Common.Utils
                 return 0f;
 
             return storeModules
-                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded))
+                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded)
+                    && (sm.Module is null || sm.Module.IsActive))
                 .Sum(static sm => CurrentPriceServiceUtils.GetCurrentPrice(
                     sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+        }
+
+        /// <summary>
+        /// The BASE (pre-discount) total of the billable catalog modules — the "original"
+        /// column a card shows above the discounted one. Same rows as
+        /// <see cref="CalculateTotal(IEnumerable{Module})"/>, because both re-use the one
+        /// <see cref="IsBillable"/> predicate; the two columns can therefore never disagree
+        /// about which modules are counted. Null or empty → 0.
+        /// </summary>
+        public static float CalculateBaseTotal(IEnumerable<Module>? modules)
+        {
+            if (modules is null)
+                return 0f;
+
+            return modules
+                .Where(static m => IsBillable(m.IsActive, m.PriceIncluded))
+                .Sum(static m => m.Price);
+        }
+
+        /// <summary>
+        /// The BASE (pre-discount) total of the billable store snapshot modules — the
+        /// "original" column beside <see cref="CalculateTotal(IEnumerable{StoreModule})"/>.
+        /// Same rows, same <see cref="IsBillable"/> predicate, plain <c>Price</c> instead of
+        /// the effective price. Null or empty → 0.
+        /// </summary>
+        public static float CalculateBaseTotal(IEnumerable<StoreModule>? storeModules)
+        {
+            if (storeModules is null)
+                return 0f;
+
+            return storeModules
+                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded)
+                    && (sm.Module is null || sm.Module.IsActive))
+                .Sum(static sm => sm.Price);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 ﻿using Application.Dtos.Administration.Modules;
+using Application.Services.Stores;
 
 namespace Application.Dtos.StoreManagement
 {
@@ -12,6 +13,13 @@ namespace Application.Dtos.StoreManagement
         public string? OwnerPhone { get; set; }
         public string? Address { get; set; }
         public string? Description { get; set; }
+        // public-catalog-static-pages (T8): ubicación pública que alimenta el JSON-LD del catálogo.
+        public string? PublicPhone { get; set; }
+        public string? AddressCity { get; set; }
+        public string? AddressProvince { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public List<OpeningHoursEntry> OpeningHours { get; set; } = new();
         public bool IsActive { get; set; }
         public bool Approved { get; set; }
         public DateOnly? PaymentStartDate { get; set; }
@@ -24,13 +32,19 @@ namespace Application.Dtos.StoreManagement
         // store cards and the plan filter read it; the frontend never infers the
         // plan from module flags.
         public string? PlanType { get; set; }
-        // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
-        // Σ over the plan's member MODULES from the live catalog with the same formula
-        // PlanProfile uses for GET /v1/plans — NOT the store's frozen StoreModule snapshot.
-        // Null when the store is disapproved or its plan is missing/inactive, so the
-        // frontend hides the price row instead of inventing one.
+        // The store's BILLING price: the original (pre-discount) sum over the modules the
+        // store has ASSIGNED and that are ACTIVE and not price-included
+        // (ModulePriceCalculator.CalculateBaseTotal) — NOT the plan catalog's total, so a
+        // store whose module set differs from its plan shows what it actually pays.
+        // PlanCurrentPrice is the same rows at their effective (discounted) price.
+        // Null when the store is disapproved, so the frontend hides the price row instead
+        // of inventing one.
         public float? PlanPrice { get; set; }
         public float? PlanCurrentPrice { get; set; }
         public List<ModuleDto> Modules { get; set; } = new();
+        // Public catalog slug (Store.CatalogSlug): the store's `/catalog/<slug>` public route.
+        // Null when the store never synced its catalog — the super-admin store cards render the
+        // catalog link only when it is present.
+        public string? CatalogSlug { get; set; }
     }
 }

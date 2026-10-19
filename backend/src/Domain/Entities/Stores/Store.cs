@@ -19,6 +19,23 @@ namespace Domain.Entities.Stores
         public string Name { get; set; }
         public string? Address { get; set; }
         public string? Description { get; set; }
+
+        // public-catalog-static-pages (T8): datos de ubicación pública para el JSON-LD del catálogo
+        // (S6). Todos opcionales: las tiendas existentes no los tienen y el JSON-LD omite lo ausente
+        // en vez de inventarlo.
+        public string? PublicPhone { get; set; }
+        public string? AddressCity { get; set; }
+        public string? AddressProvince { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+
+        /// <summary>
+        /// Horario público por día serializado como JSON canónico
+        /// (<c>[{"day":"Monday","opens":"09:00","closes":"17:00"}]</c>). Se valida y canonicaliza
+        /// en <c>OpeningHoursSerializer</c>; nunca se escribe a mano.
+        /// </summary>
+        public string? OpeningHoursJson { get; set; }
+
         public bool Approved {  get; set; } = false;
         public Guid TenantId { get; set; }
         public Owner Owner { get; set; } = null!;

@@ -29,6 +29,7 @@ function makeRow(overrides: Partial<ReSellerCommission> = {}): ReSellerCommissio
     month: 7,
     paymentCount: 3,
     totalCommission: 90,
+    totalCommissionCup: 0,
     ...overrides,
   };
 }
@@ -123,7 +124,7 @@ describe('ReSellerCommissionsPage — rows', () => {
     await waitFor(() => {
       expect(screen.getByText('07/2026')).toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
-      expect(screen.getByText('$1 234.50')).toBeInTheDocument();
+      expect(screen.getByText('1 234.50 USD')).toBeInTheDocument();
     });
 
     expect(storeHttpService.getReSellerCommissions).toHaveBeenCalledTimes(1);
@@ -149,7 +150,31 @@ describe('ReSellerCommissionsPage — rows', () => {
 
     await waitFor(() => {
       expect(screen.getByText('12/2025')).toBeInTheDocument();
-      expect(screen.getByText('$10')).toBeInTheDocument();
+      expect(screen.getByText('10 USD')).toBeInTheDocument();
+    });
+  });
+
+  it('shows the commission in TWO columns: one in USD and one in CUP', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
+      succeeded: true,
+      data: [makeRow({ year: 2026, month: 7, paymentCount: 4, totalCommission: 30, totalCommissionCup: 7500 })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: ReSellerCommissionsPage } = await import('../reseller-commissions');
+    render(
+      <Wrapper>
+        <ReSellerCommissionsPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('commission-usd-2026-7')).toHaveTextContent('30 USD');
+      expect(screen.getByTestId('commission-cup-2026-7')).toHaveTextContent('7 500 CUP');
     });
   });
 });

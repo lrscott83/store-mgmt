@@ -37,9 +37,16 @@ Nuevo módulo **MultiMonedas (15)** — replicando el patrón exacto de MultiSto
 - La moneda se guarda en `currency` de los modelos (ya existe — FROZEN).
 - Créditos/pagos heredan la moneda de la orden.
 
-## 6. Regla de carrito — una sola moneda por orden
+## 6. Regla de carrito - una sola moneda por orden
 
-- `currency-guard.ts` (espejo de `order-type-guard.ts`): primer ítem fija `cartCurrency`; producto de otra moneda → alerta bloqueante, no se agrega (también en escáner).
+> **RETIRADA el 2026-10-13 (decisión del owner).** La regla "una orden no puede mezclar productos de
+> monedas distintas" **ya no existe**: `guardCurrency` se eliminó y los 4 call sites (`sale.tsx` ×2,
+> `wholesale.tsx`, `egress.tsx`) ya no comprueban la moneda. Motivo: toda tienda nueva nace en el plan
+> Superior, que incluye "Múltiples monedas", así que el bloqueo había quedado inalcanzable para las
+> tiendas nuevas; el owner eligió retirar la regla en vez de re-acotarla. El resto del documento es
+> histórico.
+
+- ~~`currency-guard.ts` (espejo de `order-type-guard.ts`): primer ítem fija `cartCurrency`; producto de otra moneda → alerta bloqueante, no se agrega (también en escáner).~~ **RETIRADO 2026-10-13** — la regla de una sola moneda por venta ya no existe (ver la nota de la sección 6).
 - `Order.currency` = moneda del carrito.
 - **Totales por moneda**: ventas del día, órdenes, dashboard, cuadre, créditos agrupan por moneda; total primario (CUP) + chips de desglose ("30 USD · 5 EUR").
 

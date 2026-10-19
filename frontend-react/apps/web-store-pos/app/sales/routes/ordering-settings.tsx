@@ -54,10 +54,16 @@ function text(value: string | null): string {
 }
 
 function toForm(settings: OrderingSettings): OrderingForm {
+  // Una tienda que AÚN no tiene ninguna modalidad configurada arranca con la RECOGIDA abierta: es
+  // el modo que casi todo el mundo ofrece, y sin ninguna el interruptor maestro no se puede
+  // guardar (el backend rechaza un pedido que nadie puede recoger ni recibir). Un valor guardado
+  // manda SIEMPRE: con la configuración ya hecha —y el panel a la vista— esto no pisa nada, porque
+  // con el interruptor encendido el servidor garantiza al menos una modalidad.
+  const hasConfiguredModes = settings.pickupEnabled || settings.deliveryEnabled;
   return {
     enabled: settings.enabled,
     whatsappNumber: text(settings.whatsappNumber),
-    pickupEnabled: settings.pickupEnabled,
+    pickupEnabled: hasConfiguredModes ? settings.pickupEnabled : true,
     deliveryEnabled: settings.deliveryEnabled,
     businessHours: text(settings.businessHours),
     deliveryZones: text(settings.deliveryZones),
@@ -145,6 +151,17 @@ export function OrderingSettingsPage() {
     setForm((current) => (current === null ? current : { ...current, [key]: value }));
   }
 
+  /**
+   * Espejo de las DOS reglas del backend (`UpsertStoreCatalogSettingsCommandValidator`): el
+   * celular es obligatorio con el interruptor encendido, y tiene que quedar al menos una
+   * modalidad abierta. No se espera al 400 del servidor para decirlo: el botón se apaga y el
+   * motivo se pinta al lado del campo que lo causa.
+   */
+  const whatsappMissing = form !== null && form.enabled && form.whatsappNumber.trim().length === 0;
+  const noModeSelected =
+    form !== null && form.enabled && !form.pickupEnabled && !form.deliveryEnabled;
+  const canSync = form !== null && !isSyncing && !whatsappMissing && !noModeSelected;
+
   async function handleSync() {
     if (form === null) return;
 
@@ -189,7 +206,7 @@ export function OrderingSettingsPage() {
             <Button
               variant="fab"
               onClick={() => void handleSync()}
-              disabled={isSyncing || form === null}
+              disabled={!canSync}
               data-testid="ordering-sync"
             >
               {intl.formatMessage({
@@ -269,9 +286,19 @@ export function OrderingSettingsPage() {
                     placeholder={intl.formatMessage({
                       id: 'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER',
                     })}
+                    aria-required="true"
                     className={INPUT_CLASSES}
                     data-testid="ordering-whatsapp"
                   />
+                  {whatsappMissing && (
+                    <p
+                      role="alert"
+                      className="mt-1 text-xs text-danger"
+                      data-testid="ordering-whatsapp-required"
+                    >
+                      {intl.formatMessage({ id: 'ORDERING_SETTINGS.WHATSAPP_REQUIRED' })}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -336,6 +363,16 @@ export function OrderingSettingsPage() {
                   />
                 </div>
               </div>
+
+              {noModeSelected && (
+                <p
+                  role="alert"
+                  className="mt-3 text-xs text-danger"
+                  data-testid="ordering-mode-required"
+                >
+                  {intl.formatMessage({ id: 'ORDERING_SETTINGS.MODE_REQUIRED' })}
+                </p>
+              )}
 
               <p className="mt-3 text-xs text-text-muted">
                 {intl.formatMessage({ id: 'ORDERING_SETTINGS.CURRENCY_NOTE' })}

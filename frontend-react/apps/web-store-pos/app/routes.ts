@@ -59,6 +59,8 @@ export default [
     route('sales/online-orders/sales', 'sales/routes/ordering-sales.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
+    // Cierre Efectivo (cierre-efectivo, 2026-10-14): cuadre diario del efectivo.
+    route('sales/cash-closing', 'sales/routes/cash-closing.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)
     route('sales/wholesale', 'sales/routes/wholesale.tsx'),
     route('sales/today-orders', 'sales/routes/today-orders.tsx'),
@@ -70,6 +72,7 @@ export default [
 
     // Inventory
     route('inventory/available', 'inventory/routes/available.tsx'),
+    route('inventory/count', 'inventory/routes/count.tsx'),
     route('inventory/today-entries', 'inventory/routes/today-entries.tsx'),
     route('inventory/entries', 'inventory/routes/entries.tsx'),
     route('inventory/today-quantities', 'inventory/routes/today-quantities.tsx'),
@@ -182,6 +185,11 @@ export default [
   // does NOT re-export authLoader as its clientLoader.
   layout('shared/components/public-app-layout.tsx', { id: 'public-app-layout' }, [
     route('help/tutorial', 'help/routes/tutorial.tsx'),
+    // Páginas legales (PÚBLICAS): el footer las enlaza también desde el layout de
+    // invitado y el register las abre en otra pestaña, así que NO pueden pasar por
+    // authLoader. El contenido se genera desde docs/legal/*.md (generate:legal).
+    route('private-police', 'legal/routes/privacy-policy.tsx'),
+    route('terms-conditions', 'legal/routes/terms-conditions.tsx'),
   ]),
 
   // Utility routes

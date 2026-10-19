@@ -164,6 +164,16 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Realiza una nueva venta. Escanea o busca el producto, agrega cantidades, selecciona el método de pago y confirma la venta. También puedes generar ventas a crédito.',
       },
+      // cierre-efectivo (2026-10-14): justo debajo de "Vender" (S5). Mismo gate
+      // que la venta (feature Sale + módulo Sales).
+      {
+        label: 'MENU.CASH_CLOSING',
+        path: '/sales/cash-closing',
+        featureIds: [EFeatures.Sale],
+        moduleId: EModules.Sales,
+        helpContent:
+          'Cierre Efectivo. Cuadra el efectivo de la venta del día: escribe la Apertura, cuenta los billetes y monedas en el Conteo y revisa el Esperado, el Contado y la Diferencia. Solo efectivo. Pulsa Cerrar Caja al final del día; si la diferencia no es cero, el comentario es obligatorio. Solo se ofrece con el módulo MultiMonedas para elegir entre varias monedas.',
+      },
       {
         label: 'MENU.WHOLESALE',
         path: '/sales/wholesale',
@@ -302,6 +312,14 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Inventory,
         helpContent:
           'Consulta el inventario disponible. Lista todos los productos con su cantidad en stock, precio y estado. Puedes buscar y filtrar productos.',
+      },
+      {
+        label: 'MENU.PRODUCT_COUNT',
+        path: '/inventory/count',
+        featureIds: [EFeatures.Available],
+        moduleId: EModules.Inventory,
+        helpContent:
+          'Conteo de productos. Compara la cantidad del sistema con la que cuentas físicamente y muestra la diferencia. Es solo una ayuda visual: no modifica el inventario.',
       },
       {
         label: 'MENU.TODAY_ENTRIES',

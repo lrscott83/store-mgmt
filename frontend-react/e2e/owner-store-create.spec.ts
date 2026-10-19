@@ -4,6 +4,11 @@ import { Client } from 'pg';
 import { assertStoresFeature } from './support/store-fixture';
 import { readBearerToken } from './support/auth-storage';
 import { E2E_API_URL } from './support/backend-url';
+import {
+  MODISTORES_MODULE_ID,
+  MULTIPAYMENTS_MODULE_ID,
+  enableStoreModule,
+} from './support/multipayments-fixture';
 
 /**
  * [owner-multistores-store-creation] E2E Playwright — the owner's "+ Tienda"
@@ -12,11 +17,14 @@ import { E2E_API_URL } from './support/backend-url';
  *
  * Covers the MultiStores gate on the SELECTED store (billing-filtered
  * storeModuleIds — store-switcher parity), the name-only CreateStoreModal and
- * the owner-branch contract: body ownerId is the zero-Guid, approved=true,
- * moduleIds=[] — the backend derives the caller's own owner and births the
- * store on the ACTIVE Pago plan catalog (2026-09-26 birth contract, decisión
- * del propietario: TODA tienda nace con los módulos del plan Pago, siempre;
- * la tienda seleccionada es irrelevante para el nacimiento).
+ * the owner-branch contract: body ownerId is the zero-Guid, approved=true, and
+ * NO `moduleIds` at all — the backend derives the caller's own owner and births
+ * the store on the **Superior** plan with that plan's catalog (decisión del
+ * propietario 2026-10-13: "Cuando se crea debe ser en el plan Superior y no el
+ * de Pago"; commit `store-birth-superior`, 2026-10-11, which replaced the
+ * `store-birth-pago-only` contract this spec used to pin — including dropping
+ * `moduleIds: []` from the create payload, see `store-http-service.ts:35-45`).
+ * The store's selected store is irrelevant for the birth.
  *
  * Matrix MC-01, MC-02, MC-04. NEVER touches existing specs (CLAUDE.md E2E
  * rule) — this is a brand-new file. Analysis-based: the FE E2E suite is NOT
@@ -24,14 +32,12 @@ import { E2E_API_URL } from './support/backend-url';
  * the real backend); assertions follow the byte pattern of owner-stores.spec.ts
  * and store-create-security.spec.ts so CI can execute it unchanged.
  *
- * SETUP (2026-09-22, owner-authorized): the persona's store is born on the Pago
- * plan WITHOUT MultiStores (14) — registration no longer delivers every
- * availableToStore module, which left MC-01/MC-02 failing on a stale
- * precondition (not an app bug). Both tests seed module 14 into the selected
- * store via direct DB (store-fixture.ts H-15 precedent) and refresh the cached
- * session through a REAL GET /v1/auth/me (billing only trims on Vencido; the
- * store stays AlDia, so 14 survives /me's billing filter). Assertions are
- * untouched.
+ * SETUP (2026-10-13): both tests used to seed module 14 into the selected store
+ * because the Pago birth plan did not carry it. Superior DOES carry it, so the
+ * seed is now an explicit, API-pinned no-op (`enableStoreModule`) rather than
+ * an assumption — the + Tienda button gate is still pinned on a session that
+ * demonstrably holds 14, and the cached session is still refreshed through a
+ * real GET /v1/auth/me. Assertions are untouched.
  *
  * The button's NEGATIVE case (owner WITHOUT MultiStores → button hidden) stays
  * out of E2E by design: that gate is pinned deterministically in vitest
@@ -76,49 +82,25 @@ async function readMyStores(page: Page): Promise<Array<{ id: string; name: strin
   return body.data ?? [];
 }
 
-/** Reads the ACTIVE Pago plan (PlanId=2) catalog straight from the DB. */
-async function readPagoPlanModuleIds(): Promise<number[]> {
-  return withDb(async (client) => {
-    const result = await client.query(
-      'SELECT "ModuleId" FROM "StorePlanModule" WHERE "PlanId" = 2 ORDER BY "ModuleId"',
-    );
-    return result.rows.map((r) => r.ModuleId as number);
-  });
-}
-
-const MODULE_MULTISTORES = 14;
-
-async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
-  const client = new Client({ connectionString: process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL });
+/** Reads the Superior birth plan (PlanId=3) catalog straight from the DB. */
+async function readSuperiorPlanModuleIds(): Promise<number[]> {
+  const connectionString = process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL;
+  const client = new Client({ connectionString });
   try {
     await client.connect();
-    return await fn(client);
+    const result = await client.query(
+      'SELECT "ModuleId" FROM "StorePlanModule" WHERE "PlanId" = $1 ORDER BY "ModuleId"',
+      [SUPERIOR_PLAN_ID],
+    );
+    return result.rows.map((r) => r.ModuleId as number);
   } finally {
     await client.end();
   }
 }
 
-/** Inserts the MultiStores module row for the store if missing (idempotent). */
-async function seedMultiStoresModule(storeId: string): Promise<void> {
-  await withDb(async (client) => {
-    await client.query(
-      `INSERT INTO "StoreModule"
-         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
-          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
-          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
-       SELECT s."Id", 14, m."PriceIncluded", m."Price", m."Price",
-              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
-              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
-         FROM "Module" m, "Store" s
-        WHERE m."Id" = $2 AND s."Id" = $1
-          AND NOT EXISTS (
-            SELECT 1 FROM "StoreModule" sm
-             WHERE sm."StoreId" = $1 AND sm."ModuleId" = $2
-          )`,
-      [storeId, MODULE_MULTISTORES],
-    );
-  });
-}
+const SUPERIOR_PLAN_ID = 3; // StorePlanType.Superior (CreateStoreService.cs:45)
+const MODULE_MULTISTORES = MODISTORES_MODULE_ID;
+const MODULE_MULTIPAYMENTS = MULTIPAYMENTS_MODULE_ID;
 
 /**
  * Refreshes the session profile through a REAL GET /v1/auth/me and rewrites
@@ -144,19 +126,29 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   await page.reload();
 }
 
+/** Module ids the CLIENT session currently carries (the gate's real input). */
+async function sessionModuleIds(page: Page): Promise<number[]> {
+  const raw = await page.evaluate(() => window.localStorage.getItem('currentUser'));
+  if (!raw) throw new Error('owner-store-create: localStorage.currentUser is empty.');
+  const parsed = JSON.parse(raw) as { storeModuleIds?: number[] };
+  return parsed.storeModuleIds ?? [];
+}
+
 test('MC-01 — the + Tienda button shows only with MultiStores on the selected store', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
-  // SETUP (owner-authorized 2026-09-22): the persona's store is born on the
-  // Pago plan WITHOUT MultiStores (14) — registration no longer delivers every
-  // module. Seed 14 by direct DB + refresh the cached session via a real /me
-  // so the auth store's storeModuleIds contains 14, the same shape
-  // store-switcher.tsx/configurations.tsx gate on. Assertions untouched.
-  await seedMultiStoresModule(selectedStoreId);
+  // SETUP: the + Tienda button gate reads `user.storeModuleIds`, which cold-boot
+  // takes from localStorage. Superior (the birth plan since 2026-10-13) already
+  // carries MultiStores, so this is an explicit API-pinned no-op rather than an
+  // assumption, and the session is still refreshed through a real /me. The
+  // session is then asserted to really hold 14 — the gate is pinned against a
+  // state that exists, not against a plan that is hoped to carry it.
+  await enableStoreModule(page, selectedStoreId, MODULE_MULTISTORES);
   await refreshSessionFromMe(page);
+  expect(await sessionModuleIds(page)).toContain(MODULE_MULTISTORES);
 
   await page.goto('/management/my-stores');
 
@@ -166,22 +158,22 @@ test('MC-01 — the + Tienda button shows only with MultiStores on the selected 
   await expect(createButton).toContainText('Tienda');
 });
 
-test('MC-02 — creating a store posts the owner-branch contract and is born with the Pago plan modules', async ({
+test('MC-02 — creating a store posts the owner-branch contract and is born with the Superior plan modules', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
-  // SETUP (same as MC-01 — serial mode): seed 14 + refresh the session before
-  // reading the module set, so the inheritance pin below runs against a set
-  // that actually includes MultiStores.
-  await seedMultiStoresModule(selectedStoreId);
+  // SETUP (same as MC-01 — serial mode): build the module set explicitly +
+  // refresh the session before reading it, so the birth pin below runs against a
+  // store that demonstrably holds MultiStores.
+  await enableStoreModule(page, selectedStoreId, MODULE_MULTISTORES);
   await refreshSessionFromMe(page);
 
-  // Precondition pin: the seed landed on the selected store (the create-button
+  // Precondition pin: the selected store really holds 14 (the create-button
   // gate runs against this set — MC-01 pins it). The BIRTH contract below no
   // longer derives anything from this set.
-  expect(await readStoreModules(selectedStoreId)).toContain(14);
+  expect(await readStoreModules(selectedStoreId)).toContain(MODULE_MULTISTORES);
 
   // Intercept ALL /v1/stores traffic to capture the create POST (byte pattern of
   // store-create-security.spec.ts). RegExp, NOT the `**/v1/stores/**` glob: the
@@ -212,8 +204,11 @@ test('MC-02 — creating a store posts the owner-branch contract and is born wit
   await page.getByTestId('owner-store-create-save').click();
 
   // The POST arrives with the owner-branch contract payload: zero-Guid ownerId
-  // (server derives), approved=true and NO moduleIds (server assigns the Pago
-  // plan modules — 2026-09-26 birth contract).
+  // (server derives), approved=true and NO moduleIds at all — since
+  // `store-birth-superior` (2026-10-11) the create request names no modules,
+  // because the server owns the born plan and its catalog
+  // (store-http-service.ts:35-45). `toEqual` on the parsed body pins the
+  // ABSENCE of moduleIds too: any extra key would fail the comparison.
   await expect
     .poll(() => {
       const create = capturedRequests
@@ -235,7 +230,6 @@ test('MC-02 — creating a store posts the owner-branch contract and is born wit
       address: '',
       description: '',
       approved: true,
-      moduleIds: [],
     });
 
   // The modal closes and the new store appears in the listing.
@@ -246,13 +240,17 @@ test('MC-02 — creating a store posts the owner-branch contract and is born wit
   const created = (await readMyStores(page)).find((s) => s.name === newName);
   expect(created).toBeTruthy();
   if (!created) return; // unreachable — guard for the type checker
-  // BIRTH CONTRACT (decisión del propietario 2026-09-26): every new store is
-  // born with the ACTIVE Pago plan catalog — nothing is inherited from the
-  // selected store. The catalog is read straight from the DB and 14 is pinned
-  // absent explicitly (MultiStores is Superior/VIP-only).
+  // BIRTH CONTRACT (decisión del propietario 2026-10-13, commit
+  // `store-birth-superior`): every new store is born with the Superior plan
+  // catalog — nothing is inherited from the selected store. The catalog is read
+  // straight from the DB and both discriminating modules are pinned explicitly:
+  // 14 (MultiStores) is PRESENT because Superior carries it, and 16
+  // (MultiPayments) is ABSENT because it stays VIP-only. Those two pins are what
+  // would fail if the birth plan silently regressed to Pago.
   const createdModuleIds = await readStoreModules(created.id);
-  expect(createdModuleIds).toEqual(await readPagoPlanModuleIds());
-  expect(createdModuleIds).not.toContain(MODULE_MULTISTORES);
+  expect(createdModuleIds).toEqual(await readSuperiorPlanModuleIds());
+  expect(createdModuleIds).toContain(MODULE_MULTISTORES);
+  expect(createdModuleIds).not.toContain(MODULE_MULTIPAYMENTS);
 });
 
 test('MC-04 — the owner-branch 403 pins: a non-owner body is rejected by the API', async ({

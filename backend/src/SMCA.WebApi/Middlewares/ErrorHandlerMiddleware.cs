@@ -1,6 +1,8 @@
 ﻿using Application.Exceptions;
 using Application.ResponseModels;
 using Domain.Common.Results;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Json;
@@ -59,7 +61,7 @@ namespace SMCA.WebApi.Middlewares
             }
             catch (Exception error)
             {
-                if (error is ValidationException or ApiException)
+                if (error is ValidationException or ApiException || IsUniqueViolation(error))
                     _logger.LogWarning("Request rejected: {Message}", error.Message);
                 else
                 {
@@ -101,6 +103,17 @@ namespace SMCA.WebApi.Middlewares
                         response.StatusCode = (int)HttpStatusCode.NotFound;
                         responseModel.ActionCode = (int)HttpStatusCode.NotFound;
                         break;
+                    case DbUpdateException when IsUniqueViolation(error):
+                        // Dos altas concurrentes sobre el mismo índice único: es un CONFLICTO de
+                        // cliente (reintentable), no un fallo del servidor. Sin esto salía un 500
+                        // opaco — el caso que dejó abierto el alta de la configuración de pedidos.
+                        response.StatusCode = (int)HttpStatusCode.Conflict;
+                        responseModel.ActionCode = (int)HttpStatusCode.Conflict;
+                        responseModel.Errors = new List<Error>
+                        {
+                            new Error("App.Conflict", "El recurso ya existe; vuelve a intentarlo."),
+                        };
+                        break;
                     default:
                         // unhandled error
                         response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -111,6 +124,37 @@ namespace SMCA.WebApi.Middlewares
 
                 await response.WriteAsync(result);
             }
+        }
+
+        /// <summary>
+        /// ¿El error es un fallo de guardado por violación de índice único de PostgreSQL (SQLSTATE
+        /// 23505)? Dos cuidados:
+        ///
+        ///   * Se ancla en <see cref="DbUpdateException"/> —lo que EF lanza al guardar— para NO ampliar
+        ///     el mapeo a una violación que llegue por otro camino: esa sigue siendo un 500.
+        ///   * Recorre TODA la cadena de <c>InnerException</c> (incluidas las internas múltiples de un
+        ///     <see cref="AggregateException"/>), porque la excepción de PostgreSQL puede venir anidada
+        ///     a más de un nivel (envoltorios de batch/retry).
+        ///
+        /// Es un conflicto de cliente, no un fallo del servidor.
+        /// </summary>
+        private static bool IsUniqueViolation(Exception error)
+        {
+            if (error is not DbUpdateException)
+                return false;
+
+            return ContainsUniqueViolation(error);
+        }
+
+        private static bool ContainsUniqueViolation(Exception error)
+        {
+            if (error is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+                return true;
+
+            if (error is AggregateException aggregate)
+                return aggregate.InnerExceptions.Any(ContainsUniqueViolation);
+
+            return error.InnerException is not null && ContainsUniqueViolation(error.InnerException);
         }
 
         /// <summary>

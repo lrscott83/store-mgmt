@@ -24,6 +24,8 @@ import type {
 } from '@store-mgmt/domain';
 import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
+import type { CashClosingStore } from '~/sales/lib/cash-closing/cash-closing-types';
+import { emptyCashClosingStore } from '~/sales/lib/cash-closing/cash-closing-types';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
 
@@ -101,6 +103,10 @@ export const EDataFileName = {
   // always written (empty array when the store has none) and parsed as [] for
   // legacy archives.
   MessagesQueue: 'messages-queue.json',
+  // cierre-efectivo: the per-store cash-closing store — daily closings plus the
+  // denomination catalog. Always written (empty store when the store has none)
+  // and parsed as an empty store for legacy archives.
+  CashClosings: 'cash-closings.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -219,6 +225,10 @@ export interface ParsedData {
   // sync tests/call sites keep compiling. `parseContents` always populates it
   // (legacy archives → []), so real imports never see `undefined`.
   messagesQueue?: QueuedMessage[];
+  // cierre-efectivo (2026-10-14): OPTIONAL so pre-existing sync tests/call
+  // sites keep compiling. `parseContents` always populates it (legacy archives
+  // → empty store), so real imports never see `undefined`.
+  cashClosings?: CashClosingStore;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +303,15 @@ export interface StorePaymentMethodsReader {
  */
 export interface MessagesQueueReader {
   getStorageMessagesQueueJson(): string;
+}
+
+/**
+ * Cash-closing store read seam (cierre-efectivo): the offline service owns the
+ * per-store closings + denomination catalog; the serializer only reads its raw
+ * stored JSON for export. Mirrors {@link MessagesQueueReader}.
+ */
+export interface CashClosingReader {
+  getStorageCashClosingsJson(): string;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +398,10 @@ export class DataSerializerService {
     // predate the offline message queue omit it; exports then write an empty
     // entry and imports parse [] for archives that carry none.
     private readonly messagesQueueReader?: MessagesQueueReader,
+    // Optional (cierre-efectivo): legacy call sites/tests that predate the daily
+    // cash-closing omit it; exports then write an empty store and imports parse
+    // an empty store for archives that carry none.
+    private readonly cashClosingReader?: CashClosingReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -443,6 +466,11 @@ export class DataSerializerService {
     // messaging-background-offline: raw passthrough from the offline service's
     // JSON seam; always written (empty array when the store has no queue).
     const messagesQueueJson = this.messagesQueueReader?.getStorageMessagesQueueJson() ?? '[]';
+    // cierre-efectivo: raw passthrough from the offline service's JSON seam;
+    // always written (an empty store when the store has no closings).
+    const cashClosingsJson =
+      this.cashClosingReader?.getStorageCashClosingsJson() ??
+      JSON.stringify(emptyCashClosingStore());
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -515,6 +543,9 @@ export class DataSerializerService {
       );
     }
     await zipWriter.add(EDataFileName.MessagesQueue, new TextReader(messagesQueueJson), {
+      rawPassword: key,
+    });
+    await zipWriter.add(EDataFileName.CashClosings, new TextReader(cashClosingsJson), {
       rawPassword: key,
     });
 
@@ -670,6 +701,11 @@ export class DataSerializerService {
     const messagesQueue = this.messagesQueueReader
       ? (JSON.parse(this.messagesQueueReader.getStorageMessagesQueueJson()) as QueuedMessage[])
       : [];
+    // cierre-efectivo: parse the service's raw-JSON seam (reader optional →
+    // empty store).
+    const cashClosings = this.cashClosingReader
+      ? (JSON.parse(this.cashClosingReader.getStorageCashClosingsJson()) as CashClosingStore)
+      : emptyCashClosingStore();
 
     // Categories and products: read raw JSON and parse
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
@@ -701,6 +737,7 @@ export class DataSerializerService {
       elaborations,
       storePaymentMethods,
       messagesQueue,
+      cashClosings,
     };
   }
 
@@ -760,6 +797,12 @@ export class DataSerializerService {
       // messaging-background-offline: legacy archives carry no messages-queue
       // entry → [].
       messagesQueue: parseJson<QueuedMessage[]>(contents, EDataFileName.MessagesQueue, []),
+      // cierre-efectivo: legacy archives carry no cash-closings entry → empty store.
+      cashClosings: parseJson<CashClosingStore>(
+        contents,
+        EDataFileName.CashClosings,
+        emptyCashClosingStore(),
+      ),
     };
   }
 }

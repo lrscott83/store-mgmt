@@ -5,6 +5,7 @@ using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Utils;
+using Domain.Entities.StoreModules;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -55,17 +56,20 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IModuleRepository _moduleRepository;
+        private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public UpdateModuleCatalogPricingCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IModuleRepository moduleRepository,
+            IStoreModuleRepository storeModuleRepository,
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _moduleRepository = moduleRepository;
+            _storeModuleRepository = storeModuleRepository;
             _httpContextService = httpContextService;
             _localizer = localizer;
         }
@@ -95,15 +99,24 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
                     throw new ApiException(_localizer["ModuleNotFound"], HttpStatusCode.BadRequest);
             }
 
+            var newlyDeactivatedModuleIds = new List<int>();
+
             foreach (var row in rows)
             {
                 var module = catalog[row.ModuleId];
 
                 // The four fields this endpoint owns.
+                bool wasActive = module.IsActive;
                 module.Price = row.Price;
                 module.DiscountPrice = row.DiscountPrice;
                 module.PercentDiscountPrice = row.PercentDiscountPrice;
                 module.IsActive = row.IsActive;
+
+                // Cascade trigger: only the TRANSITION active -> inactive. A module that was
+                // already inactive leaves its store rows alone (the operator fixes those by
+                // hand — owner decision 2026-10-14).
+                if (wasActive && !row.IsActive)
+                    newlyDeactivatedModuleIds.Add(row.ModuleId);
 
                 // NoTracking-safe: ApplicationDbContext sets QueryTrackingBehavior.NoTracking
                 // globally, so the entity read above is detached and a bare SaveChangesAsync
@@ -112,6 +125,21 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
                 // this does not own are rewritten with the values just read, so the UPDATE
                 // is a no-op for them.
                 await _moduleRepository.UpdateAsync(module);
+            }
+
+            // CASCADE (owner decision 2026-10-14): a module switched off in the catalog is gone
+            // for EVERY store, so its still-active StoreModule rows are switched off across all
+            // stores. Only StoreModule — never StoreRoleFeature: the module-active filter in the
+            // permission resolution already hides those features.
+            if (newlyDeactivatedModuleIds.Count > 0)
+            {
+                IEnumerable<StoreModule> activeRows = await _storeModuleRepository
+                    .GetAllActiveByModuleIdsAsync(newlyDeactivatedModuleIds, cancellationToken);
+                foreach (var storeModule in activeRows)
+                {
+                    storeModule.IsActive = false;
+                    await _storeModuleRepository.UpdateAsync(storeModule);
+                }
             }
 
             // UnitOfWorkBehaviour.IsQuery() always returns true, so this explicit call is

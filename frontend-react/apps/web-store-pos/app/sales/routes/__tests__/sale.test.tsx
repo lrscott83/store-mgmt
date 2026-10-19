@@ -3,7 +3,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
-import { EModules, OrderType } from '@store-mgmt/domain';
+import { Currency, EModules, OrderType } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 
 const mockUser = vi.hoisted(() => ({ selectedStoreId: 's1', storeModuleIds: [] as number[] }));
@@ -519,6 +519,36 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     const [, text] = showBlockingErrorMock.mock.calls[0];
     expect(String(text)).toContain('venta mayorista');
     expect(String(text)).toContain('venta normal');
+  });
+
+  // Owner decision 2026-10-13: the "one currency per sale" rule is RETIRED. Mixing
+  // currencies in a sale is always allowed, with or without module 15 — so the
+  // session below deliberately carries NO store modules (the exact condition that
+  // used to raise the blocking popup) and the USD product must still enter the cart.
+  it('adds a product whose currency differs from the one already in the cart (mixed currencies are always allowed)', async () => {
+    const cart = useCartStore as unknown as () => { items: unknown[]; orderType: OrderType };
+    // The cart already holds a CUP line (no `currency` -> CUP), so the incoming
+    // product's USD currency is a real conflict.
+    cart().items = [{ product: makeProduct({ id: 'cup-1', name: 'Agua' }), quantity: 1 }];
+    cart().orderType = OrderType.Normal;
+
+    mockUser.storeModuleIds = [];
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', currency: Currency.USD }),
+    ];
+    showBlockingErrorMock.mockClear();
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
+
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(addItemMock.mock.calls[0][0]).toMatchObject({ id: 'p1', currency: Currency.USD });
   });
 
   it('shows the available quantity in parentheses next to the price when the inventory module is on and discountFromInvantory is set', async () => {

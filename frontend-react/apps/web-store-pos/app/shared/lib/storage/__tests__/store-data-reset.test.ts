@@ -17,7 +17,7 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the sixteen business entities', () => {
+  it('covers exactly the seventeen business entities', () => {
     // elaboration-module: recipes + elaborations joined the registry.
     // store-payment-methods-config: storePaymentMethods joined on 2026-09-23 —
     // it was missing from the registry, so the damaged-data recovery could not
@@ -26,6 +26,8 @@ describe('clearStoreData', () => {
     // offline-queued messages along with the rest of the store's data.
 // store-currency-config: storeCurrencyConfig joined — a store reset must
     // clear the per-store buy/sell currency config along with the rest.
+    // cierre-efectivo (2026-10-14): cashClosings joined — the daily cash-closing
+    // records and their denomination catalog.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -43,6 +45,7 @@ describe('clearStoreData', () => {
       'storePaymentMethods',
       'messagesQueue',
       'storeCurrencyConfig',
+      'cashClosings',
     ]);
   });
 

@@ -10,11 +10,13 @@ function renderModal(overrides: Partial<Parameters<typeof StoreCatalogTemplateMo
     storeId: 's1',
     storeName: 'Tienda Ana',
     value: 'default',
+    slug: 'tienda-ana',
     loading: false,
     saving: false,
     loadFailed: false,
     error: '',
     onChange: vi.fn(),
+    onSlugChange: vi.fn(),
     onClose: vi.fn(),
     onSave: vi.fn(),
     ...overrides,
@@ -86,6 +88,32 @@ describe('StoreCatalogTemplateModal', () => {
   it('bloquea guardar si la carga falló (R3-2)', () => {
     renderModal({ loadFailed: true, error: 'No se pudo cargar' });
 
+    expect(screen.getByTestId('store-catalog-template-save')).toBeDisabled();
+  });
+
+  // ── Slug público: el modal lo edita junto a la plantilla (misma decisión de plataforma) ──────
+
+  it('previsualiza el slug NORMALIZADO que se va a guardar', () => {
+    renderModal({ slug: 'Café & Té' });
+
+    expect(screen.getByTestId('store-catalog-slug-input')).toHaveValue('Café & Té');
+    expect(screen.getByTestId('store-catalog-slug-preview')).toHaveTextContent('/catalog/cafe-te');
+  });
+
+  it('avisa al padre con el texto TAL CUAL se escribe', () => {
+    const { props } = renderModal();
+
+    fireEvent.change(screen.getByTestId('store-catalog-slug-input'), {
+      target: { value: 'Mi Tienda' },
+    });
+
+    expect(props.onSlugChange).toHaveBeenCalledWith('Mi Tienda');
+  });
+
+  it('bloquea guardar cuando no queda ningún carácter válido (no inventa un slug)', () => {
+    renderModal({ slug: '???' });
+
+    expect(screen.getByTestId('store-catalog-slug-required')).toBeInTheDocument();
     expect(screen.getByTestId('store-catalog-template-save')).toBeDisabled();
   });
 });

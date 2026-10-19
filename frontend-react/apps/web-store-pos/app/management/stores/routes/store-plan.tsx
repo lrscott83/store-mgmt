@@ -86,9 +86,18 @@ export function StorePlanPage() {
   // Owner plan restriction (billing/spec.md): the caller matrix reserves
   // Superior/VIP to SuperAdmin — an OwnerAdmin sees only Gratis/Pago panels
   // (the backend 403s anything else; the filter keeps the UI honest).
+  //
+  // The store's OWN plan is always included, even when the matrix reserves it:
+  // every self-registered store is born on Superior (2026-10-11), so an owner
+  // whose store is on Superior would otherwise see NO active panel at all. It
+  // renders as the active panel and exposes no activation button, so the matrix
+  // is not bypassed.
   const visiblePlans = user?.isSuperAdmin
     ? plans
-    : plans.filter((p) => p.planType === 'Gratis' || p.planType === 'Pago');
+    : plans.filter(
+        (p) =>
+          p.planType === 'Gratis' || p.planType === 'Pago' || p.planType === planType,
+      );
 
   async function handleActivate(selectedPlan: Plan) {
     if (!plan || !storeId) return;

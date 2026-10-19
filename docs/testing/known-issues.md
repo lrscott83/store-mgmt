@@ -29,7 +29,7 @@
 - **Prueba de mutación.** Al arreglar un test, se vuelve el arreglo a su forma vieja y se comprueba que el test **sí** cae, en la aserción tocada. Sin eso no se distingue un fix real de un falso verde (el test podría pasar por otra razón).
 - **Exit code preservado.** Al filtrar la salida de un comando con `grep`/`tail`, se conserva el código de salida del comando real (o se revisa el log completo): un `grep` vacío no es un verde.
 - **Nunca en paralelo.** La suite E2E del backend y la de Playwright no se corren a la vez: el reset de datos del backend borra filas vivas y los fallos que aparecen así son falsos.
-- **Workers.** En esta máquina la suite del frontend se corre con `--workers=4` (con 8 el flakiness se multiplica por contención, no por defectos).
+- **Workers.** En esta máquina la suite del frontend se corre con **`--workers=2`** (verificado 2026-10-13: `--workers=2` → 354 passed / 0 failed / 2 flaky; `--workers=4` → 0-4 failed por contención, todos verdes al correrlos en solitario). **Pendiente de investigar si se puede subir por encima de 2 workers** sin reintroducir el ruido (candidatos: aislar datos por test, una base por worker, o cazar los inestables persistentes).
 - **Una corrida en verde no cierra una ficha que no ejecutó.** Si un spec está en `testIgnore`, sigue ⚠️ sin verificar: eso se dice, no se asume.
 - **Autorización 1 a 1.** Editar un test E2E existente o código de la aplicación requiere autorización explícita del usuario, ficha por ficha.
 
@@ -442,6 +442,33 @@ cambios de la sesión del 2026-10-12, y los introdujo el merge `dev ← test` (l
 
 **Fichas:** [`known-issues/2026-10-12-backend-e2e-verification/`](known-issues/2026-10-12-backend-e2e-verification/README.md)
 — las 3 retiradas al quedar resueltas; el README de esa carpeta guarda el registro completo.
+
+---
+
+## Corrida E2E FRONTEND del 2026-10-13 (Playwright)
+
+**Contexto.** Backend con `--launch-profile http-e2e` en `:5019` (BD `smca_test`), `pnpm test:e2e
+--workers=4` desde `frontend-react/` (README raíz, sección 6). **Dos corridas completas**:
+304 passed / 17 failed / 12 flaky y 311 passed / 17 failed / 5 flaky (18.4 / 18.2 min). El README espera
+~0 failed y ~8 min a 4 workers: el tiempo doblado y la dispersión por specs no relacionados apuntan a
+**contención**, así que lo que falla se re-verifica **en aislamiento** (`--retries=0`, 1-2 workers).
+
+| # | Spec | Síntoma | Causa raíz | Estado |
+| --- | --- | --- | --- | --- |
+| 05 | `store-create-security.spec.ts:51` | El OwnerAdmin sin MultiStores se queda en `/management/stores/create` (espera `my-stores`) | **CONFIRMADA** — la tienda nace en Superior (con el 14); premisa obsoleta | ✅ **resuelto** (2026-10-13, test) |
+| 06 | `plan-catalog-superadmin.spec.ts:59` (PCF2) | El popup de planes no muestra "Múltiples monedas" en Superior | **CONFIRMADA** — `PlanPanels` (acordeón de estado único) se **colapsaba** al pulsar el panel ya activo | ✅ **resuelto** (2026-10-13, test) |
+| 07 | `web-catalog.spec.ts:77` | `input[type="file"]` casaba con 4 y `Guardar` con 2 → strict mode | **CONFIRMADA** — defecto del test (locators sin acotar) | ✅ **resuelto** (2026-10-13, test) |
+| 08 | `channel-rates-catalogue.spec.ts:106` (**primer fallo de la corrida**) y `:197` | La sesión trae el módulo 15 donde el test exige que no esté | **CONFIRMADA** — las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`) | ✅ **resuelto** (2026-10-13, `8f203dfe`) |
+
+> Además, el **corpus completo** que asumía el plan Pago se adaptó al nacimiento en Superior
+> (commit `22b73679`): 15 specs + 4 fixtures. Nueva ficha de seguimiento del hallazgo de app en
+> [`../../known-issues.md`](../../known-issues.md).
+
+**Fichas:** [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md)
+(05 a 08 nuevas; 01 a 04 **verdes en aislamiento** — su spec pasa; no se retiran porque no están verdes de
+forma sostenida en la corrida completa). El `category-crud` (primer fallo de la 1.ª corrida) pasa en
+aislamiento → inestable de carga. **Ninguna propuesta aplicada**: editar un test E2E o la app requiere
+autorización 1 a 1.
 
 
 _Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._

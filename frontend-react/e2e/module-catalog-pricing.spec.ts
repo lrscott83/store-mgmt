@@ -85,7 +85,7 @@ import {
  * `super_admin` claim). Zero extra logins.
  */
 
-/** One row of `GET /v1/modules/ToStore` — the catalog exactly as the page reads it. */
+/** One row of `GET /v1/modules/catalog` — the catalog exactly as the page reads it. */
 interface CatalogRow {
   id: number;
   name: string;
@@ -310,9 +310,9 @@ async function readEnvelope<T>(page: Page, url: string, what: string): Promise<T
   return body.data;
 }
 
-/** The live catalog, exactly as the page's own clientLoader read it. */
+/** The live catalog, exactly as the page's own clientLoader read it (`/v1/modules/catalog`). */
 async function readCatalog(page: Page): Promise<CatalogRow[]> {
-  return readEnvelope<CatalogRow[]>(page, `${E2E_API_URL}/v1/modules/ToStore`, 'GET /v1/modules/ToStore');
+  return readEnvelope<CatalogRow[]>(page, `${E2E_API_URL}/v1/modules/catalog`, 'GET /v1/modules/catalog');
 }
 
 /** Writes catalog pricing through the same endpoint the page's "Guardar" uses. */
@@ -662,7 +662,7 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     const page = await context.newPage();
     try {
       await applySuperAdminSnapshot(page, superAdmin);
-      plans = await readPlanCatalog(page);
+      plans = await readPlanCatalog(page, true);
       const catalog = await readCatalog(page);
       target = chooseTarget(
         expectedPlanGroups(
@@ -777,7 +777,9 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     // not zeros, and not a per-store copy.
     for (const row of catalog) {
       const moduleRow = page.locator(`tr:has([data-testid="${priceInputTestId(row.id)}"])`);
-      await expect(moduleRow.locator('td').first()).toHaveText(row.name);
+      // The NAME lives in the SECOND cell: the first one is the activation checkbox
+      // (added with the toggle feature), so `td.first()` reads the checkbox, not the name.
+      await expect(moduleRow.locator('td').nth(1)).toHaveText(row.name);
       await expect(page.getByTestId(priceInputTestId(row.id))).toHaveValue(String(row.price));
       await expect(page.getByTestId(percentInputTestId(row.id))).toHaveValue(
         String(row.percentDiscountPrice),
@@ -1085,6 +1087,56 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
       target.planType,
       groupEffectiveTotal(target.planType, afterGroup?.moduleIds ?? group.moduleIds, after),
       'the group total shown after the reload',
+    );
+  });
+
+  test('MCP5 — deactivating a module keeps it under its plan and drops it from that plan total', async ({
+    page,
+  }) => {
+    // module-inactive-grouping: the grouping is driven by the plan matrix the page now
+    // reads WITH inactive modules, so unticking a row must NOT move it to the catch-all,
+    // and only ACTIVE modules may count toward the total.
+    await signInSuperAdmin(page);
+    const catalog = await readCatalog(page);
+    const groups = expectedPlanGroups(
+      plans,
+      catalog.map((row) => row.id),
+    );
+    const candidate = catalog.find(
+      (row) =>
+        isBillableCatalogRow(row) &&
+        groups.some((group) => group.planType !== '' && group.moduleIds.includes(row.id)),
+    );
+    if (!candidate) {
+      throw new Error(
+        'module-catalog-pricing: no active billable module sits inside a plan group, so this test ' +
+          'could not tell "kept under its plan" from "was never there" and would pass vacuously.',
+      );
+    }
+    const group = groups.find(
+      (entry) => entry.planType !== '' && entry.moduleIds.includes(candidate.id),
+    )!;
+
+    await page.goto('/admin/modules');
+    await waitForCatalogTable(page);
+
+    const before = parsePlanPrice(
+      await readCellWithoutStrike(page, groupTotalTestId(group.planType)),
+    );
+    expect(await groupModuleIds(page, group.planType)).toContain(candidate.id);
+
+    await page.getByTestId(`module-catalog-active-${candidate.id}`).uncheck();
+
+    // Still under the SAME plan group — the catch-all must not steal it.
+    expect(await groupModuleIds(page, group.planType)).toContain(candidate.id);
+    expect(await groupModuleIds(page, '')).not.toContain(candidate.id);
+
+    // Only active modules count: the total drops by exactly this row's effective price.
+    await expectGroupTotal(
+      page,
+      group.planType,
+      before - effectiveOf(candidate),
+      'the group total after deactivating an active member of the plan',
     );
   });
 });

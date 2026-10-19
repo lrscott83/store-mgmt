@@ -134,13 +134,13 @@ describe('CollectionsPage — rows', () => {
   });
 });
 
-describe('CollectionsPage — mark paid', () => {
-  it('calls registerStorePayment(storeId) and reloads the list on click', async () => {
+describe('CollectionsPage — register payment popup', () => {
+  async function renderWithRow() {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: true,
-      data: [makeRow({ storeId: 's42' })],
+      data: [makeRow({ storeId: 's42', storeName: 'Store One', amount: 25 })],
       message: '',
       actionCode: 0,
       errors: [],
@@ -159,19 +159,86 @@ describe('CollectionsPage — mark paid', () => {
         <CollectionsPage />
       </Wrapper>,
     );
-
     await waitFor(() => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
     });
+    return storeHttpService;
+  }
 
+  function clickRegister() {
     fireEvent.click(
       screen.getByRole('button', { name: esMessages['BILLING.COLLECTIONS.REGISTER_PAYMENT'] }),
     );
+  }
+
+  it('opens a confirmation popup with the charged amount and does NOT register until confirm', async () => {
+    const svc = await renderWithRow();
+
+    clickRegister();
+
+    expect(screen.getByTestId('payment-confirm-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-confirm-store')).toHaveTextContent('Store One');
+    expect(screen.getByTestId('payment-confirm-amount')).toHaveTextContent('$25');
+    expect(svc.registerStorePayment).not.toHaveBeenCalled();
+  });
+
+  it('typing the rate computes the total paid (amount × rate); confirming sends both and reloads', async () => {
+    const svc = await renderWithRow();
+    clickRegister();
+
+    // 25 USD × 400 CUP/USD = 10 000 CUP, auto-computed.
+    fireEvent.change(screen.getByTestId('payment-confirm-rate'), { target: { value: '400' } });
+    expect(screen.getByTestId('payment-confirm-total')).toHaveValue(10000);
+
+    fireEvent.click(screen.getByTestId('payment-confirm-submit'));
 
     await waitFor(() => {
-      expect(storeHttpService.registerStorePayment).toHaveBeenCalledWith('s42');
-      expect(storeHttpService.getStoresToCollect).toHaveBeenCalledTimes(2);
+      expect(svc.registerStorePayment).toHaveBeenCalledWith('s42', {
+        exchangeRate: 400,
+        amountPaid: 10000,
+      });
+      expect(svc.getStoresToCollect).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('lets the operator override the computed total, and sends the typed value', async () => {
+    const svc = await renderWithRow();
+    clickRegister();
+
+    fireEvent.change(screen.getByTestId('payment-confirm-rate'), { target: { value: '400' } });
+    fireEvent.change(screen.getByTestId('payment-confirm-total'), { target: { value: '9999' } });
+    fireEvent.click(screen.getByTestId('payment-confirm-submit'));
+
+    await waitFor(() => {
+      expect(svc.registerStorePayment).toHaveBeenCalledWith('s42', {
+        exchangeRate: 400,
+        amountPaid: 9999,
+      });
+    });
+  });
+
+  it('confirming with empty fields registers with both values null', async () => {
+    const svc = await renderWithRow();
+    clickRegister();
+
+    fireEvent.click(screen.getByTestId('payment-confirm-submit'));
+
+    await waitFor(() => {
+      expect(svc.registerStorePayment).toHaveBeenCalledWith('s42', {
+        exchangeRate: null,
+        amountPaid: null,
+      });
+    });
+  });
+
+  it('cancel closes the popup without registering', async () => {
+    const svc = await renderWithRow();
+    clickRegister();
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.CANCEL'] }));
+
+    expect(screen.queryByTestId('payment-confirm-modal')).toBeNull();
+    expect(svc.registerStorePayment).not.toHaveBeenCalled();
   });
 });
 

@@ -9,6 +9,8 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { rosterHttpService } from '~/shared/lib/http/roster-http-service';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { serializeRoster } from '~/shared/lib/offline/roster-serializer';
+import { HotspotShareModal } from '~/sync/components/hotspot-share-modal';
+import type { TransferSource } from '~/sync/lib/hotspot/transfer-protocol';
 
 /**
  * Admin "Export offline roster" action (offline-device-provisioning spec).
@@ -30,6 +32,7 @@ export function RosterExportPanel() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   const [open, setOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [master, setMaster] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,12 +80,36 @@ export function RosterExportPanel() {
     setError('');
   }
 
+  /** Same bundle the download produces, handed to the hotspot sender instead. */
+  async function prepareShare(masterPassword: string): Promise<TransferSource> {
+    const bundle = await rosterHttpService.getOfflineRoster(storeId);
+    const bytes = await serializeRoster(bundle, masterPassword, storeId);
+    return { name: `roster-${storeId}.smcabundle`, kind: 'roster', bytes };
+  }
+
   return (
     <>
-      <Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>
-        <DownloadIcon className="h-4 w-4" />
-        {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
-      </Button>
+      {/* Las dos acciones del roster, con el mismo estilo ovalado que «+ Empleado»
+          y una debajo de la otra (decisión del owner, 2026-10-15). */}
+      <div className="flex flex-col items-stretch gap-2">
+        <Button type="button" variant="fab" disabled={disabled} onClick={() => setOpen(true)}>
+          <DownloadIcon className="h-4 w-4" />
+          {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
+        </Button>
+        <Button
+          type="button"
+          variant="fab"
+          disabled={disabled}
+          onClick={() => setSharing(true)}
+          data-testid="hotspot-open-share-roster"
+        >
+          {intl.formatMessage({ id: 'HOTSPOT.SHARE_TITLE' })}
+        </Button>
+      </div>
+
+      {sharing && (
+        <HotspotShareModal prepare={prepareShare} onClose={() => setSharing(false)} />
+      )}
 
       {open && (
         <div

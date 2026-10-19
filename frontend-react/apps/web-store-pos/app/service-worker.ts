@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { resolveStrategy } from './shared/lib/pwa/sw-strategy';
+import { resolveStrategy, shellUrlFor } from './shared/lib/pwa/sw-strategy';
 
 declare let self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
@@ -13,7 +13,6 @@ declare let self: ServiceWorkerGlobalScope & {
 // (pwa-offline-shell spec: "Precache is consolidated into a single named
 // cache").
 const PRECACHE_NAME = 'app-shell-v3';
-const SHELL_URL = '/index.html';
 
 // Read the injected manifest exactly ONCE at module scope. Referencing
 // `self.__WB_MANIFEST` at more than one call site would leave two occurrences
@@ -99,7 +98,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (strategy === 'shell') {
-    event.respondWith(caches.match(SHELL_URL).then((cached) => cached ?? fetch(request)));
+    event.respondWith(
+      caches.match(shellUrlFor(url.pathname)).then((cached) => cached ?? fetch(request)),
+    );
     return;
   }
 

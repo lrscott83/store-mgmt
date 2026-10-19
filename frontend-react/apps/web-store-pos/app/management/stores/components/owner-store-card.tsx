@@ -23,13 +23,12 @@ interface OwnerStoreCardProps {
  * Header: store name left + gear right. Body: plan type, next billing date (paid
  * plan only) and the paid total with the struck-through original when discounted.
  *
- * Canonical price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md): the
- * price lines come from the backend's planCurrentPrice/planPrice — Σ over the
- * plan's member modules from the LIVE catalog, the same formula the plan view
- * (GET /v1/plans) uses. The card no longer reads the store's frozen module
- * snapshot, so a store's card can never disagree with its plan's catalog price.
- * Null canonical fields (disapproved store / missing plan) render the plan name
- * only — the backend owns that guard.
+ * Store price: the price lines come from the backend's planCurrentPrice/planPrice —
+ * the sum over the modules THIS store has assigned and that are ACTIVE (the same
+ * billing rule the charge uses), not the plan catalog's total. So a store whose
+ * module set differs from its plan shows what it actually pays.
+ * Null fields (disapproved store) render the plan name only — the backend owns
+ * that guard.
  */
 export function OwnerStoreCard({ store, onEdit, onEditPlan }: OwnerStoreCardProps) {
   const intl = useIntl();

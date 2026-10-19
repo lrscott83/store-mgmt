@@ -21,19 +21,20 @@ import { assertStoresFeature } from './support/store-fixture';
  *   (b) la entrada de menú gateada por el módulo retirado SIGUE visible.
  * Con el arreglo, ambas cosas pasan sin recargar la página.
  *
- * POR QUÉ LAS DIRECCIONES SON PAGO → GRATIS → PAGO
- * El persona `owner-admin` registra su tienda en el plan Pago (nacimiento por
- * defecto desde 2026-09-18, `CreateStoreService:45`). La sesión restaurada
- * (snapshot de `localStorage`) describe ese mismo plan, así que bajar a Gratis
- * tiene un delta observable: el módulo Estadísticas (6) y su feature Dashboard
- * (60) desaparecen del `/me` y el ítem `/stats/dashboard` debe desaparecer del
- * menú. La vuelta a Pago se afirma en el mismo test, así que las dos
- * direcciones quedan cubiertas.
+ * POR QUÉ LAS DIRECCIONES SON PAGADO → GRATIS → PAGADO
+ * El persona `owner-admin` registra su tienda en el plan **Superior** desde la
+ * decisión de 2026-10-13 (`store-birth-superior`; antes era Pago, `CreateStoreService:45`).
+ * La sesión restaurada (snapshot de `localStorage`) describe ese mismo plan, así
+ * que bajar a Gratis tiene un delta observable: el módulo Estadísticas (6) y su
+ * feature Dashboard (60) desaparecen del `/me` y el ítem `/stats/dashboard` debe
+ * desaparecer del menú. La vuelta a Pago se afirma en el mismo test, así que las
+ * dos direcciones quedan cubiertas. El nombre del plan de partida no aparece en
+ * ninguna aserción: lo que se afirma es el DELTA del módulo, no la etiqueta.
  *
- * (El salto a Superior está fuera del alcance del owner desde 2026-09-18: la
- * restricción de plan reserva Superior/VIP al SuperAdmin — el backend responde
- * 403 y el modal del owner filtra esos paneles —, así que la "subida" legal es
- * a Pago y su módulo exclusivo frente a Gratis es Estadísticas (6).)
+ * (El salto a Superior/VIP sigue fuera del alcance del owner: la restricción de
+ * plan los reserva al SuperAdmin — el backend responde 403 y el modal del owner
+ * filtra esos paneles —, así que la "subida" legal del owner es a Pago y su
+ * módulo exclusivo frente a Gratis es Estadísticas (6).)
  *
  * Literales en castellano copiados de `apps/web-store-pos/app/shared/lib/i18n/es.ts`
  * — nunca importados: el navegador es la caja negra bajo prueba (misma política
@@ -110,8 +111,9 @@ test('cambiar el plan refresca los permisos y el menú en ambas direcciones, sin
   // aserciones de abajo fallarían por el motivo equivocado.
   await assertStoresFeature(page);
 
-  // PRECONDICIÓN pineada: la tienda nace en Pago (2026-09-18), así que la
-  // sesión trae el módulo Estadísticas y su ítem de menú existe.
+  // PRECONDICIÓN pineada: la tienda nace en un plan PAGO (Superior desde la
+  // decisión de 2026-10-13), así que la sesión trae el módulo Estadísticas y su
+  // ítem de menú existe.
   await page.goto('/stats/dashboard');
   await openSidebar(page);
   await expect(statisticsMenuLink(page)).toBeVisible();

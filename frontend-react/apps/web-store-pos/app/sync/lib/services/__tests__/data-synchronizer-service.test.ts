@@ -8,6 +8,7 @@ import type {
   ExpenseImportService,
   SaleCreditImportService,
   MessagesQueueImportService,
+  CashClosingImportService,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
 import { Result } from '@store-mgmt/domain';
@@ -20,6 +21,10 @@ import type {
   SaleCredit,
 } from '@store-mgmt/domain';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
+import {
+  CashClosingStatus,
+  type CashClosingStore,
+} from '~/sales/lib/cash-closing/cash-closing-types';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
@@ -1710,5 +1715,83 @@ describe('DataSynchronizerService — messagesQueue merge (messaging-background-
       'expenses',
       'saleCredits',
     ]);
+  });
+});
+
+describe('DataSynchronizerService — cashClosings merge (cierre-efectivo)', () => {
+  function makeCashClosingService(result: Result = Result.Success()) {
+    const setImportedCashClosings = vi.fn(() => result);
+    const svc: CashClosingImportService = { setImportedCashClosings };
+    return { svc, setImportedCashClosings };
+  }
+
+  function makeSync(service?: CashClosingImportService): DataSynchronizerService {
+    return new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      service,
+    );
+  }
+
+  const STORE: CashClosingStore = {
+    closings: [
+      {
+        id: '2026-10-14|0',
+        dayKey: '2026-10-14',
+        currency: 0,
+        openingCash: 1_000,
+        denominations: [],
+        comment: '',
+        status: CashClosingStatus.Open,
+        countedTotal: 0,
+        expectedTotal: 1_000,
+        difference: -1_000,
+        createdDate: '',
+        createdByName: '',
+        updatedDate: '',
+        updatedByName: '',
+      },
+    ],
+    denominationCatalog: { '1': [200, 100] },
+  };
+
+  it('routes the imported store through the offline service and reports the cashClosings merge', async () => {
+    const cash = makeCashClosingService();
+    const result = await makeSync(cash.svc).sync({ ...emptyData(), cashClosings: STORE });
+
+    expect(result.succeeded).toBe(true);
+    expect(cash.setImportedCashClosings).toHaveBeenCalledWith(STORE);
+    expect(result.merges.find((m) => m.entity === 'cashClosings')).toEqual({
+      entity: 'cashClosings',
+      inserted: 1,
+      updated: 0,
+    });
+  });
+
+  it('reports CashClosingsUnexpectedError when the service fails', async () => {
+    const cash = makeCashClosingService(Result.Failure([]));
+    const result = await makeSync(cash.svc).sync({ ...emptyData(), cashClosings: STORE });
+
+    expect(result.succeeded).toBe(false);
+    const err = result.errors.find((e) => e.entity === 'cashClosings');
+    expect(err?.code).toBe(SynchronizerErrors.CashClosingsUnexpectedError.code);
+  });
+
+  it('keeps the legacy merge contract when the service is omitted', async () => {
+    const result = await makeSync().sync({ ...emptyData(), cashClosings: STORE });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.merges.map((m) => m.entity)).not.toContain('cashClosings');
   });
 });

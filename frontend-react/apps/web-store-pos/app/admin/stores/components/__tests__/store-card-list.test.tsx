@@ -17,11 +17,19 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     planType: 'Pago',
-    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 10 now.
+    // Price the backend sends: the sum of the store's OWN active modules (billing
+    // formula, owner decision 2026-10-13) — 10 with no discount.
     planPrice: 10,
     planCurrentPrice: 10,
     modules: [],
+    publicPhone: null,
+    addressCity: null,
+    addressProvince: null,
+    latitude: null,
+    longitude: null,
+    openingHours: [],
     isActive: true,
     ...overrides,
   };
@@ -179,8 +187,8 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               approved: false,
               planType: 'Gratis',
               nextPaymentDate: null,
-              // A stale paid snapshot must not leak: the backend nulls the canonical
-              // price for disapproved stores — the card shows the plan name only.
+              // A stale paid snapshot must not leak: the backend nulls the price
+              // for disapproved stores — the card shows the plan name only.
               planPrice: null,
               planCurrentPrice: null,
               modules: [
@@ -558,5 +566,46 @@ describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivat
     expect(
       screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('StoreCardList — public catalog link', () => {
+  it('opens the store public catalog in a new tab when the store has a catalog slug', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-cat', catalogSlug: 'mi-tienda' })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onChangePlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const link = screen.getByTestId('store-catalog-link-store-cat');
+    expect(link).toHaveAttribute('href', '/catalog/mi-tienda');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('omits the catalog link when the store never synced a catalog (null or empty slug)', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[
+            makeStore({ id: 'store-nocat', catalogSlug: null }),
+            makeStore({ id: 'store-emptycat', catalogSlug: '' }),
+          ]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onChangePlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('store-catalog-link-store-nocat')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-catalog-link-store-emptycat')).not.toBeInTheDocument();
   });
 });

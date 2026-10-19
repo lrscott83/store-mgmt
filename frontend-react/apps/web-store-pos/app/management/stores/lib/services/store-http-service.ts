@@ -9,19 +9,29 @@ import type {
   OwnerStoreWithPlan,
   StoreToCollect,
   ReSellerCommission,
+  RegisterStorePaymentPayload,
   SwitchMyStoreResult,
   StoreModulePricingPayload,
   StoreModulePricingResult,
   StoreModulePricingReadResult,
   ModuleCatalogPricingPayload,
   ModuleCatalogPricingResult,
+  OpeningHoursEntry,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
-/** Plantilla (vista) del catálogo público de una tienda (SuperAdmin). */
+/** Plantilla (vista) + slug público del catálogo de una tienda (SuperAdmin). */
 export interface StoreCatalogTemplate {
   storeId: string;
   templateId: string;
+  /** Ruta pública (`/catalog/<slug>`). Vacío si la tienda nunca sincronizó su catálogo. */
+  catalogSlug: string;
+}
+
+/** Respuesta de la escritura del slug (`PUT /v1/stores/{id}/catalog-slug`). */
+export interface StoreCatalogSlug {
+  storeId: string;
+  catalogSlug: string;
 }
 
 /**
@@ -59,6 +69,19 @@ interface UpdateStorePayload {
    */
   moduleIds?: number[];
   isActive: boolean;
+  /**
+   * public-catalog-static-pages (T8): opt-in switch for the public location
+   * block. Omitted by callers that only rename/activate a store (the backend
+   * then leaves address, phone, coordinates and hours untouched); the
+   * store-data view always sends it with the full block.
+   */
+  updateLocation?: boolean;
+  publicPhone?: string;
+  addressCity?: string;
+  addressProvince?: string;
+  latitude?: number;
+  longitude?: number;
+  openingHours?: OpeningHoursEntry[];
 }
 
 /** Per-call knobs for the store directory read. */
@@ -249,6 +272,22 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * Fija el SLUG público (`/catalog/<slug>`) del catálogo de una tienda (SuperAdmin-only, misma
+   * capacidad por-tienda que la plantilla). El backend NORMALIZA y rechaza con 409 un slug que ya
+   * use otra tienda; escribe SOLO `Store.CatalogSlug`.
+   */
+  async updateStoreCatalogSlug(
+    id: string,
+    catalogSlug: string,
+  ): Promise<BaseResponseModel<StoreCatalogSlug>> {
+    const response = await apiClient.put<BaseResponseModel<StoreCatalogSlug>>(
+      `/v1/stores/${id}/catalog-slug`,
+      { slug: catalogSlug },
+    );
+    return response.data;
+  },
+
   async approveStore(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/stores/approve', { id });
     return response.data;
@@ -306,9 +345,16 @@ export const storeHttpService = {
    * Plan catalog (GET /v1/plans): the three active plans — Gratis, Pago,
    * Superior — with member modules and computed prices. VIP is excluded
    * server-side; raw passthrough, no client mapping.
+   *
+   * `includeInactiveModules` is a SuperAdmin-only opt-in that keeps the inactive
+   * modules in each plan's `modules` (each carrying its own `isActive`). The module
+   * catalog editor needs it so a deactivated module stays grouped under its plan;
+   * the plan-change popup never passes it and keeps seeing active modules only.
    */
-  async getPlans(): Promise<BaseResponseModel<Plan[]>> {
-    const response = await apiClient.get<BaseResponseModel<Plan[]>>('/v1/plans');
+  async getPlans(includeInactiveModules = false): Promise<BaseResponseModel<Plan[]>> {
+    const response = await apiClient.get<BaseResponseModel<Plan[]>>(
+      `/v1/plans${includeInactiveModules ? '?includeInactiveModules=true' : ''}`,
+    );
     return response.data;
   },
 
@@ -333,8 +379,19 @@ export const storeHttpService = {
     return response.data;
   },
 
-  async registerStorePayment(id: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>(`/v1/stores/${id}/payments`);
+  /**
+   * Registers a store payment. `payload` carries the two OPTIONAL values captured in the
+   * register-payment popup: the CUP-per-USD `exchangeRate` and the `amountPaid`. Sending no
+   * payload keeps the previous behavior (both persisted as null).
+   */
+  async registerStorePayment(
+    id: string,
+    payload: RegisterStorePaymentPayload = {},
+  ): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
+      `/v1/stores/${id}/payments`,
+      payload,
+    );
     return response.data;
   },
 

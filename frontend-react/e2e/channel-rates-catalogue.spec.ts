@@ -32,11 +32,12 @@
  * synthetic "1 USD = 1 USD" pivot and could never convert), yet this spec had
  * been selecting USD and waiting for three channels. Fixed above.
  *
- * The positive half needs a module no Pago store has, so it mints a PRIVATE
- * identity (real register + login) and seeds it through the shared module
- * fixture. The second half uses the shared `owner-admin` persona, whose
- * self-registered store is on the Pago birth plan and therefore has neither 15
- * nor 16.
+ * The positive half drives a module-gated screen end to end, so it mints a PRIVATE
+ * identity (real register + login) and seeds modules through the shared module
+ * fixture. BIRTH PLAN (owner decision 2026-10-13): a newly registered store is
+ * born on the **Superior** plan and therefore ALREADY carries module 15
+ * (`store-birth-superior`, 2026-10-11). The negative half is therefore
+ * CONSTRUCTED by disabling the module — it is no longer assumed from the plan.
  */
 
 import { test, expect } from './support/test';
@@ -49,6 +50,7 @@ import {
   MULTIMONEDAS_MODULE_ID,
   MULTIPAYMENTS_MODULE_ID,
   assertModulesInSession,
+  disableStoreModule,
   enableStoreModule,
 } from './support/multipayments-fixture';
 
@@ -117,14 +119,21 @@ test.describe.serial('channel-rates catalogue (gate: módulo 15 MultiMonedas)', 
     await page.waitForURL(/\/sales\/products$/);
     const storeId = await readSelectedStoreId(page);
 
+    // ── Birth plan (owner decision 2026-10-13) ─────────────────────────────
+    // The store is born on the SUPERIOR plan, so it ALREADY carries module 15.
+    // The negative half below is CONSTRUCTED by disabling it — no longer assumed.
+    await dropDekAndCiphertext(page);
+    expect(await sessionModuleIds(page)).toContain(MULTIMONEDAS_MODULE_ID);
+
     // ── Half 1: module 16 alone does NOT buy this page ─────────────────────
-    // Seed the WRONG module first and prove the page is still not offered. This
-    // is the assertion the old spec was missing, and it is the one that pins
-    // module 15 as the real gate.
+    // Disable module 15 and add the WRONG module (16): the page must still not be
+    // offered. This is the assertion the old spec was missing, and it is the one
+    // that pins module 15 as the real gate.
+    await disableStoreModule(page, storeId, MULTIMONEDAS_MODULE_ID);
     await enableStoreModule(page, storeId, MULTIPAYMENTS_MODULE_ID);
     await dropDekAndCiphertext(page);
     await assertModulesInSession(page, [MULTIPAYMENTS_MODULE_ID]);
-    // Pin the negative precondition itself: module 15 is genuinely absent, so
+    // Pin the negative precondition itself: module 15 is genuinely absent now, so
     // the absent link below proves the gate instead of passing by accident.
     expect(await sessionModuleIds(page)).not.toContain(MULTIMONEDAS_MODULE_ID);
     await openSidebar(page);
@@ -189,17 +198,26 @@ test.describe.serial('channel-rates catalogue (gate: módulo 15 MultiMonedas)', 
   });
 });
 
-test.describe('channel-rates gate sin módulo 15 (tienda en plan Pago)', () => {
+test.describe('channel-rates gate sin módulo 15 (el 15 desactivado a mano)', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test.use({ persona: 'owner-admin' });
+  test('el menú no ofrece la página y la ruta queda gateada', async ({ page }) => {
+    // PRIVATE identity: disabling a module is a server-side mutation, so the
+    // shared persona must NOT be used (e2e/README.md §"Specs que mutan estado
+    // server-side"). The store is born on Superior and already has module 15.
+    const identity = newTestIdentity();
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.fillValidForm(identity);
+    await registerPage.acceptTerms.check();
+    await registerPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+    const storeId = await readSelectedStoreId(page);
 
-  test('el menú no ofrece la página y la ruta queda gateada', async ({ signedInPage }) => {
-    const { page } = signedInPage;
+    await disableStoreModule(page, storeId, MULTIMONEDAS_MODULE_ID);
+    await dropDekAndCiphertext(page);
+    expect(await sessionModuleIds(page)).not.toContain(MULTIMONEDAS_MODULE_ID);
 
-    // The shared persona's store is on the Pago birth plan, which carries
-    // neither 15 nor 16 — the honest negative for a store that never bought
-    // MultiMonedas.
     await openSidebar(page);
     await expect(page.locator(CHANNEL_RATES_LINK)).toHaveCount(0);
 

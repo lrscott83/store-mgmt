@@ -4,8 +4,7 @@ using Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrentUser
 using AutoMapper;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
-using Domain.Entities.Modules;
-using Domain.Entities.Plans;
+using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Entities.StorePayments;
 using Domain.Interfaces.Repositories;
@@ -21,7 +20,6 @@ public class GetStoresByCurrentUserQueryHandlerTests
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IStorePaymentRepository> _mockStorePaymentRepository;
     private readonly Mock<ISystemConfigurationRepository> _mockSystemConfigurationRepository;
-    private readonly Mock<IPlanRepository> _mockPlanRepository;
     private readonly GetStoresByCurrentUserQueryHandler _handler;
     private readonly Guid _userId;
 
@@ -32,7 +30,6 @@ public class GetStoresByCurrentUserQueryHandlerTests
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockStorePaymentRepository = new Mock<IStorePaymentRepository>();
         _mockSystemConfigurationRepository = new Mock<ISystemConfigurationRepository>();
-        _mockPlanRepository = new Mock<IPlanRepository>();
         _userId = Guid.NewGuid();
         _mockHttpContextService.Setup(x => x.UserExternalId).Returns(_userId.ToString());
         _mockSystemConfigurationRepository
@@ -43,8 +40,7 @@ public class GetStoresByCurrentUserQueryHandlerTests
             _mockMapper.Object,
             _mockHttpContextService.Object,
             _mockStorePaymentRepository.Object,
-            _mockSystemConfigurationRepository.Object,
-            _mockPlanRepository.Object);
+            _mockSystemConfigurationRepository.Object);
     }
 
     [Fact]
@@ -270,14 +266,18 @@ public class GetStoresByCurrentUserQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_stores_sharing_a_plan_get_the_same_canonical_price_regardless_of_snapshot()
+    public async Task Handle_stores_sharing_a_plan_get_the_price_of_their_own_snapshot()
     {
-        // Plan 2026-09-15: the card price is Σ over the plan's member MODULES (live
-        // catalog, PlanProfile's formula) — two stores on the same plan with wildly
-        // different StoreModule snapshots must expose identical canonical prices.
+        // Owner rule: "the price a store must pay is the sum of all the modules it has
+        // assigned and that are ACTIVE in its configuration". Two stores on the SAME
+        // plan with very different StoreModule snapshots must therefore expose
+        // DIFFERENT prices — each its own billing total, never the shared plan total.
         ArrangeRoles(isSuperAdmin: true, isReSeller: false);
         var bloated = CreateStore("Bloated");   // Pago — stated explicitly, not the Store.Create default
         var lean = CreateStore("Lean");         // Pago — stated explicitly
+        AddBillableModule(bloated, BillingSeedStatisticsId, price: 100f);
+        AddBillableModule(bloated, WarehousesModuleId, price: 250f);
+        AddBillableModule(lean, BillingSeedStatisticsId, price: 40f, percentDiscount: 50f);
         _mockStoreRepository
             .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
             .ReturnsAsync(new List<Store> { bloated, lean });
@@ -285,37 +285,60 @@ public class GetStoresByCurrentUserQueryHandlerTests
         _mockMapper.Setup(x => x.Map<StoreDto>(lean)).Returns(new StoreDto { Id = lean.Id });
         SetupNoPayments();
 
-        // Pago plan with Statistics @100 and a 50% catalog discount: original 100,
-        // current 50 — independent expectations for both fields.
-        _mockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago))
-            .ReturnsAsync(CreatePlanWithStatistics((int)StorePlanType.Pago, price: 100f, percentDiscount: 50f));
-
         var result = await _handler.Handle(new GetStoresByCurrentUserQuery(), CancellationToken.None);
 
         var dtos = result.Data!.ToList();
         dtos.Should().HaveCount(2);
-        dtos[0].PlanPrice.Should().Be(100f);
-        dtos[0].PlanCurrentPrice.Should().Be(50f);
-        dtos[1].PlanPrice.Should().Be(dtos[0].PlanPrice, "same plan ⇒ same canonical price");
-        dtos[1].PlanCurrentPrice.Should().Be(dtos[0].PlanCurrentPrice);
+        // Bloated: Statistics 100 + Warehouses 250, no discounts → base 350, current 350.
+        dtos[0].PlanPrice.Should().Be(350f);
+        dtos[0].PlanCurrentPrice.Should().Be(350f);
+        // Lean: a single Statistics @40 with a 50% discount → base 40, current 20.
+        dtos[1].PlanPrice.Should().Be(40f);
+        dtos[1].PlanCurrentPrice.Should().Be(20f);
+        dtos[1].PlanPrice.Should().NotBe(dtos[0].PlanPrice,
+            "same plan but a different assigned-and-active module set ⇒ a different price");
     }
 
     [Fact]
-    public async Task Handle_disapproved_store_returns_null_canonical_prices()
+    public async Task Handle_store_with_no_module_rows_reports_zero_and_not_its_paid_plan_total()
     {
-        // Plan 2026-09-15 P6: disapproved stores expose no price — the Approved guard
-        // lives in the backend, not in the frontend.
+        // Same Pago plan on both stores, but only one of them has an assigned module.
+        // The empty one must report 0 (a real total over zero billable rows) — NOT the
+        // paid Pago catalog total, which is what the plan-keyed rule used to return.
+        ArrangeRoles(isSuperAdmin: true, isReSeller: false);
+        var empty = CreateStore("Empty");       // Pago, no StoreModule rows at all
+        var loaded = CreateStore("Loaded");     // Pago, one billable row
+        AddBillableModule(loaded, BillingSeedStatisticsId, price: 100f);
+        _mockStoreRepository
+            .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
+            .ReturnsAsync(new List<Store> { empty, loaded });
+        _mockMapper.Setup(x => x.Map<StoreDto>(empty)).Returns(new StoreDto { Id = empty.Id });
+        _mockMapper.Setup(x => x.Map<StoreDto>(loaded)).Returns(new StoreDto { Id = loaded.Id });
+        SetupNoPayments();
+
+        var result = await _handler.Handle(new GetStoresByCurrentUserQuery(), CancellationToken.None);
+
+        var dtos = result.Data!.ToList();
+        // Zero, not null: the store IS approved, it simply has nothing to pay for.
+        dtos[0].PlanPrice.Should().Be(0f);
+        dtos[0].PlanCurrentPrice.Should().Be(0f);
+        dtos[1].PlanPrice.Should().Be(100f);
+        dtos[1].PlanCurrentPrice.Should().Be(100f);
+    }
+
+    [Fact]
+    public async Task Handle_disapproved_store_returns_null_prices()
+    {
+        // Disapproved stores expose no price — the Approved guard lives in the backend,
+        // not in the frontend, and it still wraps the snapshot computation.
         ArrangeRoles(isSuperAdmin: true, isReSeller: false);
         var disapproved = CreateStore("Disapproved", approved: false);
+        AddBillableModule(disapproved, BillingSeedStatisticsId, price: 100f);
         _mockStoreRepository
             .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
             .ReturnsAsync(new List<Store> { disapproved });
         _mockMapper.Setup(x => x.Map<StoreDto>(disapproved)).Returns(new StoreDto { Id = disapproved.Id });
         SetupNoPayments();
-        _mockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
-            .ReturnsAsync(CreatePlanWithStatistics((int)StorePlanType.Pago, 100f, 0f));
 
         var result = await _handler.Handle(new GetStoresByCurrentUserQuery(), CancellationToken.None);
 
@@ -325,45 +348,46 @@ public class GetStoresByCurrentUserQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_plan_prices_are_looked_up_once_per_distinct_plan()
+    public async Task Handle_skips_inactive_and_price_included_module_rows()
     {
-        // Memoization: two Pago stores + one Superior ⇒ exactly two plan lookups. The Pago pair is
-        // stated explicitly — the Store.Create default is Superior since store-birth-superior
-        // (2026-10-11), so relying on it would collapse the test to a single distinct plan.
+        // The billing rule's two exclusions, pinned through the card: an inactive
+        // (soft-deleted) leftover row and a bundled row contribute NOTHING.
         ArrangeRoles(isSuperAdmin: true, isReSeller: false);
-        var a = CreateStore("A");
-        var b = CreateStore("B");
-        var c = CreateStore("C", storePlanId: (int)StorePlanType.Superior);
+        var store = CreateStore("Mixed");
+        AddBillableModule(store, BillingSeedStatisticsId, price: 100f);
+        store.StoreModules.Add(InactiveRow(store, WarehousesModuleId, price: 900f));
+        store.StoreModules.Add(StoreModule.Create(
+            store.Id, MultiStoresModuleId, 500f, true, 500f, 0f, 0f, Guid.NewGuid()));
         _mockStoreRepository
             .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
-            .ReturnsAsync(new List<Store> { a, b, c });
-        _mockMapper.Setup(x => x.Map<StoreDto>(It.IsAny<Store>()))
-            .Returns((Store src) => new StoreDto { Id = src.Id });
+            .ReturnsAsync(new List<Store> { store });
+        _mockMapper.Setup(x => x.Map<StoreDto>(store)).Returns(new StoreDto { Id = store.Id });
         SetupNoPayments();
-        _mockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
-            .ReturnsAsync((int planId) => CreatePlanWithStatistics(planId, 100f, 0f));
 
         var result = await _handler.Handle(new GetStoresByCurrentUserQuery(), CancellationToken.None);
 
-        result.Data!.Should().OnlyContain(s => s.PlanPrice == 100f);
-        _mockPlanRepository.Verify(
-            x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()),
-            Times.Exactly(2), "one lookup per DISTINCT plan id, not per store");
-    }
-
-    private static StorePlan CreatePlanWithStatistics(int planId, float price, float percentDiscount)
-    {
-        var plan = StorePlan.Create(planId, $"Plan-{planId}", 0, true);
-        var module = Module.Create(BillingSeedStatisticsId, "Statistics", 6, priceIncluded: false,
-            price, discountPrice: 0f, percentDiscountPrice: percentDiscount, availableToStore: true, isActive: true);
-        var spm = StorePlanModule.Create(planId, module.Id);
-        spm.Module = module;
-        plan.StorePlanModules.Add(spm);
-        return plan;
+        var dto = result.Data!.Single();
+        dto.PlanPrice.Should().Be(100f, "the inactive row and the price-included row are outside the total");
+        dto.PlanCurrentPrice.Should().Be(100f);
     }
 
     private const int BillingSeedStatisticsId = 6;
+    private const int WarehousesModuleId = 13;
+    private const int MultiStoresModuleId = 14;
+
+    /// <summary>Appends an ACTIVE, NOT price-included row — the only kind that bills.</summary>
+    private static void AddBillableModule(
+        Store store, int moduleId, float price, float percentDiscount = 0f, float fixedDiscount = 0f)
+        => store.StoreModules.Add(StoreModule.Create(
+            store.Id, moduleId, price, false, price, fixedDiscount, percentDiscount, Guid.NewGuid()));
+
+    /// <summary>A soft-deleted leftover row — billable shape, but IsActive = false.</summary>
+    private static StoreModule InactiveRow(Store store, int moduleId, float price)
+    {
+        var row = StoreModule.Create(store.Id, moduleId, price, false, price, 0f, 0f, Guid.NewGuid());
+        row.IsActive = false;
+        return row;
+    }
 
     private void ArrangeRoles(bool isSuperAdmin, bool isReSeller)
     {
@@ -391,7 +415,7 @@ public class GetStoresByCurrentUserQueryHandlerTests
 
     /// <summary>
     /// The plan is an EXPLICIT parameter, never the <c>Store.Create</c> default: these tests are
-    /// about plan-keyed canonical pricing, and store-birth-superior (2026-10-11) moved that default
+    /// about plan-keyed pricing scenarios, and store-birth-superior (2026-10-11) moved that default
     /// from Pago to Superior — a silent default here would change what "two stores sharing a plan"
     /// even means.
     /// </summary>

@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Button } from '~/shared/components/ui/button';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -13,15 +16,23 @@ import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-se
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
+import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
+import { HotspotReceiveModal } from '~/sync/components/hotspot-receive-modal';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 
 export const clientLoader = featureLoader([EFeatures.Receive]);
 
 export function ImportPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const intl = useIntl();
+  // Payload received over the hotspot: shown pre-selected in the form so the
+  // user only types the bundle password. `key` remounts the form when a NEW
+  // file arrives, which resets both the selection and the visible file name.
+  const [receivedFile, setReceivedFile] = useState<File | null>(null);
+  const [receiving, setReceiving] = useState(false);
 
   /**
    * Reads the file bytes, decrypts+parses the envelope, then runs the
@@ -72,6 +83,10 @@ export function ImportPage() {
     // (getStorageMessagesQueueJson, always exported) and the synchronizer's
     // write seam (addImportedQueuedMessage, append/skip-on-duplicate).
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    // cierre-efectivo: serves BOTH the serializer's read seam
+    // (getStorageCashClosingsJson, always exported) and the synchronizer's write
+    // seam (setImportedCashClosings, store-level fusion).
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -87,6 +102,7 @@ export function ImportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     // Read file bytes
@@ -128,14 +144,38 @@ export function ImportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     return synchronizer.sync(parsedData);
   }
 
   return (
-    <div className="p-4">
-      <ImportForm onImport={handleImport} />
+    <div className="space-y-4 p-4">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setReceiving(true)}
+          data-testid="hotspot-open-receive"
+        >
+          {intl.formatMessage({ id: 'HOTSPOT.RECEIVE_TITLE' })}
+        </Button>
+      </div>
+      <ImportForm
+        key={receivedFile ? `${receivedFile.name}:${receivedFile.size}` : 'manual'}
+        onImport={handleImport}
+        initialFile={receivedFile}
+      />
+      {receiving && (
+        <HotspotReceiveModal
+          onReceived={(file) => {
+            setReceivedFile(file);
+            setReceiving(false);
+          }}
+          onClose={() => setReceiving(false)}
+        />
+      )}
     </div>
   );
 }

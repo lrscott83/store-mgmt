@@ -30,12 +30,19 @@ namespace Application.Dtos.StoreManagement
         /// </summary>
         public string PlanType { get; set; }
         /// <summary>
-        /// CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
-        /// Σ over the plan's member MODULES from the live catalog with the same formula
-        /// PlanProfile uses for GET /v1/plans — NOT the store's frozen StoreModule
-        /// snapshot. Null when the store is disapproved or its plan is missing/inactive.
+        /// The store's BILLING price — the original (pre-discount) sum over the modules the
+        /// store has ASSIGNED and that are ACTIVE and not price-included
+        /// (<c>ModulePriceCalculator.CalculateBaseTotal</c>). It is NOT the plan catalog's
+        /// total: a store whose module set differs from its plan pays for what it actually
+        /// has, and this is the number the billing cycle charges. Null when the store is
+        /// disapproved.
         /// </summary>
         public float? PlanPrice { get; set; }
+        /// <summary>
+        /// The same rows as <see cref="PlanPrice"/>, each at its effective price
+        /// (discounts applied) — <c>ModulePriceCalculator.CalculateTotal</c>. Null when the
+        /// store is disapproved.
+        /// </summary>
         public float? PlanCurrentPrice { get; set; }
     }
 }

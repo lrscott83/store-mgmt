@@ -63,4 +63,9 @@ export const BUSINESS_ENTITY_NAMES = [
   // store-currency-config: per-store buy/sell currency config, persisted with
   // the same `entityKey` convention as the rest.
   'storeCurrencyConfig',
+  // cierre-efectivo (2026-10-14): daily cash-closing records (one per day and
+  // currency) plus the per-store denomination catalog. Registered here so
+  // `entity-migration` encrypts it, `store-data-reset` wipes it and
+  // `damaged-data-recovery` reports it — and so it travels in the export/import.
+  'cashClosings',
 ] as const;

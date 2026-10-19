@@ -11,6 +11,7 @@ using Application.Services.Features;
 using Application.Services.Owners;
 using Application.Services.Roles;
 using Application.Services.Stores;
+using Application.Features.WebCatalog.Public;
 using Domain.Entities.Stores;
 using Domain.Entities.Tenants;
 using Domain.Interfaces.Services.Authentication;
@@ -79,6 +80,20 @@ namespace Application
             services.Configure<AuthenticationSettings>(
                 configuration.GetSection(AuthenticationSettings.SectionName));
             services.AddScoped<IHashPasswordService, Argon2idHashPasswordService>();
+
+            // public-catalog-static-pages: pre-generated indexable HTML per public catalog
+            // (/catalog/<slug>). The writer is filesystem-only; the generator reads the store and its
+            // branding; the regenerator is the best-effort trigger the save flows call; the sitemap
+            // writer (T7) keeps the discovery index — sitemap.xml/robots.txt — in the shared volume.
+            services.Configure<CatalogStaticPageOptions>(
+                configuration.GetSection(CatalogStaticPageOptions.SectionName));
+            services.AddScoped<ICatalogStaticPageWriter, CatalogStaticPageWriter>();
+            services.AddScoped<ICatalogStaticPageSitemapWriter, CatalogStaticPageSitemapWriter>();
+            services.AddScoped<ICatalogStaticPageGenerator, CatalogStaticPageGenerator>();
+            services.AddScoped<ICatalogStaticPageRegenerator, CatalogStaticPageRegenerator>();
+            // T6: full regeneration pass over every published catalog; the API host runs it at
+            // startup (backfill) and whenever the SPA shell changes (every frontend deploy).
+            services.AddScoped<ICatalogStaticPageSynchronizer, CatalogStaticPageSynchronizer>();
 
             return services;
         }

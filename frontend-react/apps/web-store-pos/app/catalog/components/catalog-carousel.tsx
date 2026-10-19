@@ -14,25 +14,26 @@ interface CatalogCarouselProps {
   /** Nombre de la tienda: el texto alternativo cuando la imagen no lleva pie de foto. */
   readonly storeName: string;
   /**
-   * La portada se va DE BORDE A BORDE en móvil: ocupa toda la pantalla bajo el header fijo
-   * (`100svh` menos su alto) y la imagen se ve COMPLETA (`object-contain`) en vez de recortada
-   * a una caja de 224 px. Desde `sm` el marco vuelve a su caja y al recorte de siempre.
+   * La portada se va DE BORDE A BORDE en TODOS los breakpoints: ocupa toda la primera pantalla
+   * bajo el header fijo (`100svh` menos su alto) y la imagen se ve COMPLETA (`object-contain`),
+   * con relleno proporcional a la vista, en vez de recortada a una caja de 224 px. En móvil ya
+   * era así; en escritorio sustituye la caja centrada (`max-w-5xl`) por el escenario ancho.
    *
    * Es opcional y su valor por defecto es `false`: la plantilla `boutique` comparte este
    * componente y tiene que quedarse exactamente como estaba.
    */
-  readonly mobileFullBleed?: boolean;
+  readonly fullBleed?: boolean;
 }
 
-/** Marco del carrusel. El de `mobileFullBleed` sustituye altura, ancho, esquinas y fondo. */
+/** Marco del carrusel. El de `fullBleed` sustituye altura, ancho, esquinas y fondo. */
 const FRAME_CLASSES =
   'relative mx-auto h-56 max-w-5xl overflow-hidden rounded-lg bg-surface shadow-card sm:h-72 lg:h-96';
 const FRAME_CLASSES_FULL_BLEED =
-  'relative mx-auto h-[calc(100svh-5rem)] w-full overflow-hidden rounded-none bg-text shadow-card sm:h-72 sm:max-w-5xl sm:rounded-lg sm:bg-surface lg:h-96';
+  'relative h-[calc(100svh-5rem)] w-full overflow-hidden bg-text shadow-card';
 
-/** Imagen de la diapositiva: recortada, o entera cuando la portada ocupa la pantalla. */
+/** Imagen de la diapositiva: recortada, o entera con relleno proporcional cuando va a pantalla. */
 const IMAGE_CLASSES = 'h-full w-full object-cover';
-const IMAGE_CLASSES_FULL_BLEED = 'h-full w-full object-contain p-4 sm:p-0 sm:object-cover';
+const IMAGE_CLASSES_FULL_BLEED = 'h-full w-full object-contain p-4 sm:p-8 lg:p-12';
 
 /**
  * `prefers-reduced-motion` del SISTEMA. Se lee una sola vez al montar y sin suscripción: es
@@ -55,7 +56,7 @@ function readReducedMotion(): boolean {
  * reducido no hay auto-avance: las flechas y los puntos siguen llevando a cualquier imagen,
  * y eso es lo que un lector de pantalla necesita de todas formas.
  */
-export function CatalogCarousel({ images, storeName, mobileFullBleed = false }: CatalogCarouselProps) {
+export function CatalogCarousel({ images, storeName, fullBleed = false }: CatalogCarouselProps) {
   const intl = useIntl();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -79,7 +80,7 @@ export function CatalogCarousel({ images, storeName, mobileFullBleed = false }: 
 
   return (
     <section
-      className={mobileFullBleed ? FRAME_CLASSES_FULL_BLEED : FRAME_CLASSES}
+      className={fullBleed ? FRAME_CLASSES_FULL_BLEED : FRAME_CLASSES}
       aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_LABEL' })}
       aria-roledescription={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_ROLE' })}
       onMouseEnter={() => setPaused(true)}
@@ -121,7 +122,7 @@ export function CatalogCarousel({ images, storeName, mobileFullBleed = false }: 
                 // El pie de foto describe la foto mejor que el nombre de la tienda; sin pie de
                 // foto, la tienda es lo único que se sabe de ella.
                 alt={image.caption || storeName}
-                className={mobileFullBleed ? IMAGE_CLASSES_FULL_BLEED : IMAGE_CLASSES}
+                className={fullBleed ? IMAGE_CLASSES_FULL_BLEED : IMAGE_CLASSES}
                 data-testid={`catalog-carousel-image-${position}`}
               />
               {image.caption && (
@@ -143,7 +144,9 @@ export function CatalogCarousel({ images, storeName, mobileFullBleed = false }: 
             type="button"
             onClick={previous}
             aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_PREVIOUS' })}
-            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-xl leading-none text-white hover:bg-black/70"
+            className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-xl leading-none text-white hover:bg-black/70 ${
+              fullBleed ? 'left-4 sm:left-8 lg:left-12' : 'left-2'
+            }`}
             data-testid="catalog-carousel-previous"
           >
             <span aria-hidden="true">‹</span>
@@ -152,14 +155,20 @@ export function CatalogCarousel({ images, storeName, mobileFullBleed = false }: 
             type="button"
             onClick={next}
             aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_NEXT' })}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-xl leading-none text-white hover:bg-black/70"
+            className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/50 px-3 py-2 text-xl leading-none text-white hover:bg-black/70 ${
+              fullBleed ? 'right-4 sm:right-8 lg:right-12' : 'right-2'
+            }`}
             data-testid="catalog-carousel-next"
           >
             <span aria-hidden="true">›</span>
           </button>
           {/* Puntos = acceso DIRECTO a cada imagen: quien no quiere esperar cinco segundos
               puede saltar a la que le interesa. */}
-          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-2">
+          <div
+            className={`absolute inset-x-0 flex justify-center gap-2 ${
+              fullBleed ? 'bottom-4 sm:bottom-6 lg:bottom-8' : 'bottom-2'
+            }`}
+          >
             {images.map((image, position) => (
               <button
                 key={image.url}

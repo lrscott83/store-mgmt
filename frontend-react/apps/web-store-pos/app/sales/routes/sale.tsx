@@ -12,10 +12,7 @@ import { Switch } from '~/shared/components/ui/switch';
 import { ScanBarcodeIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
-import {
-  hasInventoryModuleAvailable,
-  hasMultiMonedasModuleAvailable,
-} from '~/shared/lib/auth/authorization-service';
+import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -23,7 +20,6 @@ import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
 import { guardOrderType } from '../lib/order-type-guard';
-import { guardCurrency } from '~/shared/lib/currency-guard';
 import { SaleCategoryProducts } from '../components/sale-category-products';
 import { ScannerModal } from '../components/scanner-modal';
 
@@ -223,15 +219,9 @@ export function SalePage() {
       requested: OrderType.Normal,
     });
     if (!typeGuard.succeeded) return typeGuard;
-    // Una sola moneda por venta: el popup de moneda va después del de tipo de venta.
-    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
+    // Mezclar monedas en la venta está SIEMPRE permitido (regla retirada el
+    // 2026-10-13), así que no hay guarda de moneda entre el tipo de venta y el inventario.
     const requested = displayedProducts.find((p) => p.id === productId);
-    const currencyGuard = guardCurrency({
-      items: cartItems,
-      requestedProduct: requested ?? {},
-      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
-    });
-    if (!currencyGuard.succeeded) return currencyGuard;
     return availabilityGate(requested, productId, quantity);
   }
 
@@ -250,16 +240,6 @@ export function SalePage() {
     });
     if (!typeGuard.succeeded) {
       return typeGuard;
-    }
-    // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
-    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
-    const currencyGuard = guardCurrency({
-      items: cartItems,
-      requestedProduct: product,
-      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
-    });
-    if (!currencyGuard.succeeded) {
-      return currencyGuard;
     }
     const availability = availabilityGate(product, product.id, quantity);
     if (!availability.succeeded) {

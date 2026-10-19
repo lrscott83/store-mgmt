@@ -15,7 +15,6 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
 import { Switch } from '~/shared/components/ui/switch';
 import {
   hasInventoryModuleAvailable,
-  hasMultiMonedasModuleAvailable,
   isModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -33,7 +32,6 @@ import {
   wholesaleUnits,
 } from '../lib/wholesale';
 import { guardOrderType } from '../lib/order-type-guard';
-import { guardCurrency } from '~/shared/lib/currency-guard';
 import { ScannerModal } from '../components/scanner-modal';
 import type { ProductCategory } from '@store-mgmt/domain';
 
@@ -222,14 +220,7 @@ export function WholesalePage() {
     });
     if (!typeGuard.succeeded) return typeGuard;
 
-    // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
-    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
-    const currencyGuard = guardCurrency({
-      items: cartItems,
-      requestedProduct: product,
-      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
-    });
-    if (!currencyGuard.succeeded) return currencyGuard;
+    // Mezclar monedas en la venta mayorista está SIEMPRE permitido (regla retirada el 2026-10-13).
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
     const minPacks = getWholesaleMinPacks(product);

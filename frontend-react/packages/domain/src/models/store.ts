@@ -38,6 +38,30 @@ export interface Feature {
   availableToStore: boolean;
 }
 
+/**
+ * schema.org weekday name used by the store's canonical opening-hours JSON.
+ * English names on purpose: they are the schema.org `dayOfWeek` values written
+ * by the backend serializer — the UI translates them, never stores them.
+ */
+export type WeekdayName =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+/**
+ * Canonical opening range for one weekday (backend `OpeningHoursEntry`). `opens`
+ * and `closes` are "HH:mm" and the backend guarantees `opens < closes`.
+ */
+export interface OpeningHoursEntry {
+  day: WeekdayName;
+  opens: string;
+  closes: string;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -66,14 +90,29 @@ export interface Store {
   // cards and the plan filter read it; the frontend never infers the active plan
   // from module flags (that heuristic contradicted seeded membership).
   planType: string;
-  // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
-  // Σ over the plan's member modules from the LIVE catalog, same formula the plan
-  // view (GET /v1/plans) uses — never the store's frozen module snapshot. Null
-  // when the store is disapproved or its plan is missing/inactive: the card shows
-  // the plan name only.
+  // The store's BILLING price: planPrice is the original (pre-discount) sum over the
+  // modules this store has ASSIGNED and that are ACTIVE and not price-included;
+  // planCurrentPrice is those same rows at their effective (discounted) price. It is
+  // NOT the plan catalog's total, so a store whose module set differs from its plan
+  // shows what it actually pays. Null when the store is disapproved: the card then
+  // shows the plan name only.
   planPrice: number | null;
   planCurrentPrice: number | null;
   modules: Module[];
+  // Public catalog slug (`Store.CatalogSlug`): the store's `/catalog/<slug>` route.
+  // Null or empty when the store never synced its catalog — every public endpoint
+  // 404s for a slug-less store, so the UI must not offer the link.
+  catalogSlug: string | null;
+  // public-catalog-static-pages (T8): public location data that feeds the
+  // generated catalog page's LocalBusiness JSON-LD. Nullable/empty on purpose:
+  // a store whose owner never filled this in publishes no location, and the
+  // generated page omits whatever is absent instead of inventing it.
+  publicPhone: string | null;
+  addressCity: string | null;
+  addressProvince: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  openingHours: OpeningHoursEntry[];
   isActive: boolean;
 }
 
@@ -153,10 +192,10 @@ export interface OwnerStoreWithPlan {
   // Backend-serialized plan name ("Gratis" | "Pago" | "Superior"), same source
   // as StorePlan.planType.
   planType: string;
-  // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
-  // Σ over the plan's member modules from the LIVE catalog, same formula the plan
-  // view (GET /v1/plans) uses — never the store's frozen module snapshot. Null
-  // when the store is disapproved or its plan is missing/inactive.
+  // The store's BILLING price: planPrice is the original (pre-discount) sum over the
+  // modules this store has ASSIGNED and that are ACTIVE and not price-included;
+  // planCurrentPrice is those same rows at their effective (discounted) price. Not
+  // the plan catalog's total. Null when the store is disapproved.
   planPrice: number | null;
   planCurrentPrice: number | null;
 }
@@ -301,7 +340,20 @@ export interface ReSellerCommission {
   year: number;
   month: number;
   paymentCount: number;
+  /** Commission in USD: payments whose base was the charged amount. */
   totalCommission: number;
+  /** Commission in CUP: payments whose base was the total paid. */
+  totalCommissionCup: number;
+}
+
+/**
+ * Optional values captured when registering a store payment (register-payment popup).
+ * `exchangeRate` is CUP per 1 USD; `amountPaid` is the total paid (in CUP when the rate was
+ * used). Both are optional — omitting them keeps the previous payment shape.
+ */
+export interface RegisterStorePaymentPayload {
+  exchangeRate?: number | null;
+  amountPaid?: number | null;
 }
 
 export interface OwnerStoreModule {

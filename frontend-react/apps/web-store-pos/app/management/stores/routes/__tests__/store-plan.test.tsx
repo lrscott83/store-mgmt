@@ -435,7 +435,9 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
     expect(screen.getByText('Module A')).toBeInTheDocument();
     expect(screen.queryByText('Free Module')).not.toBeInTheDocument();
     // Owner plan restriction (billing/spec.md): the owner's panels are filtered
-    // to Gratis/Pago — Superior/VIP are SuperAdmin-reserved. The only non-active
+    // to Gratis/Pago PLUS the store's OWN plan — Superior/VIP stay
+    // SuperAdmin-reserved for anything that is not already the store's plan.
+    // This store is on Pago, so Superior is still hidden. The only non-active
     // panel left is Gratis (downgrade), which exposes the activation.
     expect(screen.queryByRole('button', { name: /Superior/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Gratis/ }));
@@ -455,6 +457,40 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
     expect(screen.getByRole('button', { name: 'Activar Plan' })).toBeInTheDocument();
+  });
+});
+
+describe('StorePlanPage — el dueño ve su plan actual aunque esté reservado', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+    mockUser = makeUser();
+    mockParams = {};
+    seedDefaults();
+  });
+
+  it('an owner on Superior sees the Superior panel active and expanded', async () => {
+    // Every self-registered store is born on Superior (2026-10-11), so a store on
+    // Superior is the NORMAL owner case — not an exotic one.
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makeStorePlan({ planType: 'Superior', nextDueDate: '2026-08-01' }),
+    });
+    await renderPage(makeUser({ isSuperAdmin: false }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Activo')).toBeInTheDocument();
+    });
+    // Without including the store's own plan the owner would see no active panel
+    // at all (Superior reserved and filtered, Gratis/Pago collapsed).
+    const superiorHeader = screen.getByRole('button', { name: /Superior/ });
+    expect(superiorHeader).toHaveAttribute('aria-expanded', 'true');
+    // And it says it carries the Pago plan's modules, then lists Superior's own:
+    expect(screen.getByText('Incluye todo lo del plan Pago y además:')).toBeInTheDocument();
+    expect(screen.getByText('Module C')).toBeInTheDocument();
+    // Showing a reserved plan never bypasses the matrix: it is ACTIVE, so it
+    // exposes no activation button.
+    expect(screen.queryByRole('button', { name: 'Activar Plan' })).not.toBeInTheDocument();
   });
 });
 

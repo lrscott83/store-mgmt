@@ -23,27 +23,32 @@ import { E2E_API_URL } from './support/backend-url';
  * Fix under test: a real GET /v1/auth/me via softRefreshSession() after the
  * create/activation mutations.
  *
- * SETUP (why direct-DB seeding): the owner-admin persona's selected store is
- * born on the Pago plan whose module set does NOT include MultiStores (14) —
- * the registration no longer delivers every availableToStore module, so MC-01
- * itself is stale on this seed. Following store-fixture.ts (design.md D1,
- * H-15 direct-DB precedent), the spec seeds module 14 into the persona's
- * selected store, then refreshes the session's cached profile through a REAL
- * GET /v1/auth/me (page reload on a valid cache emits zero /me — e2e-session
- * REQ-1 — so the spec mints the fresh profile explicitly via the API and
- * rewrites localStorage.currentUser, the same profile the auth-store would
- * store). Billing reads `FilterForBilling` only trims on Vencido; the seeded
- * store stays AlDia, so 14 survives /me's billing filter.
+ * SETUP (why direct-DB seeding): the + Tienda button and the store selector are
+ * both gated on MultiStores (14) in the client session, which cold-boot reads
+ * from `localStorage`. Following store-fixture.ts (design.md D1, H-15 direct-DB
+ * precedent), the spec seeds module 14 into the persona's selected store, then
+ * refreshes the session's cached profile through a REAL GET /v1/auth/me (page
+ * reload on a valid cache emits zero /me — e2e-session REQ-1 — so the spec mints
+ * the fresh profile explicitly via the API and rewrites localStorage.currentUser,
+ * the same profile the auth-store would store). Billing reads `FilterForBilling`
+ * only trims on Vencido; the seeded store stays AlDia, so 14 survives /me's
+ * billing filter. The seed was NECESSARY while new stores were born on the Pago
+ * plan, whose catalog excluded MultiStores; since the birth-plan decision of
+ * 2026-10-13 (`store-birth-superior`) the persona's store is born on Superior
+ * WITH module 14, so it is an idempotent no-op kept as an explicit statement of
+ * the precondition.
  *
- * SETUP — REALIGN (ficha 03, root cause confirmed 2026-10-06): `SelectedStoreId`
- * is PERSISTED server-side (`SwitchMyStoreCommand.cs:98`) and `/me` answers with
- * the modules of THAT store (`GetMeQuery.cs:103`) — not with the ones of the
- * snapshot this spec seeds. A store created through the UI is born on the Pago
- * plan, whose catalog excludes MultiStores (14) (`CreateStoreCommand` clamps the
+ * SETUP — REALIGN (ficha 03, root cause confirmed 2026-10-06; historical, now
+ * moot but the realign is kept because the cause is still possible for ANY spec
+ * that mutates the selection): `SelectedStoreId` is PERSISTED server-side
+ * (`SwitchMyStoreCommand.cs:98`) and `/me` answers with the modules of THAT
+ * store (`GetMeQuery.cs:103`) — not with the ones of the snapshot this spec
+ * seeds. At the time, a store created through the UI was born on the Pago plan,
+ * whose catalog excluded MultiStores (14) (`CreateStoreCommand` clamped the
  * inherited set), so a worker whose persona was left selected on such a store
- * would seed module 14 into a store nobody is looking at: `storeModuleIds` stays
- * without 14, `my-stores.tsx:37` never renders the create button and the click
- * burns the whole test timeout (the 2026-10-05 flake). Each test re-aims the
+ * would seed module 14 into a store nobody is looking at: `storeModuleIds` stayed
+ * without 14, `my-stores.tsx:37` never rendered the create button and the click
+ * burned the whole test timeout (the 2026-10-05 flake). Each test re-aims the
  * server-side selection at the persona store first — the same realign the
  * neighbouring spec has applied since 2026-09-26
  * (`store-switch-back-logout.spec.ts`'s `realignBackendSelectedStore`); it is a

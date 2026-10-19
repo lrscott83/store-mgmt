@@ -73,13 +73,16 @@ nada por sí sola.
 ## Comandos de una corrida completa (referencia)
 
 Backend E2E aparte del frontend, nunca en paralelo (el reset borra filas vivas), y la suite del
-frontend con `--workers=4` en esta máquina:
+frontend con `--workers=2` en esta máquina:
 
 ```
 # 1) backend de pruebas (perfil http-e2e, puerto 5019, BD smca_test — el arranque imprime el guard)
 dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
 # 2) suite E2E del frontend, desde frontend-react/
-pnpm test:e2e --workers=4
+pnpm test:e2e --workers=2
 ```
+
+> **Pendiente de investigar:** si se puede subir por encima de 2 workers sin reintroducir el ruido por
+> contención (ver la regla de *Workers* en [`../known-issues.md`](../known-issues.md)).
 
 Detalle completo en el README del root, sección "Suite de tests — ejecución manual".

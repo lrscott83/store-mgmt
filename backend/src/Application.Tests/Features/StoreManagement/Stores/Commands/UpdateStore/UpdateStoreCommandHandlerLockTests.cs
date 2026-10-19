@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Application.Abstractions.HttpContext;
 using Application.Exceptions;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
+using Application.Features.WebCatalog.Public;
 using Application.UnitOfWorks;
 using Domain.Common.Utils;
 using Domain.Entities.Modules;
@@ -37,6 +38,7 @@ public class UpdateStoreCommandHandlerLockTests
     private readonly Mock<IStoreRoleFeatureGenerator> _mockStoreRoleFeaturesGenerator;
     private readonly Mock<IStoreRoleFeatureRepository> _mockStoreRoleFeatureRepository;
     private readonly Mock<IStoreSessionRevocationService> _mockSessionRevocationService;
+    private readonly Mock<ICatalogStaticPageRegenerator> _mockCatalogPageRegenerator;
     private readonly UpdateStoreCommandHandler _handler;
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -55,6 +57,7 @@ public class UpdateStoreCommandHandlerLockTests
         _mockStoreRoleFeaturesGenerator = new Mock<IStoreRoleFeatureGenerator>();
         _mockStoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>();
         _mockSessionRevocationService = new Mock<IStoreSessionRevocationService>();
+        _mockCatalogPageRegenerator = new Mock<ICatalogStaticPageRegenerator>();
 
         _mockLocalizer
             .Setup(x => x["PlanLocked"])
@@ -71,7 +74,8 @@ public class UpdateStoreCommandHandlerLockTests
             _mockFeatureRepository.Object,
             _mockStoreRoleFeaturesGenerator.Object,
             _mockStoreRoleFeatureRepository.Object,
-            _mockSessionRevocationService.Object);
+            _mockSessionRevocationService.Object,
+            _mockCatalogPageRegenerator.Object);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

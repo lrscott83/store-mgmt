@@ -14,7 +14,15 @@ using System.Net;
 
 namespace Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
 
-public sealed record RegisterStorePaymentCommand(Guid StoreId) : ICommand<bool>;
+/// <summary>
+/// Registers ONE store payment. <paramref name="ExchangeRate"/> (CUP per 1 USD) and
+/// <paramref name="AmountPaid"/> (the total paid) are optional values captured in the
+/// register-payment popup; when absent the payment is unchanged from before.
+/// </summary>
+public sealed record RegisterStorePaymentCommand(
+    Guid StoreId,
+    decimal? ExchangeRate = null,
+    decimal? AmountPaid = null) : ICommand<bool>;
 
 internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<RegisterStorePaymentCommand, bool>
 {
@@ -83,9 +91,13 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
         Guid? reSellerId = reSellerOwner?.ReSellerId;
         float reSellerPercentDiscountPrice = reSellerOwner?.PercentDiscountPrice ?? 0f;
         float reSellerDiscountPrice = reSellerOwner?.DiscountPrice ?? 0f;
+        // Commission base (product rule 2026-10-13): the TOTAL PAID when the operator set one
+        // (then it is in CUP), otherwise the store's charged amount (USD). The formula itself
+        // is unchanged; only the base moves.
+        float commissionBase = request.AmountPaid.HasValue ? (float)request.AmountPaid.Value : amount;
         float reSellerAmount = reSellerOwner is null
             ? 0f
-            : StoreBillingUtils.GetReSellerCommission(amount, reSellerPercentDiscountPrice, reSellerDiscountPrice);
+            : StoreBillingUtils.GetReSellerCommission(commissionBase, reSellerPercentDiscountPrice, reSellerDiscountPrice);
 
         // Determine next due date (advance by 1 month)
         int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
@@ -114,7 +126,9 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
             reSellerPercentDiscountPrice: reSellerPercentDiscountPrice,
             reSellerDiscountPrice: reSellerDiscountPrice,
             reSellerAmount: reSellerAmount,
-            byReSeller: isReSeller);
+            byReSeller: isReSeller,
+            exchangeRate: request.ExchangeRate,
+            amountPaid: request.AmountPaid);
 
         await _storePaymentRepository.AddAsync(payment);
         // NoTracking context: the cleared override only persists if the Store is

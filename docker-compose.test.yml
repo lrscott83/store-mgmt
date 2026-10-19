@@ -49,6 +49,14 @@ services:
       - SmtpSettings__Password=${SMTP_PASSWORD}
       - SmtpSettings__FromEmail=${SMTP_FROM_EMAIL}
       - SmtpSettings__EnableSsl=${SMTP_ENABLE_SSL}
+      # Página estática del catálogo público (feature public-catalog-static-pages). Misma mecánica
+      # que producción: la API escribe <OutputRoot>/catalog/<slug>/index.html en el volumen
+      # compartido y lee <ShellPath> —el shell del SPA que publica web-store-pos en ese mismo
+      # volumen— para inyectarle el <head>. PublicBaseUrl es la URL absoluta del entorno test.
+      # Sin ShellPath ni OutputRoot la feature queda apagada (el regenerador se calla).
+      - CatalogStaticPage__OutputRoot=/srv/catalog-pages
+      - CatalogStaticPage__ShellPath=/srv/catalog-pages/shell/index.html
+      - CatalogStaticPage__PublicBaseUrl=${PUBLIC_BASE_URL:-https://vdt.playground.sceiba.net}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s
@@ -62,6 +70,10 @@ services:
       # escribir — sin esto, subir una imagen al catálogo revienta con
       # UnauthorizedAccessException en /app/storage.
       - storage_test_data:/app/storage
+      # Páginas pre-generadas del catálogo (feature public-catalog-static-pages) + el shell del SPA
+      # que publica web-store-pos. Mismo camino en los dos contenedores para que OutputRoot y la
+      # raíz de nginx sean el mismo directorio. Volumen propio del entorno test.
+      - catalog_pages:/srv/catalog-pages
     depends_on:
       - postgres
     restart: always
@@ -110,6 +122,11 @@ services:
     restart: always
     ports:
       - "8095:80"
+    volumes:
+      # El mismo volumen que la API. Aquí nginx sirve las páginas generadas (location del catálogo en
+      # frontend-react/deploy/nginx.conf) y el entrypoint publica el shell + archiva los assets del
+      # build para que las páginas aún no regeneradas sigan cargando (S9).
+      - catalog_pages:/srv/catalog-pages
     depends_on:
       - api
     networks:
@@ -119,6 +136,7 @@ volumes:
   postgres_test_data:
   pgadmin-test-data:
   storage_test_data:
+  catalog_pages:
 
 networks:
   smca_test_network:

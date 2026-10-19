@@ -204,6 +204,52 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
   });
 });
 
+describe('UserListPage — acciones del encabezado (decisión del owner 2026-10-15)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser();
+    mockIsOnline = true;
+    localStorageMock.clear();
+    mockGetUsersByStoreId = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+  });
+
+  it('el botón "+ Empleado" vive en el encabezado y navega a crear el empleado', async () => {
+    const { UserListPage } = userListModule;
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
+    await waitFor(() => screen.getByText(/no hay empleados/i));
+
+    // Ya NO dice "Adicionar" y ya no vive en el cuerpo de la lista.
+    expect(screen.queryByRole('button', { name: 'Adicionar' })).not.toBeInTheDocument();
+    const createButton = screen.getByRole('button', { name: /empleado/i });
+
+    fireEvent.click(createButton);
+    expect(mockNavigate).toHaveBeenCalledWith('/management/users/create');
+  });
+
+  it('las dos acciones del roster quedan en el encabezado, una debajo de la otra', async () => {
+    const { UserListPage } = userListModule;
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
+    await waitFor(() => screen.getByText(/no hay empleados/i));
+
+    const exportButton = screen.getByRole('button', { name: /exportar roster/i });
+    const shareButton = screen.getByTestId('hotspot-open-share-roster');
+    // Comparten el contenedor y este las apila en columna.
+    expect(exportButton.parentElement).toBe(shareButton.parentElement);
+    expect(exportButton.parentElement?.className).toContain('flex-col');
+    // Mismo estilo ovalado que el botón de crear.
+    expect(exportButton.className).toContain('rounded-full');
+    expect(shareButton.className).toContain('rounded-full');
+  });
+});
+
 describe('UserListPage — S-LIST-2: empty state', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Button } from '~/shared/components/ui/button';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
@@ -13,16 +16,21 @@ import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-se
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
+import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
+import { HotspotShareModal } from '~/sync/components/hotspot-share-modal';
+import type { TransferSource } from '~/sync/lib/hotspot/transfer-protocol';
 
 export const clientLoader = featureLoader([EFeatures.Send]);
 
 export function ExportPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const user = useAuthStore((s) => s.user);
+  const intl = useIntl();
+  const [sharing, setSharing] = useState(false);
 
-  async function handleExport(password: string): Promise<Uint8Array> {
+  async function buildExportPayload(password: string): Promise<Uint8Array> {
     // Categories/products are read via the repositories directly (Angular
     // parity, Flag #2 — raw stored-JSON pass-through), not the offline services.
     // Inventory's read side goes through InventoryOfflineService.getInventoryEntriesJson()
@@ -48,6 +56,7 @@ export function ExportPage() {
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -63,9 +72,25 @@ export function ExportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
-    const payload = await serializer.export(password);
+    return serializer.export(password);
+  }
+
+  function buildExportFileName(): string {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(2);
+    const mm = pad(now.getMonth() + 1);
+    const dd = pad(now.getDate());
+    const hh = pad(now.getHours());
+    const min = pad(now.getMinutes());
+    return `datos${yy}${mm}${dd}-${hh}${min}.zip`;
+  }
+
+  async function handleExport(password: string): Promise<Uint8Array> {
+    const payload = await buildExportPayload(password);
 
     // Delivery: plain download anchor, matching Angular's `serializeEncryptedZip`
     // (data-serializer.service.ts:68-73) 1:1. Angular's export path NEVER uses
@@ -74,24 +99,23 @@ export function ExportPage() {
     // A `navigator.share`-first delivery breaks the export on desktop, where
     // `navigator.share` exists as a function but file-sharing is unsupported and
     // the call throws.
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const yy = String(now.getFullYear()).slice(2);
-    const mm = pad(now.getMonth() + 1);
-    const dd = pad(now.getDate());
-    const hh = pad(now.getHours());
-    const min = pad(now.getMinutes());
-    const filename = `datos${yy}${mm}${dd}-${hh}${min}.zip`;
-
     const blob = new Blob([payload], { type: 'application/zip' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = buildExportFileName();
     a.click();
     URL.revokeObjectURL(url);
 
     return payload;
+  }
+
+  async function prepareShare(password: string): Promise<TransferSource> {
+    return {
+      name: buildExportFileName(),
+      kind: 'data',
+      bytes: await buildExportPayload(password),
+    };
   }
 
   /**
@@ -120,6 +144,7 @@ export function ExportPage() {
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -135,6 +160,7 @@ export function ExportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     const data = await serializer.exportPlainData();
@@ -157,8 +183,18 @@ export function ExportPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="space-y-4 p-4">
       <ExportForm onExport={handleExport} />
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setSharing(true)}
+          data-testid="hotspot-open-share"
+        >
+          {intl.formatMessage({ id: 'HOTSPOT.SHARE_TITLE' })}
+        </Button>
+      </div>
       {user?.login === 'lrscott' && (
         <div className="mt-4 border-t border-gray-200 pt-4">
           <button
@@ -172,6 +208,7 @@ export function ExportPage() {
           </p>
         </div>
       )}
+      {sharing && <HotspotShareModal prepare={prepareShare} onClose={() => setSharing(false)} />}
     </div>
   );
 }

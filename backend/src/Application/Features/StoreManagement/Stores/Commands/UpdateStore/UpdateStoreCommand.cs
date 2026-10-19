@@ -1,7 +1,9 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
+using Application.Services.Stores;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Common.Results;
@@ -25,9 +27,18 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
     /// Store data update. <c>ModuleIds</c> is optional: when null the store's
     /// modules/plan are left untouched (the plan has its own dedicated update
     /// path through this same command with <c>ModuleIds</c> populated).
+    ///
+    /// public-catalog-static-pages (T8): <c>UpdateLocation</c> gates the PUBLIC LOCATION block
+    /// (Address, PublicPhone, AddressCity, AddressProvince, Latitude, Longitude, OpeningHours).
+    /// It is OPT-IN on purpose: callers that only rename or activate a store send a partial
+    /// payload, and applying those omitted fields as null would wipe the store's public location
+    /// (and with it the catalog's JSON-LD on the next regeneration).
     /// </summary>
     public sealed record UpdateStoreCommand(Guid Id, string Name, string? Address, string? Description, 
-        bool Approved, List<int>? ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null, int? PlanId = null)
+        bool Approved, List<int>? ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null, int? PlanId = null,
+        string? PublicPhone = null, string? AddressCity = null, string? AddressProvince = null,
+        double? Latitude = null, double? Longitude = null, IReadOnlyList<OpeningHoursEntry>? OpeningHours = null,
+        bool UpdateLocation = false)
         : ICommand<bool> { }
 
     public class UpdateStoreCommandHandler : ICommandHandler<UpdateStoreCommand, bool>
@@ -43,6 +54,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly IStoreSessionRevocationService _storeSessionRevocationService;
+        private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
 
         public UpdateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -55,7 +67,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IFeatureRepository featureRepository,
             IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
             IStoreRoleFeatureRepository storeRoleFeatureRepository,
-            IStoreSessionRevocationService storeSessionRevocationService)
+            IStoreSessionRevocationService storeSessionRevocationService,
+            ICatalogStaticPageRegenerator catalogPageRegenerator)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -68,6 +81,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _storeSessionRevocationService = storeSessionRevocationService;
+            _catalogPageRegenerator = catalogPageRegenerator;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -118,8 +132,59 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (_storeRepository.Where(s => s.Id != request.Id).Any(s => s.Name == request.Name))
                 throw new ValidationException(_localizer["StoreAlreadyExists"]);
 
+            // public-catalog-static-pages (T9 + T8): la página estática inyecta nombre, descripción,
+            // dirección, teléfono, coordenadas y horario. Se guardan los valores persistidos para
+            // regenerarla solo si cambian de verdad — un OwnerAdmin puede enviar una descripción que
+            // este comando ignora.
+            var previousName = store.Name;
+            var previousDescription = store.Description;
+            var previousAddress = store.Address;
+            var previousPublicPhone = store.PublicPhone;
+            var previousAddressCity = store.AddressCity;
+            var previousAddressProvince = store.AddressProvince;
+            var previousLatitude = store.Latitude;
+            var previousLongitude = store.Longitude;
+            var previousOpeningHoursJson = store.OpeningHoursJson;
+
             store.Name = request.Name;
-            store.Address = request.Address;
+
+            // public-catalog-static-pages (T8): el bloque de ubicación pública es OPT-IN
+            // (UpdateLocation). Un llamador que solo renombra manda un payload parcial; aplicar sus
+            // campos omitidos como null borraría el teléfono, las coordenadas y el horario — y con
+            // ellos el JSON-LD de la página. Sin el flag, la ubicación queda intacta.
+            if (request.UpdateLocation)
+            {
+                // Coordenadas y horario se validan ANTES de tocar la fila. Las coordenadas son un
+                // par (lat+long) o nada; el horario se canonicaliza a un JSON que siempre describe
+                // un rango posible.
+                var hasLatitude = request.Latitude.HasValue;
+                var hasLongitude = request.Longitude.HasValue;
+                if (hasLatitude != hasLongitude
+                    || (request.Latitude.HasValue && (request.Latitude.Value < -90 || request.Latitude.Value > 90))
+                    || (request.Longitude.HasValue && (request.Longitude.Value < -180 || request.Longitude.Value > 180)))
+                {
+                    throw new ValidationException
+                    {
+                        Errors = new List<Error> { new Error("Latitude", _localizer["InvalidCoordinates"]) }
+                    };
+                }
+
+                if (!OpeningHoursSerializer.TryNormalize(request.OpeningHours, out var openingHoursJson, out _))
+                {
+                    throw new ValidationException
+                    {
+                        Errors = new List<Error> { new Error("OpeningHours", _localizer["InvalidOpeningHours"]) }
+                    };
+                }
+
+                store.Address = request.Address;
+                store.PublicPhone = TrimOrNull(request.PublicPhone);
+                store.AddressCity = TrimOrNull(request.AddressCity);
+                store.AddressProvince = TrimOrNull(request.AddressProvince);
+                store.Latitude = request.Latitude;
+                store.Longitude = request.Longitude;
+                store.OpeningHoursJson = openingHoursJson;
+            }
             
             // Capture the transition BEFORE the SuperAdmin block: revocation fires
             // only on true→false (store-deactivation-session-revocation). Reactivation
@@ -151,8 +216,30 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             await _storeRepository.UpdateAsync(store);
             if (request.ModuleIds is not null)
                 await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);
-            return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            var saved = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0;
+
+            // public-catalog-static-pages (T9 + T8): los datos que alimentan la página estática
+            // (title/description + JSON-LD) cambiaron → se regenera. Best-effort: el regenerador
+            // nunca lanza y el guardado ya está persistido, así que un fallo de escritura no tumba
+            // la operación.
+            if (!string.Equals(previousName, store.Name, StringComparison.Ordinal)
+                || !string.Equals(previousDescription, store.Description, StringComparison.Ordinal)
+                || !string.Equals(previousAddress, store.Address, StringComparison.Ordinal)
+                || !string.Equals(previousPublicPhone, store.PublicPhone, StringComparison.Ordinal)
+                || !string.Equals(previousAddressCity, store.AddressCity, StringComparison.Ordinal)
+                || !string.Equals(previousAddressProvince, store.AddressProvince, StringComparison.Ordinal)
+                || previousLatitude != store.Latitude
+                || previousLongitude != store.Longitude
+                || !string.Equals(previousOpeningHoursJson, store.OpeningHoursJson, StringComparison.Ordinal))
+            {
+                await _catalogPageRegenerator.RegenerateAsync(store.Id, cancellationToken);
+            }
+
+            return ResponseResult.Success(saved);
         }
+
+        private static string? TrimOrNull(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
         private async Task UpdateStoreModules(Guid storeId, Guid tenantId, List<int> moduleIds)
         {

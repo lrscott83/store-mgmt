@@ -240,8 +240,18 @@ namespace Domain.UnitTests.Common
             ModulePriceCalculator.CalculateTotal(modules).Should().BeApproximately(1630f, 0.0001f);
         }
 
-        // ── Parity with the reference implementation ───────────────────────────────
         [Fact]
+        public void CalculateTotal_storeModule_globallyInactiveModule_contributesZero()
+        {
+            // The row is active and not included, but its module is switched off in the
+            // catalog: it must contribute nothing (owner decision 2026-10-14).
+            var row = SnapshotModule(isActive: true, priceIncluded: false, 500f, 0f, 0f);
+            row.Module = CatalogModule(isActive: false, priceIncluded: false, 500f, 0f, 0f);
+
+            ModulePriceCalculator.CalculateTotal(new[] { row }).Should().Be(0f);
+        }
+
+        // ── Parity with the reference implementation ───────────────────────────────        [Fact]
         public void CalculateTotal_storeModule_reproducesBillingServiceInlineComputation()
         {
             // BillingService.GetStoreBillingSummaryAsync (BillingService.cs:80-83):

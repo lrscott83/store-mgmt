@@ -16,6 +16,7 @@ using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalogTemplate;
+using Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalogSlug;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
@@ -29,6 +30,7 @@ using Asp.Versioning;
 using Domain.Common.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using SMCA.WebApi.Filters;
 
 namespace SMCA.WebApi.Controllers.v1
@@ -240,11 +242,18 @@ namespace SMCA.WebApi.Controllers.v1
             return Ok(await Sender.Send(command));
         }
 
+        /// <summary>
+        /// Registers a store's payment. The body is OPTIONAL and carries the two values
+        /// captured in the register-payment popup: the CUP-per-USD exchange rate and the total
+        /// paid. Both are optional; a request with no body keeps the previous behavior.
+        /// </summary>
         [HttpPost("{storeId}/payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> RegisterStorePaymentAsync(Guid storeId)
-            => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId)));
+        public async Task<IActionResult> RegisterStorePaymentAsync(
+            Guid storeId,
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RegisterStorePaymentCommand? command)
+            => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId, command?.ExchangeRate, command?.AmountPaid)));
 
         /// <summary>
         /// Atomic Free &lt;-&gt; Paid plan toggle. No request body. Gated by the same
@@ -327,6 +336,22 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> UpdateStoreCatalogTemplateAsync(
             Guid storeId, [FromBody] UpdateStoreCatalogTemplateCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// Fija el SLUG público (`/catalog/&lt;slug&gt;`) del catálogo web de UNA tienda. SuperAdmin
+        /// only, misma capacidad por-tienda que `catalog-template`: la URL pública es una decisión de
+        /// plataforma. El handler NORMALIZA el valor y escribe SOLO `Store.CatalogSlug`; un slug ya
+        /// tomado por otra tienda responde 409 (<c>CatalogSlugInUse</c>).
+        /// </summary>
+        [HttpPut("{storeId}/catalog-slug")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreCatalogSlugDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> UpdateStoreCatalogSlugAsync(
+            Guid storeId, [FromBody] UpdateStoreCatalogSlugCommand command)
             => Ok(await Sender.Send(command with { StoreId = storeId }));
 
         /// <summary>

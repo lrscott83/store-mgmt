@@ -210,6 +210,8 @@ const messages: Record<string, string> = {
 
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',
+  'TUTORIAL.MANUAL_LINK': 'Manual de usuario',
+  'TUTORIAL.MANUAL_PDF': 'Descargar manual (PDF)',
 
   // Menu groups (exact Angular MENU.*.TITLE strings from vocabs/es.ts)
   'MENU.ADMIN': 'ADMINISTRACIÓN',
@@ -239,6 +241,8 @@ const messages: Record<string, string> = {
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
+  // cierre-efectivo: ítem justo debajo de "Vender" (S5).
+  'MENU.CASH_CLOSING': 'Cierre Caja',
   'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
   'MENU.TODAY_CREDITS': 'Créditos del día',
@@ -248,6 +252,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
+  'MENU.PRODUCT_COUNT': 'Conteo de productos',
   'MENU.WAREHOUSES': 'Gestión de Almacenes',
 
   // Catálogo Web (módulo 18, plan 2026-09-27): vista de publicación de productos.
@@ -397,6 +402,12 @@ const messages: Record<string, string> = {
   'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
   'ORDERING_SETTINGS.PICKUP_ENABLED': 'Recogida en la tienda',
   'ORDERING_SETTINGS.DELIVERY_ENABLED': 'Envío a domicilio',
+  // Las DOS reglas del backend (`UpsertStoreCatalogSettingsCommandValidator`), dichas donde se
+  // ven: el celular es obligatorio para recibir pedidos, y tiene que quedar al menos una
+  // modalidad abierta.
+  'ORDERING_SETTINGS.WHATSAPP_REQUIRED': 'El número de WhatsApp es obligatorio para recibir pedidos',
+  'ORDERING_SETTINGS.MODE_REQUIRED':
+    'Deja abierta al menos una modalidad: recogida en la tienda o envío a domicilio',
   'ORDERING_SETTINGS.BUSINESS_HOURS': 'Horario de atención',
   'ORDERING_SETTINGS.BUSINESS_HOURS_PLACEHOLDER': 'Texto libre, por ejemplo Lunes a sábado de 8:00 a 18:00',
   'ORDERING_SETTINGS.DELIVERY_ZONES': 'Zonas de reparto',
@@ -1035,6 +1046,32 @@ const messages: Record<string, string> = {
   // Category Stats (category-stats.component.html has no i18n keys — currency-formatted
   // numbers and category/product names only, no static Spanish text at all).
 
+  // Cierre Efectivo (cierre-efectivo, 2026-10-14) — cuadre diario del efectivo.
+  'CASH_CLOSING.TITLE': 'Cierre Efectivo',
+  'CASH_CLOSING.CLOSE_BUTTON': 'Cerrar Caja',
+  'CASH_CLOSING.EXPECTED': 'Esperado',
+  'CASH_CLOSING.COUNTED': 'Contado',
+  'CASH_CLOSING.DIFFERENCE': 'Diferencia',
+  'CASH_CLOSING.OPENING': 'Apertura',
+  'CASH_CLOSING.COUNT_TITLE': 'Conteo',
+  'CASH_CLOSING.DENOMINATION': 'Denominación',
+  'CASH_CLOSING.QUANTITY': 'Cantidad',
+  'CASH_CLOSING.TOTAL': 'Total',
+  'CASH_CLOSING.NEW_DENOMINATION': 'Nueva denominación',
+  'CASH_CLOSING.ADD_DENOMINATION': 'Agregar',
+  'CASH_CLOSING.COMMENT': 'Comentario',
+  'CASH_CLOSING.COMMENT_REQUIRED': 'La caja no cuadra: el comentario es obligatorio.',
+  'CASH_CLOSING.STATUS_OPEN': 'Abierta',
+  'CASH_CLOSING.STATUS_CLOSED': 'Cerrada',
+  'CASH_CLOSING.CONFIRM_TITLE': 'Confirmar cierre de caja',
+  'CASH_CLOSING.CONFIRM_MESSAGE':
+    '¿Seguro que quieres cerrar la caja? Una vez cerrada no se podrá editar.',
+  'CASH_CLOSING.CLOSED_NOTICE': 'La caja de este día está cerrada y no se puede editar.',
+  'CASH_CLOSING.CLOSED_SUCCESS': 'Caja cerrada correctamente.',
+  'CASH_CLOSING.SAVE_ERROR': 'No se pudo guardar el cierre de caja.',
+  'CASH_CLOSING.HELP':
+    'Cierre Efectivo. Cuadra el efectivo de la venta del día: escribe la Apertura, cuenta los billetes y monedas en el Conteo y revisa el Esperado, el Contado y la Diferencia. Solo efectivo. Pulsa Cerrar Caja al final del día; si la diferencia no es cero, el comentario es obligatorio. Solo se ofrece con el módulo MultiMonedas para elegir entre varias monedas.',
+
   // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts, byte-identical. PAYMENT_CREDIT is
   // Angular's literal title for BOTH edit-sale-credit-modal AND sale-credit-payment-modal
   // (also reused verbatim by edit-order-modal) — Angular's own source uses the same key
@@ -1065,6 +1102,13 @@ const messages: Record<string, string> = {
   // pasa de "Buscar" a "Buscar producto" (deja claro qué se filtra) y lleva lupa
   // al inicio. Sustituye a GENERAL.SEARCH solo en esta vista.
   'INVENTORY.SEARCH_PRODUCT': 'Buscar producto',
+  // Conteo de productos: vista propia y SOLO VISUAL — no persiste ni ajusta stock.
+  'INVENTORY.COUNT.TITLE': 'Conteo de productos',
+  'INVENTORY.COUNT.COUNTED': 'Conteo',
+  'INVENTORY.COUNT.SYSTEM': 'Sistema: {quantity}',
+  'INVENTORY.COUNT.SEARCH_PLACEHOLDER': 'Buscar producto por nombre…',
+  'INVENTORY.COUNT.CLEAR': 'Limpiar',
+  'INVENTORY.COUNT.CORRECT': 'Correcto',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
@@ -1430,6 +1474,27 @@ const messages: Record<string, string> = {
   // L6 parity (GENERAL.ACTIVE:154 'Activo')
   'STORES.IS_ACTIVE': 'Activo',
   'STORES.PAYMENT_START_DATE': 'Fecha de inicio de pago',
+  // public-catalog-static-pages (T8): public location block of the store form.
+  // This data feeds the generated catalog page's LocalBusiness JSON-LD.
+  'STORES.LOCATION_TITLE': 'Ubicación y contacto',
+  'STORES.PUBLIC_PHONE': 'Teléfono público',
+  'STORES.ADDRESS_CITY': 'Ciudad',
+  'STORES.ADDRESS_PROVINCE': 'Provincia',
+  'STORES.LATITUDE': 'Latitud',
+  'STORES.LONGITUDE': 'Longitud',
+  'STORES.OPENING_HOURS': 'Horario',
+  'STORES.OPENING_HOURS_HINT': 'Deja un día vacío para marcarlo como cerrado.',
+  'STORES.OPENS': 'Apertura',
+  'STORES.CLOSES': 'Cierre',
+  'STORES.DAY_MONDAY': 'Lunes',
+  'STORES.DAY_TUESDAY': 'Martes',
+  'STORES.DAY_WEDNESDAY': 'Miércoles',
+  'STORES.DAY_THURSDAY': 'Jueves',
+  'STORES.DAY_FRIDAY': 'Viernes',
+  'STORES.DAY_SATURDAY': 'Sábado',
+  'STORES.DAY_SUNDAY': 'Domingo',
+  'STORES.COORDINATES_PAIR_REQUIRED': 'La latitud y la longitud deben venir juntas.',
+  'STORES.OPENING_HOURS_INCOMPLETE': 'Cada día con horario necesita apertura y cierre.',
   'STORES.SAVE': 'Guardar',
   'STORES.SAVING': 'Guardando...',
   'STORES.EDIT': 'Editar',
@@ -1473,11 +1538,21 @@ const messages: Record<string, string> = {
   // because GET /v1/plans excludes VIP) so every module in the table is still reachable.
   // Plantilla (vista) del catálogo público de una tienda: la fija SOLO el SuperAdmin desde
   // /admin/stores (por tienda), no el dueño. Todas las plantillas ofrecen las mismas funciones.
-  'STORES.CATALOG_TEMPLATE.MENU_LABEL': 'Plantilla del catálogo',
-  'STORES.CATALOG_TEMPLATE.TITLE': 'Plantilla del catálogo',
+  'STORES.CATALOG_TEMPLATE.MENU_LABEL': 'Catálogo de la tienda',
+  'STORES.CATALOG_TEMPLATE.TITLE': 'Catálogo de la tienda',
   'STORES.CATALOG_TEMPLATE.LABEL': 'Plantilla',
   'STORES.CATALOG_TEMPLATE.HINT':
     'Cómo se ve el catálogo público de esta tienda. Todas las plantillas ofrecen las mismas funciones.',
+  // Slug público del catálogo (SuperAdmin, misma vista que la plantilla): es la dirección
+  // `/catalog/<slug>` de la tienda. Se normaliza al escribir y el backend rechaza un slug que ya
+  // use otra tienda.
+  'STORES.CATALOG_SLUG.LABEL': 'Enlace del catálogo (slug)',
+  'STORES.CATALOG_SLUG.HINT':
+    'La dirección pública de la tienda. Se normaliza al escribir: minúsculas, sin tildes y con guiones en vez de espacios. Cambiarla cambia la URL que usan los clientes.',
+  'STORES.CATALOG_SLUG.PREVIEW': 'URL pública',
+  'STORES.CATALOG_SLUG.REQUIRED': 'El enlace del catálogo no puede quedar vacío',
+  'STORES.CATALOG_SLUG.IN_USE': 'Ese enlace ya está en uso por otra tienda',
+  'STORES.CATALOG_SLUG.SAVE_ERROR': 'No se pudo guardar el catálogo. Intente de nuevo.',
   'STORES.MODULE_PRICING.MENU_LABEL': 'Precios de módulos',
   'STORES.MODULE_PRICING.TITLE': 'Precios de módulos',
   'STORES.MODULE_PRICING.HINT':
@@ -1521,6 +1596,9 @@ const messages: Record<string, string> = {
   'STORES.OWNER_LABEL': 'Owner',
   'STORES.STORE_PHONE_LABEL': 'Teléfono',
   'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
+  // Link de la tarjeta hacia el catálogo público de la tienda: se renderiza SOLO si la tienda
+  // tiene slug (`Store.CatalogSlug`); abre `/catalog/<slug>` en otra pestaña.
+  'STORES.CATALOG_VIEW': 'Ver catálogo web',
 
   // Channel rates — append-only register per channel (method + currency),
   // multipayments. A new effective moment is a new row; registration happens
@@ -1657,12 +1735,17 @@ const messages: Record<string, string> = {
   'BILLING.COLLECTIONS.REGISTER_PAYMENT': 'Registrar pago',
   'BILLING.COLLECTIONS.EMPTY_STATE': 'No hay cobros pendientes.',
   'BILLING.COLLECTIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
+  'BILLING.COLLECTIONS.CONFIRM_TITLE': 'Confirmar pago',
+  'BILLING.COLLECTIONS.EXCHANGE_RATE': 'Tasa de cambio (CUP por 1 USD)',
+  'BILLING.COLLECTIONS.TOTAL_PAID': 'Total pagado',
+  'BILLING.COLLECTIONS.CONFIRM_PAYMENT': 'Registrar el pago',
 
   // Billing — reseller commissions view
   'BILLING.COMMISSIONS.TITLE': 'Comisiones',
   'BILLING.COMMISSIONS.PERIOD': 'Período',
   'BILLING.COMMISSIONS.PAYMENT_COUNT': 'Cantidad de pagos',
-  'BILLING.COMMISSIONS.TOTAL': 'Total',
+  'BILLING.COMMISSIONS.TOTAL': 'Total (USD)',
+  'BILLING.COMMISSIONS.TOTAL_CUP': 'Total (CUP)',
   'BILLING.COMMISSIONS.EMPTY_STATE': 'No hay comisiones registradas.',
   'BILLING.COMMISSIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
 
@@ -1691,7 +1774,7 @@ const messages: Record<string, string> = {
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'USERS.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'USERS.EDIT': 'Editar',
-  'USERS.CREATE': 'Adicionar',
+  'USERS.CREATE': 'Empleado',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intente de nuevo.',
   // Admin export of the encrypted offline roster bundle (offline-auth-frontend,
   // design correction #5). BLOCKED-for-verification: the backend endpoint
@@ -1822,6 +1905,34 @@ const messages: Record<string, string> = {
     'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
+
+  // Hotspot device-to-device transfer (odd/tasks/hotspot-device-transfer.md).
+  // Both devices run the same PWA; the transfer never leaves the hotspot LAN.
+  'HOTSPOT.SHARE_TITLE': 'Compartir por hotspot',
+  'HOTSPOT.RECEIVE_TITLE': 'Recibir por hotspot',
+  'HOTSPOT.GENERATE': 'Generar código',
+  'HOTSPOT.PAIRING_CODE': 'Código de emparejamiento',
+  'HOTSPOT.OFFER_READY': 'Escanea este código desde el otro dispositivo.',
+  'HOTSPOT.COPY_CODE': 'Copiar código',
+  'HOTSPOT.COPIED': 'Código copiado.',
+  'HOTSPOT.SCAN_ANSWER': 'Escanear respuesta',
+  'HOTSPOT.SCAN_OFFER': 'Escanear código',
+  'HOTSPOT.SCAN_TITLE': 'Escanear código QR',
+  'HOTSPOT.SCANNING': 'Buscando el código...',
+  'HOTSPOT.CAMERA_DENIED': 'No se pudo abrir la cámara. Revisa los permisos del navegador.',
+  'HOTSPOT.SENDING': 'Enviando archivo...',
+  'HOTSPOT.SENT': 'Transferencia completada.',
+  'HOTSPOT.ERROR': 'No se pudo completar la transferencia.',
+  'HOTSPOT.ERROR_PAIRING': 'El emparejamiento no coincide. Vuelve a escanear el código.',
+  'HOTSPOT.SCAN_PROMPT': 'Escanea el código del otro dispositivo.',
+  'HOTSPOT.ACCEPT': 'Aceptar',
+  'HOTSPOT.INCOMING_FILE': 'Archivo a recibir',
+  'HOTSPOT.ANSWER_READY': 'Muestra este código al otro dispositivo.',
+  'HOTSPOT.RECEIVING': 'Recibiendo archivo...',
+  'HOTSPOT.RECEIVED': 'Archivo recibido.',
+  'HOTSPOT.ERROR_UNREACHABLE':
+    'No se pudo conectar con el otro dispositivo. Desactiva el aislamiento AP del hotspot o usa el hotspot del otro dispositivo.',
+  'HOTSPOT.ERROR_TOO_LARGE': 'El archivo es demasiado grande para transferirlo por hotspot.',
 
   // At-rest encryption — the two decryption failures the app-wide policy
   // announces (decryption-failure-policy.ts). They are worded differently on

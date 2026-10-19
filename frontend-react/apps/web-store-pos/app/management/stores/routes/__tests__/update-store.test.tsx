@@ -19,10 +19,17 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     planType: 'Pago',
     planPrice: 10,
     planCurrentPrice: 10,
     modules: [],
+    publicPhone: null,
+    addressCity: null,
+    addressProvince: null,
+    latitude: null,
+    longitude: null,
+    openingHours: [],
     isActive: true,
     ...overrides,
   };
@@ -220,6 +227,57 @@ describe('UpdateStorePage — data form WITHOUT the plan section', () => {
     expect(payload.name).toBe('Existing Store');
     expect(payload.paymentStartDate).toBe('2024-01-01');
     expect(mockGetUserByToken).toHaveBeenCalled();
+  });
+});
+
+describe('UpdateStorePage — T8: public location block rides the data save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+    mockUser = makeUser();
+    mockParams = { id: 's1' };
+    mockGetStore = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makeStore({
+        name: 'Existing Store',
+        publicPhone: '+53 5555 1234',
+        addressCity: 'La Habana',
+        latitude: 23.13,
+        longitude: -82.38,
+        openingHours: [{ day: 'Monday', opens: '09:00', closes: '17:00' }],
+      }),
+    });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
+    mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
+  });
+
+  it('sends updateLocation with the whole block converted to the wire shape', async () => {
+    const { UpdateStorePage } = await import('../update-store');
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText(/teléfono público/i), {
+      target: { value: '+53 5555 9999' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => {
+      expect(mockUpdateStore).toHaveBeenCalledTimes(1);
+    });
+    const payload = mockUpdateStore.mock.calls[0][1];
+    expect(payload.updateLocation).toBe(true);
+    expect(payload.publicPhone).toBe('+53 5555 9999');
+    expect(payload.addressCity).toBe('La Habana');
+    // Coordinates travel as numbers, not as the form's strings.
+    expect(payload.latitude).toBe(23.13);
+    expect(payload.longitude).toBe(-82.38);
+    expect(payload.openingHours).toEqual([{ day: 'Monday', opens: '09:00', closes: '17:00' }]);
   });
 });
 

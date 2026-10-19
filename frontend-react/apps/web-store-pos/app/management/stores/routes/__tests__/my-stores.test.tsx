@@ -24,8 +24,9 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     nextDueDate: '2026-11-01',
     modules: [],
     planType: 'Pago',
-    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 8 with the
-    // discount — matching the P2 struck-through shape the price tests assert on.
+    // Price the backend sends for the store: the sum of its OWN active modules (the
+    // billing formula, owner decision 2026-10-13) — 10 originally, 8 with the
+    // discount, the P2 struck-through shape the price tests assert on.
     planPrice: 10,
     planCurrentPrice: 8,
     ...overrides,
@@ -372,10 +373,11 @@ describe('MyStoresPage — card rendering', () => {
     expect(screen.queryByTestId('owner-store-price-s1')).toBeNull();
   });
 
-  it('renders the canonical price even when the module snapshot disagrees (plan 2026-09-15)', async () => {
-    // The whole point of the canonical price: the frozen StoreModule snapshot may
-    // carry whatever historical prices it wants — the card shows the plan's
-    // catalog price (original 20 struck through, current 12).
+  it('renders the price the backend sends as-is, without recomputing it from the module rows', async () => {
+    // The price fields carry the store's OWN active-module sum (billing formula,
+    // owner decision 2026-10-13). The card must render exactly what the backend
+    // sends — original 20 struck through, current 12 — and never fall back to the
+    // module rows it also receives.
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
@@ -401,8 +403,9 @@ describe('MyStoresPage — card rendering', () => {
   });
 
   it('shows the paid plan with the next due date and the struck-through discounted price (P2)', async () => {
-    // Canonical price arrives serialized per store (plan 2026-09-15) — the card
-    // renders it as-is; no catalog merge participates.
+    // Price arrives serialized per store (the sum of its active modules, owner
+    // decision 2026-10-13) — the card renders it as-is; no client-side price
+    // computation participates.
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [makeOwnerStore({ id: 's1' })],
@@ -683,6 +686,47 @@ describe('MyStoresPage — Editar el plan popup', () => {
     expect(
       screen.getByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
     ).toBeInTheDocument();
+  });
+
+  it('shows the store OWN Superior plan even though the owner cannot target it', async () => {
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeOwnerStore({
+          id: 's1',
+          name: 'Alpha',
+          planType: 'Superior',
+          modules: [],
+          nextDueDate: '2026-08-01',
+        }),
+      ],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    const { MyStoresPage } = await import('../my-stores');
+    render(
+      <Wrapper>
+        <MyStoresPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('owner-store-actions-toggle-s1'));
+    fireEvent.click(screen.getByTestId('owner-store-edit-plan-s1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+    });
+    // Every self-registered store is born on Superior (2026-10-11): the owner
+    // must SEE the plan they are on, or no panel would be active at all.
+    const superiorHeader = screen.getByRole('button', { name: /Superior/ });
+    expect(superiorHeader).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Incluye todo lo del plan Pago y además:')).toBeInTheDocument();
+    // Gratis stays available as the downgrade…
+    expect(screen.getByRole('button', { name: /Gratis/ })).toBeInTheDocument();
+    // …and the reserved plan is read-only: no activation button for it.
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
+    ).not.toBeInTheDocument();
   });
 
   it('lets an owner on a FREE store activate a paid plan', async () => {

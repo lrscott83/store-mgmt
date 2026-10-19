@@ -21,7 +21,7 @@ namespace Infrastructure.Persistence.Repositories
             return await _owners
                 .Where(o => includeInactive || o.IsActive)
                 .Include(o => o.User)
-                .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
+                .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive)).ThenInclude(sm => sm.Module)
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StorePayments)
                 .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
                 .IgnoreQueryFilters()
@@ -43,7 +43,7 @@ namespace Infrastructure.Persistence.Repositories
                 .Where(o => o.Id == ownerId)
                 .Include(o => o.User)
                 .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
-                .Include(o => o.Stores.Where(s => s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
+                .Include(o => o.Stores.Where(s => s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive)).ThenInclude(sm => sm.Module)
                 .IgnoreQueryFilters()
                 .Take(1)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -78,7 +78,7 @@ namespace Infrastructure.Persistence.Repositories
             return await _owners
                 .Where(o => o.ReSellerOwner != null && o.ReSellerOwner.ReSeller != null && o.ReSellerOwner.ReSeller.UserId == reSellerId && (includeInactive || o.IsActive))
                 .Include(o => o.User)
-                .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
+                .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive)).ThenInclude(sm => sm.Module)
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StorePayments)
                 // OwnerProfile maps ReSellerName from this navigation chain. Without it the
                 // .Where above still filters correctly (it runs in SQL) but ReSellerOwner is

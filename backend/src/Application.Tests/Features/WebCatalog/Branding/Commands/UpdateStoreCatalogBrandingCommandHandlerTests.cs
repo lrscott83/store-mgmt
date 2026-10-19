@@ -3,6 +3,7 @@ using Application.Abstractions.Storage;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Branding;
 using Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBranding;
+using Application.Features.WebCatalog.Public;
 using Application.UnitOfWorks;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
@@ -49,6 +50,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
     private readonly Mock<ILogger<UpdateStoreCatalogBrandingCommandHandler>> _logger = new();
+    private readonly Mock<ICatalogStaticPageRegenerator> _catalogPageRegenerator = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -95,7 +97,31 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _settingsRepository.Object,
         _catalogImageStorage.Object,
         _localizer.Object,
-        _logger.Object);
+        _logger.Object,
+        _catalogPageRegenerator.Object);
+
+    /// <summary>
+    /// El tenant de la CLAVE del archivo (y de la fila) sale de la TIENDA, no del claim. Si saliera del
+    /// claim, un SuperAdmin escribiendo la tienda de otro tenant guardaría el archivo bajo SU prefijo y
+    /// el endpoint de media —que valida contra el tenant de la tienda— respondería 404.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldUseTheStoreTenantForTheFileKeyNotTheCallersClaim()
+    {
+        Guid callerTenant = Guid.NewGuid();
+        Guid storeTenant = Guid.NewGuid();
+        _httpContextService.Setup(x => x.TenantId).Returns(callerTenant.ToString());
+        _storeRepository.Setup(x => x.GetStoreByIdAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda de otro tenant", Guid.NewGuid(), true, storeTenant));
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
+
+        _catalogImageStorage.Verify(x => x.SaveBrandingAsync(
+            It.IsAny<CatalogImageUpload>(), storeTenant, _storeId, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 
     /// <summary>Archivo de marca válido: jpg de 1 KB. Los bytes no se miran, solo la cabecera.</summary>
     private static CatalogImageUpload Logo(string fileName = "logo.jpg", string contentType = "image/jpeg", long length = 1024)

@@ -126,9 +126,22 @@ async function readEnvelope<T>(page: Page, url: string, what: string): Promise<T
   return body.data;
 }
 
-/** The live plan catalog — the single source for the expected grouping. */
-export async function readPlanCatalog(page: Page): Promise<PlanCatalogPlan[]> {
-  return readEnvelope<PlanCatalogPlan[]>(page, `${E2E_API_URL}/v1/plans`, 'GET /v1/plans');
+/**
+ * The live plan catalog — the single source for the expected grouping.
+ *
+ * `includeInactiveModules` mirrors the page's own read: the module catalog editor passes
+ * `true` so a deactivated module stays grouped under its plan (the backend otherwise strips
+ * inactive modules from `plan.modules`). The default keeps the active-only shape the
+ * plan-change specs rely on.
+ */
+export async function readPlanCatalog(
+  page: Page,
+  includeInactiveModules = false,
+): Promise<PlanCatalogPlan[]> {
+  const url = includeInactiveModules
+    ? `${E2E_API_URL}/v1/plans?includeInactiveModules=true`
+    : `${E2E_API_URL}/v1/plans`;
+  return readEnvelope<PlanCatalogPlan[]>(page, url, 'GET /v1/plans');
 }
 
 /** The store's own module pricing seed, exactly as the modal opens with it. */

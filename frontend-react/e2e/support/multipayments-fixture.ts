@@ -8,17 +8,17 @@ import { readBearerToken } from './auth-storage';
  * module-15 facts corrected 2026-10-03).
  *
  * ── The two modules are NOT interchangeable (2026-10-03) ──────────────────
- * A self-registered store is born on the **Pago** plan: `RegisterService.cs`
- * grants that plan's modules and deliberately withholds the Superior/VIP-only
- * ones — 13 Warehouses, 14 MultiStores, **15 MultiMonedas**, 16 MultiPayments,
- * 17 Elaboration. Module 15 ships with Superior and VIP ONLY
- * (`Catalog.MultiMonedasCatalogTests`). So a fresh store carries NEITHER 15 nor
- * 16, and every spec that needs either must seed it.
+ * **Birth plan is Superior again (owner decision 2026-10-13).** The commit
+ * `store-birth-superior` (2026-10-11) replaced `store-birth-pago-only`:
+ * `RegisterService.cs` delegates to `CreateStoreService`, which is born on the
+ * **Superior** plan and grants exactly its catalog. So a newly registered store
+ * **already carries module 15 (MultiMonedas)** and 13/14/17 — but NOT 16
+ * (MultiPayments, VIP-only) and not the VIP-exclusive ones.
  *
- * An older version of this comment claimed the birth plan was Superior with
- * modules 2..15, "therefore no 16". That premise is what made this fixture seed
- * module 16 alone, and it is why three specs stayed red for weeks: the screens
- * they drive need module 15, which nobody seeded.
+ * Consequence for specs: a NEGATIVE precondition ("without module 15 the menu
+ * entry is absent") can no longer be ASSUMED from the plan — it has to be
+ * CONSTRUCTED with `disableStoreModule`. An older version of this comment
+ * claimed the birth plan was Pago; that is stale.
  *
  * `CHANNEL_RATES_MODULES` is the set for the "Tasas de Cambio" page. That page
  * is gated by MultiMonedas ALONE — the menu entry carries
@@ -42,6 +42,15 @@ export const MULTIPAYMENTS_MODULE_ID = 16;
 
 /** ModuleType.MultiMonedas (domain enums/index.ts:72). Gates every currency surface. */
 export const MULTIMONEDAS_MODULE_ID = 15;
+
+/**
+ * ModuleType.MultiStores (domain enums/index.ts). Gates the active-store
+ * selector on `/management/configurations` and the `/management/stores/create`
+ * route (`ownerStoresGate`, loaders.ts:158-169). Also part of the Superior
+ * birth plan, so specs that need its ABSENCE build it with `disableStoreModule`
+ * instead of assuming a Pago store.
+ */
+export const MODISTORES_MODULE_ID = 14;
 
 /**
  * Precondition of the "Tasas de Cambio" page and the cart currency selector:
@@ -178,6 +187,58 @@ export async function enableStoreModules(
 ): Promise<void> {
   for (const moduleId of moduleIds) {
     await enableStoreModule(page, storeId, moduleId);
+  }
+}
+
+/**
+ * Removes `moduleId` from the store (deletes its `StoreModule` row), then pins the
+ * result through the real API. This is how a NEGATIVE precondition is built now
+ * that a newly registered store is born on the **Superior** plan and therefore
+ * already carries module 15: "without 15 the menu entry is absent" cannot be
+ * assumed, it has to be constructed.
+ *
+ * Like `enableStoreModule`, it is a SERVER-SIDE mutation: callers must use a
+ * PRIVATE identity, never the shared persona (`e2e/README.md`), and must refresh
+ * the session (drop the cached profile and reload) before asserting module-gated UI.
+ */
+export async function disableStoreModule(
+  page: Page,
+  storeId: string,
+  moduleId: number,
+): Promise<void> {
+  await requireBearer(page);
+  if ((await readStoreModules(page, storeId)).includes(moduleId)) {
+    await deleteStoreModuleRow(storeId, moduleId);
+  }
+  const after = await readStoreModules(page, storeId);
+  if (after.includes(moduleId)) {
+    throw new Error(
+      `multipayments-fixture: precondition mismatch — module ${moduleId} is still present on ` +
+        `store ${storeId} after the direct-DB delete (observed [${after.join(',')}]). ` +
+        'The negative gate assertion cannot be trusted.',
+    );
+  }
+}
+
+async function deleteStoreModuleRow(storeId: string, moduleId: number): Promise<void> {
+  const connectionString = process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL;
+  const client = new Client({ connectionString });
+  try {
+    await client.connect();
+    await client.query('BEGIN');
+    await client.query('DELETE FROM "StoreModule" WHERE "StoreId" = $1 AND "ModuleId" = $2', [
+      storeId,
+      moduleId,
+    ]);
+    await client.query('COMMIT');
+  } catch (cause) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw new Error(
+      `multipayments-fixture: removing module ${moduleId} from store ${storeId} failed — the ` +
+        `precondition was not written: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  } finally {
+    await client.end();
   }
 }
 

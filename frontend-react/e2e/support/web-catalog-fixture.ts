@@ -57,7 +57,13 @@ export interface WebCatalogOwnerMint {
  * a downstream assertion.
  */
 export async function mintWebCatalogOwner(page: Page, browser: Browser): Promise<WebCatalogOwnerMint> {
-  // 1. Register the owner (creates Owner + store on the Pago birth plan).
+  // 1. Register the owner. Since the birth-plan decision of 2026-10-13
+  // (`store-birth-superior`) this store is born on SUPERIOR and already carries
+  // module 18 (the only plan that does) — so the change-plan POST in step 4 is
+  // now an idempotent no-op (ChangeStorePlanCommandHandler returns early when
+  // the store is already on the target plan). It is kept because it still pins
+  // the endpoint contract and fails loudly if it ever changes; the /me pin and
+  // the session assertion are what actually prove the precondition.
   const identity = newTestIdentity();
   const registerPage = new RegisterPage(page);
   await registerPage.goto();

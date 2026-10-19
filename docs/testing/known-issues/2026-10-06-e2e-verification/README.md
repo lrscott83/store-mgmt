@@ -16,6 +16,14 @@ su texto completo sigue en el historial de git y su resumen está en el
 | [`03-store-switcher-refresh-boton-crear-no-aparece.md`](03-store-switcher-refresh-boton-crear-no-aparece.md) | ✅ **causa raíz confirmada** | Corrida del 2026-10-05 (SWR-1): el botón de crear tienda no apareció en 120 s. **La selección persistida en la base apunta a una tienda creada por la interfaz (plan Pago, sin el módulo 14)**: el `/me` no trae el 14 y el botón no existe. Reproducido de forma determinista y **fix aplicado y verificado el 2026-10-06** (realineado de la selección, autorización 1 a 1) |
 | [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **fix aplicado y verificado** | Locator acotado a `getByText('Actual', { exact: true })` el 2026-10-06 (autorización 1 a 1): la sonda midió que el locator viejo casa con **2 nodos distintos** (aviso + marca) y el nuevo con 1. Spec verde dos corridas seguidas en solitario (22.4 s / 21.7 s) |
 | [`funcionan-en-solitario.md`](funcionan-en-solitario.md) | inventario | No es una ficha: es la medición de qué specs pasan cuando se corren solos, con el comando exacto y las reglas para mantenerla |
+| [`05-store-create-security-owneradmin-sin-multistores-no-redirige.md`](05-store-create-security-owneradmin-sin-multistores-no-redirige.md) | ✅ **resuelto** (defecto del test; causa raíz confirmada: nacimiento en Superior) | El OwnerAdmin "sin MultiStores" ya no existe: la tienda nueva nace con el 14. El test ahora **desactiva** el 14 y afirma el redirect. `2 passed` |
+| [`06-plan-catalog-superadmin-superior-sin-multimonedas.md`](06-plan-catalog-superadmin-superior-sin-multimonedas.md) | ✅ **resuelto** (defecto del test; causa raíz confirmada: acordeón de estado único) | El clic sobre el panel ya activo lo **colapsaba**. `expandPlanPanel()` solo pulsa cuando `aria-expanded !== 'true'`. `2 passed` |
+| [`07-web-catalog-locator-file-ambiguo.md`](07-web-catalog-locator-file-ambiguo.md) | ✅ **resuelto** (defecto del test; dos locators ambiguos) | `input[type="file"]` casaba con 4 inputs y `Guardar` con 2 botones. Acotados a `[data-testid^="catalog-upload-"]` y `catalog-save-all-button`. `1 passed` |
+| [`08-channel-rates-nacimiento-superior-vs-pago.md`](08-channel-rates-nacimiento-superior-vs-pago.md) | 🔴 **abierto** (causa raíz CONFIRMADA — discrepancia de negocio) | **Primer fallo de la corrida completa del 2026-10-13**: las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`), que trae MultiMonedas (15); el spec y `main` asumen plan **Pago**. Requiere decisión del owner |
+
+> Las fichas **05 a 07** son de la verificación del **2026-10-13** (la carpeta conserva el nombre de la
+> última verificación; ver la regla de la carpeta al final). En esa misma verificación se re-corrieron
+> en aislamiento los specs de las fichas 01 a 04 y **pasan** (ver "Barrido de confirmación").
 
 ## Cómo se corrieron estas fichas
 
@@ -68,6 +76,23 @@ quedaron aplicadas y verificadas las opciones 2 a 4: `actionTimeout: 30_000` +
 y error nombrado en `session.ts`, y `workers` local default 4. Causa raíz definitiva medida con
 trace: el registro aborta (`net::ERR_ABORTED`) y el `waitForURL` del mint era espera infinita
 (`navigationTimeout` default 0). Ningún test E2E se tocó.
+
+## Barrido de confirmación (2026-10-13)
+
+Verificación dirigida: `pnpm exec playwright test e2e/store-create-security.spec.ts
+e2e/change-password.spec.ts e2e/store-switcher-refresh.spec.ts e2e/category-crud.spec.ts
+e2e/web-catalog.spec.ts e2e/plan-catalog-superadmin.spec.ts --workers=2 --retries=0` → **11 passed /
+3 failed** (1.6 m). Sin reintentos, así que lo que falla es determinista.
+
+| Ficha | Spec re-corrido | Veredicto 2026-10-13 |
+| --- | --- | --- |
+| 01 `change-password` | `change-password.spec.ts` | ✅ Pasa (spec completo) |
+| 02 `store-create-security` | `store-create-security.spec.ts` | ⚠️ El test de la ficha (StoreUser, hoy `:96`) **pasa**; el spec tiene un **test nuevo que falla** (`:51`) → **ficha 05** |
+| 03 / 04 `store-switcher-refresh` | `store-switcher-refresh.spec.ts` | ✅ Pasa (spec completo) |
+| — (primer fallo de la corrida completa) | `category-crud.spec.ts` | ✅ **Pasa en aislamiento** → era **inestable de carga**, no un defecto |
+
+> Las fichas 01 a 04 quedan **vivas pero verdes en aislamiento**: no se retiran porque su spec no está
+> en verde de forma sostenida en la corrida completa; el dato de hoy es que pasan solas.
 
 ## Registro de fichas retiradas
 

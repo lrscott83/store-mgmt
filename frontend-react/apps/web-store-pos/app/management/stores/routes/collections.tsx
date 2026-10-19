@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { PaymentConfirmModal } from '~/management/stores/components/payment-confirm-modal';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatDateOnly } from '~/shared/lib/date-utils';
@@ -15,15 +16,35 @@ import type { StoreToCollect } from '@store-mgmt/domain';
 // DIFFERENT feature id — do not conflate with EFeatures.Owners.
 export const clientLoader = resellerFeatureLoader([EFeatures.StorePayment]);
 
+/** Empty text -> null; a non-finite value -> null. Optional popup values are never guessed. */
+function toOptionalNumber(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Two decimals — the money precision the popup shows and the payment stores. */
+function toMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 /**
  * Read-only projection of backend-computed collections state (design.md — the
- * client adds zero entitlement/billing math). "Registrar pago" marks a store's
- * pending payment as collected then reloads the list.
+ * client adds zero entitlement/billing math). "Registrar pago" opens a confirmation popup
+ * with the charged amount and the two OPTIONAL values (exchange rate, total paid); confirming
+ * registers the payment then reloads the list.
  */
 export function CollectionsPage() {
   const intl = useIntl();
   const [rows, setRows] = useState<StoreToCollect[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  // Register-payment popup. The row under confirmation owns the amount; the route owns
+  // the two optional values so the modal stays presentational.
+  const [confirmRow, setConfirmRow] = useState<StoreToCollect | null>(null);
+  const [rate, setRate] = useState('');
+  const [totalPaid, setTotalPaid] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const loadRows = useCallback(async () => {
     try {
@@ -43,12 +64,52 @@ export function CollectionsPage() {
     loadRows();
   }, [loadRows]);
 
-  async function handleRegisterPayment(storeId: string) {
+  function openConfirm(row: StoreToCollect) {
+    setConfirmRow(row);
+    setRate('');
+    setTotalPaid('');
+    setModalError('');
+  }
+
+  function closeConfirm() {
+    if (saving) return;
+    setConfirmRow(null);
+    setModalError('');
+  }
+
+  /**
+   * Typing the rate recomputes the total (`amount × rate`) so the operator sees the CUP
+   * amount immediately; the field stays editable, so the last value typed is what is stored.
+   * Clearing the rate leaves the total as the operator left it.
+   */
+  function handleRateChange(value: string) {
+    setRate(value);
+    if (!confirmRow) return;
+    const parsed = toOptionalNumber(value);
+    if (parsed !== null && parsed > 0) {
+      setTotalPaid(String(toMoney(confirmRow.amount * parsed)));
+    }
+  }
+
+  async function handleConfirm() {
+    if (!confirmRow || saving) return;
+    setModalError('');
+    setSaving(true);
     try {
-      await storeHttpService.registerStorePayment(storeId);
+      const saved = await storeHttpService.registerStorePayment(confirmRow.storeId, {
+        exchangeRate: toOptionalNumber(rate),
+        amountPaid: toOptionalNumber(totalPaid),
+      });
+      if (!saved.succeeded) {
+        setModalError(intl.formatMessage({ id: 'BILLING.COLLECTIONS.ERROR' }));
+        return;
+      }
+      setConfirmRow(null);
       await loadRows();
     } catch (error) {
-      setError(intl.formatMessage({ id: httpErrorKey(error, 'BILLING.COLLECTIONS.ERROR') }));
+      setModalError(intl.formatMessage({ id: httpErrorKey(error, 'BILLING.COLLECTIONS.ERROR') }));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -108,7 +169,7 @@ export function CollectionsPage() {
                     {intl.formatMessage({ id: `BILLING.STATUS.${row.status}` })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button variant="outline" onClick={() => handleRegisterPayment(row.storeId)}>
+                    <Button variant="outline" onClick={() => openConfirm(row)}>
                       {intl.formatMessage({ id: 'BILLING.COLLECTIONS.REGISTER_PAYMENT' })}
                     </Button>
                   </td>
@@ -118,6 +179,20 @@ export function CollectionsPage() {
           </table>
         </div>
       )}
+
+      <PaymentConfirmModal
+        open={confirmRow !== null}
+        storeName={confirmRow?.storeName ?? ''}
+        amount={confirmRow?.amount ?? 0}
+        rate={rate}
+        totalPaid={totalPaid}
+        saving={saving}
+        error={modalError}
+        onRateChange={handleRateChange}
+        onTotalPaidChange={setTotalPaid}
+        onConfirm={handleConfirm}
+        onClose={closeConfirm}
+      />
     </div>
   );
 }

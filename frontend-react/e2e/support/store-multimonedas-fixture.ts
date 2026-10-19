@@ -22,7 +22,9 @@ import { mintSuperAdmin } from './superadmin-session';
  *      a non-SuperAdmin caller may only target Gratis/Pago — Superior/VIP are
  *      SuperAdmin-reserved, so this is the ONLY legitimate API caller that
  *      can put module 15 into a store. The store upgraded is the minted
- *      owner's OWN freshly-registered store.
+ *      owner's OWN freshly-registered store. (Since the 2026-10-13 birth-plan
+ *      decision the store is born on Superior already and this POST is an
+ *      idempotent no-op; see the note at the call site.)
  *   4. Pin the backend state through the API (GET /v1/stores/{id} → module 15
  *      active).
  *   5. Owner re-login → `/me` is fetched fresh and the session carries module
@@ -59,7 +61,14 @@ export async function mintMultiMonedasOwner(
   page: Page,
   browser: Browser,
 ): Promise<MultiMonedasOwnerMint> {
-  // 1. Register the owner (creates Owner + store on the Pago birth plan).
+  // 1. Register the owner. Since the birth-plan decision of 2026-10-13
+  // (`store-birth-superior`) this store is born on SUPERIOR and already carries
+  // module 15 + feature 43 — so step 3 below is now an idempotent no-op POST
+  // (ChangeStorePlanCommandHandler returns early when the store is already on
+  // the target plan). The call is kept because it still pins the endpoint
+  // contract and fails loudly if that contract ever changes; the steps after it
+  // (the /me pin, the re-login, the session assertion) are what actually prove
+  // the precondition.
   const identity = newTestIdentity();
   const registerPage = new RegisterPage(page);
   await registerPage.goto();

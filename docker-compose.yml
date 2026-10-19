@@ -42,6 +42,15 @@ services:
       - SmtpSettings__Password=${SMTP_PASSWORD}
       - SmtpSettings__FromEmail=${SMTP_FROM_EMAIL}
       - SmtpSettings__EnableSsl=${SMTP_ENABLE_SSL}
+      # Página estática del catálogo público (feature public-catalog-static-pages). La API escribe
+      # <OutputRoot>/catalog/<slug>/index.html en el volumen compartido y lee <ShellPath> —el shell
+      # del SPA que publica web-store-pos en ese mismo volumen— para inyectarle el <head>.
+      # PublicBaseUrl debe ser la URL absoluta del sitio: el canonical y las URLs de imagen tienen
+      # que ser absolutas porque el HTML se sirve estático y los rastreadores no resuelven relativas.
+      # Sin ShellPath ni OutputRoot la feature queda apagada (el regenerador se calla).
+      - CatalogStaticPage__OutputRoot=/srv/catalog-pages
+      - CatalogStaticPage__ShellPath=/srv/catalog-pages/shell/index.html
+      - CatalogStaticPage__PublicBaseUrl=${PUBLIC_BASE_URL:-https://pos.playground.sceiba.net}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s
@@ -53,6 +62,10 @@ services:
       # El Dockerfile crea el directorio con dueño `app`; con un named volume el primer mount
       # copia ese dueño, así la API no-root puede escribir y las imágenes sobreviven a redeploys.
       - storage_data:/app/storage
+      # Páginas pre-generadas del catálogo (feature public-catalog-static-pages) + el shell del SPA
+      # que publica web-store-pos. Mismo camino en los dos contenedores para que OutputRoot y la
+      # raíz de nginx sean el mismo directorio.
+      - catalog_pages:/srv/catalog-pages
     depends_on:
       - postgres
     restart: always
@@ -95,10 +108,19 @@ services:
     build:
       context: ./frontend-react
       dockerfile: Dockerfile
+      args:
+        # Canonical/og:url de la landing. Mismo valor que usa la API para los
+        # catálogos (CatalogStaticPage__PublicBaseUrl), para no tener dos fuentes.
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://pos.playground.sceiba.net}
     container_name: smca_web_pos
     restart: always
     ports:
       - "8085:80"
+    volumes:
+      # El mismo volumen que la API. Aquí nginx sirve las páginas generadas (location del catálogo en
+      # frontend-react/deploy/nginx.conf) y el entrypoint publica el shell + archiva los assets del
+      # build para que las páginas aún no regeneradas sigan cargando (S9).
+      - catalog_pages:/srv/catalog-pages
     depends_on:
       - api
     networks:
@@ -107,6 +129,7 @@ volumes:
   postgres_data:
   pgadmin-data:
   storage_data:
+  catalog_pages:
 
 networks:
   postgres_network:

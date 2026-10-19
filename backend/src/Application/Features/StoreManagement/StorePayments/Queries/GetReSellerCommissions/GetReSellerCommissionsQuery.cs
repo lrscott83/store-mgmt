@@ -59,7 +59,11 @@ internal sealed class GetReSellerCommissionsQueryHandler
                 Year = g.Key.Year,
                 Month = g.Key.Month,
                 PaymentCount = g.Count(),
-                TotalCommission = g.Sum(p => p.ReSellerAmount),
+                // Currency split (product rule 2026-10-13): a commission computed over the
+                // total paid is in CUP (AmountPaid set); otherwise it is in USD. Two totals,
+                // never mixed into one.
+                TotalCommission = g.Where(p => p.AmountPaid == null).Sum(p => p.ReSellerAmount),
+                TotalCommissionCup = g.Where(p => p.AmountPaid != null).Sum(p => p.ReSellerAmount),
             })
             .OrderByDescending(r => r.Year)
             .ThenByDescending(r => r.Month)

@@ -13,6 +13,14 @@ export const EXPENSES_HEADER = 'Gastos del día';
 export const NEW_EXPENSE_TITLE = 'Adicionar Gasto';
 export const EXPENSE_BUTTON = 'Gasto';
 
+/**
+ * Testid of the expense modal's CURRENCY select. It only renders with the
+ * MultiMonedas module (15) — which every store born on the Superior plan has
+ * since 2026-10-13 — so its presence is itself the module gate, and its absence
+ * shifts every later `<select>` index by one.
+ */
+export const EXPENSE_CURRENCY_SELECT = 'expense-currency-select';
+
 /** Opens the expense create modal on `/expenses/today` (create mode, no save). */
 export async function openExpenseFormModal(page: Page): Promise<void> {
   await page.goto('/expenses/today');
@@ -22,13 +30,20 @@ export async function openExpenseFormModal(page: Page): Promise<void> {
 }
 
 /**
- * Payment-method combobox inside the expense modal: the 2nd `<select>` in the
- * dialog (the 1st is the expense type; the currency select only renders with
- * the MultiMonedas module, which the E2E personas' Pago store does not have).
+ * Payment-method combobox inside the expense modal: the LAST `<select>` in the
+ * dialog. The dialog renders type → currency → payment method, and the CURRENCY
+ * select only exists with the MultiMonedas module (15) — which a newly
+ * registered store now always has, since the birth plan is Superior (owner
+ * decision 2026-10-13). The old `nth(1)` index silently pointed at the currency
+ * select in that layout and read 7 currency codes as "payment options".
+ *
+ * Targeting the last combobox is correct in BOTH layouts: without module 15 the
+ * dialog has [type, payment] and with it [type, currency, payment]. The note
+ * field is a `<textarea>`, so it never matches a combobox.
  */
 export function expensePaymentSelect(page: Page) {
   const dialog = page.getByRole('dialog');
-  return dialog.getByRole('combobox').nth(1);
+  return dialog.getByRole('combobox').last();
 }
 
 /** Visible option labels of the expense modal's payment-method select. */

@@ -1,0 +1,269 @@
+# Feature — Páginas estáticas indexables por catálogo público
+
+**Objetivo:** que cada catálogo público (`/catalog/<slug>`) se sirva con HTML que ya contenga título,
+descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y** las redes/WhatsApp
+(que no ejecutan JS) lo vean — **sin tocar el SPA del POS**.
+**Rama:** `test` (despliega al entorno de pruebas; `main` solo para la verificación con Google) · **Delivery:** work-unit commits, deploy manual del owner.
+
+## Specs
+
+- **S1** — Cada `/catalog/<slug>` se sirve con HTML que YA contiene (sin ejecutar JS): `<title>`,
+  `<meta name="description">`, `<link rel="canonical">`, Open Graph (`og:type`, `og:title`,
+  `og:description`, `og:url`, `og:image`, `og:site_name`, `og:locale`) y `twitter:card`. El resto de
+  la página sigue siendo el SPA actual (misma experiencia; el catálogo interactivo no cambia).
+- **S2** — Los datos salen de la configuración de tienda/catálogo guardada en la BD. La página se
+  **regenera** cuando esos datos cambian.
+- **S3** — Para los catálogos **ya existentes** se generan una vez (**backfill**) y se regeneran en
+  cada deploy. La regeneración es automática; el owner no edita páginas a mano.
+- **S4** — nginx sirve la página pre-generada si existe; si no, cae al SPA como hoy (nada se rompe).
+- **S5** — `sitemap.xml` generado con todos los slugs publicados + `robots.txt` que lo referencia
+  (arranque de indexación; ya con Search Console verificado).
+- **S6** (fase posterior) — Campos de ubicación por tienda (dirección estructurada, teléfono,
+  coordenadas, horario) + JSON-LD `schema.org` para la ficha de Google Maps/Search.
+- **S7** — El POS no se toca: las rutas autenticadas y su SPA quedan idénticas.
+- **S8** — **Todo el catálogo web sigue funcionando igual**: la página servida es el **MISMO shell del
+  SPA** (mismos assets hasheados, mismo bootstrap) con metadatos añadidos en `<head>`. El navegador
+  carga la misma app, así que carrito, checkout, pedidos por WhatsApp, estado del pedido, catálogo,
+  marca, escaparate y **gestión de pedidos** (módulos 18 WebCatalog, 19 PedidosWhatsApp y 20
+  GestionPedidos) no cambian. La API pública (`/api/v1/public/catalog/**`, `/public/ordering/**`) y
+  las rutas del POS (`sales/web-catalog`, `sales/online-orders*`, `sales/orders`, `sales/today-orders`)
+  **no se tocan**.
+- **S9** — **La página generada debe regenerarse en CADA deploy del frontend.** Copia el shell del
+  build, y ese shell referencia assets con hash que cambian en cada build; una página no regenerada
+  apuntaría a assets inexistentes y rompería el catálogo. Por eso T6 (regeneración en deploy) es
+  REQUISITO DE CORRECCIÓN, no solo frescura, y el deploy debe dejar la ventana sin páginas válidas lo
+  más corta posible.
+- **S10** — nginx sirve la página pre-generada **solo** para la ruta exacta del catálogo
+  (`/catalog/<slug>`); cualquier otra ruta (assets, `/api`, `/hubs`, el resto del SPA) sigue como hoy.
+
+## Tasks
+
+| ID | Qué | S# | Ruta | Estado |
+|---|---|---|---|---|
+| T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | COMPLETADO (`dc03913e`) |
+| T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`0cda93ac`) |
+| T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
+| T4 | Disparador: regenerar al guardar la config/estado del catálogo público (sync + marca) | S2 | inline | COMPLETADO (`21a6c935`) |
+| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | inline (infra) | COMPLETADO (`14131b21` + `ec8c114c`) |
+| T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | inline | COMPLETADO (`6b4c4bc8`) |
+| T7 | `sitemap.xml` + `robots.txt` | S5 | inline | COMPLETADO (`917a4fa5`) |
+| T8a | Persistencia + captura: campos de ubicación en `Store`/DTO + `UpdateStoreCommand` (flag opt-in `updateLocation`) + serializador canónico del horario + migración/script | S6 | inline | COMPLETADO (`84713693`) |
+| T8b | JSON-LD `LocalBusiness` en el builder + mapeo en el generador | S6 | inline | COMPLETADO (`efd0fa40`) |
+| T8c | UI: bloque de ubicación en el formulario de edición + payload `updateLocation` + tipos del dominio | S6 | inline | COMPLETADO (`18eb9634`) |
+| T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | inline | COMPLETADO (`0d16d6e7`) |
+
+## Log
+
+- **L1 (2026-10-16, owner, verbatim):** "necesito que desde aqui desde Cuba poder poner en google map
+  un negocio de restaurante que tendria en catalago publico ... Lo que estoy buscando es visibilidad
+  en Internet." → investigación en `docs/google/2026-10-16-visibilidad-google-maps-cuba.md`.
+- **L2 (owner, verbatim):** "el POS no se puede cambiar eso es solo para los catalogos publicos que
+  estan en la ruta /catalog. Si es preciso podemos hacer por cada catalogo una pagina usando la misma
+  que tenemos en default para que se pueda indexar mejor todo ... Los datos los proporciona el
+  cliente y se guardaran en la BD, pero deben estar estaticos en la pagina mejor?"
+- **L3 (owner, verbatim):** "dale entonces. Pero entonces en el VPS como hago esto para los catalogos
+  que estan? Seria como actualizar los campos de configuracion del catalogo?"
+- **Evidencia (código):** `react-router.config.ts` → `ssr: false` (SPA estático deliberado); sin
+  `<title>` ni `meta` en el shell; el POS depende de estado en `localStorage` (por eso no se activa
+  SSR). `/catalog/:storeSlug` → `app/catalog/routes/public-catalog.tsx`; datos por
+  `catalogHttpService` desde el cliente. nginx: `try_files $uri /index.html`.
+- **L4 (progreso):** T1 completado (`b4967ea7`) — builder puro `CatalogStaticPageBuilder` +
+  6 tests. Suites: Application.Tests 1291/1291, Domain.UnitTests 165/165. Nota: se trabaja en `main`
+  (rama que despliega el owner); `main` va por detrás de `test`.
+- **L5 (owner, verbatim):** "dale y eso tiene que actualizar en la BD el template del catalogo que se
+  genero." → T2 completado. Sobre la BD: **descartado** por el owner (2026-10-16: "olvida lo de la
+  BD") — no se añade registro de generación; el template ya vive en `StoreCatalogSettings.TemplateId`.
+- **L6 (corrección de rama + progreso):** el owner ordenó que la feature viva en **test** (main solo
+  la verificación de Google). Cherry-pick a `test`: T1 `dc03913e`, T2 `0cda93ac` (los SHAs de los
+  commits originales en main quedaron obsoletos tras el reset). **T3 completado (`bdff2f10`)**:
+  `CatalogStaticPageGenerator` arma la página desde tienda + marca (logo/banner) con canonical y
+  media absolutos. Suites: Application.Tests 1335/1335, Domain.UnitTests 165/165.
+- **L7 (owner, verbatim):** "los pedidos por whatsapp y la gestion de pedidos todo eso se mantiene
+  funcionando no? ... revisa bien todos los features del catalago web con los tres modulos ..." →
+  **Sí, verificado**: la página generada es el mismo shell del SPA + meta, la API pública y las rutas
+  del POS no se tocan, y los tres módulos (18/19/20) siguen igual (S8). Hallazgos: **S9** (regenerar en
+  cada deploy es requisito de corrección por los assets hasheados) y **S10** (nginx sirve la página
+  solo para la ruta exacta del catálogo). Evidencia: `app/routes.ts`, `PublicCatalogController`,
+  `PublicOrderingController`.
+- **L8 (owner, verbatim):** "pero no es mejor hacer una pagina normal y se le pone a la tienda en el
+  catalogo id y ya?" → explicado el compromiso (una página plana para todos rompería carrito/pedidos);
+  el owner eligió **opción 1** (copia del SPA + meta), más la mitigación de **conservar los assets del
+  build anterior** (anotada en T5) para eliminar el riesgo de S9.
+- **L9 (owner, verbatim):** "y como se sabe que ese catalogo es de la tienda correspondiente? o todos
+  los cambios son en el template default?" → **por el slug**: `CatalogSlug` es **único global**
+  (índice parcial único, `StoreEntityTypeConfiguration.cs:29-31`), el SPA lo lee de la URL
+  (`public-catalog.tsx:50`) y el backend resuelve la tienda con `GetStoreByCatalogSlugAsync`. Cada
+  página vive en `catalog/<slug>/`. El template NO es compartido: es por tienda
+  (`StoreCatalogSettings.TemplateId`), "default" es solo el respaldo, y la página generada es
+  **independiente del template** (solo inyecta meta; el SPA aplica la vista al cargar). Los templates
+  son vistas sin lógica propia (`templates/registry.ts`, `template-ids.ts`), así que **T4 resuelve
+  igual con cualquier template presente o futuro**.
+- **L10 (progreso):** **T4 completado (`21a6c935`)** — `CatalogStaticPageRegenerator` best-effort +
+  wiring en `SyncCatalogCommandHandler` y `UpdateStoreCatalogBrandingCommandHandler` + registro en DI
+  y binding de `CatalogStaticPageOptions`. Nueva tarea **T9** (renombre de tienda) anotada. Suites:
+  Application.Tests 1338/1338, Domain.UnitTests 165/165.
+- **L11 (progreso + verificación):** **T5 completado** (`14131b21` infra + `ec8c114c` apagado/roto).
+  Volumen compartido `catalog_pages` montado en `/srv/catalog-pages` por la API y por nginx; el
+  entrypoint del frontend publica el shell del build en `<volumen>/shell/index.html` y **archiva los
+  assets de builds anteriores** (sin sobrescribir, sin borrar); nginx sirve la página generada **solo**
+  para la ruta exacta `/catalog/<slug>`, cae al SPA en todo lo demás y rescata del archivo el asset
+  cuyo hash ya no está en el build actual (S9). Config por entorno: `CatalogStaticPage__ShellPath`,
+  `__OutputRoot`, `__PublicBaseUrl` (default `https://pos.playground.sceiba.net`).
+  **Verificado con nginx real** — contenedor `nginx:alpine`, el `nginx.conf` del repo, no una copia:
+  **22/22 aserciones**. Página generada en la ruta exacta; SPA en slug inexistente, sub-ruta y slug
+  con mayúsculas (**S10**); CSP y `Cache-Control: no-cache` heredados en la generada; `/` y
+  `/sales/new` intactos (**S7/S8**); asset del build actual igual que antes; asset de un build anterior
+  servido desde el archivo; asset inexistente **404 y nunca HTML**; y el entrypoint publica el shell,
+  lo refresca en un build nuevo, archiva el asset nuevo, conserva el anterior y no sobrescribe lo ya
+  archivado — **con nginx arriba en los cuatro escenarios**.
+  Hallazgo de la verificación: si el script llega *sourceado* (archivo sin permiso de ejecución) un
+  `exit` dentro de él mataba el arranque de nginx → quedó sin `exit` ni `set -e`/`set -u`.
+  Pendiente en el VPS: subir `PUBLIC_BASE_URL` al `.env` solo si cambia el dominio (el compose trae el
+  default) y comprobar el arranque real de los dos contenedores durante el deploy (T6).
+- **L12 (2026-10-17, progreso + verificación):** **T6 completado (`6b4c4bc8`)** — mecanismo: sincronizador
+  automático del lado de la API, sin tocar los deploy scripts. `CatalogStaticPageSyncService`
+  (BackgroundService, registrado en `Program.cs`) corre una pasada completa al arrancar — **backfill** de
+  los catálogos existentes (S3) — y vigila la firma SHA-256 del shell del SPA cada 30 s (default; mínimo
+  efectivo 5 s): firma nueva = build nuevo del frontend = pasada completa de nuevo (S9). Con la feature sin
+  configurar el servicio no hace nada (ni abre la BD). El generador pasó a lecturas **públicas**
+  (`GetStoreByIdIgnoreQueryFiltersAsync` / `GetPublicByStoreIdAsync`): sin sesión el filtro global de tenant
+  no coincide con ninguna fila y la pasada habría generado CERO páginas en silencio — los flujos de guardado
+  (T4) obtienen la misma fila. Compose de test cableado igual que producción
+  (`catalog_pages:/srv/catalog-pages` en API y web-store-pos; `CatalogStaticPage__*` con
+  `PublicBaseUrl` default `https://vdt.playground.sceiba.net`).
+  **Evidencia:** RED 18 fallidos/28 pasan/46 → **GREEN 46/46** (filter `CatalogStaticPage`, 18 pruebas
+  nuevas); Application.Tests **1357/1357**; Domain.UnitTests **165/165**; E2E `WebCatalogPublicApiTests`
+  **8/8** (fixture real). **Sonda local end-to-end** con la API real contra `smca_test` (shell y salida en
+  temp fuera del repo; `CatalogSlug` temporal en la tienda `613b6022`, revertido después): (a) el arranque
+  escribió `pages/catalog/probe-bodega-t6/index.html` con title/canonical/OG de la tienda (1/1 escritas en
+  el log); (b) shell reescrito → página regenerada ~5 s después con el marcador y los assets nuevos, dos
+  "Shell nuevo detectado" con firma distinta; (c) sin cambio de shell no hay reescritura (mtime estable,
+  exactamente 2 detecciones). Fuera de T6 (anotado, no hecho): renombrar un slug
+  (`UpdateStoreCatalogSlugCommand`) deja huérfana la página del slug viejo — candidato a tarea propia.
+  Pendiente en el VPS: redeploy de test y comprobar el arranque real (backfill en la primera página y
+  regeneración ante un build nuevo del frontend).
+- **L13 (2026-10-17, RDD):** assessment nativo del slice de T6 (`gentle-ai review assess --base-ref
+  36a30639 --committed-only --json`; cubre `6b4c4bc8` + `e3e1db53`): risk **`medium`** (13 paths,
+  576 líneas), `review_due: false`, motivo **`under_budget`** → ninguna review nativa forzada; el slice
+  queda pendiente con base `36a30639` hasta que un commit posterior alcance el presupuesto. El modo RDD
+  está `on` (global). Los cierres de T1–T5 no registran assessment RDD en este documento.
+- **L14 (2026-10-19, corrección R4 + cierre de la review):** la review nativa del slice abierto
+  (`review-4b3e9a47f9e795cd`, base `b5f05daf`, lentes risk/resilience/reliability) llegó a
+  `correction_required` con un hallazgo CRITICAL — `R4-page-write-atomicity`: el writer escribía el
+  `index.html` servible con truncate+write (un fallo a mitad podía servir una página a medias con 200).
+  Corrección test-first (RED observado contra el writer previo → GREEN) commiteada en **`59262408`**:
+  temporal en el mismo directorio + rename atómico, limpieza del temporal en el fallo; 71+/2-;
+  Application.Tests **1359/1359**; 2 pruebas nuevas quedan como regresión. La validación dirigida quedó
+  **bloqueada por la tool**: dos intentos del `review-validator` fueron refusados por Go
+  (`role_capture_failed`: "admitted targeted-validator evidence does not match its request and digests")
+  pese a que el prompt materializado por la propia tool contiene el `request_hash` (`e1c19a51…`) que el
+  modelo repitió idéntico en ambos intentos — inconsistencia interna de gentle-ai (aparente defecto;
+  evidencia: payloads en `.git/gentle-ai/rejected-results/` + materialización reproducida en
+  solo-lectura). Decisión del owner: **no se reporta**; la review queda estacionada con su estado intacto
+  (autoridad sin quemar, sin comandos sustitutos) y se continúa con T7–T9. El fix vale por sí mismo
+  (commiteado y probado); la review era control adicional.
+- **L15 (2026-10-19, progreso + verificación):** **T7 completado (`917a4fa5`)** — el pase completo de
+  regeneración escribe además el índice de descubrimiento en la **raíz del volumen**: `sitemap.xml`
+  (una URL absoluta por catálogo público, la misma del canonical) y `robots.txt` (`User-agent: *` /
+  `Allow: /` / `Sitemap:` absoluto). Reglas:
+  - Solo se listan slugs que **resuelven público** (`GetStoreByCatalogSlugAsync`: tienda + owner + user
+    activos): `GetCatalogSlugsAsync` usa `IgnoreQueryFilters` sin filtros activos y podía listar
+    catálogos desactivados. Una página que falla al escribirse **no se quita** del sitemap (su URL sigue
+    siendo la canónica; el SPA la sirve).
+  - El índice se refresca solo en la **pasada completa** (arranque + shell nuevo del deploy), no en la
+    regeneración por guardado (S5: "arranque de indexación"); los share links cubren el descubrimiento a
+    mitad de ciclo. Escritura best-effort (aviso + se traga el error; `OperationCanceledException`
+    propaga) con el mismo writer atómico del R4 (temp en el mismo directorio + `File.Move(overwrite:true)`,
+    UTF-8 sin BOM).
+  - nginx: dos `location` exactas (`= /sitemap.xml`, `= /robots.txt`) con `root /srv/catalog-pages`,
+    `expires -1`, `try_files … @spa` — si el archivo falta cae al SPA como hoy; ninguna otra ruta cambia
+    (S10).
+  - **Evidencia:** RED 16 fallidos/52 pasan/68 → GREEN filter `CatalogStaticPage` **68/68** (20 pruebas
+    nuevas: 9 builder + 6 writer + 5 sincronizador); Application.Tests **1379/1379**; Domain.UnitTests
+    **165/165**; E2E `WebCatalogPublicApi` **8/8**. **nginx real 17/17** (`nginx:alpine` + el `nginx.conf`
+    del repo): sitemap/robots con su content-type (`text/xml`/`text/plain`), `Cache-Control: no-cache`,
+    CSP heredada, página de T5 intacta, `/` y `/sales/new` SPA, slug sin página → SPA, sub-ruta NO sirve
+    el archivo, y con el volumen vacío ambos caen al SPA.
+  - **Sonda end-to-end con la API real** (perfil `http-e2e` → `smca_test`; tienda `probe-t7` sembrada y
+    revertida después): `sitemap.xml` 185 B con
+    `<loc>https://vdt.playground.sceiba.net/catalog/probe-t7</loc>`, `robots.txt` 79 B con la línea
+    `Sitemap:`, y `catalog/probe-t7/index.html` 685 B con title/description/canonical/OG de la tienda (T6
+    intacto). Log: "Páginas estáticas de catálogo regeneradas: 1/1 escritas, 0 fallidas; sitemap.xml con
+    1 catálogos públicos." BD restaurada (0 tiendas/owners/slugs; el usuario `admin` es el SuperAdmin
+    pre-existente).
+  - **RDD:** assessment del slice T7 (`--base-ref 59262408 --committed-only`): **`medium`** (8 paths,
+    519 líneas), `review_due: false` (`under_budget`). El acumulado (`b5f05daf..HEAD`, 30 paths/2278
+    líneas) da `high` por la señal `shell_process` del deploy de T6 — `review_due: true`, pero **no se
+    inicia línea nueva**: hay una transacción ya ligada a ese rango (estacionada por el defecto de
+    herramienta, L14) y el owner dejó ese candidato sin revisar.
+  - **Fuera de T7 (anotado):** una tienda desactivada conserva su página servida (misma familia que el
+    huérfano del renombre de slug) — el sitemap sí deja de listarla.
+- **L16 (2026-10-19, progreso):** **T9 completado (`0d16d6e7`)** — `UpdateStoreCommandHandler` captura
+  nombre y descripción **persistidos** antes de mutar (después del gate SuperAdmin, así una descripción
+  que envía un OwnerAdmin y el comando ignora NO dispara la regeneración) y, tras `SaveChangesAsync`,
+  llama al regenerador best-effort solo si alguno cambió (S2: nombre/descripción → title/description).
+  Evidencia: RED **3 fallidos/2 pasan/5** → GREEN filter `UpdateStoreCommandHandler` **16/16** (5 pruebas
+  nuevas); Application.Tests **1384/1384**. Sin cambios de contrato (el endpoint y el comando ya
+  existían); Domain y E2E no aplican (sin cambio de dominio; en el entorno E2E la feature está apagada).
+  RDD: slice T9 (`--base-ref f9e27b42`): **`medium`** (3 paths, 181 líneas), `review_due: false`
+  (`under_budget`); acumulado T7+T9 (`--base-ref 59262408`): **`medium`** (12 paths, 755 líneas),
+  `review_due: false` (`under_budget`).
+- **L17 (2026-10-19, progreso + verificación):** **T8 completado en tres slices** — campos de ubicación
+  por tienda + JSON-LD `LocalBusiness` (S6):
+  - **T8a (`84713693`):** `Store` gana `PublicPhone`, `AddressCity`, `AddressProvince`, `Latitude`,
+    `Longitude` y `OpeningHoursJson` (la dirección estructurada reutiliza `Address` como calle; el país
+    es fijo `CU` y se decide en el JSON-LD). `OpeningHoursSerializer` es el contrato único del horario:
+    nombres schema.org en inglés (`Monday`..`Sunday`), `HH:mm` estricto de dos dígitos (`"9:00"` es
+    INVÁLIDO), `open < close`, máximo 2 rangos por día y 14 en total; vacío/null ⇒ `NULL` en la BD. El
+    **flag opt-in `UpdateLocation`** (default `false`) gobierna el bloque completo: nace de un hallazgo
+    del mapeo — `my-stores.tsx:107` (modal de renombre) envía `address: ''` y aplicar los campos
+    omitidos como null **borraba la ubicación** (y con ella el JSON-LD); sin flag, la ubicación queda
+    intacta (además arregla el borrado pre-existente de `Address` al renombrar). El formulario de datos
+    sí manda `updateLocation: true` con el bloque completo; vaciar un campo lo limpia. La regeneración
+    se dispara si cambió cualquier campo de ubicación (comparación antes/después de `SaveChangesAsync`).
+    Migración `20261019160559_AddStoreLocationFields` aplicada de verdad a `smca_test` y columnas
+    verificadas por psql; script `35-20261019-Add-Store-Location-Fields.sql` generado desde la
+    migración anterior y parcheado (header, `ON CONFLICT ("MigrationId") DO NOTHING;`, SELECTs de
+    verificación, ROLLBACK comentado). **Excepción TDD declarada:** el cableado mecánico
+    entidad/DTO/comando se escribió antes de sus pruebas (sin RED); la validación llegó con los tests.
+  - **T8b (`efd0fa40`):** el builder añade `<script type="application/ld+json">` tras las metas con el
+    nodo `LocalBusiness` construido solo con datos guardados: `name`/`url` siempre; `description`/
+    `image` si existen; `telephone`; `PostalAddress` (calle/ciudad/provincia + `addressCountry: "CU"`,
+    solo si hay alguna parte de la dirección); `geo` (GeoCoordinates, par completo);
+    `openingHoursSpecification` (un nodo por rango, día en inglés). Los campos ausentes se OMITEN (una
+    ficha corta es mejor que una inventada). Serialización con el encoder por defecto de
+    System.Text.Json: escapa `<`, `>` y `+` (`\u002B`) — un valor con `</script>` no puede cerrar el
+    bloque; es JSON válido, deliberado. El generador mapea la ubicación de la tienda +
+    `OpeningHoursSerializer.Parse`. **TDD con RED observado** (CS0246 al referenciar el contrato nuevo)
+    → GREEN.
+  - **T8c (`18eb9634`):** el formulario de tienda muestra el bloque de ubicación **solo en edición**
+    (el flujo de creación no lo toca): teléfono, ciudad, provincia, latitud/longitud (`type=number`) y
+    una fila por día con `type=time` de apertura/cierre; valida par de coordenadas y día a medio llenar
+    (claves nuevas `STORES.COORDINATES_PAIR_REQUIRED` / `STORES.OPENING_HOURS_INCOMPLETE`); emite solo
+    los días con AMBAS horas, la ruta convierte a números y añade `updateLocation: true`. El tipo
+    `Store` del dominio gana los campos + `OpeningHoursEntry`/`WeekdayName` (fixtures de 7 archivos de
+    test actualizadas). Red de seguridad: el endpoint devuelve `openingHours` ya parseado (el perfil
+    usa `OpeningHoursSerializer.Parse`), nunca el string JSON opaco.
+  - **Evidencia:** T8a serializer+comando 27/27 y Application.Tests 1406/1406 → T8b filter
+    `CatalogStaticPage` 90/90 → flag: handler 12/12 → **Application.Tests 1413/1413** (+7 sobre el
+    último conteo: 6 del builder/generador y 1 guarda del flag). Frontend: `store-form` 22/22 + prueba
+    de costura de la ruta (`updateLocation` + coordenadas numéricas) → **suite completa 392/392
+    archivos** (el único fallo intermedio — `login.offline.e2e.test.tsx`, sin relación — pasó aislado
+    4/4 y en la re-corrida: flake); typecheck app+domain limpio; lint `--max-warnings=0` limpio.
+    **Sonda end-to-end real (T8a+T8b):** tienda `probe-t8` sembrada en `smca_test`, API en 5019 con
+    `CatalogStaticPage__*`; el sincronizador de arranque escribió `catalog/probe-t8/index.html` con el
+    JSON-LD completo (telephone, PostalAddress CU, GeoCoordinates, Monday 09:00–17:00 + Saturday
+    10:00–14:00) y el sitemap con 1 catálogo; log "1/1 escritas, 0 fallidas". API detenida, BD limpia
+    (0 tiendas/owners/slugs).
+  - **RDD:** assessments `--committed-only` (HEAD al correrlos: `18eb9634`): `--base-ref e5d149b4`
+    (los tres slices de T8) **`medium`** (29 paths, 4946 líneas — inflado por el Designer+snapshot
+    generados); `--base-ref 84713693` (T8b+T8c) **`medium`** (15 paths, 792 líneas); `--base-ref
+    efd0fa40` (T8c) **`medium`** (11 paths, 531 líneas); acumulado `--base-ref 59262408`
+    (T7+T9+T8a+T8b+T8c) **`medium`** (39 paths, 5699 líneas). `review_due: false` (`under_budget`) en
+    los cuatro ⇒ ninguna review nativa forzada; la transacción estacionada de L14 sigue intacta (sin
+    tocar, sin comandos sustitutos). Señal `executable_change`: el script 35 en los rangos que lo
+    incluyen, un archivo de tests en los demás.
+  - **Fuera de T8 (anotado):** la UI edita UN rango por día; una tienda con dos rangos en un mismo día
+    (solo posible escribiendo la API directamente) conservaría el último al guardar desde el
+    formulario. Y pendiente del deploy: aplicar el script 35 al desplegar `test` (el backfill de
+    arranque regenera las páginas, ahora con JSON-LD cuando el dueño llenó la ubicación).

@@ -38,7 +38,8 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<IEnumerable<Product>> GetActiveProductsIncludingCategoryByStoreIdAsync(Guid storeId)
         {
             return await _products
-                .Where(product => product.IsActive && product.Category.StoreId == storeId)
+                .Where(product => product.IsActive && product.Category.IsActive
+                    && product.Category.StoreId == storeId)
                 .OrderBy(product => product.Category.Order).ThenBy(product => product.Order)
                 .Include(product => product.Category)
                 .ToListAsync();

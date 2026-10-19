@@ -19,6 +19,11 @@ COPY . .
 # Serving the API from another origin means teaching connect-src that origin
 # first, in apps/web-store-pos/scripts/csp-policy.mjs.
 ARG API_URL=/api
+# Absolute public origin used by the landing metadata (canonical + og:url) and
+# served at runtime. Override with --build-arg for a different environment.
+ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net
+# Exposed to the build command below (generate-landing-page.mjs reads it).
+ENV PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
 RUN echo "API_URL=${API_URL}" > .env
 # Build web-store-pos AND its workspace deps (domain, web-common) in
 # dependency order — the `...` suffix selects the package plus its deps.
@@ -31,4 +36,16 @@ RUN pnpm install --frozen-lockfile \
 FROM nginx:alpine
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/apps/web-store-pos/build/client /usr/share/nginx/html
+
+# public-catalog-static-pages (T5): volumen compartido con la API (`catalog_pages` en
+# docker-compose.yml). Se crea con 0777 a propósito — el dueño inicial de un named volume depende de
+# cuál de los dos contenedores lo monte primero, y la API corre sin privilegios (uid `dotnet`).
+RUN mkdir -p /srv/catalog-pages && chmod 0777 /srv/catalog-pages
+
+# Publica el shell del build y conserva los assets de builds anteriores en el volumen, antes de
+# arrancar nginx (nginx:alpine ejecuta /docker-entrypoint.d/*.sh). Ver
+# deploy/10-publish-catalog-shell.sh.
+COPY deploy/10-publish-catalog-shell.sh /docker-entrypoint.d/10-publish-catalog-shell.sh
+RUN chmod +x /docker-entrypoint.d/10-publish-catalog-shell.sh
+
 EXPOSE 80

@@ -2,13 +2,23 @@
  * multimonedas — NEW coverage (2026-09-17), purely additive:
  * NO existing E2E spec is modified (E2E-untouchable rule).
  *
- * The MultiMonedas module (15) ships only with the Superior/VIP plans, and the
- * `owner-admin-with-products` persona's store is on the Pago plan — so in its
- * natural state the module is ABSENT and MMF1 pins the honest negative: the
- * currency selector must NOT render. MMF6 seeds module 15 (direct DB insert +
- * real GET /v1/auth/me session refresh, configurations.spec.ts Test B pattern)
- * and pins the positive. This suite pins the user-visible behavior the module
- * enables:
+ * The MultiMonedas module (15) ships with the Superior/VIP plans. MMF1 pins
+ * the honest negative — without the module the currency selector must NOT
+ * render — and MMF6 pins the positive.
+ *
+ * ── The negative is CONSTRUCTED, not inherited (2026-10-13) ────────────────
+ * BIRTH PLAN (owner decision 2026-10-13): a new store is born on the
+ * **Superior** plan (`store-birth-superior`, 2026-10-11), which ALREADY
+ * carries module 15. MMF1 used to assume the opposite ("the persona's store is
+ * on the Pago plan whose catalog has no MultiMonedas"), so the honest negative
+ * could no longer happen naturally. MMF1 now mints a PRIVATE identity and
+ * REMOVES the module with `disableStoreModule` — a server-side mutation, which
+ * the shared worker-scoped persona may never receive (e2e/README.md §"Specs que
+ * mutan estado server-side") — then pins the client session through a real
+ * GET /v1/auth/me. MMF6 builds its positive half with `enableStoreModule` plus
+ * the same refresh. Both halves keep every original assertion.
+ *
+ * This suite pins the user-visible behavior the module enables:
  *
  *   MMF1  WITHOUT module 15 the product currency selector does NOT render in
  *         the create-product modal (the honest negative).
@@ -16,31 +26,43 @@
  *         ("10 USD") on the sale list — never a `$` sign.
  *   MMF3  The cart total in the header shows the cart's currency label —
  *         a CUP cart reads "X CUP".
- *   MMF4  Adding a second product in a DIFFERENT currency is BLOCKED with a
- *         descriptive popup and the line never enters the cart (one currency
- *         per order).
+ *   MMF4  Adding a second product in a DIFFERENT currency is ALLOWED — both
+ *         lines enter the cart and no blocking popup appears, even on a store
+ *         WITHOUT module 15 (the "one currency per order" rule was retired by
+ *         owner decision 2026-10-13; see the test for the full note).
  *   MMF5  Same-currency additions keep working (control): both lines enter
  *         the cart and the badge counts both.
- *   MMF6  WITH module 15 seeded, the selector renders in the create-product
+ *   MMF6  WITH module 15 present, the selector renders in the create-product
  *         modal, defaulting to CUP, with the 7 currency options.
  */
 
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
 import { seedCategoryAndProduct } from './support/store-seed';
-import { Client } from 'pg';
 import { readBearerToken } from './support/auth-storage';
 import { E2E_API_URL } from './support/backend-url';
+import { RegisterPage } from './support/register-page';
+import { newTestIdentity } from './support/identity';
+import { readSelectedStoreId } from './support/session';
+import {
+  MULTIMONEDAS_MODULE_ID,
+  disableStoreModule,
+  enableStoreModule,
+} from './support/multipayments-fixture';
 
 const SALE_HEADER = 'Productos para vender';
 const ALL_CATEGORIES = 'Todos'; // SALES.ALL_CATEGORIES
 const ADD_BUTTON = 'Adicionar';
 
-// Same default as the README's documented backend mode; override with
-// E2E_DB_URL when the backend was pointed somewhere else
-// (configurations.spec.ts:23, store-fixture.ts:173).
-const DEFAULT_DB_URL = 'postgresql://postgres:postgres@localhost:5432/smca_test';
-const MODULE_MULTIMONEDAS = 15;
+const MODULE_MULTIMONEDAS = MULTIMONEDAS_MODULE_ID;
+
+/** Module ids the CLIENT session currently carries (the gate's real input). */
+async function sessionModuleIds(page: Page): Promise<number[]> {
+  const raw = await page.evaluate(() => window.localStorage.getItem('currentUser'));
+  if (!raw) throw new Error('multimonedas: localStorage.currentUser is empty.');
+  const parsed = JSON.parse(raw) as { storeModuleIds?: number[] };
+  return parsed.storeModuleIds ?? [];
+}
 
 /** Persona-stamped id for cross-test isolation (mirrors csv-import helpers). */
 function productName(prefix: string): string {
@@ -72,6 +94,36 @@ async function rewriteProductCurrency(
     },
     { sid: storeId, pid: productId, cur: currency },
   );
+}
+
+/**
+ * Makes a freshly registered session behave like the persona snapshots the rest
+ * of this spec uses: drops `currentUser`, the device DEK and every `enc:v1:`
+ * ciphertext business entity, then reloads. The session re-hydrates from
+ * AUTH_MODEL (`/v1/auth/me`) with NO DEK in memory, so every entity written
+ * from here on is honest plaintext — which `rewriteProductCurrency` and
+ * `seedInventoryForAllSellable` require (they read raw localStorage). Same
+ * helper shape as multipayments.spec.ts / channel-rates-catalogue.spec.ts.
+ */
+async function dropDekAndCiphertext(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const remove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key === 'currentUser' || key === 'lizoft.device-dek') {
+        remove.push(key);
+        continue;
+      }
+      if (key.startsWith('lizoft.store-')) {
+        const value = localStorage.getItem(key);
+        if (value && value.startsWith('enc:v1:')) remove.push(key);
+      }
+    }
+    for (const key of remove) localStorage.removeItem(key);
+  });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
 }
 
 /** Reads a product's id by its exact name from storage (specs seed unique names). */
@@ -192,41 +244,11 @@ async function createProductViaUi(page: Page, name: string, price: string): Prom
 }
 
 /**
- * Inserts the MultiMonedas module (15) row for the store if missing
- * (idempotent, additive: existing StoreModule rows are preserved). Same shape
- * as configurations.spec.ts:37-56 (seedMultiStoresModule for module 14).
- */
-async function seedMultiMonedasModule(storeId: string): Promise<void> {
-  const client = new Client({ connectionString: process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL });
-  try {
-    await client.connect();
-    await client.query(
-      `INSERT INTO "StoreModule"
-         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
-          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
-          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
-       SELECT s."Id", m."Id", m."PriceIncluded", m."Price", m."Price",
-              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
-              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
-         FROM "Module" m, "Store" s
-        WHERE m."Id" = $2 AND s."Id" = $1
-          AND NOT EXISTS (
-            SELECT 1 FROM "StoreModule" sm
-             WHERE sm."StoreId" = $1 AND sm."ModuleId" = $2
-          )`,
-      [storeId, MODULE_MULTIMONEDAS],
-    );
-  } finally {
-    await client.end();
-  }
-}
-
-/**
  * Refreshes the session profile through a REAL GET /v1/auth/me and rewrites
  * localStorage.currentUser — the gate reads `user.storeModuleIds` from the
  * client session, and cold-boot makes no backend call when the cached profile
- * matches (auth-store.ts:167-177), so the seeded module is invisible until
- * the cache is rewritten. Pattern copied from configurations.spec.ts:65-82.
+ * matches (auth-store.ts:167-177), so the constructed module set is invisible
+ * until the cache is rewritten. Pattern copied from configurations.spec.ts.
  */
 async function refreshSessionFromMe(page: Page): Promise<void> {
   const token = await readBearerToken(page);
@@ -250,15 +272,30 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   await page.reload();
 }
 
-test.describe.serial('MultiMonedas — selector, precios con moneda y regla de una moneda', () => {
+test.describe.serial('MultiMonedas — selector, precios con moneda y mezcla de monedas', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('MMF1 sin el módulo MultiMonedas el selector de moneda NO aparece', async ({
-    signedInPage,
-  }) => {
-    const { page } = signedInPage;
+  test('MMF1 sin el módulo MultiMonedas el selector de moneda NO aparece', async ({ page }) => {
+    // PRIVATE identity (e2e/README.md §"Specs que mutan estado server-side"):
+    // removing module 15 is a server-side mutation, so the shared persona must
+    // not receive it. The store is born on Superior, which already HAS the
+    // module — the negative is therefore constructed, not assumed.
+    const identity = newTestIdentity();
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.fillValidForm(identity);
+    await registerPage.acceptTerms.check();
+    await registerPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+    const storeId = await readSelectedStoreId(page);
+
+    await disableStoreModule(page, storeId, MODULE_MULTIMONEDAS);
+    await refreshSessionFromMe(page);
+    // Pin the negative precondition itself: the session really lacks the module,
+    // so the absent selector below proves the gate instead of passing by luck.
+    expect(await sessionModuleIds(page)).not.toContain(MODULE_MULTIMONEDAS);
 
     await page.goto('/sales/products');
     await page.waitForLoadState('networkidle');
@@ -268,10 +305,9 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     await page.locator('[data-testid^="category-actions-toggle-"]').first().click();
     await page.getByTestId('add-product-button').click();
 
-    // The modal opens WITHOUT the currency selector: the persona's store is on
-    // the Pago plan whose catalog has no MultiMonedas (module 15), so
-    // currency-select.tsx:40-42 renders null. The product-name input proves
-    // the modal itself is there — the gate hides only the selector.
+    // The modal opens WITHOUT the currency selector: the session lacks module
+    // 15, so currency-select.tsx:40-42 renders null. The product-name input
+    // proves the modal itself is there — the gate hides only the selector.
     await expect(page.getByTestId('product-name-input')).toBeVisible();
     await expect(page.getByTestId('product-currency-select')).toHaveCount(0);
   });
@@ -307,32 +343,69 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     await expect(headerTotal).not.toContainText('$');
   });
 
-  test('MMF4 no se puede mezclar monedas en el carrito', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
+  test('MMF4 se pueden mezclar monedas en el carrito', async ({ page }) => {
+    // ── Retired rule (owner decision 2026-10-13) ───────────────────────────
+    // The "one currency per sale" guard no longer exists: `guardCurrency` was
+    // deleted and the add paths in sale.tsx / wholesale.tsx / egress.tsx no
+    // longer check currency at all. Mixing currencies in a sale is ALWAYS
+    // allowed. This test pins the retirement on the HARDEST store — one
+    // WITHOUT module 15, which used to be the only way to reach the blocked
+    // popup at all. The construction is kept for that reason (and because
+    // removing a module is a server-side mutation, so it needs a PRIVATE
+    // identity — e2e/README.md): with the module absent, a passing MMF4 proves
+    // the rule is gone rather than merely lifted.
+    const identity = newTestIdentity();
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.fillValidForm(identity);
+    await registerPage.acceptTerms.check();
+    await registerPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+    const storeId = await readSelectedStoreId(page);
 
-    // A second product repriced to USD: adding it while the cart holds a CUP
-    // line must be blocked (the currency guard runs before availability, so
-    // no inventory is needed for the blocked row).
+    await disableStoreModule(page, storeId, MODULE_MULTIMONEDAS);
+    // The same reload also drops the DEK, so the products below are plaintext.
+    await dropDekAndCiphertext(page);
+    expect(await sessionModuleIds(page)).not.toContain(MODULE_MULTIMONEDAS);
+
+    // Two real products through the real UI: the CUP one anchors the sale, the
+    // USD one is repriced in storage (the currency selector is gated off by the
+    // same module, which is precisely why the reprice goes through localStorage).
+    const cupName = productName('MMCUP4');
+    await createProductViaUi(page, cupName, '10');
     const usdName = productName('MMUSD2');
     await createProductViaUi(page, usdName, '10');
-    const usdId = await productIdByName(page, selectedStoreId, usdName);
+    const usdId = await productIdByName(page, storeId, usdName);
     expect(usdId).toBeTruthy();
-    await rewriteProductCurrency(page, selectedStoreId, usdId!, 1); // Currency.USD
+    await rewriteProductCurrency(page, storeId, usdId!, 1); // Currency.USD
 
-    // First product stays CUP (seeded).
-    await addFirstProduct(page, selectedStoreId);
-
+    // Stock every sellable row, then re-read the store by navigating away/back.
+    await page.goto('/sales/new');
+    await page.waitForLoadState('networkidle');
+    await seedInventoryForAllSellable(page, storeId);
+    await reloadSalePage(page);
     await page.getByRole('button', { name: ALL_CATEGORIES }).click();
 
-    // Add the USD product while the cart holds a CUP line → blocked popup.
-    const usdRow = page.locator('form', { has: page.getByText(usdName) }).first();
-    await usdRow.getByRole('button', { name: ADD_BUTTON }).click();
-
-    await expect(page.getByText(/moneda.*distinta/i)).toBeVisible();
-    await page.locator('.swal2-confirm').click();
-
-    // The line never entered the cart: badge still 1.
+    // The CUP product opens the sale.
+    await page
+      .locator('form', { has: page.getByText(cupName) })
+      .first()
+      .getByRole('button', { name: ADD_BUTTON })
+      .click();
     await expect(page.getByTestId('cart-badge')).toHaveText('1');
+
+    // Add the USD product while the cart holds a CUP line → SUCCEEDS: no popup.
+    await page
+      .locator('form', { has: page.getByText(usdName) })
+      .first()
+      .getByRole('button', { name: ADD_BUTTON })
+      .click();
+
+    // Both lines are in the cart now — this is the assertion the block used to
+    // invert (the badge stayed at 1 and a popup named both currencies appeared).
+    await expect(page.getByTestId('cart-badge')).toHaveText('2');
+    await expect(page.getByText(/moneda.*distinta/i)).toHaveCount(0);
+    await expect(page.locator('.swal2-popup')).toHaveCount(0);
   });
 
   test('MMF5 dos productos de la misma moneda se agregan sin bloqueo', async ({ signedInPage }) => {
@@ -351,17 +424,19 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     await expect(page.getByTestId('cart-badge')).toHaveText('2');
   });
 
-  test('MMF6 con el módulo MultiMonedas sembrado el selector aparece con las 7 monedas', async ({
+  test('MMF6 con el módulo MultiMonedas presente el selector aparece con las 7 monedas', async ({
     signedInPage,
   }) => {
     const { page, selectedStoreId } = signedInPage;
 
-    // Seed module 15 by direct DB + refresh the cached session via a real /me
-    // (configurations.spec.ts Test B pattern): the gate reads
-    // user.storeModuleIds from the client session, which cold-boot takes from
-    // localStorage — without the refresh the seeded module stays invisible.
-    await seedMultiMonedasModule(selectedStoreId);
+    // Build the positive half explicitly (`enableStoreModule` is idempotent and
+    // pins the result through the real API) and refresh the cached session via
+    // a real /me: the gate reads user.storeModuleIds from the client session,
+    // which cold-boot takes from localStorage — without the refresh a change
+    // to the module set stays invisible.
+    await enableStoreModule(page, selectedStoreId, MODULE_MULTIMONEDAS);
     await refreshSessionFromMe(page);
+    expect(await sessionModuleIds(page)).toContain(MODULE_MULTIMONEDAS);
 
     await page.goto('/sales/products');
     await page.waitForLoadState('networkidle');

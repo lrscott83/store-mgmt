@@ -3,14 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && node scripts/externalize-bootstrap.mjs && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs && node scripts/verify-csp.mjs",
+    "build": "react-router build && node scripts/externalize-bootstrap.mjs && node scripts/generate-landing-page.mjs && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs && node scripts/verify-csp.mjs",
     "dev": "react-router dev",
     "dev:local": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "react-router typegen && tsc",
     "clean": "rimraf build .react-router",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:legal": "node scripts/generate-legal-content.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^8.0.29",
@@ -27,6 +28,7 @@
     "isbot": "^5.1.27",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "qrcode.react": "4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-intl": "^10.1.11",

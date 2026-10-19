@@ -12,15 +12,21 @@ import { mintSuperAdmin } from './superadmin-session';
  * (wholesale-superior-vip-only, 2026-09-23)
  *
  * Ventas Mayoristas is ONLY available on the Superior (3) / VIP (4) plans.
- * The self-registered store (Pago birth plan) can never hold module 12, so
- * the `/sales/wholesale` gate and the sidebar entry now require module 12 +
- * feature 39 in the session — and that state can only be reached by upgrading
- * the store through the app's OWN `change-plan` endpoint with a SuperAdmin
- * caller (`ChangeStorePlanCommandHandler.cs:97-101`), the only legitimate
- * path to Superior/VIP.
+ * A store WITHOUT module 12 can never reach the feature, and the `/sales/wholesale`
+ * gate and the sidebar entry require module 12 + feature 39 in the session.
  *
- * Mints a PRIVATE owner whose store is upgraded to Superior. Mirrors the
- * `mintMultiMonedasOwner` plan-upgrade steps (register → login → SuperAdmin
+ * Since the birth-plan decision of 2026-10-13 (`store-birth-superior`) a freshly
+ * registered store is born on Superior and therefore ALREADY holds module 12 —
+ * so the change-plan POST below is now an idempotent no-op (the handler returns
+ * early when the store is already on the target plan). It is kept because it
+ * still pins the endpoint contract and fails loudly if that changes; the /me pin,
+ * the re-login and the session assertion are what actually prove the
+ * precondition. To build the NEGATIVE half (a store without module 12) a spec
+ * mints a private identity and calls `disableStoreModule` — see
+ * `wholesale-plan-gate.spec.ts`.
+ *
+ * Mints a PRIVATE owner whose store carries module 12 + feature 39 (Superior).
+ * Mirrors the `mintMultiMonedasOwner` steps (register → login → SuperAdmin
  * mint → change-plan → pin backend module → fresh owner re-login → noisy
  * session assertion) and the `owner-admin-with-products` two-context seeding:
  *
@@ -150,7 +156,8 @@ export async function mintWholesaleSuperiorOwner(browser: Browser): Promise<Whol
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  // 1. Register the owner (Pago birth plan — module 12 NOT included yet).
+  // 1. Register the owner. Born on Superior since 2026-10-13, so it already
+  // holds module 12 — the change-plan POST in step 4 is an idempotent no-op.
   const identity = newTestIdentity();
   const registerPage = new RegisterPage(page);
   await registerPage.goto();

@@ -11,7 +11,7 @@ Rama: `dev` (árbol limpio al iniciar). Alcance autorizado: **solo `frontend-rea
 ## Problema / por qué
 
 - Hoy select de moneda y channel-rates dependen de MultiPayments (16). Un plan Superior tiene MultiMonedas (15) sin MultiPayments; esos stores no pueden operar multi-moneda.
-- La conversión multi-moneda del carrito (`convertCartLines`, `guardCurrency allowMixedCurrencies`) está atada a `hasMultiPaymentsModuleAvailable`.
+- La conversión multi-moneda del carrito (`convertCartLines`) está atada a `hasMultiPaymentsModuleAvailable`. **(2026-10-13: `guardCurrency`/`allowMixedCurrencies` se ELIMINARON; la regla de una sola moneda por venta se retiró.)**
 - No existe ninguna moneda por defecto de tienda (ni frontend ni backend). Hay que introducirla.
 - Bug verificado (T18, `cart-rate-cup-720.test.ts`): en el registro de tasas, `currency` = "unidades de esa moneda por 1 USD". Una fila `Moneda=USD` es el pivote y **nunca** resuelve CUP. La tasa "1 USD = 700/750 CUP" debe registrarse con `Moneda=CUP`. El código de conversión es correcto; el fallo es de semántica de entrada de datos + un refresco de tasas en el carrito.
 
@@ -72,7 +72,7 @@ Rama: `dev` (árbol limpio al iniciar). Alcance autorizado: **solo `frontend-rea
   - `totalAmount`: multiPaymentsActive → `lineConversion.total` (sin pricing, comportamiento actual); si no, `applyPaymentPricing(lineConversion.total or total(), pricing)` según multiMonedas.
   - `lineConversionBlocked` usa `multiCurrencyActive`; display de líneas, banner de error y `orderCartItems` de submit usan `multiCurrencyActive`.
   - `handleClear` resetea a la moneda de Venta de la tienda cuando `multiMonedasAvailable`.
-- `sale.tsx`, `wholesale.tsx`, `egress.tsx`: `allowMixedCurrencies: hasMultiMonedasModuleAvailable(user)`.
+- `sale.tsx`, `wholesale.tsx`, `egress.tsx`: ~~`allowMixedCurrencies: hasMultiMonedasModuleAvailable(user)`~~ **eliminado el 2026-10-13** (la regla de una sola moneda por venta se retiró; mezclar está siempre permitido).
 - Checks: tests unitarios nuevos/actualizados; suite `cart-shell.test.tsx` verde; `currency-guard`/`sale`/`wholesale`/`egress` relevantes verdes.
 - Criterio: un store con módulo 15 y sin 16 muestra el select, convierte líneas y persiste la venta en la moneda de venta; sin módulo 15 el comportamiento es idéntico al actual.
 

@@ -1,4 +1,5 @@
 import { test, expect } from './support/test';
+import type { Locator } from '@playwright/test';
 import { mintSuperAdmin, applySuperAdminSnapshot } from './support/superadmin-session';
 
 /**
@@ -14,11 +15,31 @@ import { mintSuperAdmin, applySuperAdminSnapshot } from './support/superadmin-se
  *          "Elaboración" 17) — the exact claims that failed on the user's
  *          environment.
  *
+ * ── Why PCF2 expands panels instead of clicking them (2026-10-13) ─────────
+ * `PlanPanels` is a SINGLE-STATE accordion that starts with the store's ACTIVE
+ * plan open (plan-panels.tsx:124,133). Since the birth plan is now Superior
+ * (owner decision 2026-10-13, `store-birth-superior`), the popup opened on the
+ * first card very often has Superior already open — and this test's blind
+ * `click()` was COLLAPSING it, which is what made "Múltiples monedas" vanish.
+ * `expandPlanPanel` opens a panel only when it is closed and then pins
+ * `aria-expanded="true"`, so the assertions are about the panel's CONTENT, never
+ * about which plan happened to be the active one.
+ *
  * Cost: ONE SuperAdmin mint (register + 2 logins), same budget as
  * superadmin-smoke.spec.ts / owner-hard-delete.spec.ts.
  */
 
 let superAdmin: Awaited<ReturnType<typeof mintSuperAdmin>>;
+
+/** Opens a plan panel if it is closed, then pins that it is open. */
+async function expandPlanPanel(modal: Locator, header: RegExp): Promise<void> {
+  const button = modal.getByRole('button', { name: header });
+  await expect(button).toBeVisible();
+  if ((await button.getAttribute('aria-expanded')) !== 'true') {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+}
 
 test.describe.serial('Plan catalog — SuperAdmin popup (VIP visible, MultiMonedas in Superior)', () => {
   test.beforeAll(async ({ browser }) => {
@@ -62,13 +83,13 @@ test.describe.serial('Plan catalog — SuperAdmin popup (VIP visible, MultiMoned
     const modal = await openChangePlanModal(page);
 
     // Superior delta vs Pago: Warehouses, MultiStores, MultiMonedas, Elaboración…
-    await modal.getByRole('button', { name: /^Superior/ }).click();
+    await expandPlanPanel(modal, /^Superior/);
     await expect(modal.getByText('Múltiples monedas')).toBeVisible();
     await expect(modal.getByText('Elaboración')).toBeVisible();
 
     // VIP delta vs Superior: ONLY "Múltiples pagos" (module 16) — 15 and 17
     // are already in Superior (seed matrix pinned by StorePlanCatalogTests).
-    await modal.getByRole('button', { name: /^VIP/ }).click();
+    await expandPlanPanel(modal, /^VIP/);
     await expect(modal.getByText('Múltiples pagos')).toBeVisible();
   });
 });
