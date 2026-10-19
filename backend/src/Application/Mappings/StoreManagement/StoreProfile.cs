@@ -9,6 +9,7 @@ using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
+using Application.Services.Stores;
 
 namespace Application.Mappings.StoreManagement
 {
@@ -23,7 +24,10 @@ namespace Application.Mappings.StoreManagement
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.User.FullName))
                 .ForMember(dest => dest.OwnerPhone, opt => opt.MapFrom(src => src.Owner.User.CellPhone))
                 .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src)))
-                .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
+                .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules))
+                // public-catalog-static-pages (T8): el JSON guardado se expone tipado en la API;
+                // el formulario nunca recibe un string JSON opaco.
+                .ForMember(dest => dest.OpeningHours, opt => opt.MapFrom(src => OpeningHoursSerializer.Parse(src.OpeningHoursJson).ToList()));
 
             CreateMap<Store, StorePlanDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()

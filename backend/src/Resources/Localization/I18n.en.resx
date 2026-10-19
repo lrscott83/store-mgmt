@@ -504,6 +504,12 @@
   <data name="StoreInactive" xml:space="preserve">
     <value>The store is inactive</value>
   </data>
+  <data name="InvalidCoordinates" xml:space="preserve">
+    <value>The coordinates are not valid: they must be provided together and within range.</value>
+  </data>
+  <data name="InvalidOpeningHours" xml:space="preserve">
+    <value>The public opening hours are not valid: check the days, times and ranges.</value>
+  </data>
   <data name="UnexpectedErrorUploadingFile" xml:space="preserve">
     <value>UnexpectedErrorUploadingFile</value>
   </data>

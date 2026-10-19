@@ -1,7 +1,9 @@
 using System.Linq.Expressions;
 using Application.Abstractions.HttpContext;
+using Application.Exceptions;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.WebCatalog.Public;
+using Application.Services.Stores;
 using Application.UnitOfWorks;
 using Domain.Common.Utils;
 using Domain.Entities.Stores;
@@ -146,5 +148,167 @@ public class UpdateStoreCommandHandlerRegenerationTests
 
         _mockCatalogPageRegenerator.Verify(
             x => x.RegenerateAsync(_storeId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_LocationFields_ArePersistedTrimmedAndRegenerate()
+    {
+        var store = Arrange(superAdmin: false);
+
+        var command = Command("Test Store", description: null) with
+        {
+            Address = "Calle 23 #45, entre 10 y 12",
+            PublicPhone = "  +53 5555 1234 ",
+            AddressCity = " La Habana ",
+            AddressProvince = " Plaza ",
+            Latitude = 23.13,
+            Longitude = -82.38,
+            OpeningHours = new[] { new OpeningHoursEntry("Monday", "09:00", "17:00") },
+            UpdateLocation = true,
+        };
+
+        await _handler.Handle(command, CancellationToken.None);
+
+        store.Address.Should().Be("Calle 23 #45, entre 10 y 12");
+        store.PublicPhone.Should().Be("+53 5555 1234");
+        store.AddressCity.Should().Be("La Habana");
+        store.AddressProvince.Should().Be("Plaza");
+        store.Latitude.Should().Be(23.13);
+        store.Longitude.Should().Be(-82.38);
+        store.OpeningHoursJson.Should()
+            .Be("[{\"day\":\"Monday\",\"opens\":\"09:00\",\"closes\":\"17:00\"}]");
+        _mockCatalogPageRegenerator.Verify(
+            x => x.RegenerateAsync(_storeId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_AddressChanged_RegeneratesBecauseAddressFeedsTheJsonLd()
+    {
+        var store = Arrange(superAdmin: false);
+
+        await _handler.Handle(
+            Command("Test Store", description: null) with
+            {
+                Address = "Calle 23 #45",
+                UpdateLocation = true,
+            },
+            CancellationToken.None);
+
+        store.Address.Should().Be("Calle 23 #45");
+        _mockCatalogPageRegenerator.Verify(
+            x => x.RegenerateAsync(_storeId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_LocationFieldsUnchanged_DoesNotRegenerate()
+    {
+        var store = Arrange(superAdmin: false);
+        store.Address = "Calle 23 #45";
+        store.PublicPhone = "+53 5555 1234";
+        store.AddressCity = "La Habana";
+        store.AddressProvince = "Plaza";
+        store.Latitude = 23.13;
+        store.Longitude = -82.38;
+        store.OpeningHoursJson = "[{\"day\":\"Monday\",\"opens\":\"09:00\",\"closes\":\"17:00\"}]";
+
+        var command = Command("Test Store", description: null) with
+        {
+            Address = "Calle 23 #45",
+            PublicPhone = "+53 5555 1234",
+            AddressCity = "La Habana",
+            AddressProvince = "Plaza",
+            Latitude = 23.13,
+            Longitude = -82.38,
+            // Mismo horario, escrito en otro orden: la canonicalización lo deja idéntico.
+            OpeningHours = new[] { new OpeningHoursEntry("Monday", "09:00", "17:00") },
+            UpdateLocation = true,
+        };
+
+        await _handler.Handle(command, CancellationToken.None);
+
+        _mockCatalogPageRegenerator.Verify(
+            x => x.RegenerateAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_InvalidOpeningHours_ThrowsValidationAndDoesNotPersist()
+    {
+        Arrange(superAdmin: false);
+
+        Func<Task> act = () => _handler.Handle(
+            Command("Test Store", description: null) with
+            {
+                OpeningHours = new[] { new OpeningHoursEntry("Lunes", "09:00", "17:00") },
+                UpdateLocation = true,
+            },
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>();
+        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _mockCatalogPageRegenerator.Verify(
+            x => x.RegenerateAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_LatitudeWithoutLongitude_ThrowsValidationAndDoesNotPersist()
+    {
+        Arrange(superAdmin: false);
+
+        Func<Task> act = () => _handler.Handle(
+            Command("Test Store", description: null) with { Latitude = 23.13, UpdateLocation = true },
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>();
+        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CoordinatesOutOfRange_ThrowsValidationAndDoesNotPersist()
+    {
+        Arrange(superAdmin: false);
+
+        Func<Task> act = () => _handler.Handle(
+            Command("Test Store", description: null) with
+            {
+                Latitude = 123.13,
+                Longitude = -82.38,
+                UpdateLocation = true,
+            },
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>();
+        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WithoutUpdateLocation_LeavesTheStoredLocationUntouched()
+    {
+        // El modal de "mis tiendas" renombra con un payload parcial (address: '', sin teléfono ni
+        // coordenadas). Sin el flag, ese payload no puede borrar la ubicación pública — si la
+        // borrara, la próxima regeneración dejaría la página sin JSON-LD de ubicación.
+        var store = Arrange(superAdmin: false);
+        store.Address = "Calle 23 #45";
+        store.PublicPhone = "+53 5555 1234";
+        store.AddressCity = "La Habana";
+        store.AddressProvince = "Plaza";
+        store.Latitude = 23.13;
+        store.Longitude = -82.38;
+        store.OpeningHoursJson =
+            "[{\"day\":\"Monday\",\"opens\":\"09:00\",\"closes\":\"17:00\"}]";
+
+        await _handler.Handle(
+            Command("Test Store", description: null) with { Address = string.Empty },
+            CancellationToken.None);
+
+        store.Address.Should().Be("Calle 23 #45");
+        store.PublicPhone.Should().Be("+53 5555 1234");
+        store.AddressCity.Should().Be("La Habana");
+        store.AddressProvince.Should().Be("Plaza");
+        store.Latitude.Should().Be(23.13);
+        store.Longitude.Should().Be(-82.38);
+        store.OpeningHoursJson.Should()
+            .Be("[{\"day\":\"Monday\",\"opens\":\"09:00\",\"closes\":\"17:00\"}]");
+        _mockCatalogPageRegenerator.Verify(
+            x => x.RegenerateAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

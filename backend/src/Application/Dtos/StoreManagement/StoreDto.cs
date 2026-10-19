@@ -1,4 +1,5 @@
 ﻿using Application.Dtos.Administration.Modules;
+using Application.Services.Stores;
 
 namespace Application.Dtos.StoreManagement
 {
@@ -12,6 +13,13 @@ namespace Application.Dtos.StoreManagement
         public string? OwnerPhone { get; set; }
         public string? Address { get; set; }
         public string? Description { get; set; }
+        // public-catalog-static-pages (T8): ubicación pública que alimenta el JSON-LD del catálogo.
+        public string? PublicPhone { get; set; }
+        public string? AddressCity { get; set; }
+        public string? AddressProvince { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public List<OpeningHoursEntry> OpeningHours { get; set; } = new();
         public bool IsActive { get; set; }
         public bool Approved { get; set; }
         public DateOnly? PaymentStartDate { get; set; }

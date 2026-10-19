@@ -23,6 +23,12 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
             builder.Property(x => x.StorePlanId).HasDefaultValue(2);
 
+            // public-catalog-static-pages (T8): ubicación pública del catálogo. Todo nullable a
+            // propósito — las tiendas existentes no tienen estos datos y el JSON-LD omite lo ausente.
+            builder.Property(x => x.PublicPhone).HasMaxLength(30);
+            builder.Property(x => x.AddressCity).HasMaxLength(100);
+            builder.Property(x => x.AddressProvince).HasMaxLength(100);
+
             // Catálogo web (plan 2026-09-27): slug público único global (/catalog/<slug>).
             // Índice parcial: las tiendas que nunca usaron el catálogo tienen CatalogSlug null.
             builder.Property(x => x.CatalogSlug).HasMaxLength(SlugNormalizer.MaxLength);

@@ -2583,6 +2583,14 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Address")
                         .HasColumnType("text");
 
+                    b.Property<string>("AddressCity")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AddressProvince")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<bool>("Approved")
                         .HasColumnType("boolean");
 
@@ -2605,6 +2613,12 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2612,11 +2626,18 @@ namespace Infrastructure.Migrations
                     b.Property<DateOnly?>("NextDueDateOverride")
                         .HasColumnType("date");
 
+                    b.Property<string>("OpeningHoursJson")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("PaymentStartDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("PublicPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<int>("StorePlanId")
                         .ValueGeneratedOnAdd()
