@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
-import type { Store, UserModel } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { makeStore } from '~/sales/components/__tests__/store-fixture';
 import type {
   CatalogBranding,
   CatalogProductView,
@@ -230,30 +231,7 @@ function visibleCarouselIds(): (string | undefined)[] {
     .map((image) => image.getAttribute('data-testid')?.replace('showcase-image-', ''));
 }
 
-const STORE: Store = {
-  id: 's1',
-  name: 'Store One',
-  displayName: 'Store One',
-  ownerId: 'o1',
-  ownerName: 'Owner One',
-  address: '123 Main St',
-  description: 'A store',
-  approved: true,
-  paymentStartDate: '2024-01-01',
-  nextPaymentDate: null,
-  ownerPhone: null,
-  planType: 'Pago',
-  planPrice: 10,
-  planCurrentPrice: 10,
-  modules: [],
-  publicPhone: '+53 5555 1234',
-  addressCity: 'La Habana',
-  addressProvince: 'Playa',
-  latitude: 23.13,
-  longitude: -82.38,
-  openingHours: [{ day: 'Monday', opens: '09:00', closes: '17:00' }],
-  isActive: true,
-};
+const STORE = makeStore();
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -372,7 +350,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     // Plegada oculta sus campos; el guardado propio sigue en la cabecera.
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('location-public-phone')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('location-save')).toBeInTheDocument();
   });
 

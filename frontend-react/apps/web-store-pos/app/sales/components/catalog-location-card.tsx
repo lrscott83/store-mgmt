@@ -8,6 +8,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { toStorePassThrough } from '~/management/stores/lib/store-location-payload';
 
 /** Orden canónico de los días — el mismo que emite el serializador del backend. */
 const WEEKDAYS: WeekdayName[] = [
@@ -66,10 +67,27 @@ function toValues(store: Store): LocationValues {
     publicPhone: store.publicPhone ?? '',
     addressCity: store.addressCity ?? '',
     addressProvince: store.addressProvince ?? '',
-    latitude: store.latitude !== null ? String(store.latitude) : '',
-    longitude: store.longitude !== null ? String(store.longitude) : '',
+    // `typeof` cubre null Y propiedad ausente: una latitud omitida debe hidratar vacía,
+    // nunca el literal "undefined" (algunos payloads no mandan las claves nulas).
+    latitude: typeof store.latitude === 'number' ? String(store.latitude) : '',
+    longitude: typeof store.longitude === 'number' ? String(store.longitude) : '',
     hours,
   };
+}
+
+/** Comparación estructural de los valores (sin serializar): expresa la regla "hay cambios". */
+function sameLocationValues(a: LocationValues, b: LocationValues): boolean {
+  return (
+    a.publicPhone === b.publicPhone &&
+    a.addressCity === b.addressCity &&
+    a.addressProvince === b.addressProvince &&
+    a.latitude === b.latitude &&
+    a.longitude === b.longitude &&
+    WEEKDAYS.every(
+      (day) =>
+        a.hours[day].opens === b.hours[day].opens && a.hours[day].closes === b.hours[day].closes,
+    )
+  );
 }
 
 /**
@@ -80,14 +98,14 @@ function toValues(store: Store): LocationValues {
  * Guarda por su cuenta (como la tarjeta "Marca"): el endpoint aplica el bloque de ubicación
  * COMPLETO bajo `updateLocation`, así que el guardado reenvía el bloque editado y deja pasar
  * sin tocar el resto de los datos de la tienda (nombre, dirección, descripción, aprobado,
- * activo) tal como vienen del GET.
+ * activo) tal como vienen de un GET fresco hecho justo antes de guardar.
  */
 export function CatalogLocationCard({ storeId }: { storeId: string }) {
   const intl = useIntl();
   const [isExpanded, setIsExpanded] = useState(true);
   const [store, setStore] = useState<Store | null>(null);
   const [values, setValues] = useState<LocationValues | null>(null);
-  const [baseline, setBaseline] = useState('');
+  const [baseline, setBaseline] = useState<LocationValues | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -106,7 +124,7 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
       setStore(result.data);
       const loaded = toValues(result.data);
       setValues(loaded);
-      setBaseline(JSON.stringify(loaded));
+      setBaseline(loaded);
     } catch (error) {
       setLoadError(
         intl.formatMessage({ id: httpErrorKey(error, 'WEB_CATALOG.LOCATION_LOAD_ERROR') }),
@@ -120,7 +138,8 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
     void loadStore();
   }, [loadStore]);
 
-  const hasChanges = values !== null && JSON.stringify(values) !== baseline;
+  const hasChanges =
+    values !== null && baseline !== null && !sameLocationValues(values, baseline);
 
   function updateHours(day: WeekdayName, field: keyof DayHours, value: string) {
     setValues((prev) =>
@@ -158,14 +177,21 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
 
     setIsSaving(true);
     try {
+      // GET fresco justo antes de guardar: este panel solo es dueño del bloque de ubicación,
+      // pero el endpoint aplica el bloque COMPLETO bajo `updateLocation`. Reenviar el snapshot
+      // de la carga pisaría cambios concurrentes (otra pestaña, otro admin) en el resto de los
+      // datos; el GET de ahora reduce esa ventana al viaje de la petición.
+      const fresh = await storeHttpService.getStore(storeId);
+      if (!fresh.succeeded) {
+        setSaveError(intl.formatMessage({ id: 'WEB_CATALOG.LOCATION_SAVE_ERROR' }));
+        return;
+      }
+
       const result = await storeHttpService.updateStore(storeId, {
         id: storeId,
-        // Datos fuera del bloque: pasan tal cual vienen del GET para que este guardado no pise nada.
-        name: store.name,
-        address: store.address,
-        description: store.description,
-        approved: store.approved,
-        isActive: store.isActive,
+        ...toStorePassThrough(fresh.data),
+        // Sin paymentStartDate: el ancla de facturación no se captura en esta vista y el
+        // backend solo la aplica cuando llega con valor, así que omitirla la deja intacta.
         // Sin moduleIds/planId: el plan no se toca desde esta vista.
         updateLocation: true,
         publicPhone: values.publicPhone || undefined,
@@ -244,7 +270,6 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
                 </label>
                 <input
                   id="location-public-phone"
-                  data-testid="location-public-phone"
                   type="tel"
                   value={values.publicPhone}
                   onChange={(event) => setValues({ ...values, publicPhone: event.target.value })}
@@ -264,7 +289,6 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
                   </label>
                   <input
                     id="location-address-city"
-                    data-testid="location-address-city"
                     type="text"
                     value={values.addressCity}
                     onChange={(event) =>
@@ -284,7 +308,6 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
                   </label>
                   <input
                     id="location-address-province"
-                    data-testid="location-address-province"
                     type="text"
                     value={values.addressProvince}
                     onChange={(event) =>
@@ -307,7 +330,6 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
                   </label>
                   <input
                     id="location-latitude"
-                    data-testid="location-latitude"
                     type="number"
                     step="any"
                     value={values.latitude}
@@ -326,7 +348,6 @@ export function CatalogLocationCard({ storeId }: { storeId: string }) {
                   </label>
                   <input
                     id="location-longitude"
-                    data-testid="location-longitude"
                     type="number"
                     step="any"
                     value={values.longitude}

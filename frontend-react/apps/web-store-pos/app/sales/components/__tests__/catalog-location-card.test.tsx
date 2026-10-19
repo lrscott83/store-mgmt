@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import type { Store } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { makeStore } from './store-fixture';
 
 const storeMock = vi.hoisted(() => ({
   getStore: vi.fn(),
@@ -22,34 +23,6 @@ vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => toastMock(...args),
 }));
 
-function makeStore(overrides: Partial<Store> = {}): Store {
-  return {
-    id: 's1',
-    name: 'Store One',
-    displayName: 'Store One',
-    ownerId: 'o1',
-    ownerName: 'Owner One',
-    address: 'Calle 1',
-    description: 'Desc',
-    approved: true,
-    paymentStartDate: '2024-01-01',
-    nextPaymentDate: null,
-    ownerPhone: null,
-    planType: 'Pago',
-    planPrice: 10,
-    planCurrentPrice: 10,
-    modules: [],
-    publicPhone: '+53 5555 1234',
-    addressCity: 'La Habana',
-    addressProvince: 'Playa',
-    latitude: 23.13,
-    longitude: -82.38,
-    openingHours: [{ day: 'Monday', opens: '09:00', closes: '17:00' }],
-    isActive: true,
-    ...overrides,
-  };
-}
-
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -57,6 +30,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
     </IntlProvider>
   );
 }
+
+/** El botón de guardado se consulta por su etiqueta visible, no por un testid. */
+const SAVE_BUTTON = { name: /guardar ubicación/i };
 
 describe('CatalogLocationCard — ubicación pública del catálogo', () => {
   beforeEach(() => {
@@ -76,16 +52,16 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     const toggle = screen.getByTestId('location-toggle');
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-    expect(await screen.findByTestId('location-public-phone')).toHaveValue('+53 5555 1234');
-    expect(screen.getByTestId('location-address-city')).toHaveValue('La Habana');
-    expect(screen.getByTestId('location-address-province')).toHaveValue('Playa');
-    expect(screen.getByTestId('location-latitude')).toHaveValue(23.13);
-    expect(screen.getByTestId('location-longitude')).toHaveValue(-82.38);
+    expect(await screen.findByLabelText(/teléfono público/i)).toHaveValue('+53 5555 1234');
+    expect(screen.getByLabelText(/^ciudad$/i)).toHaveValue('La Habana');
+    expect(screen.getByLabelText(/^provincia$/i)).toHaveValue('Playa');
+    expect(screen.getByLabelText(/^latitud$/i)).toHaveValue(23.13);
+    expect(screen.getByLabelText(/^longitud$/i)).toHaveValue(-82.38);
     expect(screen.getByLabelText('Apertura Lunes')).toHaveValue('09:00');
     expect(screen.getByLabelText('Cierre Lunes')).toHaveValue('17:00');
     expect(storeMock.getStore).toHaveBeenCalledWith('s1');
     // Sin cambios respecto a lo cargado, el botón no está disponible.
-    expect(screen.getByTestId('location-save')).toBeDisabled();
+    expect(screen.getByRole('button', SAVE_BUTTON)).toBeDisabled();
   });
 
   it('se pliega y despliega con el toggle de la cabecera', async () => {
@@ -97,18 +73,18 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     );
 
     const toggle = screen.getByTestId('location-toggle');
-    await screen.findByTestId('location-public-phone');
+    await screen.findByLabelText(/teléfono público/i);
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('location-public-phone')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('location-public-phone')).toBeInTheDocument();
+    expect(screen.getByLabelText(/teléfono público/i)).toBeInTheDocument();
   });
 
-  it('guarda el bloque editado y deja pasar el resto del GET tal cual; toast y recarga', async () => {
+  it('guarda el bloque editado y deja pasar el resto del GET fresco; toast y recarga', async () => {
     const { CatalogLocationCard } = await import('../catalog-location-card');
     render(
       <Wrapper>
@@ -116,11 +92,11 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
-    const phone = await screen.findByTestId('location-public-phone');
+    const phone = await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(phone, { target: { value: '+53 5555 9999' } });
-    fireEvent.change(screen.getByTestId('location-latitude'), { target: { value: '23.5' } });
+    fireEvent.change(screen.getByLabelText(/^latitud$/i), { target: { value: '23.5' } });
 
-    const save = screen.getByTestId('location-save');
+    const save = screen.getByRole('button', SAVE_BUTTON);
     expect(save).toBeEnabled();
     fireEvent.click(save);
 
@@ -138,8 +114,8 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     expect(payload.openingHours).toEqual([{ day: 'Monday', opens: '09:00', closes: '17:00' }]);
     // El resto de los datos pasa sin tocar (los aplica bajo updateLocation).
     expect(payload.name).toBe('Store One');
-    expect(payload.address).toBe('Calle 1');
-    expect(payload.description).toBe('Desc');
+    expect(payload.address).toBe('123 Main St');
+    expect(payload.description).toBe('A store');
     expect(payload.approved).toBe(true);
     expect(payload.isActive).toBe(true);
     expect(payload).not.toHaveProperty('paymentStartDate');
@@ -147,10 +123,98 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     await waitFor(() => {
       expect(toastMock).toHaveBeenCalledTimes(1);
     });
-    // Tras guardar, recarga desde el servidor (el GET inicial + el de la recarga).
+    // GET inicial + GET previo al guardado + recarga posterior.
     await waitFor(() => {
-      expect(storeMock.getStore).toHaveBeenCalledTimes(2);
+      expect(storeMock.getStore).toHaveBeenCalledTimes(3);
     });
+  });
+
+  it('relee la tienda justo antes de guardar y reenvía el resto desde ese GET', async () => {
+    storeMock.getStore
+      .mockResolvedValueOnce({ succeeded: true, data: makeStore({ name: 'Nombre viejo' }) })
+      .mockResolvedValueOnce({
+        succeeded: true,
+        data: makeStore({ name: 'Nombre fresco', address: 'Calle 2' }),
+      });
+    const { CatalogLocationCard } = await import('../catalog-location-card');
+    render(
+      <Wrapper>
+        <CatalogLocationCard storeId="s1" />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
+      target: { value: '+53 5555 0000' },
+    });
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
+
+    await waitFor(() => {
+      expect(storeMock.updateStore).toHaveBeenCalledTimes(1);
+    });
+    const payload = storeMock.updateStore.mock.calls[0][1];
+    expect(payload.name).toBe('Nombre fresco');
+    expect(payload.address).toBe('Calle 2');
+    expect(payload.publicPhone).toBe('+53 5555 0000');
+  });
+
+  it('no guarda si el GET previo al guardado falla', async () => {
+    storeMock.getStore
+      .mockResolvedValueOnce({ succeeded: true, data: makeStore() })
+      .mockResolvedValueOnce({ succeeded: false });
+    const { CatalogLocationCard } = await import('../catalog-location-card');
+    render(
+      <Wrapper>
+        <CatalogLocationCard storeId="s1" />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
+      target: { value: '+53 5555 0000' },
+    });
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
+
+    expect(await screen.findByText('No se pudo guardar la ubicación')).toBeInTheDocument();
+    expect(storeMock.updateStore).not.toHaveBeenCalled();
+    expect(storeMock.getStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('muestra el error de guardado cuando el endpoint responde fallido y conserva lo editado', async () => {
+    storeMock.updateStore.mockResolvedValue({ succeeded: false, data: false });
+    const { CatalogLocationCard } = await import('../catalog-location-card');
+    render(
+      <Wrapper>
+        <CatalogLocationCard storeId="s1" />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
+      target: { value: '+53 5555 9999' },
+    });
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
+
+    expect(await screen.findByText('No se pudo guardar la ubicación')).toBeInTheDocument();
+    expect(toastMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/teléfono público/i)).toHaveValue('+53 5555 9999');
+    // Sin recarga tras el fallo: GET inicial + GET previo al guardado.
+    expect(storeMock.getStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('muestra el error de guardado cuando la petición lanza', async () => {
+    storeMock.updateStore.mockRejectedValue(new Error('boom'));
+    const { CatalogLocationCard } = await import('../catalog-location-card');
+    render(
+      <Wrapper>
+        <CatalogLocationCard storeId="s1" />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
+      target: { value: '+53 5555 9999' },
+    });
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
+
+    expect(await screen.findByText('No se pudo guardar la ubicación')).toBeInTheDocument();
+    expect(toastMock).not.toHaveBeenCalled();
   });
 
   it('un campo vacío limpia el dato guardado (undefined en el payload)', async () => {
@@ -161,9 +225,9 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
-    const phone = await screen.findByTestId('location-public-phone');
+    const phone = await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(phone, { target: { value: '' } });
-    fireEvent.click(screen.getByTestId('location-save'));
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
 
     await waitFor(() => {
       expect(storeMock.updateStore).toHaveBeenCalledTimes(1);
@@ -180,9 +244,9 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
-    const longitude = await screen.findByTestId('location-longitude');
-    fireEvent.change(longitude, { target: { value: '' } });
-    fireEvent.click(screen.getByTestId('location-save'));
+    await screen.findByLabelText(/^longitud$/i);
+    fireEvent.change(screen.getByLabelText(/^longitud$/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
 
     expect(
       await screen.findByText('La latitud y la longitud deben venir juntas.'),
@@ -198,14 +262,32 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
-    await screen.findByTestId('location-public-phone');
+    await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(screen.getByLabelText('Apertura Martes'), { target: { value: '09:00' } });
-    fireEvent.click(screen.getByTestId('location-save'));
+    fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
 
     expect(
       await screen.findByText('Cada día con horario necesita apertura y cierre.'),
     ).toBeInTheDocument();
     expect(storeMock.updateStore).not.toHaveBeenCalled();
+  });
+
+  it('hidrata vacío cuando la tienda no trae coordenadas (ni el literal "undefined")', async () => {
+    const storeWithoutCoordinates = {
+      ...makeStore(),
+      latitude: undefined,
+      longitude: undefined,
+    } as unknown as Store;
+    storeMock.getStore.mockResolvedValue({ succeeded: true, data: storeWithoutCoordinates });
+    const { CatalogLocationCard } = await import('../catalog-location-card');
+    render(
+      <Wrapper>
+        <CatalogLocationCard storeId="s1" />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByLabelText(/^latitud$/i)).toHaveValue(null);
+    expect(screen.getByLabelText(/^longitud$/i)).toHaveValue(null);
   });
 
   it('muestra el error de carga en la tarjeta', async () => {
@@ -218,6 +300,6 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     );
 
     expect(await screen.findByText('No se pudo cargar la ubicación')).toBeInTheDocument();
-    expect(screen.queryByTestId('location-public-phone')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
   });
 });

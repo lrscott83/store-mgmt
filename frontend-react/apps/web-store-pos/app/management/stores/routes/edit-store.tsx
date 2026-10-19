@@ -6,6 +6,7 @@ import { ownerStoresGate } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { toStoredLocationPayload } from '~/management/stores/lib/store-location-payload';
 import { StoreForm } from '~/management/stores/components/store-form';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import type { Store, Owner } from '@store-mgmt/domain';
@@ -117,6 +118,13 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
     try {
       if (isEditMode) {
         if (!store) return;
+        // La ubicación no se captura aquí: se reenvía el bloque GUARDADO y fresco (GET justo
+        // antes de guardar) para que este save no lo pise con el snapshot de la carga.
+        const fresh = await storeHttpService.getStore(storeId);
+        if (!fresh.succeeded) {
+          setError(intl.formatMessage({ id: 'STORES.ERROR' }));
+          return;
+        }
         await storeHttpService.updateStore(storeId, {
           id: storeId,
           name: values.name,
@@ -131,15 +139,10 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
           // The public location block moved to the web catalog view: this form no
           // longer captures it. The endpoint applies the WHOLE block — Address
           // included — whenever updateLocation is on, so the form still opts in
-          // and re-sends the stored values unchanged: the address edit keeps
-          // applying and the location captured in the catalog survives this save.
+          // and re-sends the STORED values unchanged (fresh GET above): the address
+          // edit keeps applying and the location captured in the catalog survives.
           updateLocation: true,
-          publicPhone: store.publicPhone ?? undefined,
-          addressCity: store.addressCity ?? undefined,
-          addressProvince: store.addressProvince ?? undefined,
-          latitude: store.latitude ?? undefined,
-          longitude: store.longitude ?? undefined,
-          openingHours: store.openingHours,
+          ...toStoredLocationPayload(fresh.data),
         });
         // Angular parity: after edit, refresh user session via the consolidated
         // getUserByToken() action (auth-store.ts) — no page reload.

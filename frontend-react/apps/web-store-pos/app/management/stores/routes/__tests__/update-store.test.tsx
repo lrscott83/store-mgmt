@@ -281,6 +281,58 @@ describe('UpdateStorePage — T8a: the location block passes through the data sa
     expect(payload.openingHours).toEqual([{ day: 'Monday', opens: '09:00', closes: '17:00' }]);
     expect(payload.name).toBe('Existing Store');
   });
+
+  it('reenvía la ubicación del GET fresco hecho justo antes de guardar', async () => {
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        succeeded: true,
+        data: makeStore({ name: 'Existing Store', publicPhone: '+53 0000 0000' }),
+      })
+      .mockResolvedValueOnce({
+        succeeded: true,
+        data: makeStore({ name: 'Existing Store', publicPhone: '+53 7777 7777' }),
+      });
+    const { UpdateStorePage } = await import('../update-store');
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => {
+      expect(mockUpdateStore).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpdateStore.mock.calls[0][1].publicPhone).toBe('+53 7777 7777');
+  });
+
+  it('no guarda si el GET previo al guardado falla', async () => {
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValueOnce({ succeeded: true, data: makeStore({ name: 'Existing Store' }) })
+      .mockResolvedValueOnce({ succeeded: false });
+    const { UpdateStorePage } = await import('../update-store');
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(mockUpdateStore).not.toHaveBeenCalled();
+  });
 });
 
 describe('UpdateStorePage — non-super admin save omits empty paymentStartDate', () => {
