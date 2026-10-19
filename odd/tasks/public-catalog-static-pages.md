@@ -47,7 +47,9 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | inline (infra) | COMPLETADO (`14131b21` + `ec8c114c`) |
 | T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | inline | COMPLETADO (`6b4c4bc8`) |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | inline | COMPLETADO (`917a4fa5`) |
-| T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
+| T8a | Persistencia + captura: campos de ubicación en `Store`/DTO + `UpdateStoreCommand` (flag opt-in `updateLocation`) + serializador canónico del horario + migración/script | S6 | inline | COMPLETADO (`84713693`) |
+| T8b | JSON-LD `LocalBusiness` en el builder + mapeo en el generador | S6 | inline | COMPLETADO (`efd0fa40`) |
+| T8c | UI: bloque de ubicación en el formulario de edición + payload `updateLocation` + tipos del dominio | S6 | inline | COMPLETADO (`18eb9634`) |
 | T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | inline | COMPLETADO (`0d16d6e7`) |
 
 ## Log
@@ -206,3 +208,62 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   RDD: slice T9 (`--base-ref f9e27b42`): **`medium`** (3 paths, 181 líneas), `review_due: false`
   (`under_budget`); acumulado T7+T9 (`--base-ref 59262408`): **`medium`** (12 paths, 755 líneas),
   `review_due: false` (`under_budget`).
+- **L17 (2026-10-19, progreso + verificación):** **T8 completado en tres slices** — campos de ubicación
+  por tienda + JSON-LD `LocalBusiness` (S6):
+  - **T8a (`84713693`):** `Store` gana `PublicPhone`, `AddressCity`, `AddressProvince`, `Latitude`,
+    `Longitude` y `OpeningHoursJson` (la dirección estructurada reutiliza `Address` como calle; el país
+    es fijo `CU` y se decide en el JSON-LD). `OpeningHoursSerializer` es el contrato único del horario:
+    nombres schema.org en inglés (`Monday`..`Sunday`), `HH:mm` estricto de dos dígitos (`"9:00"` es
+    INVÁLIDO), `open < close`, máximo 2 rangos por día y 14 en total; vacío/null ⇒ `NULL` en la BD. El
+    **flag opt-in `UpdateLocation`** (default `false`) gobierna el bloque completo: nace de un hallazgo
+    del mapeo — `my-stores.tsx:107` (modal de renombre) envía `address: ''` y aplicar los campos
+    omitidos como null **borraba la ubicación** (y con ella el JSON-LD); sin flag, la ubicación queda
+    intacta (además arregla el borrado pre-existente de `Address` al renombrar). El formulario de datos
+    sí manda `updateLocation: true` con el bloque completo; vaciar un campo lo limpia. La regeneración
+    se dispara si cambió cualquier campo de ubicación (comparación antes/después de `SaveChangesAsync`).
+    Migración `20261019160559_AddStoreLocationFields` aplicada de verdad a `smca_test` y columnas
+    verificadas por psql; script `35-20261019-Add-Store-Location-Fields.sql` generado desde la
+    migración anterior y parcheado (header, `ON CONFLICT ("MigrationId") DO NOTHING;`, SELECTs de
+    verificación, ROLLBACK comentado). **Excepción TDD declarada:** el cableado mecánico
+    entidad/DTO/comando se escribió antes de sus pruebas (sin RED); la validación llegó con los tests.
+  - **T8b (`efd0fa40`):** el builder añade `<script type="application/ld+json">` tras las metas con el
+    nodo `LocalBusiness` construido solo con datos guardados: `name`/`url` siempre; `description`/
+    `image` si existen; `telephone`; `PostalAddress` (calle/ciudad/provincia + `addressCountry: "CU"`,
+    solo si hay alguna parte de la dirección); `geo` (GeoCoordinates, par completo);
+    `openingHoursSpecification` (un nodo por rango, día en inglés). Los campos ausentes se OMITEN (una
+    ficha corta es mejor que una inventada). Serialización con el encoder por defecto de
+    System.Text.Json: escapa `<`, `>` y `+` (`\u002B`) — un valor con `</script>` no puede cerrar el
+    bloque; es JSON válido, deliberado. El generador mapea la ubicación de la tienda +
+    `OpeningHoursSerializer.Parse`. **TDD con RED observado** (CS0246 al referenciar el contrato nuevo)
+    → GREEN.
+  - **T8c (`18eb9634`):** el formulario de tienda muestra el bloque de ubicación **solo en edición**
+    (el flujo de creación no lo toca): teléfono, ciudad, provincia, latitud/longitud (`type=number`) y
+    una fila por día con `type=time` de apertura/cierre; valida par de coordenadas y día a medio llenar
+    (claves nuevas `STORES.COORDINATES_PAIR_REQUIRED` / `STORES.OPENING_HOURS_INCOMPLETE`); emite solo
+    los días con AMBAS horas, la ruta convierte a números y añade `updateLocation: true`. El tipo
+    `Store` del dominio gana los campos + `OpeningHoursEntry`/`WeekdayName` (fixtures de 7 archivos de
+    test actualizadas). Red de seguridad: el endpoint devuelve `openingHours` ya parseado (el perfil
+    usa `OpeningHoursSerializer.Parse`), nunca el string JSON opaco.
+  - **Evidencia:** T8a serializer+comando 27/27 y Application.Tests 1406/1406 → T8b filter
+    `CatalogStaticPage` 90/90 → flag: handler 12/12 → **Application.Tests 1413/1413** (+7 sobre el
+    último conteo: 6 del builder/generador y 1 guarda del flag). Frontend: `store-form` 22/22 + prueba
+    de costura de la ruta (`updateLocation` + coordenadas numéricas) → **suite completa 392/392
+    archivos** (el único fallo intermedio — `login.offline.e2e.test.tsx`, sin relación — pasó aislado
+    4/4 y en la re-corrida: flake); typecheck app+domain limpio; lint `--max-warnings=0` limpio.
+    **Sonda end-to-end real (T8a+T8b):** tienda `probe-t8` sembrada en `smca_test`, API en 5019 con
+    `CatalogStaticPage__*`; el sincronizador de arranque escribió `catalog/probe-t8/index.html` con el
+    JSON-LD completo (telephone, PostalAddress CU, GeoCoordinates, Monday 09:00–17:00 + Saturday
+    10:00–14:00) y el sitemap con 1 catálogo; log "1/1 escritas, 0 fallidas". API detenida, BD limpia
+    (0 tiendas/owners/slugs).
+  - **RDD:** assessments `--committed-only` (HEAD al correrlos: `18eb9634`): `--base-ref e5d149b4`
+    (los tres slices de T8) **`medium`** (29 paths, 4946 líneas — inflado por el Designer+snapshot
+    generados); `--base-ref 84713693` (T8b+T8c) **`medium`** (15 paths, 792 líneas); `--base-ref
+    efd0fa40` (T8c) **`medium`** (11 paths, 531 líneas); acumulado `--base-ref 59262408`
+    (T7+T9+T8a+T8b+T8c) **`medium`** (39 paths, 5699 líneas). `review_due: false` (`under_budget`) en
+    los cuatro ⇒ ninguna review nativa forzada; la transacción estacionada de L14 sigue intacta (sin
+    tocar, sin comandos sustitutos). Señal `executable_change`: el script 35 en los rangos que lo
+    incluyen, un archivo de tests en los demás.
+  - **Fuera de T8 (anotado):** la UI edita UN rango por día; una tienda con dos rangos en un mismo día
+    (solo posible escribiendo la API directamente) conservaría el último al guardar desde el
+    formulario. Y pendiente del deploy: aplicar el script 35 al desplegar `test` (el backfill de
+    arranque regenera las páginas, ahora con JSON-LD cuando el dueño llenó la ubicación).
