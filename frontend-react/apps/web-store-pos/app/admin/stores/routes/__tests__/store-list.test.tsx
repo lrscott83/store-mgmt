@@ -154,6 +154,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     modules: [],
     publicPhone: null,
     addressCity: null,
@@ -348,6 +349,49 @@ describe('AdminStoreListPage — render', () => {
 
     await waitFor(() => {
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Order — closest next payment first (SuperAdmin lifecycle list)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminStoreListPage — order by next payment date', () => {
+  it('shows the store closest to its next payment first and stores without a due date last', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeStore({ id: 'late', name: 'Store Late', nextPaymentDate: '2026-12-01' }),
+        makeStore({ id: 'nodate', name: 'Store NoDate', nextPaymentDate: null }),
+        makeStore({ id: 'soon-b', name: 'Store Soon B', nextPaymentDate: '2026-11-15' }),
+        makeStore({ id: 'overdue', name: 'Store Overdue', nextPaymentDate: '2026-10-01' }),
+        makeStore({ id: 'soon-a', name: 'Store Soon A', nextPaymentDate: '2026-11-15' }),
+      ],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId(/^store-actions-toggle-/).map((el) => el.getAttribute('data-testid')),
+      ).toEqual([
+        'store-actions-toggle-overdue',
+        'store-actions-toggle-soon-b',
+        'store-actions-toggle-soon-a',
+        'store-actions-toggle-late',
+        'store-actions-toggle-nodate',
+      ]);
     });
   });
 });

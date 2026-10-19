@@ -99,6 +99,10 @@ export interface Store {
   planPrice: number | null;
   planCurrentPrice: number | null;
   modules: Module[];
+  // Public catalog slug (`Store.CatalogSlug`): the store's `/catalog/<slug>` route.
+  // Null or empty when the store never synced its catalog — every public endpoint
+  // 404s for a slug-less store, so the UI must not offer the link.
+  catalogSlug: string | null;
   // public-catalog-static-pages (T8): public location data that feeds the
   // generated catalog page's LocalBusiness JSON-LD. Nullable/empty on purpose:
   // a store whose owner never filled this in publishes no location, and the

@@ -17,6 +17,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     planType: 'Pago',
     // Price the backend sends: the sum of the store's OWN active modules (billing
     // formula, owner decision 2026-10-13) — 10 with no discount.
@@ -565,5 +566,46 @@ describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivat
     expect(
       screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('StoreCardList — public catalog link', () => {
+  it('opens the store public catalog in a new tab when the store has a catalog slug', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-cat', catalogSlug: 'mi-tienda' })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onChangePlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const link = screen.getByTestId('store-catalog-link-store-cat');
+    expect(link).toHaveAttribute('href', '/catalog/mi-tienda');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('omits the catalog link when the store never synced a catalog (null or empty slug)', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[
+            makeStore({ id: 'store-nocat', catalogSlug: null }),
+            makeStore({ id: 'store-emptycat', catalogSlug: '' }),
+          ]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onChangePlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('store-catalog-link-store-nocat')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-catalog-link-store-emptycat')).not.toBeInTheDocument();
   });
 });
