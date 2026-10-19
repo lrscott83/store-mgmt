@@ -177,22 +177,14 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdatedStoreAsync(Guid id, [FromBody] UpdateStoreCommand command)
         {
-            // public-catalog-static-pages (T8): the public location block must reach the handler
-            // verbatim. This reconstruction used to drop UpdateLocation and the six location
-            // fields, so the flag was always false over HTTP and the catalog panel's save
-            // persisted nothing while the endpoint still answered 200. PlanId stays null on
-            // purpose: plan changes have their own dedicated path and this PUT must not start
-            // applying a body-supplied plan id.
-            return Ok(await Sender.Send(
-                new UpdateStoreCommand(id, command.Name, command.Address, command.Description,
-                command.Approved, command.ModuleIds, command.IsActive, command.PaymentStartDate,
-                PublicPhone: command.PublicPhone,
-                AddressCity: command.AddressCity,
-                AddressProvince: command.AddressProvince,
-                Latitude: command.Latitude,
-                Longitude: command.Longitude,
-                OpeningHours: command.OpeningHours,
-                UpdateLocation: command.UpdateLocation)));
+            // public-catalog-static-pages (T8): the bound command is forwarded as-is; only the
+            // route id and the plan override are pinned. The previous hand-kept 16-argument
+            // projection silently dropped UpdateLocation and the six location fields, so the
+            // flag was always false over HTTP and the catalog panel's save persisted nothing.
+            // Passing the record through means a field added to UpdateStoreCommand cannot be
+            // forgotten here again. PlanId stays null on purpose: plan changes have their own
+            // dedicated path and this PUT must not start applying a body-supplied plan id.
+            return Ok(await Sender.Send(command with { Id = id, PlanId = null }));
         }
 
         /// <summary>

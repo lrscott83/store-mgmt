@@ -117,4 +117,42 @@ public sealed class StoreLocationUpdateTests
         }
         finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
     }
+
+    [Fact]
+    public async Task Update_with_updateLocation_and_an_omitted_field_clears_the_stored_value()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login);
+            var seeded = await client.PutAsJsonAsync(
+                $"/api/v1/stores/{sa.StoreId}", LocationBody($"Located-{Guid.NewGuid():N}", "Calle 1 #234"));
+            seeded.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // The panel clears a field by omitting it while the flag is on: the wire drops
+            // `undefined` keys, so the backend must overwrite the stored value with null
+            // instead of keeping the old one — that is the empty-field behavior the UI promises.
+            var cleared = await client.PutAsJsonAsync($"/api/v1/stores/{sa.StoreId}", new
+            {
+                Id = Guid.Empty,
+                Name = $"Located-{Guid.NewGuid():N}",
+                Address = "Calle 1 #234",
+                Description = (string?)null,
+                Approved = false,
+                IsActive = true,
+                AddressProvince = "Playa",
+                Latitude = 23.13,
+                Longitude = -82.38,
+                OpeningHours = new[] { new { day = "Monday", opens = "09:00", closes = "17:00" } },
+                UpdateLocation = true
+            });
+            cleared.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var row = await ReadLocationAsync(_f, sa.StoreId);
+            row.PublicPhone.Should().BeNull();
+            row.AddressCity.Should().BeNull();
+            row.AddressProvince.Should().Be("Playa");
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
 }
