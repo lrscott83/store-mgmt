@@ -67,5 +67,20 @@ showcase); el backend no se toca.
   `@store-mgmt/domain` (el `^build` vive en el pipeline de turbo): con el dist viejo, `tsc` reporta que
   `publicPhone` y compañía "no existen" en `Store` aunque existan en `packages/domain/src` — docenas de
   errores falsos. Correr el typecheck desde `frontend-react/` (`pnpm typecheck`) y el dist queda fresco.
+- **L5 (2026-10-19, owner, textual):** "Todos esos datos para el catalogo web de la tienda son opcionales,
+  solo una sugerencia para un mejor SEO". Confirmado en las tres capas: el panel no exige ninguno (un campo
+  vacío limpia), y el backend solo valida coherencia (pareja de coordenadas, día completo), no obligatoriedad.
+- **L6 (2026-10-19, bug de producción encontrado por el owner):** `StoreAuthorizationTests.
+  OwnerAdmin_update_ignores_superadmin_only_fields` en rojo determinista. Causa raíz: el PUT de
+  `SMCA.WebApi/Controllers/v1/StoresController.cs` reconstruía el `UpdateStoreCommand` a mano con 8 de sus
+  16 parámetros y T8a no tocó la capa WebApi — `UpdateLocation` llegaba siempre `false` por HTTP, así que el
+  guardado del panel no persistía nada (200 silencioso). Fix: la reconstrucción pasa el bloque T8 con
+  argumentos nombrados y `PlanId` sigue en `null` a propósito (el plan tiene su ruta propia). El test E2E
+  existente recibe `UpdateLocation = true` (el flag es opt-in del bloque, no un privilegio).
+- **L7 (2026-10-19, evidencia E2E):** `dotnet test` filtrado a `StoreAuthorizationTests.OwnerAdmin_...` y
+  `StoreLocationUpdateTests`: Failed 0, Passed 3, Total 3 ✓ contra `smca_test` real (`[E2E Guard]` presente).
+  Tests nuevos (`StoreLocationUpdateTests.cs`): con `updateLocation: true` persisten los seis campos; sin el
+  flag, un rename conserva el bloque intacto.
 - **Siguiente paso:** al desplegar, aplicar la migración `35-20261019-Add-Store-Location-Fields.sql`
-  (pendiente). El E2E del catálogo web no cubre el bloque (lo cubren los unit tests nuevos del panel).
+  (pendiente). El E2E del catálogo web no cubre el bloque (lo cubren los unit tests del panel + los dos E2E
+  nuevos del PUT).
