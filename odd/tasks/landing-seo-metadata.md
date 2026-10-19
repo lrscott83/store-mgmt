@@ -58,5 +58,4 @@ shell del SPA** que usan las rutas privadas y la pre-generación de catálogos.
   disponible; no se sustituye por un PASS.
 - **Riesgo:** item 5 (deploy: nginx, Dockerfile, docker-compose, pipeline de build).
 - **Cierre:** work unit `b338aaeb` (11 archivos, +386/−5) — T1–T5 completadas; este documento viaja en ese commit.
-- **Siguiente:** `robots.txt` + `sitemap.xml` (T7 de `public-catalog-static-pages`); el sitemap con
-  slugs de catálogos requiere producción del backend → aprobación explícita del owner.
+- **Siguiente (fuera de esta rama):** `robots.txt` + `sitemap.xml` (T7 de `public-catalog-static-pages`) — **ya en curso en otra rama/sesión** (estado 2026-10-19, owner); no retomar desde `dev`.
