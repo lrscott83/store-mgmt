@@ -11,6 +11,7 @@ using Application.Services.Features;
 using Application.Services.Owners;
 using Application.Services.Roles;
 using Application.Services.Stores;
+using Application.Features.WebCatalog.Public;
 using Domain.Entities.Stores;
 using Domain.Entities.Tenants;
 using Domain.Interfaces.Services.Authentication;
@@ -79,6 +80,15 @@ namespace Application
             services.Configure<AuthenticationSettings>(
                 configuration.GetSection(AuthenticationSettings.SectionName));
             services.AddScoped<IHashPasswordService, Argon2idHashPasswordService>();
+
+            // public-catalog-static-pages: pre-generated indexable HTML per public catalog
+            // (/catalog/<slug>). The writer is filesystem-only; the generator reads the store and its
+            // branding; the regenerator is the best-effort trigger the save flows call.
+            services.Configure<CatalogStaticPageOptions>(
+                configuration.GetSection(CatalogStaticPageOptions.SectionName));
+            services.AddScoped<ICatalogStaticPageWriter, CatalogStaticPageWriter>();
+            services.AddScoped<ICatalogStaticPageGenerator, CatalogStaticPageGenerator>();
+            services.AddScoped<ICatalogStaticPageRegenerator, CatalogStaticPageRegenerator>();
 
             return services;
         }

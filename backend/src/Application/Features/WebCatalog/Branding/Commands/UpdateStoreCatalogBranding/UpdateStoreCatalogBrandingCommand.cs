@@ -5,6 +5,7 @@ using Application.Dtos.WebCatalog;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Branding;
 using Application.Features.WebCatalog.Images;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Extensions;
@@ -65,6 +66,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly ILogger<UpdateStoreCatalogBrandingCommandHandler> _logger;
+        private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
 
         public UpdateStoreCatalogBrandingCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -73,7 +75,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer,
-            ILogger<UpdateStoreCatalogBrandingCommandHandler> logger)
+            ILogger<UpdateStoreCatalogBrandingCommandHandler> logger,
+            ICatalogStaticPageRegenerator catalogPageRegenerator)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -82,6 +85,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
             _logger = logger;
+            _catalogPageRegenerator = catalogPageRegenerator;
         }
 
         public async Task<ResponseResult<StoreCatalogBrandingDto>> Handle(
@@ -212,6 +216,11 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                         key);
                 }
             }
+
+            // public-catalog-static-pages (T4): la marca cambió (logo/banner), así que se regenera la
+            // página estática del catálogo. Best-effort: la fila y los archivos ya están persistidos;
+            // un fallo aquí no puede tumbar el guardado (el SPA sigue sirviendo el catálogo).
+            await _catalogPageRegenerator.RegenerateAsync(storeId, cancellationToken);
 
             return ResponseResult.Success(new StoreCatalogBrandingDto
             {

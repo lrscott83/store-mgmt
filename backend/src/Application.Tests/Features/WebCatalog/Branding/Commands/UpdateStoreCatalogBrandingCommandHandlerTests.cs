@@ -3,6 +3,7 @@ using Application.Abstractions.Storage;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Branding;
 using Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBranding;
+using Application.Features.WebCatalog.Public;
 using Application.UnitOfWorks;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
@@ -49,6 +50,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
     private readonly Mock<ILogger<UpdateStoreCatalogBrandingCommandHandler>> _logger = new();
+    private readonly Mock<ICatalogStaticPageRegenerator> _catalogPageRegenerator = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -95,7 +97,8 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _settingsRepository.Object,
         _catalogImageStorage.Object,
         _localizer.Object,
-        _logger.Object);
+        _logger.Object,
+        _catalogPageRegenerator.Object);
 
     /// <summary>
     /// El tenant de la CLAVE del archivo (y de la fila) sale de la TIENDA, no del claim. Si saliera del
