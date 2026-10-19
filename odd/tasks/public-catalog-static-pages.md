@@ -3,7 +3,7 @@
 **Objetivo:** que cada catálogo público (`/catalog/<slug>`) se sirva con HTML que ya contenga título,
 descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y** las redes/WhatsApp
 (que no ejecutan JS) lo vean — **sin tocar el SPA del POS**.
-**Rama:** main (main despliega a `pos.playground.sceiba.net`) · **Delivery:** work-unit commits, deploy manual del owner.
+**Rama:** `test` (despliega al entorno de pruebas; `main` solo para la verificación con Google) · **Delivery:** work-unit commits, deploy manual del owner.
 
 ## Specs
 
@@ -145,3 +145,18 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   576 líneas), `review_due: false`, motivo **`under_budget`** → ninguna review nativa forzada; el slice
   queda pendiente con base `36a30639` hasta que un commit posterior alcance el presupuesto. El modo RDD
   está `on` (global). Los cierres de T1–T5 no registran assessment RDD en este documento.
+- **L14 (2026-10-19, corrección R4 + cierre de la review):** la review nativa del slice abierto
+  (`review-4b3e9a47f9e795cd`, base `b5f05daf`, lentes risk/resilience/reliability) llegó a
+  `correction_required` con un hallazgo CRITICAL — `R4-page-write-atomicity`: el writer escribía el
+  `index.html` servible con truncate+write (un fallo a mitad podía servir una página a medias con 200).
+  Corrección test-first (RED observado contra el writer previo → GREEN) commiteada en **`59262408`**:
+  temporal en el mismo directorio + rename atómico, limpieza del temporal en el fallo; 71+/2-;
+  Application.Tests **1359/1359**; 2 pruebas nuevas quedan como regresión. La validación dirigida quedó
+  **bloqueada por la tool**: dos intentos del `review-validator` fueron refusados por Go
+  (`role_capture_failed`: "admitted targeted-validator evidence does not match its request and digests")
+  pese a que el prompt materializado por la propia tool contiene el `request_hash` (`e1c19a51…`) que el
+  modelo repitió idéntico en ambos intentos — inconsistencia interna de gentle-ai (aparente defecto;
+  evidencia: payloads en `.git/gentle-ai/rejected-results/` + materialización reproducida en
+  solo-lectura). Decisión del owner: **no se reporta**; la review queda estacionada con su estado intacto
+  (autoridad sin quemar, sin comandos sustitutos) y se continúa con T7–T9. El fix vale por sí mismo
+  (commiteado y probado); la review era control adicional.
