@@ -19,6 +19,11 @@ COPY . .
 # Serving the API from another origin means teaching connect-src that origin
 # first, in apps/web-store-pos/scripts/csp-policy.mjs.
 ARG API_URL=/api
+# Absolute public origin used by the landing metadata (canonical + og:url) and
+# served at runtime. Override with --build-arg for a different environment.
+ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net
+# Exposed to the build command below (generate-landing-page.mjs reads it).
+ENV PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
 RUN echo "API_URL=${API_URL}" > .env
 # Build web-store-pos AND its workspace deps (domain, web-common) in
 # dependency order — the `...` suffix selects the package plus its deps.
