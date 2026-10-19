@@ -93,8 +93,25 @@ namespace Application.Features.WebCatalog.Public
 
             var directory = Path.Combine(outputRoot, "catalog", storeSlug);
             Directory.CreateDirectory(directory);
-            await File.WriteAllTextAsync(
-                Path.Combine(directory, "index.html"), html, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
+
+            // Corrección R4: la página se publica con un rename atómico — se escribe completa en un
+            // temporal del mismo directorio y se mueve sobre index.html. Un fallo a mitad de escritura
+            // (crash, disco lleno) deja a lo sumo el temporal como residuo, nunca la ruta servible a
+            // medias: nginx sigue sirviendo la página anterior o cae al SPA, no un HTML truncado.
+            var pagePath = Path.Combine(directory, "index.html");
+            var temporaryPath = Path.Combine(directory, $".index.html.{Guid.NewGuid():N}.tmp");
+            try
+            {
+                await File.WriteAllTextAsync(
+                    temporaryPath, html, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
+                File.Move(temporaryPath, pagePath, overwrite: true);
+            }
+            catch
+            {
+                try { File.Delete(temporaryPath); }
+                catch { /* residuo no servible: lo limpia el siguiente pase */ }
+                throw;
+            }
         }
     }
 }

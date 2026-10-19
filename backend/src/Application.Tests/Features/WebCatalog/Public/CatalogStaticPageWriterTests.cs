@@ -89,6 +89,58 @@ public sealed class CatalogStaticPageWriterTests : IDisposable
         html.Should().NotContain("Nombre Viejo");
     }
 
+    [Fact]
+    public async Task Write_replaces_the_served_page_instead_of_rewriting_it_in_place()
+    {
+        var writer = CreateWriter();
+        await writer.WriteAsync("mercado-25-y-28", Meta("Nombre Viejo"));
+
+        var pagePath = Path.Combine(_outputRoot, "catalog", "mercado-25-y-28", "index.html");
+        var createdAt = File.GetCreationTimeUtc(pagePath);
+
+        await Task.Delay(50);
+        await writer.WriteAsync("mercado-25-y-28", Meta("Nombre Nuevo"));
+
+        // Corrección R4: la publicación reemplaza el archivo servible con un rename atómico; nunca lo
+        // trunca ni lo reescribe in-place. Un archivo reemplazado es un objeto nuevo (conserva el
+        // creation time del temporal); una reescritura in-place conservaría el creation time original
+        // — y su ventana trunca-y-escribe es la que podía servir un HTML a medias.
+        File.GetCreationTimeUtc(pagePath).Should().BeAfter(createdAt);
+
+        var html = await File.ReadAllTextAsync(pagePath);
+        html.Should().Contain("<title>Nombre Nuevo</title>");
+        html.Should().NotContain("Nombre Viejo");
+        Directory.GetFiles(Path.GetDirectoryName(pagePath)!)
+            .Should().BeEquivalentTo(new[] { pagePath });
+    }
+
+    [Fact]
+    public async Task A_blocked_publish_never_serves_a_partial_page_nor_leaves_residue()
+    {
+        var writer = CreateWriter();
+        await writer.WriteAsync("mercado-25-y-28", Meta("Nombre Viejo"));
+
+        var pagePath = Path.Combine(_outputRoot, "catalog", "mercado-25-y-28", "index.html");
+        var before = await File.ReadAllTextAsync(pagePath);
+
+        // Un lector bloquea el reemplazo (el sistema de archivos puede denegar el rename sobre un
+        // archivo abierto): la publicación puede fallar, pero la ruta servible debe quedar intacta,
+        // nunca a medias y sin temporales de por medio.
+        using (new FileStream(pagePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            try { await writer.WriteAsync("mercado-25-y-28", Meta("Nombre Nuevo")); }
+            catch (IOException) { /* bloqueo del sistema de archivos: el fallo es la ruta ejercitada */ }
+            catch (UnauthorizedAccessException) { /* idem: el SO deniega el reemplazo */ }
+        }
+
+        var after = await File.ReadAllTextAsync(pagePath);
+        after.Should().EndWith("</html>");
+        (after == before || after.Contains("<title>Nombre Nuevo</title>"))
+            .Should().BeTrue("la ruta servible queda como la página anterior completa o la nueva completa");
+        Directory.GetFiles(Path.GetDirectoryName(pagePath)!)
+            .Should().BeEquivalentTo(new[] { pagePath });
+    }
+
     [Theory]
     [InlineData("../escape")]
     [InlineData("a/b")]
