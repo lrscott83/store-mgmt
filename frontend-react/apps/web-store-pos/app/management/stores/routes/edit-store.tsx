@@ -8,7 +8,7 @@ import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-servi
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import type { Store, Owner, OpeningHoursEntry } from '@store-mgmt/domain';
+import type { Store, Owner } from '@store-mgmt/domain';
 
 export const clientLoader = ownerStoresGate();
 
@@ -111,12 +111,6 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
     approved: boolean;
     paymentStartDate: string;
     isActive: boolean;
-    publicPhone: string;
-    addressCity: string;
-    addressProvince: string;
-    latitude: string;
-    longitude: string;
-    openingHours: OpeningHoursEntry[];
   }) {
     setError('');
     setIsLoading(true);
@@ -134,17 +128,18 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
           // binding; the backend only applies non-null.
           paymentStartDate: values.paymentStartDate || undefined,
           isActive: values.isActive,
-          // T8: the store-data view owns the public location block, so it always
-          // opts in (updateLocation) and sends the whole block — including the
-          // empty values, which clear the stored data. Callers that only rename
-          // omit the flag and never touch it.
+          // The public location block moved to the web catalog view: this form no
+          // longer captures it. The endpoint applies the WHOLE block — Address
+          // included — whenever updateLocation is on, so the form still opts in
+          // and re-sends the stored values unchanged: the address edit keeps
+          // applying and the location captured in the catalog survives this save.
           updateLocation: true,
-          publicPhone: values.publicPhone || undefined,
-          addressCity: values.addressCity || undefined,
-          addressProvince: values.addressProvince || undefined,
-          latitude: values.latitude ? Number(values.latitude) : undefined,
-          longitude: values.longitude ? Number(values.longitude) : undefined,
-          openingHours: values.openingHours,
+          publicPhone: store.publicPhone ?? undefined,
+          addressCity: store.addressCity ?? undefined,
+          addressProvince: store.addressProvince ?? undefined,
+          latitude: store.latitude ?? undefined,
+          longitude: store.longitude ?? undefined,
+          openingHours: store.openingHours,
         });
         // Angular parity: after edit, refresh user session via the consolidated
         // getUserByToken() action (auth-store.ts) — no page reload.
