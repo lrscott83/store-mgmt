@@ -48,7 +48,7 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | inline | COMPLETADO (`6b4c4bc8`) |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | inline | COMPLETADO (`917a4fa5`) |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
-| T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | — | PENDIENTE |
+| T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | inline | COMPLETADO (`0d16d6e7`) |
 
 ## Log
 
@@ -196,3 +196,13 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
     herramienta, L14) y el owner dejó ese candidato sin revisar.
   - **Fuera de T7 (anotado):** una tienda desactivada conserva su página servida (misma familia que el
     huérfano del renombre de slug) — el sitemap sí deja de listarla.
+- **L16 (2026-10-19, progreso):** **T9 completado (`0d16d6e7`)** — `UpdateStoreCommandHandler` captura
+  nombre y descripción **persistidos** antes de mutar (después del gate SuperAdmin, así una descripción
+  que envía un OwnerAdmin y el comando ignora NO dispara la regeneración) y, tras `SaveChangesAsync`,
+  llama al regenerador best-effort solo si alguno cambió (S2: nombre/descripción → title/description).
+  Evidencia: RED **3 fallidos/2 pasan/5** → GREEN filter `UpdateStoreCommandHandler` **16/16** (5 pruebas
+  nuevas); Application.Tests **1384/1384**. Sin cambios de contrato (el endpoint y el comando ya
+  existían); Domain y E2E no aplican (sin cambio de dominio; en el entorno E2E la feature está apagada).
+  RDD: slice T9 (`--base-ref f9e27b42`): **`medium`** (3 paths, 181 líneas), `review_due: false`
+  (`under_budget`); acumulado T7+T9 (`--base-ref 59262408`): **`medium`** (12 paths, 755 líneas),
+  `review_due: false` (`under_budget`).
