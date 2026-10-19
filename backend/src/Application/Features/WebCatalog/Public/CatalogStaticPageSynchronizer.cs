@@ -11,6 +11,8 @@ namespace Application.Features.WebCatalog.Public
     /// T6: regenera la página estática de TODOS los catálogos publicados de una sola pasada. Es lo
     /// que corre al arrancar la API (backfill de los catálogos existentes) y cuando cambia el shell
     /// del SPA (cada deploy del frontend, porque el shell referencia assets hasheados del build).
+    /// T7 (S5): la misma pasada deja actualizado el índice de descubrimiento — <c>sitemap.xml</c> con
+    /// los catálogos públicos y <c>robots.txt</c>— en la raíz del volumen compartido.
     /// </summary>
     public interface ICatalogStaticPageSynchronizer
     {
@@ -28,17 +30,20 @@ namespace Application.Features.WebCatalog.Public
     {
         private readonly IStoreRepository _storeRepository;
         private readonly ICatalogStaticPageGenerator _generator;
+        private readonly ICatalogStaticPageSitemapWriter _sitemapWriter;
         private readonly CatalogStaticPageOptions _options;
         private readonly ILogger<CatalogStaticPageSynchronizer> _logger;
 
         public CatalogStaticPageSynchronizer(
             IStoreRepository storeRepository,
             ICatalogStaticPageGenerator generator,
+            ICatalogStaticPageSitemapWriter sitemapWriter,
             IOptions<CatalogStaticPageOptions> options,
             ILogger<CatalogStaticPageSynchronizer> logger)
         {
             _storeRepository = storeRepository;
             _generator = generator;
+            _sitemapWriter = sitemapWriter;
             _options = options.Value;
             _logger = logger;
         }
@@ -60,6 +65,7 @@ namespace Application.Features.WebCatalog.Public
             var slugs = await _storeRepository.GetCatalogSlugsAsync();
             var written = 0;
             var failed = 0;
+            var published = new List<string>();
 
             foreach (var slug in slugs)
             {
@@ -70,6 +76,11 @@ namespace Application.Features.WebCatalog.Public
                     var store = await _storeRepository.GetStoreByCatalogSlugAsync(slug);
                     if (store is null)
                         continue;
+
+                    // Resolver la tienda es lo que PUBLICa el slug: el índice de descubrimiento
+                    // (sitemap.xml) lista exactamente los que resuelven — un slug cuya tienda (o su
+                    // dueño) ya no está activo queda fuera aunque la columna siga puesta.
+                    published.Add(slug);
 
                     if (await _generator.GenerateAsync(store.Id, cancellationToken))
                         written++;
@@ -84,11 +95,26 @@ namespace Application.Features.WebCatalog.Public
                 }
             }
 
+            try
+            {
+                await _sitemapWriter.WriteAsync(published, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // El índice es decoración de descubrimiento: si no se puede escribir, las páginas
+                // generadas siguen sirviéndose y la próxima pasada lo reintenta.
+                _logger.LogWarning(
+                    exception,
+                    "No se pudieron actualizar sitemap.xml/robots.txt; los catálogos publicados siguen sirviéndose.");
+            }
+
             _logger.LogInformation(
-                "Páginas estáticas de catálogo regeneradas: {Written}/{Candidates} escritas, {Failed} fallidas.",
+                "Páginas estáticas de catálogo regeneradas: {Written}/{Candidates} escritas, {Failed} fallidas; " +
+                "sitemap.xml con {Published} catálogos públicos.",
                 written,
                 slugs.Count,
-                failed);
+                failed,
+                published.Count);
 
             return new CatalogStaticPageSyncResult(slugs.Count, written, failed);
         }

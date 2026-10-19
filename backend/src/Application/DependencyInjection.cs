@@ -83,10 +83,12 @@ namespace Application
 
             // public-catalog-static-pages: pre-generated indexable HTML per public catalog
             // (/catalog/<slug>). The writer is filesystem-only; the generator reads the store and its
-            // branding; the regenerator is the best-effort trigger the save flows call.
+            // branding; the regenerator is the best-effort trigger the save flows call; the sitemap
+            // writer (T7) keeps the discovery index — sitemap.xml/robots.txt — in the shared volume.
             services.Configure<CatalogStaticPageOptions>(
                 configuration.GetSection(CatalogStaticPageOptions.SectionName));
             services.AddScoped<ICatalogStaticPageWriter, CatalogStaticPageWriter>();
+            services.AddScoped<ICatalogStaticPageSitemapWriter, CatalogStaticPageSitemapWriter>();
             services.AddScoped<ICatalogStaticPageGenerator, CatalogStaticPageGenerator>();
             services.AddScoped<ICatalogStaticPageRegenerator, CatalogStaticPageRegenerator>();
             // T6: full regeneration pass over every published catalog; the API host runs it at
