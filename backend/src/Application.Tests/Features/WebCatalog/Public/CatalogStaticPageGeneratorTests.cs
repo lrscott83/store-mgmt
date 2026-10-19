@@ -1,4 +1,5 @@
 using Application.Features.WebCatalog.Public;
+using Application.Services.Stores;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -95,6 +96,44 @@ public sealed class CatalogStaticPageGeneratorTests
         await CreateGenerator().GenerateAsync(_storeId);
 
         _written[0].Meta.ImageUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Generate_maps_the_public_location_and_opening_hours_into_the_page_meta()
+    {
+        var store = ArrangeStore();
+        store.Address = "Calle 23 #45";
+        store.PublicPhone = "+53 5555 1234";
+        store.AddressCity = "La Habana";
+        store.AddressProvince = "Plaza";
+        store.Latitude = 23.13;
+        store.Longitude = -82.38;
+        store.OpeningHoursJson =
+            "[{\"day\":\"Monday\",\"opens\":\"09:00\",\"closes\":\"17:00\"}]";
+
+        await CreateGenerator().GenerateAsync(_storeId);
+
+        var location = _written[0].Meta.Location;
+        location.Should().NotBeNull();
+        location!.Phone.Should().Be("+53 5555 1234");
+        location.StreetAddress.Should().Be("Calle 23 #45");
+        location.City.Should().Be("La Habana");
+        location.Province.Should().Be("Plaza");
+        location.Latitude.Should().Be(23.13);
+        location.Longitude.Should().Be(-82.38);
+        location.OpeningHours.Should().ContainSingle()
+            .Which.Should().Be(new OpeningHoursEntry("Monday", "09:00", "17:00"));
+    }
+
+    [Fact]
+    public async Task Generate_ignores_a_corrupted_opening_hours_value()
+    {
+        var store = ArrangeStore();
+        store.OpeningHoursJson = "{not json";
+
+        await CreateGenerator().GenerateAsync(_storeId);
+
+        _written[0].Meta.Location!.OpeningHours.Should().BeEmpty();
     }
 
     [Fact]

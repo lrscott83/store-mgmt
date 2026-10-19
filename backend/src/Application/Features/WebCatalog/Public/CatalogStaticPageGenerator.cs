@@ -1,3 +1,4 @@
+using Application.Services.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Options;
 
@@ -68,7 +69,15 @@ namespace Application.Features.WebCatalog.Public
                 Locale: "es_ES",
                 ImageUrl: string.IsNullOrWhiteSpace(imageKey)
                     ? null
-                    : baseUrl + CatalogPublicUrls.Media(slug, imageKey));
+                    : baseUrl + CatalogPublicUrls.Media(slug, imageKey),
+                Location: new CatalogStaticPageLocation(
+                    Phone: store.PublicPhone,
+                    StreetAddress: store.Address,
+                    City: store.AddressCity,
+                    Province: store.AddressProvince,
+                    Latitude: store.Latitude,
+                    Longitude: store.Longitude,
+                    OpeningHours: OpeningHoursSerializer.Parse(store.OpeningHoursJson)));
 
             await _writer.WriteAsync(slug, meta, cancellationToken);
             return true;

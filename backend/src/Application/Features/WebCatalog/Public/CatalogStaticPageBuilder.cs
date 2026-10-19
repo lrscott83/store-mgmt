@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using Application.Services.Stores;
 
 namespace Application.Features.WebCatalog.Public
 {
@@ -13,7 +15,21 @@ namespace Application.Features.WebCatalog.Public
         string CanonicalUrl,
         string SiteName,
         string Locale = "es_ES",
-        string? ImageUrl = null);
+        string? ImageUrl = null,
+        CatalogStaticPageLocation? Location = null);
+
+    /// <summary>
+    /// public-catalog-static-pages (T8): ubicación pública de la tienda tal como entra en el JSON-LD
+    /// (<c>LocalBusiness</c>). Todo opcional: lo ausente se omite del JSON en vez de publicarse vacío.
+    /// </summary>
+    public sealed record CatalogStaticPageLocation(
+        string? Phone,
+        string? StreetAddress,
+        string? City,
+        string? Province,
+        double? Latitude,
+        double? Longitude,
+        IReadOnlyList<OpeningHoursEntry> OpeningHours);
 
     /// <summary>
     /// Construye la página estática de un catálogo público inyectando los metadatos en el shell del
@@ -59,8 +75,78 @@ namespace Application.Features.WebCatalog.Public
             tags.Append("<meta property=\"og:site_name\" content=\"").Append(Attr(meta.SiteName)).Append("\" />");
             tags.Append("<meta property=\"og:locale\" content=\"").Append(Attr(meta.Locale)).Append("\" />");
             tags.Append("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
+            tags.Append("<script type=\"application/ld+json\">").Append(JsonLd(meta)).Append("</script>");
 
             return head + tags + tail;
+        }
+
+        /// <summary>
+        /// Ficha schema.org del negocio (T8). Se serializa con System.Text.Json, que escapa
+        /// <c>&lt;</c> y <c>&gt;</c>: un valor con <c>&lt;/script&gt;</c> no puede cerrar el bloque.
+        /// Los campos ausentes NO se emiten — una ficha con datos inventados es peor que una corta.
+        /// </summary>
+        private static string JsonLd(CatalogStaticPageMeta meta)
+        {
+            var business = new Dictionary<string, object?>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "LocalBusiness",
+                ["name"] = meta.Title,
+                ["url"] = meta.CanonicalUrl,
+            };
+            if (HasText(meta.Description))
+                business["description"] = meta.Description;
+            if (HasText(meta.ImageUrl))
+                business["image"] = meta.ImageUrl;
+
+            var location = meta.Location;
+            if (location is not null)
+            {
+                if (HasText(location.Phone))
+                    business["telephone"] = location.Phone;
+
+                // addressCountry es Cuba: la plataforma opera en Cuba y el catálogo público es una
+                // ficha local. Solo se emite address si hay al menos una parte de la dirección.
+                var address = new Dictionary<string, object?>();
+                if (HasText(location.StreetAddress))
+                    address["streetAddress"] = location.StreetAddress;
+                if (HasText(location.City))
+                    address["addressLocality"] = location.City;
+                if (HasText(location.Province))
+                    address["addressRegion"] = location.Province;
+                if (address.Count > 0)
+                {
+                    address["addressCountry"] = "CU";
+                    address["@type"] = "PostalAddress";
+                    business["address"] = address;
+                }
+
+                if (location.Latitude.HasValue && location.Longitude.HasValue)
+                {
+                    business["geo"] = new Dictionary<string, object?>
+                    {
+                        ["@type"] = "GeoCoordinates",
+                        ["latitude"] = location.Latitude.Value,
+                        ["longitude"] = location.Longitude.Value,
+                    };
+                }
+
+                var hours = location.OpeningHours;
+                if (hours is not null && hours.Count > 0)
+                {
+                    business["openingHoursSpecification"] = hours
+                        .Select(hour => new Dictionary<string, object?>
+                        {
+                            ["@type"] = "OpeningHoursSpecification",
+                            ["dayOfWeek"] = hour.Day,
+                            ["opens"] = hour.Opens,
+                            ["closes"] = hour.Closes,
+                        })
+                        .ToArray();
+                }
+            }
+
+            return JsonSerializer.Serialize(business);
         }
 
         private static bool HasText(string? value) => !string.IsNullOrWhiteSpace(value);

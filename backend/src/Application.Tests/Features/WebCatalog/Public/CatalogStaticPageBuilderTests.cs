@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Application.Features.WebCatalog.Public;
+using Application.Services.Stores;
 using FluentAssertions;
 
 namespace Application.Tests.Features.WebCatalog.Public;
@@ -16,14 +18,33 @@ public class CatalogStaticPageBuilderTests
     private static CatalogStaticPageMeta Meta(
         string title = "Mercado 25 y 28",
         string? description = "Mira el catálogo de Mercado 25 y 28 y haz tu pedido por WhatsApp.",
-        string? image = "https://pos.playground.sceiba.net/media/logo.webp")
+        string? image = "https://pos.playground.sceiba.net/media/logo.webp",
+        CatalogStaticPageLocation? location = null)
         => new(
             Title: title,
             Description: description,
             CanonicalUrl: "https://pos.playground.sceiba.net/catalog/mercado-25-y-28",
             SiteName: "Mercado 25 y 28",
             Locale: "es_ES",
-            ImageUrl: image);
+            ImageUrl: image,
+            Location: location);
+
+    private static CatalogStaticPageLocation Location(
+        string? phone = "+53 5555 1234",
+        string? street = "Calle 23 #45, entre 10 y 12",
+        string? city = "La Habana",
+        string? province = "Plaza",
+        double? latitude = 23.13,
+        double? longitude = -82.38,
+        IReadOnlyList<OpeningHoursEntry>? hours = null)
+        => new(
+            Phone: phone,
+            StreetAddress: street,
+            City: city,
+            Province: province,
+            Latitude: latitude,
+            Longitude: longitude,
+            OpeningHours: hours ?? new[] { new OpeningHoursEntry("Monday", "09:00", "17:00") });
 
     [Fact]
     public void Build_inserts_head_metadata_and_leaves_the_body_untouched()
@@ -107,6 +128,104 @@ public class CatalogStaticPageBuilderTests
         var act = () => CatalogStaticPageBuilder.Build("   ", Meta());
 
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Build_emits_local_business_json_ld_with_the_core_fields()
+    {
+        var ld = JsonLd(CatalogStaticPageBuilder.Build(Shell, Meta()));
+
+        ld.GetProperty("@context").GetString().Should().Be("https://schema.org");
+        ld.GetProperty("@type").GetString().Should().Be("LocalBusiness");
+        ld.GetProperty("name").GetString().Should().Be("Mercado 25 y 28");
+        ld.GetProperty("url").GetString().Should()
+            .Be("https://pos.playground.sceiba.net/catalog/mercado-25-y-28");
+        ld.GetProperty("description").GetString().Should().Contain("catálogo");
+        ld.GetProperty("image").GetString().Should()
+            .Be("https://pos.playground.sceiba.net/media/logo.webp");
+    }
+
+    [Fact]
+    public void Build_emits_the_location_as_schema_org_address_geo_and_opening_hours()
+    {
+        var ld = JsonLd(CatalogStaticPageBuilder.Build(Shell, Meta(location: Location())));
+
+        ld.GetProperty("telephone").GetString().Should().Be("+53 5555 1234");
+
+        var address = ld.GetProperty("address");
+        address.GetProperty("@type").GetString().Should().Be("PostalAddress");
+        address.GetProperty("streetAddress").GetString().Should().Be("Calle 23 #45, entre 10 y 12");
+        address.GetProperty("addressLocality").GetString().Should().Be("La Habana");
+        address.GetProperty("addressRegion").GetString().Should().Be("Plaza");
+        address.GetProperty("addressCountry").GetString().Should().Be("CU");
+
+        var geo = ld.GetProperty("geo");
+        geo.GetProperty("@type").GetString().Should().Be("GeoCoordinates");
+        geo.GetProperty("latitude").GetDouble().Should().Be(23.13);
+        geo.GetProperty("longitude").GetDouble().Should().Be(-82.38);
+
+        var hours = ld.GetProperty("openingHoursSpecification");
+        hours.GetArrayLength().Should().Be(1);
+        hours[0].GetProperty("@type").GetString().Should().Be("OpeningHoursSpecification");
+        hours[0].GetProperty("dayOfWeek").GetString().Should().Be("Monday");
+        hours[0].GetProperty("opens").GetString().Should().Be("09:00");
+        hours[0].GetProperty("closes").GetString().Should().Be("17:00");
+    }
+
+    [Fact]
+    public void Build_omits_location_fields_that_are_absent()
+    {
+        var ld = JsonLd(CatalogStaticPageBuilder.Build(
+            Shell,
+            Meta(location: new CatalogStaticPageLocation(
+                Phone: null,
+                StreetAddress: null,
+                City: null,
+                Province: null,
+                Latitude: null,
+                Longitude: null,
+                OpeningHours: Array.Empty<OpeningHoursEntry>()))));
+
+        ld.TryGetProperty("telephone", out _).Should().BeFalse();
+        ld.TryGetProperty("address", out _).Should().BeFalse();
+        ld.TryGetProperty("geo", out _).Should().BeFalse();
+        ld.TryGetProperty("openingHoursSpecification", out _).Should().BeFalse();
+        ld.GetProperty("name").GetString().Should().Be("Mercado 25 y 28");
+    }
+
+    [Fact]
+    public void Build_keeps_the_json_ld_inside_its_script_tag_even_with_hostile_values()
+    {
+        const string hostile = "</script><script>alert(1)</script>";
+
+        var html = CatalogStaticPageBuilder.Build(
+            Shell,
+            Meta(
+                title: hostile,
+                description: hostile,
+                location: Location(phone: hostile, street: hostile, city: hostile, province: hostile)));
+
+        // Un valor con "</script>" no puede cerrar el bloque: el JSON lo escapa.
+        html.Should().NotContain("</script><script>alert(1)</script>");
+        CountOccurrences(html, "application/ld+json").Should().Be(1);
+
+        var ld = JsonLd(html);
+        ld.GetProperty("name").GetString().Should().Be(hostile);
+        ld.GetProperty("description").GetString().Should().Be(hostile);
+        ld.GetProperty("telephone").GetString().Should().Be(hostile);
+    }
+
+    private static JsonElement JsonLd(string html)
+    {
+        const string open = "<script type=\"application/ld+json\">";
+        var start = html.IndexOf(open, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1, "the page must carry one JSON-LD block");
+        var end = html.IndexOf("</script>", start, StringComparison.Ordinal);
+        end.Should().BeGreaterThan(start);
+        var json = html.Substring(start + open.Length, end - start - open.Length);
+
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 
     private static int CountOccurrences(string haystack, string needle)
