@@ -291,6 +291,23 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       ]);
       expect(repo.getAvailableToSaleProductsByCategoryId('cat-1').map((p) => p.id)).toEqual(['p1']);
     });
+
+    it('returns [] when the category is inactive, even if its products are active and available to sale', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { isActive: false })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { categoryId: 'cat-1', isActive: true, availableToSale: true }),
+        makeProduct('p2', { categoryId: 'cat-1', isActive: true, availableToSale: true }),
+      ]);
+      expect(repo.getAvailableToSaleProductsByCategoryId('cat-1')).toEqual([]);
+    });
+
+    it('still returns the category products when the category is active', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { isActive: true })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { categoryId: 'cat-1', isActive: true, availableToSale: true }),
+      ]);
+      expect(repo.getAvailableToSaleProductsByCategoryId('cat-1').map((p) => p.id)).toEqual(['p1']);
+    });
   });
 
   // ─── 3.4 hasAnyAvailableToSaleProduct ─────────────────────────────────────

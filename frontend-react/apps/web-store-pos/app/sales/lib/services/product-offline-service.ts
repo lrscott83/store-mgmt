@@ -144,13 +144,14 @@ export class ProductOfflineService implements ProductService {
   }
 
   /**
-   * 1:1 port of Angular `getProductsToSelect` (product-offline.service.ts:133-157) — groups
-   * `productRepository.getAvailableProducts()` by category in
-   * `categoryRepository.getProductCategories()` iteration order, sorted by product `order`
+   * Angular parity (`product-offline.service.ts:133-157`) with one deliberate correction:
+   * iterates the ACTIVE categories (`getAvailableProductCategories`) instead of every
+   * category, so the entry dropdown never offers a product whose category was deactivated.
+   * Groups `productRepository.getAvailableProducts()` by category, sorted by product `order`
    * within each category, mapped to `{ id, fullName: categoryName + ' - ' + name }`. Never fails.
    */
   async getProductsToSelect(): Promise<BaseResponseModel<ProductSelectView[]>> {
-    const categories = this.categoryRepository.getProductCategories();
+    const categories = this.categoryRepository.getAvailableProductCategories();
     const categoryProductsMap = new Map<string, Product[]>();
     const products = this.productRepository.getAvailableProducts();
     products.forEach((product) => {

@@ -149,10 +149,15 @@ export class ProductRepository {
   }
 
   /**
-   * 1:1 port of Angular `getAvailableToSaleProductsByCategoryId` (product.repository.ts:78-82) —
-   * `isActive && availableToSale`, sorted by order.
+   * Angular parity (`product.repository.ts:78-82`) with one deliberate correction: a product
+   * whose category is inactive is not offered for sale even when the product itself is
+   * `isActive && availableToSale`. A missing category keeps the Angular behavior (the sale
+   * screens only ever ask for categories they loaded as active).
    */
   getAvailableToSaleProductsByCategoryId(categoryId: string): Product[] {
+    const category = this.categoryRepository.getProductCategoryById(categoryId);
+    if (category && !category.isActive) return [];
+
     return this.getStorageProducts()
       .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
       .sort((p1, p2) => p1.order - p2.order);
