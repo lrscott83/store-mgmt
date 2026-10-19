@@ -1596,6 +1596,9 @@ const messages: Record<string, string> = {
   'STORES.OWNER_LABEL': 'Owner',
   'STORES.STORE_PHONE_LABEL': 'Teléfono',
   'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
+  // Link de la tarjeta hacia el catálogo público de la tienda: se renderiza SOLO si la tienda
+  // tiene slug (`Store.CatalogSlug`); abre `/catalog/<slug>` en otra pestaña.
+  'STORES.CATALOG_VIEW': 'Ver catálogo web',
 
   // Channel rates — append-only register per channel (method + currency),
   // multipayments. A new effective moment is a new row; registration happens

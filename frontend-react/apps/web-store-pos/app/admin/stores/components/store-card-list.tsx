@@ -120,6 +120,31 @@ function PlanLine({ store }: { store: Store }) {
   );
 }
 
+/**
+ * Public catalog link: rendered only for a store that synced its catalog — every public
+ * endpoint resolves `/catalog/<slug>` by `Store.CatalogSlug` and 404s for a store without
+ * one. Opens in a new tab so the SuperAdmin keeps the list in view.
+ */
+function CatalogLink({ store }: { store: Store }) {
+  const intl = useIntl();
+  const slug = store.catalogSlug?.trim();
+  if (!slug) return null;
+
+  return (
+    <p className="text-sm">
+      <a
+        href={`/catalog/${slug}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline"
+        data-testid={`store-catalog-link-${store.id}`}
+      >
+        {intl.formatMessage({ id: 'STORES.CATALOG_VIEW' })}
+      </a>
+    </p>
+  );
+}
+
 export function StoreCardList({
   stores,
   onEdit,
@@ -214,6 +239,7 @@ export function StoreCardList({
                 {store.description}
               </p>
             )}
+            <CatalogLink store={store} />
           </div>
         </Card>
       ))}

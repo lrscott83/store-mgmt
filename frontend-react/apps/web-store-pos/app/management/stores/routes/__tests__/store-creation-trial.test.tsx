@@ -33,6 +33,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2026-08-04',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     planType: 'Pago',
     planPrice: 10,
     planCurrentPrice: 10,
