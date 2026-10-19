@@ -38,6 +38,30 @@ export interface Feature {
   availableToStore: boolean;
 }
 
+/**
+ * schema.org weekday name used by the store's canonical opening-hours JSON.
+ * English names on purpose: they are the schema.org `dayOfWeek` values written
+ * by the backend serializer — the UI translates them, never stores them.
+ */
+export type WeekdayName =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+/**
+ * Canonical opening range for one weekday (backend `OpeningHoursEntry`). `opens`
+ * and `closes` are "HH:mm" and the backend guarantees `opens < closes`.
+ */
+export interface OpeningHoursEntry {
+  day: WeekdayName;
+  opens: string;
+  closes: string;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -75,6 +99,16 @@ export interface Store {
   planPrice: number | null;
   planCurrentPrice: number | null;
   modules: Module[];
+  // public-catalog-static-pages (T8): public location data that feeds the
+  // generated catalog page's LocalBusiness JSON-LD. Nullable/empty on purpose:
+  // a store whose owner never filled this in publishes no location, and the
+  // generated page omits whatever is absent instead of inventing it.
+  publicPhone: string | null;
+  addressCity: string | null;
+  addressProvince: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  openingHours: OpeningHoursEntry[];
   isActive: boolean;
 }
 

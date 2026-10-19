@@ -16,6 +16,7 @@ import type {
   StoreModulePricingReadResult,
   ModuleCatalogPricingPayload,
   ModuleCatalogPricingResult,
+  OpeningHoursEntry,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -68,6 +69,19 @@ interface UpdateStorePayload {
    */
   moduleIds?: number[];
   isActive: boolean;
+  /**
+   * public-catalog-static-pages (T8): opt-in switch for the public location
+   * block. Omitted by callers that only rename/activate a store (the backend
+   * then leaves address, phone, coordinates and hours untouched); the
+   * store-data view always sends it with the full block.
+   */
+  updateLocation?: boolean;
+  publicPhone?: string;
+  addressCity?: string;
+  addressProvince?: string;
+  latitude?: number;
+  longitude?: number;
+  openingHours?: OpeningHoursEntry[];
 }
 
 /** Per-call knobs for the store directory read. */

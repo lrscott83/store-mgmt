@@ -37,6 +37,12 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     planPrice: 10,
     planCurrentPrice: 10,
     modules: [],
+    publicPhone: null,
+    addressCity: null,
+    addressProvince: null,
+    latitude: null,
+    longitude: null,
+    openingHours: [],
     isActive: true,
     ...overrides,
   };
