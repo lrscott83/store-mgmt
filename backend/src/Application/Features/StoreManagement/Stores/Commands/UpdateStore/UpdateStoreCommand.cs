@@ -1,6 +1,7 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
@@ -43,6 +44,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly IStoreSessionRevocationService _storeSessionRevocationService;
+        private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
 
         public UpdateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -55,7 +57,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IFeatureRepository featureRepository,
             IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
             IStoreRoleFeatureRepository storeRoleFeatureRepository,
-            IStoreSessionRevocationService storeSessionRevocationService)
+            IStoreSessionRevocationService storeSessionRevocationService,
+            ICatalogStaticPageRegenerator catalogPageRegenerator)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -68,6 +71,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _storeSessionRevocationService = storeSessionRevocationService;
+            _catalogPageRegenerator = catalogPageRegenerator;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -118,6 +122,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (_storeRepository.Where(s => s.Id != request.Id).Any(s => s.Name == request.Name))
                 throw new ValidationException(_localizer["StoreAlreadyExists"]);
 
+            // public-catalog-static-pages (T9): el <head> de la página estática lleva el nombre y la
+            // descripción de la tienda. Se guardan los valores persistidos para regenerarla solo si
+            // cambian de verdad — un OwnerAdmin puede enviar una descripción que este comando ignora.
+            var previousName = store.Name;
+            var previousDescription = store.Description;
+
             store.Name = request.Name;
             store.Address = request.Address;
             
@@ -151,7 +161,18 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             await _storeRepository.UpdateAsync(store);
             if (request.ModuleIds is not null)
                 await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);
-            return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            var saved = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0;
+
+            // public-catalog-static-pages (T9): nombre/descripción cambiaron → la página estática
+            // tiene title/description viejos. Best-effort: el regenerador nunca lanza y el guardado
+            // ya está persistido, así que un fallo de escritura no tumba la operación.
+            if (!string.Equals(previousName, store.Name, StringComparison.Ordinal)
+                || !string.Equals(previousDescription, store.Description, StringComparison.Ordinal))
+            {
+                await _catalogPageRegenerator.RegenerateAsync(store.Id, cancellationToken);
+            }
+
+            return ResponseResult.Success(saved);
         }
 
         private async Task UpdateStoreModules(Guid storeId, Guid tenantId, List<int> moduleIds)
