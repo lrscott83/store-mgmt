@@ -1,6 +1,6 @@
 # Manual de usuario — VendeDTo
 
-**Versión:** 1.0 · **Fecha:** 2026-10-15
+**Versión:** 1.1 · **Fecha:** 2026-10-16
 **Dirigido a:** el **Dueño** (Administrador de tienda) y sus **Empleados** (Usuario de tienda).
 
 **Cómo leerlo.** La **Parte 1** es la puesta en marcha: se hace una vez, cuando montas la
@@ -13,10 +13,10 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
 
 - **Dos roles importan aquí.** El **Dueño** (Administrador de tienda) monta y configura todo.
   El **Empleado** (Usuario de tienda) opera: vende, cobra, registra. Hay funciones que solo
-  ve el Dueño (configurar el catálogo web, los pedidos, los empleados…).
-- **Funciona sin conexión.** Salvo el Catálogo Web y los Pedidos, que van contra el servidor,
-  casi todo el POS trabaja con los datos guardados en el propio dispositivo. Por eso conviene
-  instalar la app en el equipo y activarle el **acceso sin conexión** (Parte 1, paso 7).
+  ve el Dueño (configurar el catálogo web, los pedidos de WhatsApp, los empleados…).
+- **Funciona sin conexión.** Salvo el Catálogo Web y los Pedidos WhatsApp, que van contra el
+  servidor, casi todo el POS trabaja con los datos guardados en el propio dispositivo. Por eso
+  conviene instalar la app en el equipo y activarle el **acceso sin conexión** (Parte 1, paso 7).
 - **Los módulos activan funciones.** La tienda tiene un plan, y según los módulos activos
   aparecen unas pantallas u otras (multi-moneda, créditos, gastos, multi-tienda, catálogo web,
   pedidos de WhatsApp…). Si en tu menú no ves un apartado, es que esa función no está activa.
@@ -24,6 +24,19 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
   gastos…) pertenece a la tienda que tienes seleccionada en ese momento.
 - **El carrito es global.** El ícono del carrito vive en el encabezado de la app y se comparte
   entre las pantallas de venta: armas la venta y la confirmas desde ahí (Parte 2).
+
+### El menú (barra lateral)
+
+Aquí viven **todas las vistas**. Se abre con la **doble flecha** del encabezado y se cierra con la
+**doble flecha** de su propio encabezado. Está agrupado por bloques (**VENTA**, **CATÁLOGO WEB**,
+**INVENTARIO**, **GASTOS**, **SINCRONIZACIÓN**, **REPORTES**, **ESTADÍSTICAS**, **GESTIÓN**), y
+**cada opción lleva un `?` que abre la ayuda de esa vista**.
+
+![Menú — parte 1 de 3: el bloque VENTA y el arranque de CATÁLOGO WEB](img/45-menu-1.png)
+
+![Menú — parte 2 de 3](img/45-menu-2.png)
+
+![Menú — parte 3 de 3](img/45-menu-3.png)
 
 ### El encabezado (barra superior)
 
@@ -314,11 +327,9 @@ monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 
 **📷 Imagen sugerida.**
 
-![Cierre Efectivo — parte 1 de 3: Apertura, Esperado/Contado/Diferencia y el arranque del conteo](img/09-cierre-caja-1.png)
+![Cierre Efectivo — parte 1 de 2: Esperado/Contado/Diferencia, la Apertura y el arranque del conteo](img/09-cierre-caja-1.png)
 
-![Cierre Efectivo — parte 2 de 3: la tarjeta Conteo con las denominaciones](img/09-cierre-caja-2.png)
-
-![Cierre Efectivo — parte 3 de 3: comentario y el botón Cerrar Caja](img/09-cierre-caja-3.png)
+![Cierre Efectivo — parte 2 de 2: el resto de las denominaciones, el Comentario y el aviso de caja descuadrada](img/09-cierre-caja-2.png)
 
 ## 13. Ver tus ventas y el cuadre del día
 
@@ -336,6 +347,8 @@ monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 es la sección 12.
 
 **📷 Imagen sugerida.**
+
+![Ventas del día: las ventas de hoy con sus filtros por método de pago, estado y moneda](img/15-ventas-del-dia.png)
 
 ![Cuadre del día: paneles de Resumen Efectivo, transferencias, gastos, créditos y ventas](img/14-cuadre-dia.png)
 
@@ -372,7 +385,7 @@ es la sección 12.
 1. Ve a **Inventario → Conteo de productos** (título **Conteo de productos** con el número de
    productos).
 2. Expande una categoría (paneles colapsables, como en las otras vistas).
-3. En cada producto verás el número de fila, el nombre y **Sistema: N uds**. Escribe lo contado en
+3. En cada producto verás el número de fila, el nombre y **Sistema: N**. Escribe lo contado en
    **Conteo**.
 4. La **diferencia** (contada − sistema) se resalta: **negativa** con signo `-` en **rojo**; **cero
    o positiva** en **verde** con `+`. Sin escribir nada, muestra `—`.
@@ -491,7 +504,21 @@ dicen cuántas categorías, productos, publicados y sin imagen tienes.
 
 ![Catálogo público: marca, buscador, destacados y la rejilla de productos con sus precios](img/41-catalogo-publico.jpg)
 
-![Detalle de un producto en el catálogo público](img/42-catalogo-producto.jpg)
+Cada producto se abre en una ficha con su foto, su precio y el botón **Añadir**:
+
+![Ficha de un producto en el catálogo público — Combo Don Tavo](img/42-catalogo-producto-1.jpg)
+
+![Ficha de otro producto del catálogo público — Pescado frito](img/42-catalogo-producto-2.jpg)
+
+**Y así pide**: el **carrito** y el **checkout** los ve el **cliente**, no el POS. El ejemplo
+sigue un pedido de **dos productos** (el primero con dos unidades), y el checkout llega al final
+con los datos del cliente ya escritos:
+
+![Carrito del catálogo público: los dos productos del pedido, sus cantidades y el subtotal](img/43-catalogo-carrito.jpg)
+
+![Checkout del catálogo público — parte 1 de 2: el resumen del pedido, el nombre, el teléfono y cómo lo quiere recibir](img/44-catalogo-checkout-1.jpg)
+
+![Checkout del catálogo público — parte 2 de 2: la dirección de entrega y las notas; el pedido se envía por WhatsApp](img/44-catalogo-checkout-2.jpg)
 
 
 ## 20. Editar los productos del catálogo (descripción e imagen)
@@ -532,81 +559,11 @@ perder lo escrito.
 ![Pedidos WhatsApp: interruptor de pedidos online y su configuración](img/24-pedidos-whatsapp.png)
 
 
-## 22. Atender los pedidos
-
-**Qué es.** La cola de pedidos que llegan por WhatsApp, para gestionarlos hasta la entrega.
-
-**Cómo se hace.**
-1. Ve a **Ventas → Pedidos** (**Pedidos**). Puede usarlo el Dueño y el Empleado.
-2. Filtra por **Estado**, **Pago**, **Entrega**, **Repartidor** y **Desde/Hasta**; o busca por
-   **código o teléfono**.
-3. En cada fila: **Cambiar estado** (Nuevo → Aceptado → En preparación → Listo → Entregado /
-   Cancelado), **Marcar pagado / pendiente** y **Asignar repartidor**.
-
-**A tener en cuenta.** Los estados finales (Entregado, Cancelado) ya no muestran el selector de
-estado. Todo va contra el servidor: tras cada acción la pantalla se recarga. La lista se pagina de
-20 en 20 (**Anterior / Siguiente**).
-
-**📷 Imagen sugerida.**
-
-![Pedidos: la cola de pedidos con sus filtros y acciones](img/25-pedidos.png)
-
-**Cómo pide el cliente** (el carrito y el checkout los ve el cliente, no el POS):
-
-![Carrito del catálogo público: el producto añadido y el total](img/43-catalogo-carrito.jpg)
-
-![Checkout del catálogo público: nombre, teléfono, entrega y notas; el pedido se envía por WhatsApp](img/44-catalogo-checkout.jpg)
-
-
-## 23. Repartidores
-
-**Qué es.** La lista de personas que reparten, para asignarlas a los pedidos.
-
-**Cómo se hace.**
-1. Ve a **Ventas → Repartidores**.
-2. Pulsa **Nuevo repartidor** y rellena **Nombre** y **Teléfono**; guarda.
-3. Para editar, abre el repartidor, ajusta los datos y usa el interruptor **Activo**.
-
-**A tener en cuenta.** Desactivar un repartidor es una **baja lógica** (no lo borra) para no romper
-los pedidos ya repartidos: por eso los inactivos siguen apareciendo, tachados. Aquí solo se
-gestionan personas; **asignar** repartidores se hace en **Pedidos**.
-
-**📷 Imagen sugerida.**
-
-![Repartidores: alta y listado de repartidores](img/26-repartidores.png)
-
-![Nuevo repartidor: nombre y teléfono](img/39-nuevo-repartidor.png)
-
-
-
-## 24. Ventas de pedidos
-
-**Qué es.** Las métricas del periodo y el histórico de pedidos (sin acciones).
-
-**Cómo se hace.**
-1. Ve a **Ventas → Ventas** (**Ventas**).
-2. Ajusta los filtros (**Estado, Pago, Entrega, Desde, Hasta**): las métricas cambian al vuelo.
-3. Revisa las tarjetas: **Pedidos**, **Ventas totales**, **Ticket medio**, **Pagado** y
-   **Pendiente de cobro**, más los desgloses **Por estado** y **Por entrega**.
-4. Abajo tienes la tabla histórica, paginada de 20 en 20.
-
-**A tener en cuenta.** Los pedidos **cancelados** aparecen en el histórico pero **no** suman en las
-métricas. Aquí solo se consulta: para operar un pedido se usa **Pedidos**.
-
-**📷 Imagen sugerida.**
-
-![Ventas de pedidos — parte 1 de 3: las métricas del periodo](img/27-ventas-pedidos-1.png)
-
-![Ventas de pedidos — parte 2 de 3](img/27-ventas-pedidos-2.png)
-
-![Ventas de pedidos — parte 3 de 3: el histórico](img/27-ventas-pedidos-3.png)
-
-
 ---
 
 # Parte 5 — Gastos, Reportes y Estadísticas
 
-## 25. Gastos
+## 22. Gastos
 
 **Qué es.** Registrar los gastos operativos del día y consultarlos en el tiempo.
 
@@ -626,7 +583,7 @@ alimentan el **Cuadre del día** y las **Estadísticas**.
 ![Nuevo gasto: tipo, total, moneda, tipo de pago y nota](img/36-nuevo-gasto.png)
 
 
-## 26. Reportes
+## 23. Reportes
 
 **Qué es.** El resumen de ventas del día y la generación de un PDF de inventario a precio de venta.
 
@@ -643,7 +600,7 @@ esa moneda; no convierte).
 ![Reportes de hoy: Pedidos, Ingresos, Costo y Ganancia bruta](img/16-reportes.png)
 
 
-## 27. Panel de Control
+## 24. Panel de Control
 
 **Qué es.** El tablero con la evolución del negocio en un rango de fechas.
 
@@ -668,7 +625,7 @@ conversión. Las secciones de **Gastos** y **Créditos** solo aparecen si esos m
 ![Panel de Control — parte 5 de 5](img/17-dashboard-5.png)
 
 
-## 28. Cuadre por fechas
+## 25. Cuadre por fechas
 
 **Qué es.** El cuadre del periodo: ventas, gastos y ganancias entre dos fechas.
 
@@ -683,14 +640,16 @@ la bruta **menos** los gastos. La fecha de inicio debe ser anterior o igual a la
 
 **📷 Imagen sugerida.**
 
-![Cuadre por fechas: los cuatro KPI y el cuadre del periodo](img/18-cuadre-fechas.png)
+![Cuadre por fechas — parte 1 de 2: el rango de fechas y los cuatro KPI del periodo](img/18-cuadre-fechas-1.png)
+
+![Cuadre por fechas — parte 2 de 2: la tarjeta Cuadre con sus paneles colapsables](img/18-cuadre-fechas-2.png)
 
 
 ---
 
 # Parte 6 — Configuración y mantenimiento
 
-## 29. Empleados y roster (resumen)
+## 26. Empleados y roster (resumen)
 
 Ver la **sección 6** para crear empleados y la **sección 7** para el acceso sin conexión. Recuerda:
 gestionar empleados **necesita conexión**, y el roster exportado es lo que habilita el equipo de un
@@ -698,10 +657,10 @@ empleado para trabajar sin internet.
 
 **📷 Imagen sugerida.**
 
-![Empleados y roster: la lista desde donde se exporta el roster](img/21-empleados.png)
+![Empleados: la pantalla desde la que se añaden empleados y se exporta el roster sin conexión](img/21-empleados.png)
 
 
-## 30. Tasas de Cambio
+## 27. Tasas de Cambio
 
 **Qué es.** Registrar cuántas unidades de cada moneda equivalen a **1 USD** para cada método de
 pago. Solo aparece con el módulo de **múltiples monedas**.
@@ -722,7 +681,7 @@ limita a los válidos para la moneda elegida.
 ![Tasas de Cambio: tasas vigentes e historial](img/20-tasas-cambio.png)
 
 
-## 31. Configuraciones
+## 28. Configuraciones
 
 Ver la **sección 3** (monedas y métodos de pago). En resumen, esta pantalla ofrece: **Tienda
 activa** (solo multi-tienda), **Monedas de compra y venta** (solo con múltiples monedas) y
@@ -733,7 +692,7 @@ activa** (solo multi-tienda), **Monedas de compra y venta** (solo con múltiples
 ![Configuraciones: Tienda activa, Monedas y Métodos de pago](img/19-configuraciones.png)
 
 
-## 32. Mis tiendas
+## 29. Mis tiendas
 
 **Qué es.** Ver y gestionar todas tus tiendas (activas e inactivas).
 
@@ -752,7 +711,7 @@ uso).
 ![Mis tiendas: las tarjetas de tus tiendas con su plan y próximo cobro](img/22-mis-tiendas.png)
 
 
-## 33. Sincronización: exportar e importar
+## 30. Sincronización: exportar e importar
 
 **Qué es.** Hacer una **copia de seguridad** cifrada de los datos de la tienda y **restaurarla**
 (en el mismo u otro dispositivo).
@@ -778,7 +737,7 @@ Al importar, los datos se **fusionan** con los del dispositivo (no se pisa a cie
 ![Importar datos: archivo de respaldo y contraseña](img/31-importar.png)
 
 
-## 34. Diagnóstico
+## 31. Diagnóstico
 
 **Qué es.** Una pantalla de soporte con el registro de errores y eventos del dispositivo. Solo la
 ven el **Dueño** y el administrador de la plataforma.
@@ -803,22 +762,6 @@ falla, para enviar el detalle.
 
 Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp** y
 las **configuraciones**. Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
-Superior) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
+Superior), las pantallas de **Gestión de pedidos** (atender los pedidos, repartidores y ventas de
+pedidos) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).
-
-## Pendiente (capturas y ajustes acordados)
-
-- **Falta la imagen del MENÚ.** No hay ninguna captura que muestre **dónde está la barra lateral y
-  todas sus opciones**. El manual no puede prescindir de ella: el usuario tiene que saber dónde
-  vive cada vista. Se añadirá junto con las capturas de las dos vistas de conteo (ver abajo).
-- **El signo de interrogación (?) del encabezado es la AYUDA** (el Tutorial). Está detallado en
-  «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
-- **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
-  (`/inventory/count`, sección 14.1) y *Disponible* se regeneró **sin** la columna de conteo.
-- **Panel de Control (imagen `17-dashboard`).** La captura ya lleva el rango a **hoy** (7 días
-  terminando hoy), así que el filtro es correcto; pero los KPI siguen en **0 CUP** aunque
-  *Ventas del día* muestra las 3 ventas (4 800 CUP). Es un problema del **agregador del panel**
-  (`computeSingleStoreDashboardRange`), no del filtro: **queda por investigar**.
-- **Pedidos online (imágenes `25`, `27`).** Salen vacíos porque no hay pedidos en el servidor. Se
-  pueden sembrar publicando el catálogo (`/sales/web-catalog` → *Sincronizar Catálogo*) y creando
-  pedidos por el endpoint público `POST /v1/public/ordering/<slug>/orders`.

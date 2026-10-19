@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStrategy, type FetchStrategy, type StrategyInput } from '../sw-strategy';
+import {
+  resolveStrategy,
+  shellUrlFor,
+  type FetchStrategy,
+  type StrategyInput,
+} from '../sw-strategy';
 
 // ── resolveStrategy — pwa-offline-shell spec ─────────────────────────────────
 // Pure routing decision (no `caches`, no `self`), so this is fully covered by
@@ -114,5 +119,23 @@ const cases: Case[] = [
 describe('resolveStrategy', () => {
   it.each(cases.map((c) => [c.name, c] as const))('%s', (_name, testCase) => {
     expect(resolveStrategy(testCase.input)).toBe(testCase.expected);
+  });
+});
+
+// ── shellUrlFor — which precached HTML answers a navigation ─────────────────
+// The landing (`/`) is served from a head-injected variant (`landing.html`) so
+// its SEO metadata survives once the service worker takes over. Every other
+// navigation keeps the plain SPA shell.
+describe('shellUrlFor', () => {
+  it('serves the landing variant for the exact root path', () => {
+    expect(shellUrlFor('/')).toBe('/landing.html');
+  });
+
+  it('serves the plain SPA shell for app routes', () => {
+    expect(shellUrlFor('/sales/new')).toBe('/index.html');
+  });
+
+  it('serves the plain SPA shell for public catalog paths', () => {
+    expect(shellUrlFor('/catalog/mercado-25')).toBe('/index.html');
   });
 });

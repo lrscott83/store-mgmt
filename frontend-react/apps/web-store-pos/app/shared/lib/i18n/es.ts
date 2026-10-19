@@ -210,6 +210,8 @@ const messages: Record<string, string> = {
 
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',
+  'TUTORIAL.MANUAL_LINK': 'Manual de usuario',
+  'TUTORIAL.MANUAL_PDF': 'Descargar manual (PDF)',
 
   // Menu groups (exact Angular MENU.*.TITLE strings from vocabs/es.ts)
   'MENU.ADMIN': 'ADMINISTRACIÓN',
@@ -1103,7 +1105,7 @@ const messages: Record<string, string> = {
   // Conteo de productos: vista propia y SOLO VISUAL — no persiste ni ajusta stock.
   'INVENTORY.COUNT.TITLE': 'Conteo de productos',
   'INVENTORY.COUNT.COUNTED': 'Conteo',
-  'INVENTORY.COUNT.SYSTEM': 'Sistema: {quantity} uds',
+  'INVENTORY.COUNT.SYSTEM': 'Sistema: {quantity}',
   'INVENTORY.COUNT.SEARCH_PLACEHOLDER': 'Buscar producto por nombre…',
   'INVENTORY.COUNT.CLEAR': 'Limpiar',
   'INVENTORY.COUNT.CORRECT': 'Correcto',

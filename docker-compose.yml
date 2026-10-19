@@ -108,6 +108,10 @@ services:
     build:
       context: ./frontend-react
       dockerfile: Dockerfile
+      args:
+        # Canonical/og:url de la landing. Mismo valor que usa la API para los
+        # catálogos (CatalogStaticPage__PublicBaseUrl), para no tener dos fuentes.
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://pos.playground.sceiba.net}
     container_name: smca_web_pos
     restart: always
     ports:

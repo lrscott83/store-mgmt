@@ -121,7 +121,8 @@ describe('ProductCountList — fila del producto (número, nombre, Sistema, Cont
     const row = screen.getByTestId('product-count-row-p1');
     expect(row).toHaveTextContent('1');
     expect(row).toHaveTextContent('Producto 1');
-    expect(row).toHaveTextContent('Sistema: 34 uds');
+    expect(row).toHaveTextContent('Sistema: 34');
+    expect(row).not.toHaveTextContent('uds');
     expect(within(row).getByLabelText('Conteo')).toBeInTheDocument();
     expect(screen.getByTestId('inventory-count-input-p1')).toHaveValue(null);
   });
@@ -141,7 +142,8 @@ describe('ProductCountList — fila del producto (número, nombre, Sistema, Cont
     fireEvent.click(screen.getByTestId('product-count-category-toggle-cat1'));
 
     const difference = screen.getByTestId('inventory-count-difference-p1');
-    expect(difference).toHaveTextContent('-4');
+    // Exacto: el número negativo no debe quedar como '+−4'.
+    expect(difference.textContent).toBe('-4');
     expect(difference.className).toContain('text-danger');
   });
 
@@ -162,7 +164,7 @@ describe('ProductCountList — fila del producto (número, nombre, Sistema, Cont
     fireEvent.click(screen.getByTestId('product-count-category-toggle-cat1'));
 
     const difference = screen.getByTestId('inventory-count-difference-p1');
-    expect(difference).toHaveTextContent('+6');
+    expect(difference.textContent).toBe('+6');
     expect(difference.className).toContain('text-success');
   });
 });

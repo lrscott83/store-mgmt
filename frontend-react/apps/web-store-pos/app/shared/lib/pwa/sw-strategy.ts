@@ -13,6 +13,19 @@ export interface StrategyInput {
 
 const API_PREFIX = '/api';
 
+export const SHELL_URL = '/index.html';
+export const LANDING_URL = '/landing.html';
+
+/**
+ * Which precached HTML answers a navigation. The landing (`/`) is served from
+ * the head-injected `landing.html` so its SEO metadata survives once the
+ * service worker controls the page; every other route keeps the plain SPA
+ * shell. Pure, so the decision is testable without a service-worker runtime.
+ */
+export function shellUrlFor(pathname: string): string {
+  return pathname === '/' ? LANDING_URL : SHELL_URL;
+}
+
 function isApiPath(pathname: string): boolean {
   return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
 }

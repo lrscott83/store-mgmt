@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manual de usuario — VendeDTo</title>
+    <style>
+      :root {
+        --text: #1f2933;
+        --text-muted: #52606d;
+        --border: #e4e7eb;
+        --surface: #ffffff;
+        --bg: #f5f7fa;
+        --accent: #06b6d4;
+        --code-bg: #f0f4f8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      .doc {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      .doc__header {
+        border-bottom: 3px solid var(--accent);
+        padding-bottom: 12px;
+        margin-bottom: 24px;
+      }
+      .doc__header h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+      .doc__header p {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+      main h1 {
+        font-size: 1.55rem;
+        margin: 2rem 0 0.75rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 1px solid var(--border);
+      }
+      main h2 {
+        font-size: 1.25rem;
+        margin: 1.75rem 0 0.5rem;
+      }
+      main h3 {
+        font-size: 1.05rem;
+        margin: 1.25rem 0 0.5rem;
+      }
+      main p {
+        margin: 0.6rem 0;
+      }
+      main ul,
+      main ol {
+        margin: 0.6rem 0;
+        padding-left: 1.4rem;
+      }
+      main li {
+        margin: 0.25rem 0;
+      }
+      main img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0.9rem 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+      main blockquote {
+        margin: 0.8rem 0;
+        padding: 0.5rem 1rem;
+        border-left: 4px solid var(--accent);
+        background: var(--surface);
+        color: var(--text-muted);
+      }
+      main code {
+        background: var(--code-bg);
+        border-radius: 4px;
+        padding: 0.1em 0.35em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+      }
+      main hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 2rem 0;
+      }
+      main strong {
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <header class="doc__header">
+        <h1>Manual de usuario — VendeDTo</h1>
+        <p>Generado el 2026-10-17 · documento público de ayuda</p>
+      </header>
+      <main><h1>Manual de usuario — VendeDTo</h1>
+<p><strong>Versión:</strong> 1.1 · <strong>Fecha:</strong> 2026-10-16
+<strong>Dirigido a:</strong> el <strong>Dueño</strong> (Administrador de tienda) y sus <strong>Empleados</strong> (Usuario de tienda).</p>
+<p><strong>Cómo leerlo.</strong> La <strong>Parte 1</strong> es la puesta en marcha: se hace una vez, cuando montas la
+tienda. Las <strong>Partes 2 a 6</strong> son el uso del día a día. Cada sección termina con una
+<strong>Imagen sugerida</strong>: la captura del POS que conviene poner y qué debe mostrar.</p>
+<hr>
+<h2>Antes de empezar: cómo funciona el sistema</h2>
+<ul>
+<li><strong>Dos roles importan aquí.</strong> El <strong>Dueño</strong> (Administrador de tienda) monta y configura todo.
+El <strong>Empleado</strong> (Usuario de tienda) opera: vende, cobra, registra. Hay funciones que solo
+ve el Dueño (configurar el catálogo web, los pedidos de WhatsApp, los empleados…).</li>
+<li><strong>Funciona sin conexión.</strong> Salvo el Catálogo Web y los Pedidos WhatsApp, que van contra el
+servidor, casi todo el POS trabaja con los datos guardados en el propio dispositivo. Por eso
+conviene instalar la app en el equipo y activarle el <strong>acceso sin conexión</strong> (Parte 1, paso 7).</li>
+<li><strong>Los módulos activan funciones.</strong> La tienda tiene un plan, y según los módulos activos
+aparecen unas pantallas u otras (multi-moneda, créditos, gastos, multi-tienda, catálogo web,
+pedidos de WhatsApp…). Si en tu menú no ves un apartado, es que esa función no está activa.</li>
+<li><strong>Un dato vive en la tienda seleccionada.</strong> Todo lo que registras (ventas, inventario,
+gastos…) pertenece a la tienda que tienes seleccionada en ese momento.</li>
+<li><strong>El carrito es global.</strong> El ícono del carrito vive en el encabezado de la app y se comparte
+entre las pantallas de venta: armas la venta y la confirmas desde ahí (Parte 2).</li>
+</ul>
+<h3>El menú (barra lateral)</h3>
+<p>Aquí viven <strong>todas las vistas</strong>. Se abre con la <strong>doble flecha</strong> del encabezado y se cierra con la
+<strong>doble flecha</strong> de su propio encabezado. Está agrupado por bloques (<strong>VENTA</strong>, <strong>CATÁLOGO WEB</strong>,
+<strong>INVENTARIO</strong>, <strong>GASTOS</strong>, <strong>SINCRONIZACIÓN</strong>, <strong>REPORTES</strong>, <strong>ESTADÍSTICAS</strong>, <strong>GESTIÓN</strong>), y
+<strong>cada opción lleva un <code>?</code> que abre la ayuda de esa vista</strong>.</p>
+<p><img src="images/45-menu-1.png" alt="Menú — parte 1 de 3: el bloque VENTA y el arranque de CATÁLOGO WEB"></p>
+<p><img src="images/45-menu-2.png" alt="Menú — parte 2 de 3"></p>
+<p><img src="images/45-menu-3.png" alt="Menú — parte 3 de 3"></p>
+<h3>El encabezado (barra superior)</h3>
+<p>De izquierda a derecha:</p>
+<ul>
+<li><strong>Doble flecha</strong> — abre la <strong>barra lateral</strong> de menú cuando está cerrada.</li>
+<li><strong>Tienda</strong> — <strong>cambiar de tienda</strong> (solo el Dueño, y solo si tiene más de una tienda).</li>
+<li><strong>Signo de interrogación</strong> — abre el <strong>Tutorial</strong> (la ayuda de la app); al pulsarlo de nuevo,
+vuelve a la vista donde estabas.</li>
+<li><strong>Carrito</strong> — la <strong>venta en curso</strong>: cuántos artículos llevas (el número) y el <strong>total</strong> al
+lado. Se usa desde cualquier pantalla de venta.</li>
+<li><strong>Burbuja de chat (verde)</strong> — el <strong>chat de soporte</strong> con el administrador de la plataforma;
+el número indica mensajes sin leer.</li>
+<li><strong>Campana</strong> — avisos de la plataforma (solo para la administración).</li>
+<li><strong>Persona</strong> — <strong>menú de usuario</strong>: tu usuario y tu nombre, y las opciones <strong>Editar Perfil</strong>,
+<strong>Cambiar Contraseña</strong> y <strong>Salir</strong>.</li>
+</ul>
+<p><img src="images/04-encabezado.png" alt="Encabezado del POS: doble flecha · tienda · interrogación · carrito · mensajes · usuario"></p>
+<h3>El pie de página</h3>
+<ul>
+<li><strong>Políticas de Privacidad</strong> y <strong>Términos y Condiciones</strong> — los documentos legales (abren en
+una pestaña nueva).</li>
+<li><strong>Contáctanos</strong> — abre un chat de <strong>WhatsApp</strong> con el soporte. <strong>Solo aparece con la sesión
+iniciada</strong> (en la pantalla de acceso no se muestra).</li>
+</ul>
+<p><img src="images/05-pie.png" alt="Pie del POS: Políticas de Privacidad · Términos y Condiciones · Contáctanos · copyright"></p>
+<hr>
+<h1>Parte 1 — Puesta en marcha (el Dueño, una sola vez)</h1>
+<h2>1. Crear la cuenta e instalar la app</h2>
+<p><strong>Qué es.</strong> El alta del propietario: crea tu cuenta y tu primera tienda a la vez, y deja el POS
+instalado en el dispositivo.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Entra en la pantalla de <strong>Creación de cuenta</strong>.</li>
+<li>Rellena: <strong>Nombre completo</strong>, <strong>Nombre de la tienda</strong>, <strong>Usuario</strong>, <strong>Contraseña</strong>,
+<strong>Confirmar contraseña</strong>, <strong>Teléfono celular</strong> y <strong>Email</strong> (el único opcional).</li>
+<li>La contraseña debe tener al menos <strong>8 caracteres, una mayúscula y un número</strong>.</li>
+<li>Marca la casilla de <strong>términos y condiciones</strong> (hay un enlace para leerlos).</li>
+<li>Pulsa <strong>Registrar</strong>. La cuenta se crea, <strong>entra automáticamente</strong> y te lleva a tu <strong>página
+de inicio</strong> (el catálogo <strong>Productos</strong>, todavía vacío porque aún no has cargado nada).</li>
+<li><strong>Instala la app en el dispositivo.</strong> En tu <strong>página de inicio</strong> verás el botón flotante
+<strong>INSTALAR APP</strong>: púlsalo. El dispositivo <strong>añade el ícono de la app automáticamente</strong>;
+espera a verlo aparecer en la pantalla de inicio (o en el escritorio) y abre la app desde
+ahí a partir de ahora — así trabaja <strong>sin conexión</strong>. Cuando la app queda instalada, el
+botón <strong>desaparece</strong> (ya no hace falta).</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Todo es obligatorio salvo el email. Si el alta se interrumpe justo al
+final, la cuenta ya puede existir: se te avisa y se te lleva a la pantalla de acceso.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/01-crear-cuenta.png" alt="Creación de cuenta — formulario relleno con datos de ejemplo y el botón INSTALAR APP visible"></p>
+<p><img src="images/02-inicio.png" alt="Página de inicio tras registrarse — el catálogo Productos, aún vacío"></p>
+<h2>2. Primer acceso</h2>
+<p><strong>Qué es.</strong> Entrar con usuario y contraseña y llegar a la pantalla de inicio.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>En <strong>Inicia sesión en tu cuenta</strong>, escribe <strong>Usuario</strong> y <strong>Contraseña</strong> (el ojo muestra u
+oculta la contraseña).</li>
+<li>Pulsa <strong>Iniciar sesión</strong>. Verás un aviso de carga mientras se resuelve tu sesión.</li>
+<li>Aterrizas en tu pantalla de inicio: la venta si la tienda ya tiene productos vendibles, o el
+catálogo de productos si aún no.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Si la cuenta está desactivada, o fallas muchas veces seguidas, se te
+avisa con un mensaje claro. Una sesión ya iniciada que vuelve a la pantalla de acceso se
+redirige sola a su inicio.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/03-iniciar-sesion.png" alt="Pantalla de acceso — Usuario y Contraseña, botón Iniciar sesión, enlace Crear cuenta y el botón Activar acceso sin conexión"></p>
+<h2>3. Configurar la tienda (monedas, métodos de pago y tasas)</h2>
+<p><strong>Qué es.</strong> Dejar lista la forma de cobrar antes de vender: con qué monedas trabajas, qué métodos
+aceptas y a qué tasa cambias.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Gestión → Configuraciones</strong>.</li>
+<li>(Solo multi-tienda) En <strong>Tienda activa</strong>, elige la tienda que vas a configurar.</li>
+<li>(Solo con el módulo de múltiples monedas) En <strong>Monedas de compra y venta</strong> elige la
+<strong>Moneda de Compra</strong> y la <strong>Moneda de Venta</strong>.</li>
+<li>En <strong>Métodos de pago</strong>, activa o desactiva los métodos con su interruptor. Los canales en
+<strong>Efectivo están siempre activos</strong> y su interruptor no se puede apagar.</li>
+<li>(Solo con el módulo de múltiples monedas) Si necesitas cambiar valores, ve a <strong>Tasas de
+Cambio</strong> (ver la sección 30) y registra la tasa de cada moneda por método de pago.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> El catálogo de <strong>categorías de producto</strong> no está aquí: se gestiona en
+<strong>Productos</strong>. Esta pantalla guarda al instante (verás <strong>Guardado</strong>).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/19-configuraciones.png" alt="Configuraciones: Tienda activa, Monedas de compra y venta, y Métodos de pago"></p>
+<h2>4. Cargar el catálogo de productos</h2>
+<p><strong>Qué es.</strong> Dar de alta tus productos y organizarlos por categorías. Es la base de todo: sin
+productos no se puede vender.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Catálogo Productos</strong> (título de la tarjeta: <strong>Productos</strong>).</li>
+<li>Crea una <strong>categoría</strong> con el botón <strong>Categoría</strong> de la cabecera.</li>
+<li>Con el engranaje de la categoría, añade productos: <strong>Productos</strong> para un alta rápida de varios,
+o <strong>Producto</strong> para un alta individual.</li>
+<li>En el formulario del producto rellena <strong>Nombre</strong>, <strong>Precio</strong> (y su moneda si tienes varias),
+<strong>Cantidad</strong>, <strong>Orden</strong>, y marca <strong>Activo</strong>, <strong>Disponible para Vender</strong> y, si corresponde,
+<strong>Descuenta del Inventario</strong>. Puedes añadir <strong>Código de barras</strong> y la configuración mayorista.</li>
+<li>Para cargas grandes, usa <strong>Importar Productos</strong> (CSV): descarga el ejemplo, rellénalo y súbelo.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Si registras un producto con costo y cantidad, se crea además una
+<strong>entrada de inventario</strong> del día. Desactivar un producto <strong>no lo borra</strong>: queda listado y
+atenuado como inactivo, y puede reactivarse.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/06-productos.png" alt="Catálogo de productos: categorías y productos con su precio de venta, y el engranaje de cada categoría"></p>
+<p><img src="images/33-nueva-categoria.png" alt="Crear categoría: el modal con el nombre y el orden">
+<img src="images/34-nuevo-producto.png" alt="Nuevo producto: el modal con costo, precio y cantidad"></p>
+<h2>5. Registrar las primeras entradas de inventario</h2>
+<p><strong>Qué es.</strong> Meter el stock inicial de los productos.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Entradas del día</strong>.</li>
+<li>Pulsa <strong>Entrada</strong>, elige el <strong>producto</strong>, la <strong>cantidad</strong> y el <strong>costo</strong>, y guarda.</li>
+<li>Repite por cada producto que tenga existencias.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> La <strong>fecha la pone el sistema</strong> (es del día): no se puede registrar una
+entrada con fecha pasada. Corregir el costo de una entrada <strong>se propaga</strong> a las ventas ya hechas
+de ese producto.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/35-nueva-entrada.png" alt="Nueva entrada de inventario: producto, cantidad y costo"></p>
+<h2>6. Crear los empleados y sus roles</h2>
+<p><strong>Qué es.</strong> Dar de alta a la gente que usará el POS y decidir qué puede hacer cada uno.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Gestión → Usuarios</strong> (título: <strong>Empleados</strong>).</li>
+<li>Pulsa <strong>Crear</strong> y rellena los datos del empleado.</li>
+<li>Asígnale su rol y las funcionalidades que puede usar.</li>
+<li>Con las tarjetas de cada empleado puedes <strong>Editar</strong>, <strong>Activar</strong> o <strong>Desactivar</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Esta pantalla necesita <strong>conexión</strong>. Los datos del empleado pertenecen a
+la tienda que tengas seleccionada.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/21-empleados.png" alt="Empleados: la lista de los empleados de la tienda y sus acciones"></p>
+<h2>7. Activar el acceso sin conexión en los equipos</h2>
+<p><strong>Qué es.</strong> Preparar un equipo para que el empleado pueda entrar y trabajar <strong>sin internet</strong>.
+Esto se hace con el <strong>roster</strong> (la lista de empleados con contraseña).</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>En el equipo del Dueño, ve a <strong>Gestión → Usuarios</strong> y pulsa <strong>Exportar roster</strong>; ponle una
+contraseña maestra y confirma. Obtienes un <strong>archivo de activación</strong>.</li>
+<li>Lleva ese archivo al equipo del empleado (por ejemplo con <strong>Compartir</strong> por hotspot).</li>
+<li>En el equipo de destino, abre el <strong>Acceso sin conexión</strong> en la pantalla de acceso, elige el
+<strong>Archivo de activación</strong> y escribe la <strong>Contraseña de activación</strong>, y pulsa <strong>Activar</strong>.</li>
+<li>Desde entonces, ese equipo puede iniciar sesión aunque no haya internet.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Para <strong>desactivar</strong> el acceso sin conexión se pide confirmación; si el
+dispositivo tiene datos cifrados y no hay otra copia de la clave, se te avisa del riesgo de
+pérdida.</p>
+<p><strong>📷 Imagen sugerida.</strong> El panel de <strong>Acceso sin conexión</strong> abierto con sus dos opciones
+(<em>Activar</em> / <em>Desactivar</em>) y, si se puede, el modal de activación con el archivo y la contraseña.</p>
+<hr>
+<h1>Parte 2 — El día a día del empleado</h1>
+<h2>8. Vender</h2>
+<p><strong>Qué es.</strong> Armar una venta normal y confirmarla.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Vender</strong> (<strong>Productos para vender</strong>).</li>
+<li>Encuentra el producto: escríbelo en el buscador, usa el <strong>escáner</strong> de código de barras, o
+navega por categorías (el interruptor <strong>Todos</strong> muestra todas).</li>
+<li>En la fila del producto, indica la <strong>Cantidad</strong> y pulsa <strong>Añadir</strong>. La disponibilidad aparece
+entre paréntesis junto al nombre.</li>
+<li>Repite con el resto de líneas. El <strong>carrito</strong> (ícono del encabezado) va sumando.</li>
+<li>Abre el carrito, revisa la <strong>Venta actual</strong> y pulsa <strong>Registrar</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Si un producto descuenta del inventario y no hay stock suficiente, el
+sistema te lo dice antes de dejarlo añadir. Tras registrar, las cantidades se refrescan solas.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/07-vender.png" alt="Pantalla Vender: buscador, categorías y filas de producto con su cantidad"></p>
+<h2>9. Cobrar (método de pago, crédito y vuelto)</h2>
+<p><strong>Qué es.</strong> Elegir cómo paga el cliente y confirmar la venta desde el carrito.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Abre el <strong>carrito</strong>.</li>
+<li>Elige la <strong>moneda</strong> de la venta (si tienes varias).</li>
+<li>Elige el <strong>método de pago</strong> (Efectivo, Transferencia, Zelle…).</li>
+<li>En <strong>efectivo</strong>, escribe <em>con cuánto paga</em> y la app calcula el <strong>Vuelto</strong>.</li>
+<li>Si la venta es <strong>a crédito</strong>, activa el interruptor <strong>Crédito</strong> y escribe el <strong>Cliente</strong>.</li>
+<li>Pulsa <strong>Registrar</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> No se puede registrar un carrito <strong>vacío</strong>, ni cobrar <strong>menos</strong> que el
+total, ni dejar un <strong>crédito sin cliente</strong>. No se pueden mezclar ventas normales y mayoristas en
+el mismo carrito.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/37-carrito.png" alt="El carrito: moneda, método de pago y vuelto, crédito y las líneas de la venta"></p>
+<h2>10. Vender al mayor (por paquetes)</h2>
+<p><strong>Qué es.</strong> Vender por paquetes, con precio por unidad según el tamaño de la compra.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Vender Mayorista</strong>.</li>
+<li>Busca o escanea el producto; pulsa el <strong>?</strong> de la fila para ver los <strong>rangos</strong> de precio.</li>
+<li>Escribe la <strong>cantidad de paquetes</strong> (el mínimo es el primero del rango) y <strong>añade</strong>.</li>
+<li>La fila muestra la cotización (<em>paquetes × tamaño × precio = total</em>).</li>
+<li>Confirma desde el carrito igual que una venta normal.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Solo aparecen los productos configurados como mayoristas. En el carrito,
+<strong>+</strong> y <strong>−</strong> mueven <strong>paquetes</strong> (no unidades), y bajar por debajo del primer rango elimina la
+línea.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/28-mayorista.png" alt="Vender Mayorista: productos por paquetes"></p>
+<h2>11. Cobrar un crédito</h2>
+<p><strong>Qué es.</strong> Marcar como pagada una venta que se dejó a crédito.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Créditos de hoy</strong> (o al <strong>Historial de créditos</strong> para días anteriores).</li>
+<li>Localiza al cliente en la lista.</li>
+<li>Pulsa <strong>Pagar</strong> en la fila del crédito y confirma.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> En el historial (<strong>Créditos</strong>), el filtro arranca en <strong>Por Pagar</strong>. Puedes
+filtrar por rango de fechas y por estado (<strong>Todos / Por Pagar / Pagados</strong>).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/29-creditos-dia.png" alt="Créditos del día: clientes y su estado de pago"></p>
+<p><img src="images/38-pagar-credito.png" alt="Pagar un crédito: la forma de pago y la nota"></p>
+<h2>12. Cierre de caja</h2>
+<p><strong>Qué es.</strong> Cuadrar el <strong>efectivo</strong> del día y cerrar la caja: la apertura, el conteo por
+denominaciones y la diferencia.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Cierre Caja</strong> (<strong>Cierre Efectivo</strong>).</li>
+<li>Escribe el valor de la <strong>Apertura</strong> (el efectivo con el que arranca la caja).</li>
+<li>En la tarjeta <strong>Conteo</strong>, escribe cuántos billetes/monedas hay de cada <strong>denominación</strong>. Si
+necesitas una denominación que no está, usa <strong>Nueva denominación</strong> y <strong>Agregar</strong>.</li>
+<li>Revisa las tarjetas <strong>Esperado</strong>, <strong>Contado</strong> y <strong>Diferencia</strong> (roja si falta, verde si sobra).</li>
+<li>Pulsa <strong>Cerrar Caja</strong> y confirma. Si la <strong>Diferencia no es cero</strong>, el <strong>Comentario</strong> es
+obligatorio.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Cuadra <strong>solo el efectivo</strong> (no transferencias ni Zelle). Mientras el día
+está <strong>Abierta</strong> puedes seguir llenándolo; al cerrar, todo queda bloqueado. Si tienes varias
+monedas, hay un registro por <strong>día y moneda</strong> (usa el filtro de moneda).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/09-cierre-caja-1.png" alt="Cierre Efectivo — parte 1 de 2: Esperado/Contado/Diferencia, la Apertura y el arranque del conteo"></p>
+<p><img src="images/09-cierre-caja-2.png" alt="Cierre Efectivo — parte 2 de 2: el resto de las denominaciones, el Comentario y el aviso de caja descuadrada"></p>
+<h2>13. Ver tus ventas y el cuadre del día</h2>
+<p><strong>Qué es.</strong> Consultar lo vendido hoy y cómo va la caja.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ul>
+<li><strong>Ventas del día</strong> (<strong>Ventas → Pedidos de hoy</strong>): lista de las ventas de hoy con filtro por
+<strong>método de pago</strong>, por estado (<strong>Todas / Pagadas / Créditos</strong>) y por moneda. Desde el engranaje
+de una venta puedes <strong>Editar</strong> o <strong>Eliminar/Cancelar</strong>.</li>
+<li><strong>Cuadre del día</strong> (<strong>Ventas → Cuadre del día</strong>): paneles colapsables con <strong>Resumen Efectivo</strong>
+(ventas en efectivo + créditos pagados − gastos), <strong>Pago por Transferencia</strong>, <strong>Gastos</strong>,
+<strong>Créditos por cobrar</strong>, <strong>Créditos pagados</strong> y <strong>Ventas por categoría</strong>.</li>
+</ul>
+<p><strong>A tener en cuenta.</strong> El <strong>Cuadre del día</strong> es una foto de control; el cierre formal del efectivo
+es la sección 12.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/15-ventas-del-dia.png" alt="Ventas del día: las ventas de hoy con sus filtros por método de pago, estado y moneda"></p>
+<p><img src="images/14-cuadre-dia.png" alt="Cuadre del día: paneles de Resumen Efectivo, transferencias, gastos, créditos y ventas"></p>
+<hr>
+<h1>Parte 3 — Inventario</h1>
+<blockquote>
+<p>El inventario de la tienda es <strong>local</strong>: se consulta sin conexión y refleja lo que se ha
+registrado en el dispositivo.</p>
+</blockquote>
+<h2>14. Inventario disponible</h2>
+<p><strong>Qué es.</strong> Consultar el stock por categoría y producto, su costo y su valor.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Disponible</strong> (título: <strong>Inventario</strong>). Verás las categorías colapsadas.</li>
+<li>Expande la categoría y revisa cada producto: nombre, <strong>cantidad del sistema</strong> entre paréntesis,
+costo unitario y valor total.</li>
+<li>Usa el buscador (<strong>Buscar producto</strong>) para localizar uno.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> El <strong>conteo</strong> no está en esta vista: tiene la suya propia (la siguiente).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/08-disponible.png" alt="Inventario disponible: total, categorías y, por producto, cantidad del sistema, costo y valor"></p>
+<h2>14.1 Conteo de productos</h2>
+<p><strong>Qué es.</strong> La vista de <strong>conteo</strong>: recorrer los productos, escribir lo que hay realmente y ver la
+<strong>diferencia</strong> contra el sistema. Es <strong>solo de conteo</strong> y <strong>no ajusta</strong> el stock.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Conteo de productos</strong> (título <strong>Conteo de productos</strong> con el número de
+productos).</li>
+<li>Expande una categoría (paneles colapsables, como en las otras vistas).</li>
+<li>En cada producto verás el número de fila, el nombre y <strong>Sistema: N</strong>. Escribe lo contado en
+<strong>Conteo</strong>.</li>
+<li>La <strong>diferencia</strong> (contada − sistema) se resalta: <strong>negativa</strong> con signo <code>-</code> en <strong>rojo</strong>; <strong>cero
+o positiva</strong> en <strong>verde</strong> con <code>+</code>. Sin escribir nada, muestra <code>—</code>.</li>
+<li>Para empezar de cero, pulsa <strong>Limpiar</strong>: borra todos los conteos y deja la vista en blanco.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Es <strong>solo visual</strong>: no guarda nada (ni en el dispositivo) y <strong>no</strong> modifica
+el stock. Si recargas o sales de la vista, los conteos se pierden.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/40-conteo-productos.png" alt="Conteo de productos: buscador, categorías y, por producto, Sistema, Conteo y la diferencia resaltada"></p>
+<h2>15. Entradas: del día e historial</h2>
+<p><strong>Qué es.</strong> Registrar y consultar las entradas de mercancía.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ul>
+<li><strong>Entradas del día</strong> (<strong>Inventario → Entradas del día</strong>): pulsa <strong>Entrada</strong>, elige producto,
+cantidad y costo, y guarda. Con el menú de la fila puedes <strong>Editar</strong> o <strong>Eliminar</strong>.</li>
+<li><strong>Historial</strong> (<strong>Inventario → Historial de entradas</strong>, título <strong>Entradas</strong>): consulta por rango
+de fechas, agrupado por día. Es <strong>solo lectura</strong>.</li>
+</ul>
+<p><strong>A tener en cuenta.</strong> Solo el <strong>Dueño</strong> ve la columna de costo y las acciones del día. Una entrada
+que ya se vendió no se puede anular. La fecha siempre es la del día.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/11-entradas-dia.png" alt="Entradas del día: las compras registradas hoy"></p>
+<h2>16. Cantidades del día</h2>
+<p><strong>Qué es.</strong> Reconciliar, por producto, cómo se movió el inventario hoy.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Cantidades del día</strong>.</li>
+<li>Revisa la tabla por producto: <strong>Inicio · Entradas · Disponible · Vendido · Final</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Es <strong>solo lectura</strong>, sin filtros. Los valores negativos y los movimientos se
+resaltan con color para que salten a la vista.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/12-cantidades-dia.png" alt="Cantidades del Día: Inicio, Entradas, Disponible, Vendido y Final por producto"></p>
+<h2>17. Ganancias del día</h2>
+<p><strong>Qué es.</strong> El margen real del día: a qué precio se vendió y a qué costo.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Ganancias del día</strong>.</li>
+<li>Revisa por producto el <strong>Vendido</strong>, <strong>Precio</strong>, <strong>Costo</strong> y la <strong>Ganancia</strong>, con el <strong>Total</strong>
+abajo.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> El costo sale del desglose <strong>grabado en el momento de la venta</strong> (no se
+recalcula). La ganancia total se pinta en verde si es positiva y en rojo si es negativa.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/13-ganancias-dia.png" alt="Ganancias del Día: precio, costo y ganancia por producto"></p>
+<h2>18. Salida</h2>
+<p><strong>Qué es.</strong> La pantalla <strong>Salida</strong> abre la venta con un <strong>selector de tipo de pedido</strong> (por defecto
+Mayorista) sobre las categorías de productos. Comparte el carrito de la venta.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Inventario → Salida</strong>.</li>
+<li>Elige el <strong>tipo</strong> en el selector de la esquina superior, navega por categorías y añade lo que
+corresponda.</li>
+<li>Confirma desde el carrito, igual que cualquier venta.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> La etiqueta del menú invita a pensar en <em>mermas o salidas no de venta</em>, pero
+la pantalla funciona como una <strong>venta</strong> con tipo de pedido seleccionable. <strong>Confirmar con el
+Dueño</strong> si el uso previsto es ese antes de documentarlo con más detalle.</p>
+<p><strong>📷 Imagen sugerida.</strong> La pantalla <strong>Salida</strong> con el selector de <strong>tipo</strong> arriba y una categoría con
+sus productos.</p>
+<hr>
+<h1>Parte 4 — Catálogo Web y Pedidos WhatsApp</h1>
+<blockquote>
+<p>A diferencia del resto del POS, estas pantallas <strong>necesitan internet</strong>: el catálogo publicado y
+los pedidos viven en el servidor.</p>
+</blockquote>
+<h2>19. Catálogo Web: publicar y presentación</h2>
+<p><strong>Qué es.</strong> Publicar tu catálogo en internet para que tus clientes lo vean, y darle tu marca.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Configuración</strong> (<strong>Catálogo Web</strong>). Solo lo ve el <strong>Dueño</strong>.</li>
+<li>Pulsa <strong>Sincronizar Catálogo</strong>: se publican tus categorías y productos (creados, actualizados y
+los desactivados). Verás el resultado de la sincronización.</li>
+<li>Copia la <strong>dirección pública</strong> (botón <strong>Copiar</strong>) o ábrela con <strong>Ver catálogo</strong> para compartirla.</li>
+<li>En la tarjeta <strong>Marca</strong>: sube tu <strong>Logo</strong> y elige <strong>Productos por fila en móvil</strong>
+(uno o dos). Pulsa <strong>Guardar marca</strong>.</li>
+<li>En <strong>Carrusel</strong> e <strong>Imágenes del día</strong>: <strong>Elegir imágenes</strong> (hasta 10), opcionalmente un
+<strong>Pie de foto</strong>, y <strong>Subir imágenes</strong>. Puedes reordenar (subir/bajar) o quitar cada una.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> <strong>Editar un producto no lo republica</strong>: publicar es el acto explícito de
+<strong>Sincronizar Catálogo</strong>. El logo del banner ya no se edita aquí. Los contadores de la cabecera te
+dicen cuántas categorías, productos, publicados y sin imagen tienes.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/23-catalogo-web-1.png" alt="Catálogo Web — parte 1 de 3: dirección pública, métricas y marca"></p>
+<p><img src="images/23-catalogo-web-2.png" alt="Catálogo Web — parte 2 de 3"></p>
+<p><img src="images/23-catalogo-web-3.png" alt="Catálogo Web — parte 3 de 3"></p>
+<p><strong>Así lo ve el cliente</strong> (ejemplo real del catálogo publicado):</p>
+<p><img src="images/41-catalogo-publico.jpg" alt="Catálogo público: marca, buscador, destacados y la rejilla de productos con sus precios"></p>
+<p>Cada producto se abre en una ficha con su foto, su precio y el botón <strong>Añadir</strong>:</p>
+<p><img src="images/42-catalogo-producto-1.jpg" alt="Ficha de un producto en el catálogo público — Combo Don Tavo"></p>
+<p><img src="images/42-catalogo-producto-2.jpg" alt="Ficha de otro producto del catálogo público — Pescado frito"></p>
+<p><strong>Y así pide</strong>: el <strong>carrito</strong> y el <strong>checkout</strong> los ve el <strong>cliente</strong>, no el POS. El ejemplo
+sigue un pedido de <strong>dos productos</strong> (el primero con dos unidades), y el checkout llega al final
+con los datos del cliente ya escritos:</p>
+<p><img src="images/43-catalogo-carrito.jpg" alt="Carrito del catálogo público: los dos productos del pedido, sus cantidades y el subtotal"></p>
+<p><img src="images/44-catalogo-checkout-1.jpg" alt="Checkout del catálogo público — parte 1 de 2: el resumen del pedido, el nombre, el teléfono y cómo lo quiere recibir"></p>
+<p><img src="images/44-catalogo-checkout-2.jpg" alt="Checkout del catálogo público — parte 2 de 2: la dirección de entrega y las notas; el pedido se envía por WhatsApp"></p>
+<h2>20. Editar los productos del catálogo (descripción e imagen)</h2>
+<p><strong>Qué es.</strong> Completar el detalle que ve el cliente en el catálogo público.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Dentro de <strong>Catálogo Web</strong>, expande una categoría.</li>
+<li>En cada producto edita la <strong>Descripción</strong> (hay un contador de caracteres) y sube su <strong>Imagen</strong>.</li>
+<li>Verás etiquetas como <strong>Sin publicar</strong>, <strong>Nuevo</strong> o <strong>Sin guardar</strong> según el estado.</li>
+<li>Al terminar, pulsa <strong>Guardar cambios</strong> (arriba hay un resumen de pendientes).</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Hoy, en esta pantalla, se editan la <strong>descripción y una imagen</strong> por
+producto; el porcentaje de descuento, el precio rebajado y la galería múltiple <strong>no</strong> están
+disponibles aunque la ayuda del menú los mencione. Los cambios se guardan <strong>por lotes</strong> y lo que
+falle se queda pendiente para reintentar.</p>
+<p><strong>📷 Imagen sugerida.</strong> Una categoría expandida con un producto cuyo editor muestra la <strong>Descripción</strong>
+y la <strong>Imagen</strong>, y el resumen de pendientes con <strong>Guardar cambios</strong>.</p>
+<h2>21. Configurar los Pedidos WhatsApp</h2>
+<p><strong>Qué es.</strong> Encender el pedido online y decir a dónde llega y cómo se entrega.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Ventas → Pedidos WhatsApp</strong> (<strong>Pedidos WhatsApp</strong>). Solo lo ve el <strong>Dueño</strong>.</li>
+<li>Activa el interruptor <strong>Pedidos online</strong>. Al encenderlo se muestra el resto.</li>
+<li>Escribe el <strong>Número de WhatsApp</strong> donde quieres recibir los pedidos (obligatorio).</li>
+<li>Activa <strong>Recogida en la tienda</strong> y/o <strong>Envío a domicilio</strong> (al menos una).</li>
+<li>Rellena <strong>Horario de atención</strong> y <strong>Zonas de reparto</strong>, y pulsa <strong>Sincronizar</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Una tienda nueva arranca con <strong>Recogida</strong> encendida. El precio y la moneda
+del pedido salen del catálogo. Si el guardado va bien pero falla la recarga, se te avisa sin
+perder lo escrito.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/24-pedidos-whatsapp.png" alt="Pedidos WhatsApp: interruptor de pedidos online y su configuración"></p>
+<hr>
+<h1>Parte 5 — Gastos, Reportes y Estadísticas</h1>
+<h2>22. Gastos</h2>
+<p><strong>Qué es.</strong> Registrar los gastos operativos del día y consultarlos en el tiempo.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li><strong>Gastos del día</strong> (<strong>Gastos → Gastos del día</strong>): pulsa <strong>Gasto</strong>, elige el <strong>Tipo</strong>, escribe el
+<strong>Total</strong> (mayor que 0), la <strong>moneda</strong>, el <strong>Tipo de pago</strong> y una <strong>Nota</strong>, y guarda.</li>
+<li><strong>Historial</strong> (<strong>Gastos → Gastos</strong>): filtra por rango de fechas, por tipo de pago y por moneda;
+se agrupa por día.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> La <strong>fecha la pone el sistema</strong>. El historial es <strong>solo lectura</strong>. Los gastos
+alimentan el <strong>Cuadre del día</strong> y las <strong>Estadísticas</strong>.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/10-gastos.png" alt="Gastos del día: botón Gasto y la lista de gastos del día"></p>
+<p><img src="images/36-nuevo-gasto.png" alt="Nuevo gasto: tipo, total, moneda, tipo de pago y nota"></p>
+<h2>23. Reportes</h2>
+<p><strong>Qué es.</strong> El resumen de ventas del día y la generación de un PDF de inventario a precio de venta.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Reportes → Reportes de hoy</strong>.</li>
+<li>Revisa las tarjetas: <strong>Pedidos</strong>, <strong>Ingresos</strong>, <strong>Costo</strong> y <strong>Ganancia bruta</strong>.</li>
+<li>(Opcional) Elige la <strong>moneda</strong> y pulsa <strong>Inventario a precio de venta</strong> para descargar el PDF.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> El PDF <strong>respeta el filtro de moneda</strong> (si eliges una, el archivo lleva solo
+esa moneda; no convierte).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/16-reportes.png" alt="Reportes de hoy: Pedidos, Ingresos, Costo y Ganancia bruta"></p>
+<h2>24. Panel de Control</h2>
+<p><strong>Qué es.</strong> El tablero con la evolución del negocio en un rango de fechas.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Estadísticas → Dashboard</strong> (<strong>Panel de Control</strong>).</li>
+<li>Elige el <strong>rango de fechas</strong> (por defecto: los últimos <strong>7 días</strong>, terminando <strong>ayer</strong>).</li>
+<li>Revisa los KPI y las gráficas de <strong>Ventas</strong> y <strong>Ganancia</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Si tienes varias monedas, los importes se muestran <strong>por moneda</strong>, sin
+conversión. Las secciones de <strong>Gastos</strong> y <strong>Créditos</strong> solo aparecen si esos módulos están activos.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/17-dashboard-1.png" alt="Panel de Control — parte 1 de 5: el rango de fechas y los KPI principales"></p>
+<p><img src="images/17-dashboard-2.png" alt="Panel de Control — parte 2 de 5"></p>
+<p><img src="images/17-dashboard-3.png" alt="Panel de Control — parte 3 de 5: las gráficas"></p>
+<p><img src="images/17-dashboard-4.png" alt="Panel de Control — parte 4 de 5"></p>
+<p><img src="images/17-dashboard-5.png" alt="Panel de Control — parte 5 de 5"></p>
+<h2>25. Cuadre por fechas</h2>
+<p><strong>Qué es.</strong> El cuadre del periodo: ventas, gastos y ganancias entre dos fechas.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Estadísticas → Cuadre por fechas</strong>.</li>
+<li>Elige <strong>Fecha inicio</strong> y <strong>Fecha fin</strong> y pulsa <strong>Generar</strong>.</li>
+<li>Revisa los cuatro KPI — <strong>Ventas</strong>, <strong>Gastos</strong>, <strong>Ganancias Bruta</strong> y <strong>Ganancias</strong> — y la
+tarjeta <strong>Cuadre</strong> con sus paneles colapsables.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> <strong>Ganancias Bruta</strong> es la ganancia <strong>sin</strong> restar gastos; <strong>Ganancias</strong> es
+la bruta <strong>menos</strong> los gastos. La fecha de inicio debe ser anterior o igual a la de fin.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/18-cuadre-fechas-1.png" alt="Cuadre por fechas — parte 1 de 2: el rango de fechas y los cuatro KPI del periodo"></p>
+<p><img src="images/18-cuadre-fechas-2.png" alt="Cuadre por fechas — parte 2 de 2: la tarjeta Cuadre con sus paneles colapsables"></p>
+<hr>
+<h1>Parte 6 — Configuración y mantenimiento</h1>
+<h2>26. Empleados y roster (resumen)</h2>
+<p>Ver la <strong>sección 6</strong> para crear empleados y la <strong>sección 7</strong> para el acceso sin conexión. Recuerda:
+gestionar empleados <strong>necesita conexión</strong>, y el roster exportado es lo que habilita el equipo de un
+empleado para trabajar sin internet.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/21-empleados.png" alt="Empleados: la pantalla desde la que se añaden empleados y se exporta el roster sin conexión"></p>
+<h2>27. Tasas de Cambio</h2>
+<p><strong>Qué es.</strong> Registrar cuántas unidades de cada moneda equivalen a <strong>1 USD</strong> para cada método de
+pago. Solo aparece con el módulo de <strong>múltiples monedas</strong>.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Gestión → Tasas de Cambio</strong>.</li>
+<li>Pulsa <strong>Tasa</strong>, elige la <strong>moneda</strong> y el <strong>método</strong>, escribe el <strong>valor de compra</strong> y el
+<strong>valor de venta</strong>, y la <strong>fecha desde la que rige</strong>; pulsa <strong>Registrar</strong>.</li>
+<li>Consulta <strong>Tasas Vigentes</strong> (las activas) y el <strong>Historial de tasas</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> El sistema es <strong>append-only</strong>: cada cambio crea una fila nueva y las filas
+históricas <strong>no se editan ni se borran</strong>. La papelera solo <strong>desactiva</strong> (la saca del cálculo pero
+la deja en el historial). <strong>USD no aparece</strong> en el selector (es la referencia). El <strong>método</strong> se
+limita a los válidos para la moneda elegida.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/20-tasas-cambio.png" alt="Tasas de Cambio: tasas vigentes e historial"></p>
+<h2>28. Configuraciones</h2>
+<p>Ver la <strong>sección 3</strong> (monedas y métodos de pago). En resumen, esta pantalla ofrece: <strong>Tienda
+activa</strong> (solo multi-tienda), <strong>Monedas de compra y venta</strong> (solo con múltiples monedas) y
+<strong>Métodos de pago</strong>. Guarda al instante.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/19-configuraciones.png" alt="Configuraciones: Tienda activa, Monedas y Métodos de pago"></p>
+<h2>29. Mis tiendas</h2>
+<p><strong>Qué es.</strong> Ver y gestionar todas tus tiendas (activas e inactivas).</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Gestión → Mis tiendas</strong>.</li>
+<li>Con el engranaje de cada tarjeta puedes <strong>Editar</strong> (nombre, activar/desactivar) y <strong>Editar el
+plan</strong>.</li>
+<li>Si tienes el módulo de multi-tienda, arriba hay un botón para <strong>crear una tienda</strong> nueva.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Esta pantalla <strong>necesita conexión</strong>. Al crear una tienda, esta <strong>nace en el
+plan Superior</strong> con su catálogo. Desactivar una tienda pide confirmación (puede ser la que tienes en
+uso).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/22-mis-tiendas.png" alt="Mis tiendas: las tarjetas de tus tiendas con su plan y próximo cobro"></p>
+<h2>30. Sincronización: exportar e importar</h2>
+<p><strong>Qué es.</strong> Hacer una <strong>copia de seguridad</strong> cifrada de los datos de la tienda y <strong>restaurarla</strong>
+(en el mismo u otro dispositivo).</p>
+<p><strong>Cómo se hace — Exportar.</strong></p>
+<ol>
+<li>Ve a <strong>Sincronización → Exportar</strong>.</li>
+<li>Escribe la <strong>Contraseña de cifrado</strong>.</li>
+<li>Pulsa <strong>Exportar</strong>: se descarga un archivo <code>.zip</code> (o compártelo por hotspot con <strong>Compartir</strong>).</li>
+</ol>
+<p><strong>Cómo se hace — Importar.</strong></p>
+<ol>
+<li>Ve a <strong>Sincronización → Importar</strong>.</li>
+<li>Elige el <strong>Archivo de respaldo (.zip)</strong> (o recíbelo por hotspot) y escribe la contraseña.</li>
+<li>Pulsa <strong>Importar</strong>.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> <strong>Guarda la contraseña</strong>: sin ella el respaldo no se puede abrir. La copia
+incluye catálogo, inventario, ventas, gastos, créditos, métodos de pago, cierres de efectivo y más.
+Al importar, los datos se <strong>fusionan</strong> con los del dispositivo (no se pisa a ciegas).</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/30-exportar.png" alt="Exportar datos: contraseña de cifrado y botón Exportar"></p>
+<p><img src="images/31-importar.png" alt="Importar datos: archivo de respaldo y contraseña"></p>
+<h2>31. Diagnóstico</h2>
+<p><strong>Qué es.</strong> Una pantalla de soporte con el registro de errores y eventos del dispositivo. Solo la
+ven el <strong>Dueño</strong> y el administrador de la plataforma.</p>
+<p><strong>Cómo se hace.</strong></p>
+<ol>
+<li>Ve a <strong>Gestión → Diagnóstico</strong>.</li>
+<li>Revisa <strong>Información del dispositivo</strong> (versión, conexión, navegador).</li>
+<li>Filtra por <strong>nivel</strong> o <strong>busca</strong> en la lista; usa <strong>Compartir / Descargar / Copiar</strong> para
+enviarlo a soporte y <strong>Limpiar</strong> para vaciarlo.</li>
+</ol>
+<p><strong>A tener en cuenta.</strong> Se actualiza solo cada segundo. Es la pantalla que conviene abrir cuando algo
+falla, para enviar el detalle.</p>
+<p><strong>📷 Imagen sugerida.</strong></p>
+<p><img src="images/32-diagnostico.png" alt="Diagnóstico: información del dispositivo y el registro de eventos"></p>
+<hr>
+<h2>Anexo — Qué NO cubre este manual</h2>
+<p>Este manual se limita a los módulos del plan <strong>Pago</strong> más <strong>Catálogo Web</strong>, <strong>Pedidos WhatsApp</strong> y
+las <strong>configuraciones</strong>. Quedan <strong>fuera</strong>: los módulos de <strong>Almacenes</strong> y <strong>Elaboración</strong> (plan
+Superior), las pantallas de <strong>Gestión de pedidos</strong> (atender los pedidos, repartidores y ventas de
+pedidos) y todas las pantallas de <strong>Administración de la plataforma</strong> (SuperAdmin: tiendas, dueños,
+comercializadores, módulos, cobros y comisiones).</p>
+</main>
+    </div>
+  </body>
+</html>

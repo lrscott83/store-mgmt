@@ -38,6 +38,7 @@
     "NODE_ENV",
     "APP_VERSION",
     "API_URL",
+    "PUBLIC_BASE_URL",
     "SESSION_SECRET",
     "SESSION_DOMAIN",
     "E2E_CSP_ENFORCE",

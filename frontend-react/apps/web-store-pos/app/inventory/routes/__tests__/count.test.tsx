@@ -114,8 +114,8 @@ describe('ProductCountPage', () => {
 
     fireEvent.change(screen.getByTestId('inventory-count-input-p1'), { target: { value: '30' } });
     fireEvent.change(screen.getByTestId('inventory-count-input-p2'), { target: { value: '90' } });
-    expect(screen.getByTestId('inventory-count-difference-p1')).toHaveTextContent('-4');
-    expect(screen.getByTestId('inventory-count-difference-p2')).toHaveTextContent('+2');
+    expect(screen.getByTestId('inventory-count-difference-p1').textContent).toBe('-4');
+    expect(screen.getByTestId('inventory-count-difference-p2').textContent).toBe('+2');
 
     fireEvent.click(screen.getByTestId('product-count-clear'));
 

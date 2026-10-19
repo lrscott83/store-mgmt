@@ -23,6 +23,8 @@ using Serilog.Sinks.Elasticsearch;
 using System.Reflection;
 using System;
 using SMCA.WebApi.OptionsSetup;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -192,6 +194,31 @@ x.AllowAnyHeader()
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+// Manual de usuario — HTML estático PÚBLICO bajo /api/manual, generado desde
+// docs/manual/ con `pnpm generate:manual` (ver frontend-react/scripts/build-manual.mjs).
+// Se sirve bajo /api/* para que el service worker del POS lo trate como passthrough:
+// no se precachea ni se cachea en runtime → no pesa en el POS offline.
+// `no-cache` (revalidar) es parte del requisito de caché del manual: el navegador
+// vuelve a preguntar y recibe 304 si el archivo no cambió, o 200 con la versión nueva
+// si cambió (una imagen editada deja de servirse vieja; una sin cambios no se
+// re-descarga). ETag/Last-Modified los emite el middleware de estáticos.
+var manualRoot = Path.Combine(app.Environment.ContentRootPath, "help");
+if (Directory.Exists(manualRoot))
+{
+    var manualFiles = new PhysicalFileProvider(manualRoot);
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        FileProvider = manualFiles,
+        RequestPath = "/api/manual",
+    });
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = manualFiles,
+        RequestPath = "/api/manual",
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers["Cache-Control"] = "no-cache",
+    });
+}
 
 //Add support to logging request with SERILOG
 app.UseSerilogRequestLogging();

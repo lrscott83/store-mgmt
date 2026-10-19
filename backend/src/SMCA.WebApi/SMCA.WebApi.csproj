@@ -46,4 +46,11 @@
     <InternalsVisibleTo Include="Application.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Manual de usuario generado (pnpm generate:manual). Se copia al output y al
+         publish para que el backend lo sirva en /api/manual desde ContentRootPath/help
+         (ver Program.cs). Fuente y generador viven fuera del backend. -->
+    <None Update="help\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -333,6 +333,21 @@ describe('ProductOfflineService', () => {
       ]);
     });
 
+    it('excludes products of an inactive category', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+
+      const bebidasId = categoryRepository.addProductCategoryByName('Bebidas');
+      categoryRepository.addProductCategory('Postres', 2, false);
+      const postresId = categoryRepository.getProductCategoryByName('Postres')!.id;
+      productRepository.addProduct(bebidasId, 'Coca Cola', 1, '', 1, true, true, true);
+      productRepository.addProduct(postresId, 'Torta', 1, '', 1, true, true, true);
+
+      const result = await service.getProductsToSelect();
+      expect(unwrap(result).map((p) => p.fullName)).toEqual(['Bebidas - Coca Cola']);
+    });
+
     it('resolves an empty array when there are no products', async () => {
       const result = await service.getProductsToSelect();
       expect(result.data).toEqual([]);
