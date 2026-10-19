@@ -39,6 +39,7 @@ showcase); el backend no se toca.
 | T1  | Panel `catalog-location-card.tsx` + claves `WEB_CATALOG.LOCATION_*` + montaje en la vista + tests      | S1,S2,S4 | inline | HECHO |
 | T2  | Retiro del bloque en `store-form.tsx`, pass-through en `edit-store.tsx`, claves `STORES.*` retiradas, tests actualizados | S3 | inline | HECHO |
 | T3  | Verificación final: typecheck, lint, suites afectadas                                                  | S5       | inline | HECHO |
+| T5  | Review nativo: los 12 hallazgos cerrados (payload compartido, GET fresco, tests faltantes) | S2,S3,S5 | inline | HECHO · `7f31ec9d` + `b5b4b006` |
 
 ## Log
 
@@ -49,10 +50,10 @@ showcase); el backend no se toca.
   tienda? nunca mencione el edit de la tienda todo el tiempo fue el catalogo web"; "una cosa es
   donde se guarda y otra cosa es donde esta la vista. Quiero todo para esa vista antes de los
   productos y vamos a ponerla en un panel colapsable en esa vista".
-- **Evidencia (código):** el bloque vive en `store-form.tsx:228-365` (solo edit); payload en
-  `edit-store.tsx:137-147`; `UpdateStoreCommand.cs` (línea 155) aplica Address + bloque solo bajo
-  `UpdateLocation` — de ahí el pass-through del form para no perder la dirección. Las claves
-  `STORES.*` del bloque (1477-1497 de `es.ts`) tienen un único consumidor: ese bloque.
+- **Evidencia (código, líneas PRE-CAMBIO):** el bloque vivía en `store-form.tsx:228-365` (solo edit);
+  payload en `edit-store.tsx:137-147`; `UpdateStoreCommand.cs` (línea 155) aplica Address + bloque solo
+  bajo `UpdateLocation` — de ahí el pass-through del form para no perder la dirección. Las claves
+  `STORES.*` del bloque (1477-1497 de `es.ts`) tenían un único consumidor: ese bloque.
 - **L2 (2026-10-19, evidencia de verificación):** tests focalizados: 6 archivos / 118 tests ✓ (panel nuevo,
   vista, form, ruta de edición). Suite de `web-store-pos`: 5683 passed / 1 failed / 6 skipped — el único
   fallo es `sync-routes.test.tsx > ExportPage > downloads via an anchor and never calls navigator.share`,
@@ -81,6 +82,25 @@ showcase); el backend no se toca.
   `StoreLocationUpdateTests`: Failed 0, Passed 3, Total 3 ✓ contra `smca_test` real (`[E2E Guard]` presente).
   Tests nuevos (`StoreLocationUpdateTests.cs`): con `updateLocation: true` persisten los seis campos; sin el
   flag, un rename conserva el bloque intacto.
+- **L8 (2026-10-19, review nativo + los 12 hallazgos cerrados):** review aprobado
+  (`review-9d7fd6dd9a5f04b9`, lentes risk/readability/reliability, 13 archivos / 1.350 líneas, authority
+  burned; el preflight sin selectores proponía 409 archivos / 30.421 líneas y se acotó con
+  `--base-ref 622f712e --committed-only`). Todos los hallazgos informativos se atendieron:
+  - R2-1: el PUT dejó de reconstruir el comando a mano — `Sender.Send(command with { Id = id, PlanId = null })`;
+    un campo nuevo de `UpdateStoreCommand` ya no puede olvidarse en ese punto.
+  - R1/R3-D: panel y ruta de edición hacen un GET fresco justo antes de guardar y reenvían el resto desde
+    ese GET; si el GET falla, el save se aborta con error (antes se pisaba con el snapshot de la carga).
+  - R2-2/R2-4: proyecciones compartidas `management/stores/lib/store-location-payload.ts`
+    (`toStoredLocationPayload`, `toStorePassThrough`) y rationale explícito de la omisión de `paymentStartDate`.
+  - R2-3: `hasChanges` compara estructuralmente contra un baseline tipado (sin `JSON.stringify` ni centinela).
+  - R2-5: fixture único `sales/components/__tests__/store-fixture.ts` compartido por los tests del catálogo.
+  - R2-6: la evidencia de código quedó marcada como PRE-CAMBIO (arriba).
+  - R3-A: tests de fallo de guardado (endpoint fallido y excepción) que conservan lo editado.
+  - R3-B: E2E nuevo que prueba por HTTP que omitir un campo con `updateLocation: true` LO BORRA.
+  - R3-C: hidratación con `typeof` (cubre null y propiedad ausente) + test del caso ausente.
+  - R3-E: el test del panel consulta por label/rol; los testids de los inputs salieron del markup.
+  Commits `7f31ec9d` (frontend) y `b5b4b006` (backend). Evidencia: focalizados 5 archivos / 92 tests ✓,
+  `turbo typecheck` 5/5 ✓, eslint 0, E2E del PUT Failed 0 / Passed 4 ✓ contra `smca_test` real.
 - **Siguiente paso:** al desplegar, aplicar la migración `35-20261019-Add-Store-Location-Fields.sql`
-  (pendiente). El E2E del catálogo web no cubre el bloque (lo cubren los unit tests del panel + los dos E2E
-  nuevos del PUT).
+  (pendiente). El E2E del catálogo web no cubre el bloque; lo cubren los unit tests del panel y los tres
+  E2E del PUT (persistencia, no-pisar sin flag y borrado al omitir un campo).
