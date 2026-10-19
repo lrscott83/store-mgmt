@@ -17,6 +17,7 @@ export function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     planType: 'Pago',
     planPrice: 10,
     planCurrentPrice: 10,
