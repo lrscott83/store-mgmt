@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Post-build landing metadata (SEO).
 //
 // The app is SPA mode (`ssr:false`): React Router renders only the root route
