@@ -35,6 +35,29 @@ function toPriceNumber(value: string): number {
 }
 
 /**
+ * Lifecycle-list order: the store closest to its next payment first. Stores
+ * without a due date (Gratis plan, billing never started, disapproved) go last;
+ * ISO dates compare lexicographically and equal dates keep their incoming order.
+ * `0001-` is the DateOnly default sentinel the cards already guard against, so
+ * it counts as "no date" here too.
+ */
+function sortByNextPaymentDate(stores: Store[]): Store[] {
+  const dueDate = (store: Store): string | null => {
+    const date = store.nextPaymentDate;
+    return date && !date.startsWith('0001-') ? date : null;
+  };
+
+  return [...stores].sort((a, b) => {
+    const dueA = dueDate(a);
+    const dueB = dueDate(b);
+    if (dueA === dueB) return 0;
+    if (dueA === null) return 1;
+    if (dueB === null) return -1;
+    return dueA < dueB ? -1 : 1;
+  });
+}
+
+/**
  * Sole super-admin store lifecycle list (design.md: "Super-admin lifecycle list stays SOLE
  * at /admin/stores"). Approve/Disapprove now require confirmation before the HTTP call
  * (Angular parity — store-list.component.ts:132-166,169-203, `Swal.fire({... icon: 'question'
@@ -95,7 +118,7 @@ export function AdminStoreListPage() {
         setError(formatMessage({ id: 'STORES.ERROR' }));
         return;
       }
-      setStores(storesRes.data);
+      setStores(sortByNextPaymentDate(storesRes.data));
       setPlans(plansRes.data);
       setFeaturesByModuleId(groupFeaturesByModuleId(featuresRes.data));
       setError(undefined);
