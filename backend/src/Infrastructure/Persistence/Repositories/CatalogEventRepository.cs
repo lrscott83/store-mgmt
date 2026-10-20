@@ -16,42 +16,43 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         /// <summary>
-        /// Agregado de una tienda en un rango. Proyecta SOLO las columnas que cuentan y agrega en
-        /// memoria: el rango lo acota el panel (7/30 días) y así el cálculo no depende de que el
-        /// proveedor traduzca `COUNT(DISTINCT ...)` dentro de un `GROUP BY`. `IgnoreQueryFilters`
-        /// es deliberado: el endpoint es SuperAdmin y el aislamiento lo da el `storeId`, no el
-        /// tenant del contexto.
+        /// Agregado de una tienda en un rango. El trabajo de conteo/agrupación ocurre en la BASE:
+        /// traer la ventana entera y agregar en memoria convertía un panel SuperAdmin en una
+        /// lectura sin cota de la tabla de eventos. El filtro global por tenant queda ACTIVO: el
+        /// endpoint es SuperAdmin y el `storeId` sigue siendo el aislamiento explícito.
         /// </summary>
         public async Task<CatalogStatsSnapshot> GetStatsAsync(Guid storeId, DateTime fromUtc, DateTime toUtc,
             CancellationToken cancellationToken)
         {
-            var rows = await _events
-                .IgnoreQueryFilters()
-                .Where(e => e.StoreId == storeId && e.OccurredAt >= fromUtc && e.OccurredAt <= toUtc)
-                .Select(e => new
+            IQueryable<CatalogEvent> query = _events
+                .Where(e => e.StoreId == storeId && e.OccurredAt >= fromUtc && e.OccurredAt <= toUtc);
+
+            int pageViews = await query.CountAsync(e => e.Type == CatalogEventType.PageView, cancellationToken);
+            int visits = await query.Select(e => e.SessionHash).Distinct().CountAsync(cancellationToken);
+            int visitors = await query.Select(e => e.VisitorHash).Distinct().CountAsync(cancellationToken);
+
+            var sourceRows = await query
+                .GroupBy(e => e.Source)
+                .Select(group => new
                 {
-                    e.Type,
-                    e.VisitorHash,
-                    e.SessionHash,
-                    e.Source,
-                    e.OccurredAt,
-                    e.ProductId,
+                    Source = group.Key,
+                    Visits = group.Select(e => e.SessionHash).Distinct().Count(),
                 })
                 .ToListAsync(cancellationToken);
 
-            int pageViews = rows.Count(row => row.Type == CatalogEventType.PageView);
-            int visits = rows.Select(row => row.SessionHash).Distinct().Count();
-            int visitors = rows.Select(row => row.VisitorHash).Distinct().Count();
-
-            List<CatalogSourceVisits> sources = rows
-                .GroupBy(row => row.Source)
-                .Select(group => new CatalogSourceVisits(
-                    group.Key,
-                    group.Select(row => row.SessionHash).Distinct().Count()))
+            List<CatalogSourceVisits> sources = sourceRows
+                .Select(row => new CatalogSourceVisits(row.Source, row.Visits))
                 .OrderByDescending(source => source.Visits)
                 .ToList();
 
-            List<CatalogDayVisits> daily = rows
+            // `GroupBy(e => e.OccurredAt.Date)` sobre `timestamp with time zone` no se traduce en
+            // Npgsql (date_trunc de 3 argumentos). Se proyectan solo las dos columnas necesarias y
+            // se agrupa en memoria: no se materializa la fila completa del evento.
+            var dailyRows = await query
+                .Select(e => new { e.OccurredAt, e.SessionHash })
+                .ToListAsync(cancellationToken);
+
+            List<CatalogDayVisits> daily = dailyRows
                 .GroupBy(row => row.OccurredAt.Date)
                 .Select(group => new CatalogDayVisits(
                     group.Key,
@@ -59,13 +60,21 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderBy(day => day.Day)
                 .ToList();
 
-            List<CatalogProductViews> topProducts = rows
-                .Where(row => row.Type == CatalogEventType.ProductView && row.ProductId.HasValue)
-                .GroupBy(row => row.ProductId!.Value)
-                .Select(group => new CatalogProductViews(group.Key, group.Count()))
-                .OrderByDescending(product => product.Views)
-                .ThenBy(product => product.ProductId)
+            var productRows = await query
+                .Where(e => e.Type == CatalogEventType.ProductView && e.ProductId != null)
+                .GroupBy(e => e.ProductId!.Value)
+                .Select(group => new
+                {
+                    ProductId = group.Key,
+                    Views = group.Count(),
+                })
+                .OrderByDescending(row => row.Views)
+                .ThenBy(row => row.ProductId)
                 .Take(5)
+                .ToListAsync(cancellationToken);
+
+            List<CatalogProductViews> topProducts = productRows
+                .Select(row => new CatalogProductViews(row.ProductId, row.Views))
                 .ToList();
 
             return new CatalogStatsSnapshot(pageViews, visits, visitors, sources, topProducts, daily);

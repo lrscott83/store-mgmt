@@ -12,8 +12,15 @@ namespace Application.Features.WebCatalog.Public
     {
         private static readonly string[] BotMarkers =
         [
-            "bot",
-            "crawl",
+            "googlebot",
+            "bingbot",
+            "yandexbot",
+            "duckduckbot",
+            "baiduspider",
+            "semrushbot",
+            "ahrefsbot",
+            "petalbot",
+            "crawler",
             "spider",
             "slurp",
             "bingpreview",

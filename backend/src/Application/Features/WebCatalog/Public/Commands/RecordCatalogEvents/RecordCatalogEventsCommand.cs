@@ -6,6 +6,7 @@ using Domain.Common.Enums;
 using Domain.Entities.CatalogEvents;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
+using Microsoft.Extensions.Configuration;
 
 namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
 {
@@ -43,19 +44,27 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
 
         private readonly IStoreRepository _storeRepository;
         private readonly ICatalogEventRepository _catalogEventRepository;
+        private readonly IProductRepository _productRepository;
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
+        private readonly string _telemetrySalt;
 
         public RecordCatalogEventsCommandHandler(
             IStoreRepository storeRepository,
             ICatalogEventRepository catalogEventRepository,
+            IProductRepository productRepository,
             IApplicationUnitOfWork applicationUnitOfWork,
-            IHttpContextService httpContextService)
+            IHttpContextService httpContextService,
+            IConfiguration configuration)
         {
             _storeRepository = storeRepository;
             _catalogEventRepository = catalogEventRepository;
+            _productRepository = productRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
+            _telemetrySalt = configuration["CatalogTelemetry:Salt"]
+                ?? configuration["Jwt:SecretKey"]
+                ?? "catalog-telemetry";
         }
 
         public async Task<ResponseResult<bool>> Handle(RecordCatalogEventsCommand request,
@@ -76,12 +85,34 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
 
             DateTime now = DateTime.UtcNow;
             string ipAddress = _httpContextService.IPAddress;
-            string visitorHash = CatalogTelemetryHash.Visitor(store.Id, ipAddress, request.UserAgent, now);
+            string visitorHash = CatalogTelemetryHash.Visitor(
+                store.Id, ipAddress, request.UserAgent, now, _telemetrySalt);
             string sessionHash = CatalogTelemetryHash.Session(store.Id, visitorHash, now);
             CatalogDeviceType deviceType = CatalogDeviceClassifier.Resolve(request.UserAgent);
 
+            // Un `null` dentro del array es un cuerpo malformado, no un evento: se descarta sin
+            // romper el lote. El cliente público no recibe un 500 por su propia telemetría.
+            List<CatalogEventRequest> requested = request.Events
+                .Take(MaxEventsPerRequest)
+                .Where(item => item is not null)
+                .ToList();
+
+            // Un `productId` de otra tienda o inexistente no entra: el `TopProducts` del panel se
+            // calcula por tienda y un GUID inventado contaminaría el agregado. Se resuelve en UNA
+            // consulta para todo el lote.
+            List<Guid> requestedProductIds = requested
+                .Where(item => item.ProductId.HasValue && item.ProductId.Value != Guid.Empty)
+                .Select(item => item.ProductId!.Value)
+                .Distinct()
+                .ToList();
+            HashSet<Guid> publishedProductIds = requestedProductIds.Count == 0
+                ? []
+                : (await _productRepository.GetPublishedByIdsAsync(store.Id, requestedProductIds))
+                    .Select(product => product.Id)
+                    .ToHashSet();
+
             var events = new List<CatalogEvent>();
-            foreach (CatalogEventRequest item in request.Events.Take(MaxEventsPerRequest))
+            foreach (CatalogEventRequest item in requested)
             {
                 CatalogEventType? type = ParseType(item.Name);
                 if (!type.HasValue)
@@ -98,7 +129,7 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
                     visitorHash,
                     sessionHash,
                     BuildPath(item.Path, store.CatalogSlug),
-                    BuildProductId(item.ProductId, type.Value),
+                    BuildProductId(item.ProductId, type.Value, publishedProductIds),
                     source,
                     referrerHost,
                     Truncate(item.UtmSource, CatalogEvent.UtmMaxLength),
@@ -128,15 +159,26 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
         private static string BuildPath(string? path, string storeSlug)
         {
             string value = path?.Trim() ?? string.Empty;
-            return value.Length == 0
-                ? $"/catalog/{storeSlug}"
-                : Truncate(value, CatalogEvent.PathMaxLength)!;
+
+            // El path lo manda el cliente y se persiste: solo se acepta la ruta del catálogo,
+            // relativa y sin esquema/host ni caracteres de control. Cualquier otra cosa cae al
+            // path canónico de la tienda, para que un beacon no pueda inyectar texto arbitrario
+            // en la tabla (ni en un futuro export/panel que lo pinte).
+            bool valid = value.StartsWith("/catalog/", StringComparison.Ordinal)
+                && !value.Contains("://", StringComparison.Ordinal)
+                && !value.Any(char.IsControl);
+
+            return valid
+                ? Truncate(value, CatalogEvent.PathMaxLength)!
+                : $"/catalog/{storeSlug}";
         }
 
-        private static Guid? BuildProductId(Guid? productId, CatalogEventType type)
+        private static Guid? BuildProductId(Guid? productId, CatalogEventType type,
+            IReadOnlySet<Guid> publishedProductIds)
             => type is CatalogEventType.ProductView or CatalogEventType.AddToCart
                && productId.HasValue
                && productId.Value != Guid.Empty
+               && publishedProductIds.Contains(productId.Value)
                 ? productId
                 : null;
 

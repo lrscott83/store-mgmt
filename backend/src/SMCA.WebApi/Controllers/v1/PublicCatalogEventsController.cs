@@ -21,6 +21,7 @@ namespace SMCA.WebApi.Controllers.v1
     {
         [HttpPost("~/api/v1/public/catalog/{storeSlug}/events")]
         [EnableRateLimiting("PublicCatalogPolicy")]
+        [RequestSizeLimit(16_384)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> RecordAsync(string storeSlug,

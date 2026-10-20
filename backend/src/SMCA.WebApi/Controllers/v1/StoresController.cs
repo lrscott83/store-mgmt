@@ -381,7 +381,8 @@ namespace SMCA.WebApi.Controllers.v1
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<CatalogStatsDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> GetCatalogStatsAsync(Guid storeId, [FromQuery] int days = 30)
+        public async Task<IActionResult> GetCatalogStatsAsync(Guid storeId,
+            [FromQuery] int days = GetCatalogStatsQuery.DefaultDays)
             => Ok(await Sender.Send(new GetCatalogStatsQuery(storeId, days)));
 
         [HttpGet("to-collect")]

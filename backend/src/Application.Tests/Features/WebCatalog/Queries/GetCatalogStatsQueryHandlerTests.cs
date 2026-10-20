@@ -60,7 +60,43 @@ namespace Application.Tests.Features.WebCatalog.Queries
             result.Data.TopProducts.Should().ContainSingle()
                 .Which.Should().BeEquivalentTo(new { ProductId = productId, Name = "Camisa", Views = 7 });
             result.Data.Daily.Should().HaveCount(30);
-            result.Data.Daily[^1].Visits.Should().Be(5);
+            result.Data.Daily.Should().Contain(day => day.Visits == 5);
+        }
+
+        [Fact]
+        public async Task Handle_PassesTheSameUtcWindowToEventsAndOrders()
+        {
+            DateTime? eventsFrom = null;
+            DateTime? eventsTo = null;
+            DateTime? ordersFrom = null;
+            DateTime? ordersTo = null;
+
+            _catalogEventRepository
+                .Setup(x => x.GetStatsAsync(_storeId, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<Guid, DateTime, DateTime, CancellationToken>((_, from, to, _) =>
+                {
+                    eventsFrom = from;
+                    eventsTo = to;
+                })
+                .ReturnsAsync(new CatalogStatsSnapshot(0, 0, 0, [], [], []));
+            _orderRepository
+                .Setup(x => x.CountOnlineOrdersAsync(_storeId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+                .Callback<Guid, DateTime, DateTime>((_, from, to) =>
+                {
+                    ordersFrom = from;
+                    ordersTo = to;
+                })
+                .ReturnsAsync(0);
+
+            await Handler().Handle(new GetCatalogStatsQuery(_storeId, 7), CancellationToken.None);
+
+            eventsFrom.Should().NotBeNull();
+            eventsTo.Should().NotBeNull();
+            eventsTo!.Value.Date.Should().Be(DateTime.UtcNow.Date);
+            eventsFrom.Should().Be(eventsTo!.Value.Date.AddDays(-6));
+            ordersFrom.Should().Be(eventsFrom);
+            ordersTo.Should().Be(eventsTo);
         }
 
         [Fact]

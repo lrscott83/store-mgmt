@@ -13,6 +13,7 @@ namespace Application.Tests.Features.WebCatalog.Public
         [InlineData("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", true)]
         [InlineData("curl/8.4.0", true)]
         [InlineData("Mozilla/5.0 (compatible; bingbot/2.0)", true)]
+        [InlineData("Mozilla/5.0 (Linux; Android 13; CUBOT X70) AppleWebKit/537.36 Mobile Safari/537.36", false)]
         [InlineData("", true)]
         [InlineData(null, true)]
         public void IsBot_ClassifiesCommonUserAgents(string? userAgent, bool expected)

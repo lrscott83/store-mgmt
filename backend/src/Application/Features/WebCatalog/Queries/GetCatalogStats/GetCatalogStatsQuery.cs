@@ -10,11 +10,13 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStats
     /// <summary>
     /// Estadísticas del catálogo de una tienda. Endpoint SuperAdmin: no se expone al dueño.
     /// </summary>
-    public sealed record GetCatalogStatsQuery(Guid StoreId, int Days = 30) : IQuery<CatalogStatsDto>;
+    public sealed record GetCatalogStatsQuery(Guid StoreId, int Days = GetCatalogStatsQuery.DefaultDays) : IQuery<CatalogStatsDto>
+    {
+        public const int DefaultDays = 30;
+    }
 
     public sealed class GetCatalogStatsQueryHandler : IQueryHandler<GetCatalogStatsQuery, CatalogStatsDto>
     {
-        private const int DefaultDays = 30;
         private const int MaxDays = 365;
 
         private readonly ICatalogEventRepository _catalogEventRepository;
@@ -34,7 +36,7 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStats
         public async Task<ResponseResult<CatalogStatsDto>> Handle(GetCatalogStatsQuery query,
             CancellationToken cancellationToken)
         {
-            int days = Math.Clamp(query.Days <= 0 ? DefaultDays : query.Days, 1, MaxDays);
+            int days = Math.Clamp(query.Days <= 0 ? GetCatalogStatsQuery.DefaultDays : query.Days, 1, MaxDays);
 
             // Ventana inclusiva de `days` días calendario UTC, terminando hoy. El evento y el
             // pedido usan el mismo rango, para que la conversión no mezcle peras con manzanas.

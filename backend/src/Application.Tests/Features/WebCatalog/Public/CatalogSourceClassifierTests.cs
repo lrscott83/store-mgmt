@@ -51,6 +51,16 @@ namespace Application.Tests.Features.WebCatalog.Public
         }
 
         [Fact]
+        public void Resolve_UtmWinsOverTheReferrer()
+        {
+            (CatalogSource source, string? host) = CatalogSourceClassifier.Resolve(
+                "whatsapp", "social", "https://www.google.com/search?q=tienda");
+
+            source.Should().Be(CatalogSource.WhatsApp);
+            host.Should().Be("google.com");
+        }
+
+        [Fact]
         public void Resolve_InvalidReferrer_FallsBackToDirect()
         {
             (CatalogSource source, string? host) = CatalogSourceClassifier.Resolve(null, null, "not a url");

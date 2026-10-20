@@ -3,9 +3,11 @@ using Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Entities.CatalogEvents;
+using Domain.Entities.Products;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 
@@ -19,15 +21,26 @@ namespace Application.Tests.Features.WebCatalog.Public
 
         private readonly Mock<IStoreRepository> _storeRepository = new();
         private readonly Mock<ICatalogEventRepository> _catalogEventRepository = new();
+        private readonly Mock<IProductRepository> _productRepository = new();
         private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
         private readonly Mock<IHttpContextService> _httpContextService = new();
         private readonly Guid _tenantId = Guid.NewGuid();
+        private readonly IConfiguration _configuration;
         private Store _store = null!;
 
         public RecordCatalogEventsCommandHandlerTests()
         {
             _httpContextService.SetupGet(x => x.IPAddress).Returns("1.2.3.4");
             _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            _productRepository
+                .Setup(x => x.GetPublishedByIdsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>()))
+                .ReturnsAsync([]);
+            _configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CatalogTelemetry:Salt"] = "test-salt",
+                })
+                .Build();
 
             _store = Store.Create("Tienda", Guid.NewGuid(), true, _tenantId);
             _store.CatalogSlug = StoreSlug;
@@ -39,8 +52,10 @@ namespace Application.Tests.Features.WebCatalog.Public
         private RecordCatalogEventsCommandHandler Handler() => new(
             _storeRepository.Object,
             _catalogEventRepository.Object,
+            _productRepository.Object,
             _unitOfWork.Object,
-            _httpContextService.Object);
+            _httpContextService.Object,
+            _configuration);
 
         private static CatalogEventRequest PageView(string path = "/catalog/mi-tienda") => new()
         {
@@ -58,6 +73,11 @@ namespace Application.Tests.Features.WebCatalog.Public
                 .Returns(Task.CompletedTask);
 
             Guid productId = Guid.NewGuid();
+            _productRepository
+                .Setup(x => x.GetPublishedByIdsAsync(_store.Id, It.IsAny<IReadOnlyCollection<Guid>>()))
+                .ReturnsAsync([
+                    Product.Create(productId, "Camisa", Guid.NewGuid(), 100m, 1, true, false, "b1", _tenantId),
+                ]);
             var command = new RecordCatalogEventsCommand(StoreSlug, DesktopUserAgent, [
                 PageView(),
                 new CatalogEventRequest
@@ -167,6 +187,57 @@ namespace Application.Tests.Features.WebCatalog.Public
 
             saved!.Should().ContainSingle();
             saved[0].Type.Should().Be(CatalogEventType.PageView);
+        }
+        [Fact]
+        public async Task Handle_WithUnknownProduct_DoesNotStoreTheProductId()
+        {
+            List<CatalogEvent>? saved = null;
+            _catalogEventRepository
+                .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<CatalogEvent>>()))
+                .Callback<IEnumerable<CatalogEvent>>(items => saved = items.ToList())
+                .Returns(Task.CompletedTask);
+
+            var command = new RecordCatalogEventsCommand(StoreSlug, DesktopUserAgent, [
+                new CatalogEventRequest { Name = "product_view", ProductId = Guid.NewGuid() },
+            ]);
+
+            await Handler().Handle(command, CancellationToken.None);
+
+            saved!.Single().ProductId.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task Handle_WithExternalPath_FallsBackToTheCanonicalCatalogPath()
+        {
+            List<CatalogEvent>? saved = null;
+            _catalogEventRepository
+                .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<CatalogEvent>>()))
+                .Callback<IEnumerable<CatalogEvent>>(items => saved = items.ToList())
+                .Returns(Task.CompletedTask);
+
+            var command = new RecordCatalogEventsCommand(StoreSlug, DesktopUserAgent, [
+                PageView("https://evil.example/catalog/mi-tienda"),
+            ]);
+
+            await Handler().Handle(command, CancellationToken.None);
+
+            saved!.Single().Path.Should().Be("/catalog/mi-tienda");
+        }
+
+        [Fact]
+        public async Task Handle_WithNullEvent_SkipsItWithoutBreakingTheBatch()
+        {
+            List<CatalogEvent>? saved = null;
+            _catalogEventRepository
+                .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<CatalogEvent>>()))
+                .Callback<IEnumerable<CatalogEvent>>(items => saved = items.ToList())
+                .Returns(Task.CompletedTask);
+
+            var command = new RecordCatalogEventsCommand(StoreSlug, DesktopUserAgent, [null!, PageView()]);
+
+            await Handler().Handle(command, CancellationToken.None);
+
+            saved!.Should().ContainSingle();
         }
     }
 }
