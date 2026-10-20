@@ -829,6 +829,10 @@ describe('storefront cart / checkout / order status (F3)', () => {
       whatsappNumber: '+53 5-987 6543',
     };
 
+    beforeEach(() => {
+      serviceMock.createPublicOrderInBackground.mockResolvedValue(undefined);
+    });
+
     function renderCheckout(overrides: Partial<React.ComponentProps<typeof StorefrontCheckout>> = {}) {
       return renderWithIntl(
         <StorefrontCheckout
@@ -875,6 +879,27 @@ describe('storefront cart / checkout / order status (F3)', () => {
       // el carrito intacto.
       expect(onCreated).not.toHaveBeenCalled();
       expect(onSentWithoutOrder).toHaveBeenCalledTimes(1);
+    });
+
+    it('un doble toque sin "Gestión de Pedidos" no crea dos pedidos', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      let resolveBackground!: () => void;
+      serviceMock.createPublicOrderInBackground.mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveBackground = resolve;
+        }),
+      );
+      renderCheckout();
+
+      submitValidOrder();
+      // Segundo toque mientras el POST en segundo plano sigue en vuelo: la guarda debe frenarlo.
+      fireEvent.click(screen.getByTestId('checkout-submit'));
+
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledTimes(1);
+
+      resolveBackground();
+      await waitFor(() => expect(screen.getByTestId('checkout-submit')).not.toBeDisabled());
     });
 
     it('sin "Gestión de Pedidos" el resumen se arma con el CARRITO y el número del CONFIG', async () => {

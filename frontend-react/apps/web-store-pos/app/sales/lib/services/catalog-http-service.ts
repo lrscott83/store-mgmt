@@ -710,13 +710,14 @@ export const catalogHttpService = {
    * el modo asíncrono elimina. El backend sigue validando el pedido; si lo rechaza, la tienda lo
    * recibe igual por WhatsApp.
    */
-  createPublicOrderInBackground(storeSlug: string, payload: CreatePublicOrderRequest): void {
-    void apiClient
+  createPublicOrderInBackground(storeSlug: string, payload: CreatePublicOrderRequest): Promise<void> {
+    return apiClient
       .post<BaseResponseModel<PublicOrderCreated>>(
         `/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`,
         payload,
         { skipLoading: true },
       )
+      .then(() => undefined)
       .catch(() => {
         // Best-effort: el pedido ya salió por WhatsApp. No hay UI que corregir.
       });

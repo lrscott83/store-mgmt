@@ -216,12 +216,16 @@ export function StorefrontCheckout({
         setSubmitting(false);
       }
     } else {
-      // Sin 20 no hay nada que esperar: el alta arranca en segundo plano y la guarda se suelta
-      // YA para que el botón no quede apagado. Un fallo del POST no se pinta: el pedido viaja
-      // igual por WhatsApp, que es el canal de entrega que el cliente ya conocía.
-      catalogHttpService.createPublicOrderInBackground(storeSlug, orderPayload);
-      submittingRef.current = false;
-      setSubmitting(false);
+      // Sin 20 no hay nada que esperar para el handoff, pero la guarda de doble envío se mantiene
+      // hasta que el POST en segundo plano termine: soltarla en el acto dejaba el botón habilitado
+      // mientras la petición seguía en vuelo, y un segundo toque (habitual en móvil) creaba un
+      // pedido duplicado. El handoff por WhatsApp ocurre igual, sin esperar la promesa.
+      void catalogHttpService
+        .createPublicOrderInBackground(storeSlug, orderPayload)
+        .finally(() => {
+          submittingRef.current = false;
+          setSubmitting(false);
+        });
     }
 
     // ── 2) EL AVISO ─────────────────────────────────────────────────────────────────────────

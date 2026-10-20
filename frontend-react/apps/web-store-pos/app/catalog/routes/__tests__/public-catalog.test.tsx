@@ -232,6 +232,7 @@ describe('PublicCatalogPage', () => {
     // La ruta es pública: sin sesión salvo que un test la ponga.
     session.current = null;
     useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
+    catalogMock.createPublicOrderInBackground.mockResolvedValue(undefined);
     catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
     catalogMock.getPublicProducts.mockResolvedValue(envelope(page([makeProduct()])));
     catalogMock.getPublicProduct.mockResolvedValue(envelope(makeProduct()));
