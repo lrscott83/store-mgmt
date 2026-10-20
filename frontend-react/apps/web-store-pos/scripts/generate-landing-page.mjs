@@ -229,15 +229,14 @@ function findAttributeValue(html, attribute, value) {
 async function main() {
   const here = dirname(fileURLToPath(import.meta.url));
   const root = resolve(here, '..');
-  const shellPath = resolve(root, 'build/client/index.html');
-  const outputPath = resolve(root, 'build/client/landing.html');
+  const landingPath = resolve(root, 'build/client/landing.html');
   const baseUrl = process.env.PUBLIC_BASE_URL || DEFAULT_BASE_URL;
 
-  const shell = await readFile(shellPath, 'utf8');
-  const html = injectLandingMeta(shell, { baseUrl });
+  const landing = await readFile(landingPath, 'utf8');
+  const html = injectLandingMeta(landing, { baseUrl });
 
-  await writeFile(outputPath, html, 'utf8');
-  console.log(`generate-landing-page: wrote ${outputPath} (canonical ${resolveBaseUrl(baseUrl)}/)`);
+  await writeFile(landingPath, html, 'utf8');
+  console.log(`generate-landing-page: wrote ${landingPath} (canonical ${resolveBaseUrl(baseUrl)}/)`);
 }
 
 const invokedDirectly =
