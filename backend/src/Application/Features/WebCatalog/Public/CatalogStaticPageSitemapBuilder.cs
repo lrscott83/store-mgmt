@@ -25,6 +25,9 @@ namespace Application.Features.WebCatalog.Public
             var xml = new StringBuilder();
             xml.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
             xml.Append("<urlset xmlns=\"").Append(UrlSetNamespace).Append("\">\n");
+            // La landing pública va primero: es la página que describe el producto y la que el owner
+            // quiere que los buscadores conozcan (auditoría SEO, 2026-10-20).
+            xml.Append("  <url><loc>").Append(EscapeXml(baseUrl + "/")).Append("</loc></url>\n");
             // Orden ordinal estable: el mismo conjunto de catálogos produce el mismo archivo.
             foreach (var slug in publishedSlugs.OrderBy(slug => slug, StringComparer.Ordinal))
             {
@@ -36,6 +39,18 @@ namespace Application.Features.WebCatalog.Public
             return xml.ToString();
         }
 
+        /// <summary>
+        /// Rutas de la app que no son contenido público: el POS vive detrás de login y ninguna de
+        /// ellas debe entrar al índice. La landing (`/`), los catálogos (`/catalog/&lt;slug&gt;`) y las
+        /// páginas legales quedan fuera de esta lista a propósito.
+        /// </summary>
+        private static readonly string[] PrivateRoutePrefixes =
+        {
+            "/admin", "/auth", "/diagnostics", "/expenses", "/health", "/help", "/inventory",
+            "/login", "/management", "/private-police", "/profile", "/register", "/reports",
+            "/sales", "/stats", "/sync",
+        };
+
         public static string BuildRobots(string publicBaseUrl)
         {
             if (string.IsNullOrWhiteSpace(publicBaseUrl))
@@ -43,11 +58,15 @@ namespace Application.Features.WebCatalog.Public
 
             var baseUrl = publicBaseUrl.TrimEnd('/');
 
+            var robots = new StringBuilder();
+            robots.Append("User-agent: *\n");
+            robots.Append("Allow: /\n");
+            foreach (var prefix in PrivateRoutePrefixes)
+                robots.Append("Disallow: ").Append(prefix).Append('\n');
+            robots.Append('\n');
             // robots.txt es texto plano, no XML: la URL del sitemap va tal cual (sin escapar).
-            return "User-agent: *\n" +
-                   "Allow: /\n" +
-                   "\n" +
-                   "Sitemap: " + baseUrl + SitemapUrlPath + "\n";
+            robots.Append("Sitemap: ").Append(baseUrl).Append(SitemapUrlPath).Append('\n');
+            return robots.ToString();
         }
 
         /// <summary>Escapa lo esencial del texto XML; los acentos se conservan (el archivo es UTF-8).</summary>
