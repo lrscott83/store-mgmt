@@ -24,8 +24,52 @@ export const LANDING_META = {
     'reportes. POS offline con catálogo web y pedidos por WhatsApp.',
   siteName: 'VendeDTo',
   locale: 'es_ES',
+  // Logo cuadradado para el grafo de schema.org (`logo`).
   imagePath: '/icons/icon-512x512.png',
+  // Imagen social dedicada: 1200x630, la relacion que esperan Open Graph/X/WhatsApp.
+  ogImagePath: '/og-image.png',
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: 'VendeDTo — Tu POS offline: ventas, inventario y caja sin Internet',
 };
+
+/**
+ * Grafo schema.org minimo y verificable: quien es el producto (`Organization`) y que es
+ * (`SoftwareApplication`). Sin `offers`: los precios viven en la API y el build no tiene acceso a
+ * ellos; publicarlos hardcodeados los dejaria desactualizados en silencio.
+ */
+export function buildLandingJsonLd({ baseUrl = DEFAULT_BASE_URL, meta = LANDING_META } = {}) {
+  const base = resolveBaseUrl(baseUrl);
+  const url = `${base}/`;
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${base}/#organization`,
+        name: meta.siteName,
+        url,
+        logo: `${base}${meta.imagePath}`,
+      },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${base}/#software`,
+        name: meta.siteName,
+        description: meta.description,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        inLanguage: 'es',
+        url,
+        publisher: {
+          '@type': 'Organization',
+          '@id': `${base}/#organization`,
+          name: meta.siteName,
+        },
+      },
+    ],
+  };
+}
 
 /**
  * Normalizes the public site base URL and rejects values that would produce an
@@ -69,6 +113,12 @@ export function injectLandingMeta(
 
   head = removeElement(head, '<title', '</title>');
   head = removeMetaByName(head, 'description');
+  head = removeElement(head, '<script type="application/ld+json"', '</script>');
+
+  const jsonLd = JSON.stringify(buildLandingJsonLd({ baseUrl: base, meta })).replace(
+    /</g,
+    '\\u003c',
+  );
 
   const tags = [
     `<title>${escapeHtml(meta.title, false)}</title>`,
@@ -78,12 +128,23 @@ export function injectLandingMeta(
     `<meta property="og:title" content="${escapeHtml(meta.title, true)}" />`,
     `<meta property="og:description" content="${escapeHtml(meta.description, true)}" />`,
     `<meta property="og:url" content="${escapeHtml(canonicalUrl, true)}" />`,
-    meta.imagePath
-      ? `<meta property="og:image" content="${escapeHtml(`${base}${meta.imagePath}`, true)}" />`
+    meta.ogImagePath
+      ? `<meta property="og:image" content="${escapeHtml(`${base}${meta.ogImagePath}`, true)}" />`
+      : '',
+    meta.ogImageWidth ? `<meta property="og:image:width" content="${meta.ogImageWidth}" />` : '',
+    meta.ogImageHeight ? `<meta property="og:image:height" content="${meta.ogImageHeight}" />` : '',
+    meta.ogImageAlt
+      ? `<meta property="og:image:alt" content="${escapeHtml(meta.ogImageAlt, true)}" />`
       : '',
     `<meta property="og:site_name" content="${escapeHtml(meta.siteName, true)}" />`,
     `<meta property="og:locale" content="${escapeHtml(meta.locale, true)}" />`,
-    '<meta name="twitter:card" content="summary" />',
+    '<meta name="twitter:card" content="summary_large_image" />',
+    `<meta name="twitter:title" content="${escapeHtml(meta.title, true)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(meta.description, true)}" />`,
+    meta.ogImagePath
+      ? `<meta name="twitter:image" content="${escapeHtml(`${base}${meta.ogImagePath}`, true)}" />`
+      : '',
+    `<script type="application/ld+json">${jsonLd}</script>`,
   ]
     .filter(Boolean)
     .join('');
