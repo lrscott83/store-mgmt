@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -216,6 +217,57 @@ describe('useStoreUsageTracker — USAGE-HOOK-5: flushes pending days on readine
 
 // ── USAGE-HOOK-3 (Slice 5 — Fase 1 auth cluster, port of Angular
 // `cleanOldData(30)` unconditional mount-time call) ─────────────────────────
+
+// ── Catalog usage exclusion (2026-10-20): the public catalog is a customer-facing
+// route, not POS activity. A logged-in owner/staff (or a shared device with a live
+// session) opening /catalog/<slug> must not stamp the store as "active" for the day.
+
+describe('useStoreUsageTracker — catalog visits are not POS usage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isTrackingReadyMock.mockReturnValue(true);
+  });
+
+  function catalogWrapper(initialPath: string) {
+    return ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={[initialPath]}>{children}</MemoryRouter>
+    );
+  }
+
+  it('does not stamp POS usage on the public catalog route (navigation)', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog/mi-tienda') });
+
+    expect(registerStoreActivityMock).not.toHaveBeenCalled();
+  });
+
+  it('does not stamp POS usage on pointer/keyboard activity inside the catalog', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog/mi-tienda') });
+    registerStoreActivityMock.mockClear();
+
+    window.dispatchEvent(new Event('pointerdown'));
+    window.dispatchEvent(new Event('keydown'));
+
+    expect(registerStoreActivityMock).not.toHaveBeenCalled();
+  });
+
+  it('still stamps POS usage outside the catalog', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/sales/new') });
+
+    expect(registerStoreActivityMock).toHaveBeenCalledWith('user-1', 'store-1');
+  });
+});
 
 describe('useStoreUsageTracker — USAGE-HOOK-3: invokes cleanOldStoreUsage once on mount', () => {
   beforeEach(() => {
