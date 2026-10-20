@@ -25,9 +25,9 @@ const PHONE_MIN_DIGITS = 7;
  * BLOQUEADO.
  *
  * `code === null` es un ESTADO DISTINTO y no un dato que falte: es el modo sin "Gestión de
- * Pedidos" (20), donde el alta se persiste en SEGUNDO PLANO y no hay respuesta con código que
- * dictar. El pedido SÍ queda guardado; el aviso no puede decir "pedido {code} guardado" porque no
- * recibió el código, y se limita a confirmar el handoff.
+ * Pedidos" (20), donde el alta se persiste en SEGUNDO PLANO (best-effort) y no hay respuesta con
+ * código que dictar. El aviso no puede decir "pedido {code} guardado" porque no recibió el código,
+ * y se limita a confirmar el handoff.
  */
 interface WhatsAppSend {
   /** Código del pedido PERSISTIDO en el flujo síncrono. null en el alta en segundo plano. */

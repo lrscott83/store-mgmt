@@ -644,7 +644,7 @@
     <value>Store {0} does not have online orders enabled</value>
   </data>
   <data name="OnlineOrdersModuleNotEnabled" xml:space="preserve">
-    <value>Store {0} does not have the Order Management module enabled</value>
+    <value>Store {0} does not have the WhatsApp Orders module enabled</value>
   </data>
   <data name="OnlineOrderProductNotAvailable" xml:space="preserve">
     <value>Product {0} is no longer available in the catalog</value>
