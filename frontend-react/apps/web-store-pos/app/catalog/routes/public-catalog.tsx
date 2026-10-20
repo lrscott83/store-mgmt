@@ -12,7 +12,7 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
 import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
-import { trackCatalogEvent } from '~/catalog/lib/catalog-telemetry';
+import { trackCatalogEvent, type CatalogTelemetryEvent } from '~/catalog/lib/catalog-telemetry';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import { isCatalogStoreStaff } from '~/catalog/lib/catalog-staff';
 import { resolveTemplate } from '~/catalog/templates/registry';
@@ -122,6 +122,16 @@ export function PublicCatalogPage() {
    */
   const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
 
+  // Una sola regla para las cuatro llamadas: el staff de esta tienda no genera visitas de
+  // cliente. Centralizarla evita que un cambio futuro se aplique a tres call-sites y se olvide
+  // en el cuarto.
+  const trackCustomerEvent = useCallback(
+    (event: CatalogTelemetryEvent) => {
+      if (!staffMode) trackCatalogEvent(storeSlug, event);
+    },
+    [staffMode, storeSlug],
+  );
+
   /**
    * La visita se registra UNA vez por carga del catálogo, cuando la carta ya se pintó. El staff
    * de la tienda queda fuera: ver su propia carta no es una visita de cliente. El ref evita que
@@ -131,8 +141,8 @@ export function PublicCatalogPage() {
   useEffect(() => {
     if (state !== 'ready' || staffMode || pageViewSentFor.current === storeSlug) return;
     pageViewSentFor.current = storeSlug;
-    trackCatalogEvent(storeSlug, { name: 'page_view' });
-  }, [state, storeSlug, staffMode]);
+    trackCustomerEvent({ name: 'page_view' });
+  }, [state, storeSlug, staffMode, trackCustomerEvent]);
 
   function addProductToCart(product: PublicCatalogProduct) {
     addToCart(storeSlug, {
@@ -142,9 +152,7 @@ export function PublicCatalogPage() {
       unitPrice: product.finalPrice,
       imageUrl: product.imageUrl,
     });
-    if (!staffMode) {
-      trackCatalogEvent(storeSlug, { name: 'add_to_cart', productId: product.id });
-    }
+    trackCustomerEvent({ name: 'add_to_cart', productId: product.id });
     // El aviso va al TOAST global, no a un `<p>` en la cabecera (decisión del owner,
     // 2026-10-08): el botón de la tarjeta ya es solo un ícono, así que el texto pegado a la
     // cabecera era la única confirmación y competía con el propio botón del carrito.
@@ -226,9 +234,7 @@ export function PublicCatalogPage() {
     setActiveImage(product.imageUrl);
     setZoomed(false);
     setDetailOpen(true);
-    if (!staffMode) {
-      trackCatalogEvent(storeSlug, { name: 'product_view', productId: product.id });
-    }
+    trackCustomerEvent({ name: 'product_view', productId: product.id });
     try {
       const result = await catalogHttpService.getPublicProduct(storeSlug, product.id);
       if (result.succeeded) {
@@ -436,9 +442,7 @@ export function PublicCatalogPage() {
         onRemove={(productId) => removeFromCart(storeSlug, productId)}
         onClear={() => clearCart(storeSlug)}
         onCheckout={() => {
-          if (!staffMode) {
-            trackCatalogEvent(storeSlug, { name: 'checkout_open' });
-          }
+          trackCustomerEvent({ name: 'checkout_open' });
           setCartOpen(false);
           setCheckoutOpen(true);
         }}

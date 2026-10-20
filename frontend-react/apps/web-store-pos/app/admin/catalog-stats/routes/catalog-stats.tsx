@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Store } from '@store-mgmt/domain';
 import { superAdminLoader } from '~/auth/routes/loaders';
@@ -26,19 +26,26 @@ const SOURCE_LABEL_IDS: Record<CatalogSourceKind, string> = {
   [CatalogSourceKind.Campaign]: 'ADMIN_CATALOG_STATS.SOURCE_CAMPAIGN',
 };
 
-function formatDay(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('es-ES');
+function formatDay(value: string, locale: string): string {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 export function AdminCatalogStatsPage() {
-  const { formatMessage } = useIntl();
+  const { formatMessage, locale } = useIntl();
   const [stores, setStores] = useState<Store[]>([]);
   const [storeId, setStoreId] = useState('');
   const [days, setDays] = useState<number>(30);
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const requestId = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -46,9 +53,12 @@ export function AdminCatalogStatsPage() {
       .listStores()
       .then((result) => {
         if (!active) return;
-        const list = result.succeeded ? result.data : [];
-        setStores(list);
-        if (list.length > 0) setStoreId((current) => current || list[0].id);
+        if (!result.succeeded) {
+          setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
+          return;
+        }
+        setStores(result.data);
+        if (result.data.length > 0) setStoreId((current) => current || result.data[0].id);
       })
       .catch(() => {
         if (active) setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
@@ -60,10 +70,12 @@ export function AdminCatalogStatsPage() {
 
   const loadStats = useCallback(
     async (selectedStoreId: string, range: number) => {
+      const currentRequest = ++requestId.current;
       setLoading(true);
       setError(undefined);
       try {
         const result = await catalogStatsHttpService.getStats(selectedStoreId, range);
+        if (currentRequest !== requestId.current) return;
         if (result.succeeded) {
           setStats(result.data);
         } else {
@@ -71,10 +83,11 @@ export function AdminCatalogStatsPage() {
           setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
         }
       } catch (err) {
+        if (currentRequest !== requestId.current) return;
         setStats(null);
         setError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
       } finally {
-        setLoading(false);
+        if (currentRequest === requestId.current) setLoading(false);
       }
     },
     [formatMessage],
@@ -136,6 +149,11 @@ export function AdminCatalogStatsPage() {
       </Card>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {!loading && !error && stores.length === 0 && (
+        <p className="text-sm text-text-muted">
+          {formatMessage({ id: 'ADMIN_CATALOG_STATS.NO_STORES' })}
+        </p>
+      )}
       {loading && <Spinner label={formatMessage({ id: 'GENERAL.LOADING' })} />}
 
       {!loading && !error && stats && (
@@ -217,14 +235,14 @@ export function AdminCatalogStatsPage() {
                   key={day.day}
                   className="min-w-1 flex-1 rounded-t bg-cyan-500"
                   style={{ height: `${Math.max(2, (day.visits / maxDailyVisits) * 100)}%` }}
-                  title={`${formatDay(day.day)}: ${day.visits}`}
+                  title={`${formatDay(day.day, locale)}: ${day.visits}`}
                 />
               ))}
             </div>
             {stats.daily.length > 0 && (
               <div className="mt-2 flex justify-between text-xs text-text-muted">
-                <span>{formatDay(stats.daily[0].day)}</span>
-                <span>{formatDay(stats.daily[stats.daily.length - 1].day)}</span>
+                <span>{formatDay(stats.daily[0].day, locale)}</span>
+                <span>{formatDay(stats.daily[stats.daily.length - 1].day, locale)}</span>
               </div>
             )}
           </Card>

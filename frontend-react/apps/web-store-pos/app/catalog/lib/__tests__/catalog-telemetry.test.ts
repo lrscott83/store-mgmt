@@ -3,12 +3,12 @@ import { trackCatalogEvent } from '../catalog-telemetry';
 
 const fetchMock = vi.fn();
 
-function lastBody(): Record<string, unknown> {
+function firstBody(): Record<string, unknown> {
   const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
   return JSON.parse(String(init.body)) as Record<string, unknown>;
 }
 
-function lastUrl(): string {
+function firstUrl(): string {
   return fetchMock.mock.calls[0][0] as string;
 }
 
@@ -27,6 +27,7 @@ describe('trackCatalogEvent — telemetría anónima del catálogo', () => {
       value: 'https://wa.me/5355555555',
     });
     Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: undefined });
+    Object.defineProperty(window, 'doNotTrack', { configurable: true, value: undefined });
   });
 
   afterEach(() => {
@@ -38,8 +39,8 @@ describe('trackCatalogEvent — telemetría anónima del catálogo', () => {
     trackCatalogEvent('mi-tienda', { name: 'page_view' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(lastUrl()).toContain('/v1/public/catalog/mi-tienda/events');
-    const body = lastBody();
+    expect(firstUrl()).toContain('/v1/public/catalog/mi-tienda/events');
+    const body = firstBody();
     expect(body.events).toEqual([
       expect.objectContaining({
         name: 'page_view',
@@ -57,7 +58,7 @@ describe('trackCatalogEvent — telemetría anónima del catálogo', () => {
   it('incluye productId en los eventos de producto', () => {
     trackCatalogEvent('mi-tienda', { name: 'product_view', productId: 'p1' });
 
-    expect(lastBody().events).toEqual([
+    expect(firstBody().events).toEqual([
       expect.objectContaining({ name: 'product_view', productId: 'p1' }),
     ]);
   });
@@ -70,10 +71,28 @@ describe('trackCatalogEvent — telemetría anónima del catálogo', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('un fallo de red no lanza ni rompe el catálogo', async () => {
+  it('también respeta el DNT legacy ("yes") y window.doNotTrack', () => {
+    Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: 'yes' });
+
+    trackCatalogEvent('mi-tienda', { name: 'page_view' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: undefined });
+    Object.defineProperty(window, 'doNotTrack', { configurable: true, value: '1' });
+    trackCatalogEvent('mi-tienda', { name: 'page_view' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('un fallo de red no lanza, deja señal y no rompe el catálogo', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     fetchMock.mockRejectedValue(new Error('offline'));
 
     expect(() => trackCatalogEvent('mi-tienda', { name: 'page_view' })).not.toThrow();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

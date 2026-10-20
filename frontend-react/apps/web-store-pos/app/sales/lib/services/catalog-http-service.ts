@@ -1,6 +1,8 @@
 import type { BaseResponseModel } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
+const API_URL = (import.meta.env['API_URL'] as string | undefined) ?? '';
+
 /**
  * Estado del catálogo de la tienda seleccionada (cabecera de la vista Catálogo Web).
  * Espejo de `Application/Dtos/WebCatalog/CatalogDtos.cs` (CatalogStatusDto).
@@ -711,16 +713,23 @@ export const catalogHttpService = {
    * recibe igual por WhatsApp.
    */
   createPublicOrderInBackground(storeSlug: string, payload: CreatePublicOrderRequest): Promise<void> {
-    return apiClient
-      .post<BaseResponseModel<PublicOrderCreated>>(
-        `/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`,
-        payload,
-        { skipLoading: true },
-      )
-      .then(() => undefined)
-      .catch(() => {
-        // Best-effort: el pedido ya salió por WhatsApp. No hay UI que corregir.
-      });
+    try {
+      return fetch(`${API_URL}/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      })
+        .then(() => undefined)
+        .catch((err: unknown) => {
+          // Best-effort: el pedido ya salió por WhatsApp. Dejamos señal para diagnosticar una
+          // caída del endpoint sin bloquear ni asustar al cliente.
+          console.warn('[catalog-http-service] no se pudo persistir el pedido en segundo plano', err);
+        });
+    } catch (err) {
+      console.warn('[catalog-http-service] no se pudo iniciar el pedido en segundo plano', err);
+      return Promise.resolve();
+    }
   },
 
   /**

@@ -90,6 +90,9 @@ export function useStoreUsageTracker(): void {
   // Readiness flush: push pending days the moment a valid context exists
   // (covers reload / version-update re-arm), not only on navigation.
   // `flushUsage` no-ops on an empty buffer and respects the `sending` mutex.
+  // Deliberately NOT gated on `onPublicCatalog`: flushing does not stamp a new
+  // day — it only sends days the POS already recorded — so it cannot turn a
+  // catalog visit into usage.
   useEffect(() => {
     if (!userId || !selectedStoreId) return;
     if (!isTrackingReady()) return;

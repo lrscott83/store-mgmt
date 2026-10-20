@@ -244,4 +244,29 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
     expect(body.has('removeBanner')).toBe(false);
     expect(body.has('mobileColumns')).toBe(false);
   });
+
+  it('HTTP-14: el alta en segundo plano usa fetch keepalive y no propaga el fallo', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
+    vi.stubGlobal('fetch', fetchMock);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { catalogHttpService, PublicOrderDeliveryType } = await import('../catalog-http-service');
+    await expect(
+      catalogHttpService.createPublicOrderInBackground('mi-tienda', {
+        customerName: 'Ana',
+        customerPhone: '5351234567',
+        deliveryType: PublicOrderDeliveryType.Pickup,
+        items: [],
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/public/ordering/mi-tienda/orders'),
+      expect.objectContaining({ method: 'POST', keepalive: true }),
+    );
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
 });

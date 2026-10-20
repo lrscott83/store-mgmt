@@ -135,14 +135,14 @@ export function StorefrontCheckout({
    * se persiste en SEGUNDO PLANO: el pedido y el handoff por WhatsApp salen en el mismo gesto y el
    * cliente no espera a la base. Las vistas de gestión siguen ocultas hasta que se active el 20.
    */
-  const managesOrders = config.gestionPedidosEnabled;
+  const createsOrderSynchronously = config.gestionPedidosEnabled;
 
   /**
-   * ¿Sale el resumen por WhatsApp? Con gestión, para el cliente anónimo siempre y para el STAFF
-   * solo cuando el pedido NO se persistió. SIN gestión, siempre: no hay panel donde verlo y el
-   * chat es la única constancia inmediata, también para staff.
+   * ¿Sale el resumen por WhatsApp? Con gestión, el cliente anónimo siempre y el STAFF no: su
+   * pedido queda en el panel y mandarlo también al chat lo duplicaría. SIN gestión, siempre
+   * (también para staff): no hay panel donde verlo y el chat es la única constancia inmediata.
    */
-  const sendsByWhatsapp = managesOrders ? !staffMode : true;
+  const sendsByWhatsapp = createsOrderSynchronously ? !staffMode : true;
 
   // Un aviso del pedido ANTERIOR no puede quedar flotando mientras se hace el siguiente: abrir
   // el checkout es empezar un pedido nuevo.
@@ -198,7 +198,7 @@ export function StorefrontCheckout({
     // código y abrir la consulta del pedido. SIN el 20 se persiste en SEGUNDO PLANO y se sigue
     // de inmediato al handoff por WhatsApp: el cliente no espera a que la base confirme.
     let created: PublicOrderCreated | null = null;
-    if (managesOrders) {
+    if (createsOrderSynchronously) {
       try {
         const result = await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
 
@@ -396,7 +396,7 @@ export function StorefrontCheckout({
                   registra y se puede consultar. El modo staff se queda con sus dos etiquetas solo
                   cuando hay pedido que registrar y gestionar de verdad. */}
               {intl.formatMessage({
-                id: !managesOrders
+                id: !createsOrderSynchronously
                   ? submitting
                     ? 'CHECKOUT.SUBMITTING_WHATSAPP'
                     : 'CHECKOUT.SUBMIT_WHATSAPP'

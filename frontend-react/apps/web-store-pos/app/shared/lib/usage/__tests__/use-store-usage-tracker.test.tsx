@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useNavigate } from 'react-router';
 import type { UserModel } from '@store-mgmt/domain';
 
 // ── USAGE-HOOK-1/2 (Stage 6 Slice C — navigation-triggered tracker) ─────────
@@ -228,6 +228,11 @@ describe('useStoreUsageTracker — catalog visits are not POS usage', () => {
     isTrackingReadyMock.mockReturnValue(true);
   });
 
+  afterEach(async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+  });
+
   function catalogWrapper(initialPath: string) {
     return ({ children }: { children: ReactNode }) => (
       <MemoryRouter initialEntries={[initialPath]}>{children}</MemoryRouter>
@@ -242,6 +247,51 @@ describe('useStoreUsageTracker — catalog visits are not POS usage', () => {
     renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog/mi-tienda') });
 
     expect(registerStoreActivityMock).not.toHaveBeenCalled();
+  });
+
+  it('does not stamp POS usage on the bare /catalog or a trailing slash', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog') });
+    expect(registerStoreActivityMock).not.toHaveBeenCalled();
+
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog/') });
+    expect(registerStoreActivityMock).not.toHaveBeenCalled();
+  });
+
+  it('still stamps a POS route that only shares the /catalog prefix', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+
+    renderHook(() => useStoreUsageTracker(), { wrapper: catalogWrapper('/catalog-admin') });
+
+    expect(registerStoreActivityMock).toHaveBeenCalledWith('user-1', 'store-1');
+  });
+
+  it('re-attaches POS activity after navigating away from the catalog', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+
+    function Harness() {
+      useStoreUsageTracker();
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/sales/new')}>go</button>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/catalog/mi-tienda']}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    registerStoreActivityMock.mockClear();
+
+    fireEvent.click(screen.getByText('go'));
+
+    expect(registerStoreActivityMock).toHaveBeenCalledWith('user-1', 'store-1');
   });
 
   it('does not stamp POS usage on pointer/keyboard activity inside the catalog', async () => {

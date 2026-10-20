@@ -1820,6 +1820,7 @@ const messages: Record<string, string> = {
   'ADMIN_CATALOG_STATS.TOP_PRODUCTS': 'Productos más vistos',
   'ADMIN_CATALOG_STATS.NO_PRODUCTS': 'Todavía no hay productos vistos.',
   'ADMIN_CATALOG_STATS.DAILY': 'Visitas por día',
+  'ADMIN_CATALOG_STATS.NO_STORES': 'No hay tiendas para mostrar.',
   'ADMIN_CATALOG_STATS.ERROR': 'No se pudieron cargar las estadísticas.',
   'ADMIN_CATALOG_STATS.SOURCE_DIRECT': 'Directo',
   'ADMIN_CATALOG_STATS.SOURCE_WHATSAPP': 'WhatsApp',

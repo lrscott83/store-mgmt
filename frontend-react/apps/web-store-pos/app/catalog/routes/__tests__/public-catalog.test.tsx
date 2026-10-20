@@ -370,6 +370,13 @@ describe('PublicCatalogPage', () => {
     await waitFor(() =>
       expect(trackCatalogEventMock).toHaveBeenCalledWith('mi-tienda', { name: 'page_view' }),
     );
+    // La visita se emite UNA vez por carga, aunque el config o un re-render vuelvan a pasar por
+    // el efecto: el ref de deduplicación tiene que sostenerlo.
+    expect(
+      trackCatalogEventMock.mock.calls.filter(
+        ([, event]) => (event as { name?: string }).name === 'page_view',
+      ),
+    ).toHaveLength(1);
 
     fireEvent.click(screen.getByTestId('catalog-card-cp1'));
     await screen.findByTestId('catalog-detail-modal');
@@ -1536,6 +1543,19 @@ describe('PublicCatalogPage', () => {
       });
       fireEvent.click(within(checkout).getByTestId('checkout-submit'));
     }
+
+    it('el staff de la tienda no genera page_view', async () => {
+      session.current = makeUser({ isOwnerAdmin: true, selectedStoreId: 's1' });
+      renderPage();
+
+      await screen.findByTestId('catalog-card-cp1');
+
+      expect(
+        trackCatalogEventMock.mock.calls.filter(
+          ([, event]) => (event as { name?: string }).name === 'page_view',
+        ),
+      ).toHaveLength(0);
+    });
 
     it('el owner de la tienda registra el pedido: sin wa.me, sin aviso, con el código a la vista', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);

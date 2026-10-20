@@ -37,7 +37,6 @@ function utmFromLocation(): Pick<
   TelemetryPayloadEvent,
   'utmSource' | 'utmMedium' | 'utmCampaign'
 > {
-  if (typeof window === 'undefined') return {};
   const params = new URLSearchParams(window.location.search);
   return {
     utmSource: params.get('utm_source') ?? undefined,
@@ -52,7 +51,12 @@ function utmFromLocation(): Pick<
  */
 export function trackCatalogEvent(storeSlug: string, event: CatalogTelemetryEvent): void {
   if (typeof window === 'undefined') return;
-  if (navigator.doNotTrack === '1') return;
+
+  // `navigator.doNotTrack` es '1' en navegadores modernos y 'yes' en algunos legacy; también
+  // existe `window.doNotTrack`. Si cualquiera pide no ser rastreado, no se manda nada.
+  const legacyWindow = window as typeof window & { doNotTrack?: string | null };
+  const doNotTrack = navigator.doNotTrack ?? legacyWindow.doNotTrack;
+  if (doNotTrack === '1' || doNotTrack === 'yes') return;
 
   const payload: TelemetryPayloadEvent = {
     name: event.name,
@@ -68,10 +72,13 @@ export function trackCatalogEvent(storeSlug: string, event: CatalogTelemetryEven
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ events: [payload] }),
       keepalive: true,
-    }).catch(() => {
-      // Best-effort: no hay UI que corregir ni reintento que valga la pena.
+    }).catch((err: unknown) => {
+      // Best-effort: no hay UI que corregir ni reintento que valga la pena, pero una caída del
+      // endpoint no puede ser invisible.
+      console.warn('[catalog-telemetry] evento descartado', event.name, err);
     });
-  } catch {
+  } catch (err) {
     // `fetch` ausente o una URL inválida: el catálogo sigue funcionando.
+    console.warn('[catalog-telemetry] no se pudo enviar el evento', event.name, err);
   }
 }
