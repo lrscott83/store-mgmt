@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Comprueba que el HTML servido publica el canonical del host real, no el de playground.
 //
 // El valor sale de `PUBLIC_BASE_URL` (build arg del frontend y `CatalogStaticPage__PublicBaseUrl`
