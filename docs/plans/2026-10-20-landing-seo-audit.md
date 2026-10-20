@@ -223,6 +223,14 @@ No son del cambio ni del producto. Evidencia recogida en tres corridas completas
 `testTimeout`/`hookTimeout` en `vitest.config.ts` (hoy 5 s por defecto) es la palanca, pero alarga la
 detección de un cuelgue real; es una decisión de infraestructura, no de este cambio.
 
+**Decisión (owner, 2026-10-20):** subirlos. `testTimeout` y `hookTimeout` pasan a **15 s** en
+`vitest.config.ts`, con el motivo escrito al lado. Un cuelgue real sigue fallando, solo que más tarde;
+los `waitFor` individuales conservan su timeout propio.
+
+- Prueba de que la config muerde: test temporal con un cuerpo de 6 s → falla con el default
+  (`Test timed out in 5000ms`) y pasa con la config nueva (6,02 s). El archivo temporal se eliminó.
+- Suite completa después del cambio: **394 archivos, 5697 passed, 6 skipped**, 335 s.
+
 ---
 
 ## 5. Pendiente (no incluido aquí)
