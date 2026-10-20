@@ -57,10 +57,11 @@ namespace SMCA.WebApi.Controllers.v1
             [FromQuery] DateTime? to,
             [FromQuery] string? search,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20)
+            [FromQuery] int pageSize = 20,
+            [FromQuery] bool exactRange = false)
         {
             return Ok(await Sender.Send(new GetOnlineOrdersQuery(
-                status, paymentStatus, deliveryType, driverId, from, to, search, page, pageSize)));
+                status, paymentStatus, deliveryType, driverId, from, to, search, page, pageSize, exactRange)));
         }
 
         /// <summary>
@@ -121,7 +122,8 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateStatusAsync(Guid id, [FromBody] UpdateOrderStatusCommand request)
         {
-            return Ok(await Sender.Send(new UpdateOrderStatusCommand(id, request.Status)));
+            return Ok(await Sender.Send(new UpdateOrderStatusCommand(
+                id, request.Status, request.DriverId, request.CancellationReason)));
         }
 
         /// <summary>

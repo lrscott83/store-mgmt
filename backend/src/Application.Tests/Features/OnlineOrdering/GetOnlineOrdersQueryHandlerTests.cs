@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
@@ -125,7 +125,7 @@ public class GetOnlineOrdersQueryHandlerTests
         order.DeliveryType = OrderDeliveryType.Delivery;
         order.Total = 1500m;
         order.Currency = Currency.USD;
-        order.Status = OrderStatus.Preparing;
+        order.Status = OrderStatus.Preparado;
         order.PaymentStatus = OrderPaymentStatus.Paid;
         order.DriverId = driver.Id;
         order.Driver = driver;
@@ -142,7 +142,7 @@ public class GetOnlineOrdersQueryHandlerTests
         item.DeliveryType.Should().Be(OrderDeliveryType.Delivery);
         item.Total.Should().Be(1500m);
         item.Currency.Should().Be(Currency.USD);
-        item.Status.Should().Be(OrderStatus.Preparing);
+        item.Status.Should().Be(OrderStatus.Preparado);
         item.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
         item.DriverId.Should().Be(driver.Id);
         item.DriverName.Should().Be("Ana");
@@ -222,7 +222,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
     /// <summary>
     /// Sin filtros, el filtro que sale hacia la base tiene TODO a null: el handler no rellena con
-    /// valores neutros (`OrderStatus.New` sería un filtro de verdad que escondería los pedidos ya
+    /// valores neutros (`OrderStatus.Creado` sería un filtro de verdad que escondería los pedidos ya
     /// aceptados) ni manda un objeto "vacío" que el repositorio tendría que interpretar.
     ///
     /// Se comparan con `== null` y no con `is null` porque `It.Is` recibe un árbol de expresión, y
@@ -250,11 +250,11 @@ public class GetOnlineOrdersQueryHandlerTests
     [Fact]
     public async Task Handle_WithAStatus_ShouldFilterByIt()
     {
-        await Handler().Handle(new GetOnlineOrdersQuery(Status: OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new GetOnlineOrdersQuery(Status: OrderStatus.Preparado), CancellationToken.None);
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.Status == OrderStatus.Accepted), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.Status == OrderStatus.Preparado), It.IsAny<int>(), It.IsAny<int>()),
             Times.Once);
     }
 
@@ -311,6 +311,24 @@ public class GetOnlineOrdersQueryHandlerTests
     }
 
     /// <summary>
+    /// Con `ExactRange`, los dos extremos son INSTANTES y se reenvían intactos: el navegador ya
+    /// convirtió su día local (el del teléfono) a los dos instantes UTC que lo delimitan, y
+    /// truncarlos a fecha movería la ventana al día UTC de la tienda.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithExactRange_ShouldForwardBothInstantsUntouched()
+    {
+        DateTime from = new(2026, 10, 20, 4, 0, 0, DateTimeKind.Utc);
+        DateTime to = new(2026, 10, 21, 3, 59, 59, DateTimeKind.Utc);
+
+        OrderListFilter filter = await CaptureFilter(
+            new GetOnlineOrdersQuery(From: from, To: to, ExactRange: true));
+
+        filter.From.Should().Be(from);
+        filter.To.Should().Be(to);
+    }
+
+    /// <summary>
     /// La búsqueda llega con los bordes que puso el usuario ("  A-1  ") y se pasa limpia. No
     /// "recortada" en el handler y "recortada" en el repositorio: si el recorte viviera solo en la
     /// base, el filtro que se registra y se compara en un test sería distinto del que se ejecuta.
@@ -357,7 +375,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         await Handler().Handle(
             new GetOnlineOrdersQuery(
-                Status: OrderStatus.Ready,
+                Status: OrderStatus.Preparado,
                 PaymentStatus: OrderPaymentStatus.Pending,
                 DeliveryType: OrderDeliveryType.Delivery,
                 DriverId: driverId,
@@ -369,7 +387,7 @@ public class GetOnlineOrdersQueryHandlerTests
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
                 _storeId,
-                It.Is<OrderListFilter>(f => f.Status == OrderStatus.Ready
+                It.Is<OrderListFilter>(f => f.Status == OrderStatus.Preparado
                     && f.PaymentStatus == OrderPaymentStatus.Pending
                     && f.DeliveryType == OrderDeliveryType.Delivery
                     && f.DriverId == driverId

@@ -156,7 +156,7 @@ namespace Infrastructure.Persistence.Repositories
         /// acote. Por eso el desglose se pide con <c>GroupBy</c> y no con un <c>.Count()</c> en
         /// memoria sobre la lista.
         ///
-        /// <para><b>LA REGLA DE F6</b>: los pedidos <see cref="OrderStatus.Cancelled"/> NO suman
+        /// <para><b>LA REGLA DE F6</b>: los pedidos <see cref="OrderStatus.Cancelado"/> NO suman
         /// <c>TotalSales</c>, y tampoco cuentan ni suman en los pares de pago. Un pedido cancelado
         /// no es venta y no es deuda: si sumara, el panel publicaría una venta que el dueño deshizo
         /// y le pediría cobrar un pedido que ya no existe.
@@ -214,15 +214,15 @@ namespace Infrastructure.Persistence.Repositories
                 .Select(g => new
                 {
                     OrdersCount = g.Count(),
-                    NonCancelledCount = g.Count(o => o.Status != OrderStatus.Cancelled),
-                    TotalSales = g.Sum(o => o.Status != OrderStatus.Cancelled ? o.Total : 0m),
-                    PaidCount = g.Count(o => o.Status != OrderStatus.Cancelled
+                    NonCancelledCount = g.Count(o => o.Status != OrderStatus.Cancelado),
+                    TotalSales = g.Sum(o => o.Status != OrderStatus.Cancelado ? o.Total : 0m),
+                    PaidCount = g.Count(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Paid),
-                    PaidAmount = g.Sum(o => o.Status != OrderStatus.Cancelled
+                    PaidAmount = g.Sum(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Paid ? o.Total : 0m),
-                    PendingCount = g.Count(o => o.Status != OrderStatus.Cancelled
+                    PendingCount = g.Count(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Pending),
-                    PendingAmount = g.Sum(o => o.Status != OrderStatus.Cancelled
+                    PendingAmount = g.Sum(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Pending ? o.Total : 0m),
                 })
                 .FirstOrDefaultAsync();
@@ -240,7 +240,7 @@ namespace Infrastructure.Persistence.Repositories
             // aquí no hay `GROUP BY` implicado y la traducción es la simple, que es la que se
             // puede leer y verificar.
             Currency? currency = await query
-                .Where(o => o.Status != OrderStatus.Cancelled)
+                .Where(o => o.Status != OrderStatus.Cancelado)
                 .OrderByDescending(o => o.Date)
                 .ThenByDescending(o => o.Id)
                 .Select(o => (Currency?)o.Currency)

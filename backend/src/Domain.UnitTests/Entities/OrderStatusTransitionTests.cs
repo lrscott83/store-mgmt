@@ -5,138 +5,297 @@ using FluentAssertions;
 namespace Domain.UnitTests.Entities
 {
     /// <summary>
-    /// Tabla de transiciones de estado del pedido online (pedidos-whatsapp-persistencia F2, T8,
-    /// decisiones D11/D18):
+    /// Máquina de estados del pedido online. Secuencia estricta, sin saltos:
     ///
-    ///   New       -> Accepted, Cancelled
-    ///   Accepted  -> Preparing, Cancelled
-    ///   Preparing -> Ready, Cancelled
-    ///   Ready     -> Delivered, Cancelled
-    ///   Delivered -> (terminal)
-    ///   Cancelled -> (terminal)
+    ///   Delivery: Creado -> Preparado -> Transportando -> Entregado
+    ///   Pickup:   Creado -> Preparado -> Entregado
+    ///   (ambos)  : cualquier estado no terminal -> Cancelado
     ///
-    /// NO existe "En camino" (D18) y un estado terminal no se mueve. Estos tests fijan las DOS
-    /// mitades de la tabla: lo que se acepta y lo que se rechaza, para que nadie pueda abrir un
-    /// hueco por descuido (saltarse Preparing, resucitar un pedido cancelado, ...).
+    /// `Entregado` y `Cancelado` son terminales. Además de la tabla, la puerta hace cumplir tres
+    /// reglas que estos tests fijan: cancelar exige razón, pasar a reparto exige repartidor, y
+    /// entregar deja el pedido pagado.
     /// </summary>
     public class OrderStatusTransitionTests
     {
-        /// <summary>Tabla completa de la decisión D11, tal cual está escrita en el plan.</summary>
-        private static readonly (OrderStatus From, OrderStatus[] Allowed)[] TransitionTable =
+        private const string Reason = "El cliente no contesta";
+
+        /// <summary>
+        /// Tabla completa por tipo de entrega. `Transportando` sólo aparece con `Delivery`: en
+        /// recogida, `Preparado` pasa directo a `Entregado`.
+        /// </summary>
+        private static readonly (OrderDeliveryType DeliveryType, OrderStatus From, OrderStatus[] Allowed)[] TransitionTable =
         [
-            (OrderStatus.New, [OrderStatus.Accepted, OrderStatus.Cancelled]),
-            (OrderStatus.Accepted, [OrderStatus.Preparing, OrderStatus.Cancelled]),
-            (OrderStatus.Preparing, [OrderStatus.Ready, OrderStatus.Cancelled]),
-            (OrderStatus.Ready, [OrderStatus.Delivered, OrderStatus.Cancelled]),
-            (OrderStatus.Delivered, []),
-            (OrderStatus.Cancelled, []),
+            (OrderDeliveryType.Delivery, OrderStatus.Creado, [OrderStatus.Preparado, OrderStatus.Cancelado]),
+            (OrderDeliveryType.Delivery, OrderStatus.Preparado, [OrderStatus.Transportando, OrderStatus.Cancelado]),
+            (OrderDeliveryType.Delivery, OrderStatus.Transportando, [OrderStatus.Entregado, OrderStatus.Cancelado]),
+            (OrderDeliveryType.Delivery, OrderStatus.Entregado, []),
+            (OrderDeliveryType.Delivery, OrderStatus.Cancelado, []),
+
+            (OrderDeliveryType.Pickup, OrderStatus.Creado, [OrderStatus.Preparado, OrderStatus.Cancelado]),
+            (OrderDeliveryType.Pickup, OrderStatus.Preparado, [OrderStatus.Entregado, OrderStatus.Cancelado]),
+            (OrderDeliveryType.Pickup, OrderStatus.Entregado, []),
+            (OrderDeliveryType.Pickup, OrderStatus.Cancelado, []),
         ];
 
-        private static Order OrderInStatus(OrderStatus status)
-        {
-            Order order = CreateOnlineOrder();
+        private static readonly Guid DriverId = Guid.NewGuid();
 
-            // Se llega al estado por la vía legal; si el estado inicial no es alcanzable desde
-            // New, el test queArrange() falla aquí y el fallo señala la tabla, no elArrange().
-            if (status != OrderStatus.New)
-            {
-                List<OrderStatus> path = PathTo(status);
-                foreach (OrderStatus step in path)
-                    order.ChangeStatus(step);
-            }
+        private static Order OrderInStatus(OrderStatus status, OrderDeliveryType deliveryType = OrderDeliveryType.Delivery)
+        {
+            Order order = CreateOnlineOrder(deliveryType);
+            foreach (OrderStatus step in PathTo(status, deliveryType))
+                MoveTo(order, step);
 
             return order;
         }
 
         /// <summary>
-        /// Ruta LEGAL hasta el estado pedido. `Cancelled` sale de `Accepted` y no se puede
-        /// alcanzar desde `Delivered` (es terminal), así que su camino no es la cadena completa.
+        /// Ruta LEGAL hasta el estado pedido. `Cancelado` se alcanza desde `Preparado` porque es el
+        /// último estado común a los dos tipos de entrega, y los terminales no tienen salida.
         /// </summary>
-        private static List<OrderStatus> PathTo(OrderStatus target)
+        private static List<OrderStatus> PathTo(OrderStatus target, OrderDeliveryType deliveryType)
         {
-            if (target == OrderStatus.Cancelled)
-                return [OrderStatus.Accepted, OrderStatus.Cancelled];
+            if (target == OrderStatus.Creado)
+                return [];
 
-            OrderStatus[] chain = [OrderStatus.Accepted, OrderStatus.Preparing, OrderStatus.Ready, OrderStatus.Delivered];
+            if (target == OrderStatus.Cancelado)
+                return [OrderStatus.Preparado, OrderStatus.Cancelado];
+
+            OrderStatus[] chain = deliveryType == OrderDeliveryType.Delivery
+                ? [OrderStatus.Preparado, OrderStatus.Transportando, OrderStatus.Entregado]
+                : [OrderStatus.Preparado, OrderStatus.Entregado];
+
             return [.. chain.TakeWhile(s => s != target).Append(target)];
         }
 
-        private static Order CreateOnlineOrder() =>
+        /// <summary>
+        /// Aplica un paso por la puerta real, aportando lo que cada transición exige. Usar
+        /// `ChangeStatus` (y no asignar `Status`) es lo que hace que el arreglo no pueda inventarse
+        /// un estado que la tabla no permite.
+        /// </summary>
+        private static void MoveTo(Order order, OrderStatus step)
+        {
+            if (step == OrderStatus.Cancelado)
+                order.ChangeStatus(step, cancellationReason: Reason);
+            else if (step == OrderStatus.Transportando)
+                order.ChangeStatus(step, driverId: DriverId);
+            else
+                order.ChangeStatus(step);
+        }
+
+        private static Order CreateOnlineOrder(OrderDeliveryType deliveryType = OrderDeliveryType.Delivery) =>
             Order.CreateOnline(
                 storeId: Guid.NewGuid(),
                 tenantId: Guid.NewGuid(),
                 code: "AB12CD",
-                deliveryType: OrderDeliveryType.Pickup,
+                deliveryType: deliveryType,
                 customerName: "Ana",
                 customerPhone: "+5350000000",
                 total: 100m,
                 currency: Currency.CUP,
                 lines: [new OrderLine(Guid.NewGuid(), "Azúcar", 1, 100m, Currency.CUP)],
-                description: null,
-                deliveryAddress: null,
-                notes: null);
+                deliveryAddress: deliveryType == OrderDeliveryType.Delivery ? "Calle 1" : null);
+
+        public static TheoryData<OrderDeliveryType, OrderStatus, OrderStatus> ValidTransitions()
+        {
+            var data = new TheoryData<OrderDeliveryType, OrderStatus, OrderStatus>();
+
+            foreach ((OrderDeliveryType deliveryType, OrderStatus from, OrderStatus[] allowed) in TransitionTable)
+                foreach (OrderStatus to in allowed)
+                    data.Add(deliveryType, from, to);
+
+            return data;
+        }
 
         #region Happy path — toda transición de la tabla se ACEPTA
 
         [Theory]
-        [InlineData(OrderStatus.New, OrderStatus.Accepted)]
-        [InlineData(OrderStatus.New, OrderStatus.Cancelled)]
-        [InlineData(OrderStatus.Accepted, OrderStatus.Preparing)]
-        [InlineData(OrderStatus.Accepted, OrderStatus.Cancelled)]
-        [InlineData(OrderStatus.Preparing, OrderStatus.Ready)]
-        [InlineData(OrderStatus.Preparing, OrderStatus.Cancelled)]
-        [InlineData(OrderStatus.Ready, OrderStatus.Delivered)]
-        [InlineData(OrderStatus.Ready, OrderStatus.Cancelled)]
-        public void ChangeStatus_FromAValidTransition_ShouldApplyTheNewStatus(OrderStatus from, OrderStatus to)
+        [MemberData(nameof(ValidTransitions))]
+        public void ChangeStatus_FromAValidTransition_ShouldApplyTheNewStatus(
+            OrderDeliveryType deliveryType, OrderStatus from, OrderStatus to)
         {
             // Arrange
-            Order order = OrderInStatus(from);
+            Order order = OrderInStatus(from, deliveryType);
 
             // Act
-            order.ChangeStatus(to);
+            MoveTo(order, to);
 
             // Assert
             order.Status.Should().Be(to);
         }
 
         /// <summary>
-        /// La tabla se recorre entera desde New: el recorrido completo es la prueba de que la
-        /// máquina NO está cableada con casos sueltos.
+        /// Los dos recorridos completos. Que el camino entero funcione es la prueba de que la
+        /// máquina no está cableada con casos sueltos.
         /// </summary>
         [Fact]
-        public void ChangeStatus_ThroughTheWholeHappyPath_ShouldReachDelivered()
+        public void ChangeStatus_ThroughTheWholeDeliveryPath_ShouldReachEntregado()
         {
             // Arrange
-            Order order = CreateOnlineOrder();
+            Order order = CreateOnlineOrder(OrderDeliveryType.Delivery);
 
             // Act + Assert
-            order.Status.Should().Be(OrderStatus.New);
-            order.ChangeStatus(OrderStatus.Accepted);
-            order.Status.Should().Be(OrderStatus.Accepted);
-            order.ChangeStatus(OrderStatus.Preparing);
-            order.Status.Should().Be(OrderStatus.Preparing);
-            order.ChangeStatus(OrderStatus.Ready);
-            order.Status.Should().Be(OrderStatus.Ready);
-            order.ChangeStatus(OrderStatus.Delivered);
-            order.Status.Should().Be(OrderStatus.Delivered);
+            order.Status.Should().Be(OrderStatus.Creado);
+            order.ChangeStatus(OrderStatus.Preparado);
+            order.Status.Should().Be(OrderStatus.Preparado);
+            order.ChangeStatus(OrderStatus.Transportando, driverId: DriverId);
+            order.Status.Should().Be(OrderStatus.Transportando);
+            order.ChangeStatus(OrderStatus.Entregado);
+            order.Status.Should().Be(OrderStatus.Entregado);
         }
 
-        /// <summary>Un pedido se puede cancelar desde cualquier estado no terminal (D11).</summary>
-        [Theory]
-        [InlineData(OrderStatus.New)]
-        [InlineData(OrderStatus.Accepted)]
-        [InlineData(OrderStatus.Preparing)]
-        [InlineData(OrderStatus.Ready)]
-        public void ChangeStatus_FromAnyNonTerminalState_ShouldAcceptCancelled(OrderStatus from)
+        [Fact]
+        public void ChangeStatus_ThroughTheWholePickupPath_ShouldReachEntregadoWithoutTransportando()
         {
             // Arrange
-            Order order = OrderInStatus(from);
+            Order order = CreateOnlineOrder(OrderDeliveryType.Pickup);
+
+            // Act + Assert
+            order.Status.Should().Be(OrderStatus.Creado);
+            order.ChangeStatus(OrderStatus.Preparado);
+            order.Status.Should().Be(OrderStatus.Preparado);
+            order.ChangeStatus(OrderStatus.Entregado);
+            order.Status.Should().Be(OrderStatus.Entregado);
+        }
+
+        /// <summary>Un pedido se puede cancelar desde cualquier estado no terminal.</summary>
+        [Theory]
+        [InlineData(OrderDeliveryType.Delivery, OrderStatus.Creado)]
+        [InlineData(OrderDeliveryType.Delivery, OrderStatus.Preparado)]
+        [InlineData(OrderDeliveryType.Delivery, OrderStatus.Transportando)]
+        [InlineData(OrderDeliveryType.Pickup, OrderStatus.Creado)]
+        [InlineData(OrderDeliveryType.Pickup, OrderStatus.Preparado)]
+        public void ChangeStatus_FromAnyNonTerminalState_ShouldAcceptCancelado(
+            OrderDeliveryType deliveryType, OrderStatus from)
+        {
+            // Arrange
+            Order order = OrderInStatus(from, deliveryType);
 
             // Act
-            order.ChangeStatus(OrderStatus.Cancelled);
+            order.ChangeStatus(OrderStatus.Cancelado, cancellationReason: Reason);
 
             // Assert
-            order.Status.Should().Be(OrderStatus.Cancelled);
+            order.Status.Should().Be(OrderStatus.Cancelado);
+        }
+
+        #endregion
+
+        #region Reglas propias de la puerta
+
+        [Fact]
+        public void ChangeStatus_ToCanceladoWithoutReason_ShouldThrowAndKeepTheStatus()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Preparado);
+
+            // Act
+            Action act = () => order.ChangeStatus(OrderStatus.Cancelado);
+
+            // Assert
+            act.Should().Throw<MissingCancellationReasonException>();
+            order.Status.Should().Be(OrderStatus.Preparado);
+            order.CancellationReason.Should().BeNull("un rechazo no debe dejar la razón escrita");
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void ChangeStatus_ToCanceladoWithABlankReason_ShouldThrow(string reason)
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Preparado);
+
+            // Act
+            Action act = () => order.ChangeStatus(OrderStatus.Cancelado, cancellationReason: reason);
+
+            // Assert
+            act.Should().Throw<MissingCancellationReasonException>();
+            order.Status.Should().Be(OrderStatus.Preparado);
+        }
+
+        [Fact]
+        public void ChangeStatus_ToCancelado_ShouldStoreTheTrimmedReason()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Preparado);
+
+            // Act
+            order.ChangeStatus(OrderStatus.Cancelado, cancellationReason: "  El cliente desistió  ");
+
+            // Assert
+            order.CancellationReason.Should().Be("El cliente desistió");
+        }
+
+        [Fact]
+        public void ChangeStatus_ToTransportandoWithoutDriver_ShouldThrowAndKeepTheStatus()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Preparado, OrderDeliveryType.Delivery);
+
+            // Act
+            Action act = () => order.ChangeStatus(OrderStatus.Transportando);
+
+            // Assert
+            act.Should().Throw<MissingDeliveryDriverException>();
+            order.Status.Should().Be(OrderStatus.Preparado);
+            order.DriverId.Should().BeNull();
+        }
+
+        [Fact]
+        public void ChangeStatus_ToTransportando_ShouldAssignTheDriver()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Preparado, OrderDeliveryType.Delivery);
+
+            // Act
+            order.ChangeStatus(OrderStatus.Transportando, driverId: DriverId);
+
+            // Assert
+            order.DriverId.Should().Be(DriverId);
+        }
+
+        [Theory]
+        [InlineData(OrderDeliveryType.Pickup, OrderStatus.Preparado)]
+        [InlineData(OrderDeliveryType.Delivery, OrderStatus.Transportando)]
+        public void ChangeStatus_ToEntregado_ShouldLeaveTheOrderPaid(
+            OrderDeliveryType deliveryType, OrderStatus from)
+        {
+            // Arrange
+            Order order = OrderInStatus(from, deliveryType);
+            order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
+
+            // Act
+            order.ChangeStatus(OrderStatus.Entregado);
+
+            // Assert
+            order.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
+        }
+
+        [Fact]
+        public void ChangeStatus_WithAReasonOnANonCancellingTransition_ShouldThrow()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Creado);
+
+            // Act
+            Action act = () => order.ChangeStatus(OrderStatus.Preparado, cancellationReason: Reason);
+
+            // Assert
+            act.Should().Throw<UnexpectedStatusOptionException>();
+            order.Status.Should().Be(OrderStatus.Creado);
+        }
+
+        [Fact]
+        public void ChangeStatus_WithADriverOnANonTransportingTransition_ShouldThrow()
+        {
+            // Arrange
+            Order order = OrderInStatus(OrderStatus.Creado);
+
+            // Act
+            Action act = () => order.ChangeStatus(OrderStatus.Preparado, driverId: DriverId);
+
+            // Assert
+            act.Should().Throw<UnexpectedStatusOptionException>();
+            order.Status.Should().Be(OrderStatus.Creado);
         }
 
         #endregion
@@ -144,19 +303,23 @@ namespace Domain.UnitTests.Entities
         #region Error handling — toda transición FUERA de la tabla se RECHAZA
 
         /// <summary>
-        /// Todas las combinaciones (from, to) que la tabla no permite. Es un barrido exhaustivo y
-        /// no una lista de casos: si alguien añade un estado nuevo a <see cref="OrderStatus"/>, este
-        /// test empieza a fallar y le obliga a decidir su fila en la tabla a propósito.
+        /// Todas las combinaciones (from, to) que la tabla no permite, para cada tipo de entrega.
+        /// Es un barrido exhaustivo y no una lista de casos: si alguien añade un estado nuevo a
+        /// <see cref="OrderStatus"/>, este test empieza a fallar y le obliga a decidir su fila.
         /// </summary>
         [Theory]
         [MemberData(nameof(InvalidTransitions))]
-        public void ChangeStatus_FromAnInvalidTransition_ShouldThrowAndKeepTheStatus(OrderStatus from, OrderStatus to)
+        public void ChangeStatus_FromAnInvalidTransition_ShouldThrowAndKeepTheStatus(
+            OrderDeliveryType deliveryType, OrderStatus from, OrderStatus to)
         {
             // Arrange
-            Order order = OrderInStatus(from);
+            Order order = OrderInStatus(from, deliveryType);
 
             // Act
-            Action act = () => order.ChangeStatus(to);
+            Action act = () => order.ChangeStatus(
+                to,
+                driverId: to == OrderStatus.Transportando ? DriverId : null,
+                cancellationReason: to == OrderStatus.Cancelado ? Reason : null);
 
             // Assert
             act.Should().Throw<InvalidOrderStatusTransitionException>()
@@ -164,48 +327,59 @@ namespace Domain.UnitTests.Entities
             order.Status.Should().Be(from, "un rechazo NO debe mover el estado");
         }
 
-        public static TheoryData<OrderStatus, OrderStatus> InvalidTransitions()
+        public static TheoryData<OrderDeliveryType, OrderStatus, OrderStatus> InvalidTransitions()
         {
-            var data = new TheoryData<OrderStatus, OrderStatus>();
+            var data = new TheoryData<OrderDeliveryType, OrderStatus, OrderStatus>();
 
-            foreach ((OrderStatus from, OrderStatus[] allowed) in TransitionTable)
+            foreach ((OrderDeliveryType deliveryType, OrderStatus from, OrderStatus[] allowed) in TransitionTable)
                 foreach (OrderStatus to in Enum.GetValues<OrderStatus>())
                     if (to != from && !allowed.Contains(to))
-                        data.Add(from, to);
+                        data.Add(deliveryType, from, to);
 
             return data;
         }
 
         /// <summary>
-        /// Delivered y Cancelled son terminales: ni siquiera a sí mismos. Este test existe para
-        /// que "no hacer nada" no quede pareciendo una operación válida.
+        /// Entregado y Cancelado son terminales: ni siquiera a sí mismos. Este test existe para que
+        /// "no hacer nada" no quede pareciendo una operación válida.
         /// </summary>
         [Theory]
-        [InlineData(OrderStatus.Delivered)]
-        [InlineData(OrderStatus.Cancelled)]
+        [InlineData(OrderStatus.Entregado)]
+        [InlineData(OrderStatus.Cancelado)]
         public void ChangeStatus_FromATerminalState_ShouldRejectEveryTarget(OrderStatus terminal)
         {
             // Arrange
-            Order order = OrderInStatus(terminal);
+            Order order = OrderInStatus(terminal, OrderDeliveryType.Pickup);
 
             // Act + Assert
             foreach (OrderStatus target in Enum.GetValues<OrderStatus>())
             {
-                Action act = () => order.ChangeStatus(target);
+                Action act = () => order.ChangeStatus(
+                    target,
+                    driverId: target == OrderStatus.Transportando ? DriverId : null,
+                    cancellationReason: target == OrderStatus.Cancelado ? Reason : null);
+
                 act.Should().Throw<InvalidOrderStatusTransitionException>();
                 order.Status.Should().Be(terminal);
             }
         }
 
         /// <summary>
-        /// D18: "En camino" NO existe en la v1. Nadie puede colar un estado más sin que este test
-        /// lo delate, porque enumera los valores reales en vez de los conocidos.
+        /// El enum es un contrato con la base: estos son los cinco estados y estos sus valores.
+        /// Enumera los valores reales en vez de los conocidos, así que un estado nuevo sin decisión
+        /// explícita rompe el test.
         /// </summary>
         [Fact]
-        public void OrderStatus_ShouldNotHaveAnOnTheWayStatus()
+        public void OrderStatus_ShouldHaveExactlyTheFiveStatesAndTheirValues()
         {
             Enum.GetNames<OrderStatus>().Should().BeEquivalentTo(
-                ["New", "Accepted", "Preparing", "Ready", "Delivered", "Cancelled"]);
+                ["Creado", "Preparado", "Transportando", "Entregado", "Cancelado"]);
+
+            ((int)OrderStatus.Creado).Should().Be(0);
+            ((int)OrderStatus.Preparado).Should().Be(1);
+            ((int)OrderStatus.Transportando).Should().Be(2);
+            ((int)OrderStatus.Entregado).Should().Be(3);
+            ((int)OrderStatus.Cancelado).Should().Be(10);
         }
 
         #endregion
@@ -216,13 +390,13 @@ namespace Domain.UnitTests.Entities
         public void ChangeStatus_WithAnInvalidTransition_ShouldExposeFromAndToOnTheException()
         {
             // Arrange
-            Order order = CreateOnlineOrder();
+            Order order = CreateOnlineOrder(OrderDeliveryType.Pickup);
 
             // Act
             InvalidOrderStatusTransitionException? thrown = null;
             try
             {
-                order.ChangeStatus(OrderStatus.Delivered);
+                order.ChangeStatus(OrderStatus.Entregado);
             }
             catch (InvalidOrderStatusTransitionException ex)
             {
@@ -231,8 +405,8 @@ namespace Domain.UnitTests.Entities
 
             // Assert
             thrown.Should().NotBeNull();
-            thrown!.From.Should().Be(OrderStatus.New);
-            thrown.To.Should().Be(OrderStatus.Delivered);
+            thrown!.From.Should().Be(OrderStatus.Creado);
+            thrown.To.Should().Be(OrderStatus.Entregado);
         }
 
         #endregion

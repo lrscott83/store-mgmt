@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.AssignOrderDriver;
 using Application.UnitOfWorks;
@@ -65,7 +65,7 @@ public class AssignOrderDriverCommandHandlerTests
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         order.DeliveryType = deliveryType;
-        order.Status = OrderStatus.Preparing;
+        order.Status = OrderStatus.Preparado;
         return order;
     }
 
@@ -239,13 +239,13 @@ public class AssignOrderDriverCommandHandlerTests
     {
         DeliveryDriver driver = ActiveDriver();
         Order order = OrderFor(OrderDeliveryType.Delivery);
-        order.Status = OrderStatus.Preparing;
+        order.Status = OrderStatus.Preparado;
         order.PaymentStatus = OrderPaymentStatus.Pending;
         Returns(order);
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
 
-        order.Status.Should().Be(OrderStatus.Preparing);
+        order.Status.Should().Be(OrderStatus.Preparado);
         order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
     }
 

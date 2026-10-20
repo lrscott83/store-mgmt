@@ -1,35 +1,43 @@
-using System;
+﻿using System;
 
 namespace Domain.Common.Enums
 {
     /// <summary>
-    /// Estado de un pedido ONLINE (pedidos-whatsapp-persistencia, F2, decisiones D11/D18).
+    /// Estado de un pedido ONLINE.
     ///
-    /// Solo existe la secuencia `New → Accepted → Preparing → Ready → Delivered` más `Cancelled`.
-    /// NO existe "En camino" en la v1 (D18): el reparto se gestiona con `Order.DriverId` sin
-    /// intercalar un estado nuevo.
+    /// Secuencia estricta, sin saltos: `Creado → Preparado → Entregado` en recogida, y
+    /// `Creado → Preparado → Transportando → Entregado` con entrega a domicilio. `Cancelado` es
+    /// alcanzable desde cualquier estado no terminal. La tabla de transiciones válidas vive en
+    /// `Order.ChangeStatus`, que es la única puerta al estado.
     ///
     /// Los valores numéricos son persistidos (columna `Order.Status`), así que no se reutilizan ni
-    /// se reordenan. La tabla de transiciones válidas vive en `Order.ChangeStatus`.
+    /// se reordenan. `Cancelado` vale 10 a propósito: deja hueco para estados intermedios futuros
+    /// sin renumerar los existentes.
     /// </summary>
     public enum OrderStatus : int
     {
-        /// <summary>Pedido recibido, todavía sin confirmar por la tienda.</summary>
-        New = 0,
+        /// <summary>Pedido recibido, todavía sin preparar.</summary>
+        Creado = 0,
 
-        /// <summary>La tienda confirmó el pedido.</summary>
-        Accepted = 1,
+        /// <summary>La tienda preparó el pedido: listo para entregar o para salir a reparto.</summary>
+        Preparado = 1,
 
-        /// <summary>En preparación.</summary>
-        Preparing = 2,
+        /// <summary>
+        /// En reparto. Solo existe en pedidos con <see cref="OrderDeliveryType.Delivery"/>: una
+        /// recogida en tienda nunca pasa por aquí.
+        /// </summary>
+        Transportando = 2,
 
-        /// <summary>Listo para recoger o entregar.</summary>
-        Ready = 3,
+        /// <summary>
+        /// Entregado (o recogido). Terminal. Deja el pedido como pagado: entregar equivale a haber
+        /// cobrado.
+        /// </summary>
+        Entregado = 3,
 
-        /// <summary>Terminado (entregado o recogido).</summary>
-        Delivered = 4,
-
-        /// <summary>Cancelado. Estado terminal, igual que <see cref="Delivered"/>.</summary>
-        Cancelled = 5
+        /// <summary>
+        /// Cancelado. Terminal. Exige una razón de texto libre, que se guarda en
+        /// `Order.CancellationReason`.
+        /// </summary>
+        Cancelado = 10
     }
 }

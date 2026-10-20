@@ -1,4 +1,4 @@
-using Domain.Common.Enums;
+﻿using Domain.Common.Enums;
 using Domain.Common.Repositories;
 using Domain.Entities.Orders;
 
@@ -159,7 +159,7 @@ namespace Domain.Interfaces.Repositories
         /// <summary>Pedidos del rango, cancelados incluidos.</summary>
         public int OrdersCount { get; init; }
 
-        /// <summary>Pedidos del rango excluyendo <see cref="OrderStatus.Cancelled"/>.</summary>
+        /// <summary>Pedidos del rango excluyendo <see cref="OrderStatus.Cancelado"/>.</summary>
         public int NonCancelledCount { get; init; }
 
         /// <summary>Suma de <c>Order.Total</c> de los no cancelados.</summary>

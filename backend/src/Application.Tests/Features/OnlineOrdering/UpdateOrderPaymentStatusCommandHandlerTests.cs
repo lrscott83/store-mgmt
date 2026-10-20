@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus;
 using Application.UnitOfWorks;
@@ -54,7 +54,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         _orderRepository.Object,
         _localizer.Object);
 
-    private Order OrderWith(OrderPaymentStatus paymentStatus, OrderStatus status = OrderStatus.New)
+    private Order OrderWith(OrderPaymentStatus paymentStatus, OrderStatus status = OrderStatus.Creado)
     {
         Order order = Domain.Entities.Orders.Order.Create(
             _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
@@ -119,8 +119,8 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
     /// (el cobro se hace en la puerta, después de entregar).
     /// </summary>
     [Theory]
-    [InlineData(OrderStatus.New)]
-    [InlineData(OrderStatus.Delivered)]
+    [InlineData(OrderStatus.Creado)]
+    [InlineData(OrderStatus.Entregado)]
     public async Task Handle_ShouldNotMoveTheOrderStatus(OrderStatus status)
     {
         Order order = OrderWith(OrderPaymentStatus.Pending, status);

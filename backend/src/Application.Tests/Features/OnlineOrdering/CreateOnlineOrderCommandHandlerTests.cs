@@ -1,4 +1,4 @@
-using Application.Dtos.OnlineOrdering;
+﻿using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.CreateOnlineOrder;
 using Application.UnitOfWorks;
@@ -201,7 +201,7 @@ public class CreateOnlineOrderCommandHandlerTests
         _orderRepository.Verify(
             x => x.AddAsync(It.Is<Order>(o =>
                 o.OrderType == OrderType.WhatsApp
-                && o.Status == OrderStatus.New
+                && o.Status == OrderStatus.Creado
                 && o.PaymentStatus == OrderPaymentStatus.Pending
                 && o.StoreId == _storeId
                 && o.TenantId == _tenantId)),

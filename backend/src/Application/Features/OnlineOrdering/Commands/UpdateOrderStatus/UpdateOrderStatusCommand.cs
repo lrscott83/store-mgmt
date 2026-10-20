@@ -26,7 +26,21 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
     ///
     /// No hay estado "En camino" (D18): el panel no lo ofrece porque el dominio no lo tiene.
     /// </summary>
-    public sealed record UpdateOrderStatusCommand(Guid Id, OrderStatus Status) : ICommand<bool>;
+    /// <param name="Id">Pedido a mover.</param>
+    /// <param name="Status">Estado de destino.</param>
+    /// <param name="DriverId">
+    /// Repartidor. Obligatorio al pasar a <see cref="OrderStatus.Transportando"/>, ignorado —de
+    /// hecho rechazado por el dominio— en cualquier otra transición.
+    /// </param>
+    /// <param name="CancellationReason">
+    /// Razón de la cancelación, texto libre. Obligatoria al pasar a
+    /// <see cref="OrderStatus.Cancelado"/>.
+    /// </param>
+    public sealed record UpdateOrderStatusCommand(
+        Guid Id,
+        OrderStatus Status,
+        Guid? DriverId = null,
+        string? CancellationReason = null) : ICommand<bool>;
 
     public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatusCommand, bool>
     {
@@ -71,15 +85,27 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
 
             try
             {
-                // La tabla de la D11 vive en el dominio. `ChangeStatus` no toca el estado si la
-                // transición no es alcanzable, así que aquí no hay nada que deshacer.
-                order.ChangeStatus(request.Status);
+                // La tabla vive en el dominio. `ChangeStatus` no toca el estado si la transición no
+                // es alcanzable, así que aquí no hay nada que deshacer.
+                order.ChangeStatus(request.Status, request.DriverId, request.CancellationReason);
             }
             catch (InvalidOrderStatusTransitionException exception)
             {
                 // Traducción de capa: `Domain` no puede lanzar `ApiException` (la dependencia va en
                 // el sentido contrario), y sin esta traducción una transición inválida —un 400 del
                 // cliente— saldría como un 500 del servidor.
+                throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
+            }
+            catch (MissingCancellationReasonException exception)
+            {
+                throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
+            }
+            catch (MissingDeliveryDriverException exception)
+            {
+                throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
+            }
+            catch (UnexpectedStatusOptionException exception)
+            {
                 throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
             }
 

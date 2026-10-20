@@ -14,18 +14,20 @@ using System.Net;
 namespace Application.Tests.Features.OnlineOrdering;
 
 /// <summary>
-/// Mover un pedido por la tabla de estados de la D11 (F5, T3). Cuatro responsabilidades, y las
-/// dos últimas son las que un handler "rápido" suele saltarse:
+/// Mover un pedido por la máquina de estados. Cuatro responsabilidades, y las dos últimas son las
+/// que un handler "rápido" suele saltarse:
 ///
 ///   1. La tabla de transiciones la decide el DOMINIO (`Order.ChangeStatus`), no el handler.
-///      Un handler que asignara `order.Status = next` aceptaría `Delivered → New`, que es
-///      exactamente el estado que no debe existir.
-///   2. La excepción de dominio se TRADUCE a un `ApiException` 400. Suelta saldría como 500:
-///      una transición inválida es un error del que el cliente, no del servidor.
+///      Un handler que asignara `order.Status = next` aceptaría `Entregado → Creado`.
+///   2. Las excepciones de dominio se TRADUCEN a un `ApiException` 400. Sueltas saldrían como
+///      500: una transición inválida es un error del cliente, no del servidor.
 ///   3. El pedido se pide YA con el `storeId` de la sesión. Un id de otra tienda es un 404
 ///      indistinguible de "no existe" (criterio 7), no una mutación.
 ///   4. Como `ApplicationDbContext` es `NoTracking`, el guardado exige `UpdateAsync` explícito:
 ///      mutar la fila cargada y llamar a `SaveChanges` sin marcar no escribiría NADA.
+///
+/// El handler además transporta los dos datos que la máquina exige: la razón de la cancelación y
+/// el repartidor del reparto.
 /// </summary>
 public class UpdateOrderStatusCommandHandlerTests
 {
@@ -35,6 +37,8 @@ public class UpdateOrderStatusCommandHandlerTests
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
+    private static readonly Guid DriverId = Guid.NewGuid();
+    private const string Reason = "El cliente desistió";
 
     public UpdateOrderStatusCommandHandlerTests()
     {
@@ -56,13 +60,17 @@ public class UpdateOrderStatusCommandHandlerTests
         _orderRepository.Object,
         _localizer.Object);
 
-    /// <summary>Pedido online de la tienda en un estado concreto de la D11.</summary>
-    private Order OrderIn(OrderStatus status)
+    /// <summary>
+    /// Pedido online de la tienda en un estado concreto. El estado se fija directo a propósito: es
+    /// el ARRANGE del escenario, y la puerta que se prueba es la que se ejecuta después.
+    /// </summary>
+    private Order OrderIn(OrderStatus status, OrderDeliveryType deliveryType = OrderDeliveryType.Delivery)
     {
         Order order = Domain.Entities.Orders.Order.Create(
             _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
+        order.DeliveryType = deliveryType;
         order.Status = status;
         return order;
     }
@@ -81,52 +89,85 @@ public class UpdateOrderStatusCommandHandlerTests
     [Fact]
     public async Task Handle_WithAValidTransition_ShouldApplyTheNewStatus()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
-        order.Status.Should().Be(OrderStatus.Accepted);
+        order.Status.Should().Be(OrderStatus.Preparado);
     }
 
     [Theory]
-    [InlineData(OrderStatus.New, OrderStatus.Cancelled)]
-    [InlineData(OrderStatus.Accepted, OrderStatus.Preparing)]
-    [InlineData(OrderStatus.Preparing, OrderStatus.Ready)]
-    [InlineData(OrderStatus.Ready, OrderStatus.Delivered)]
-    public async Task Handle_WithEveryTransitionOfTheTable_ShouldApplyIt(OrderStatus from, OrderStatus to)
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Creado, OrderStatus.Preparado)]
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Preparado, OrderStatus.Transportando)]
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Transportando, OrderStatus.Entregado)]
+    [InlineData(OrderDeliveryType.Pickup, OrderStatus.Preparado, OrderStatus.Entregado)]
+    public async Task Handle_WithEveryTransitionOfTheTable_ShouldApplyIt(
+        OrderDeliveryType deliveryType, OrderStatus from, OrderStatus to)
     {
-        Order order = OrderIn(from);
+        Order order = OrderIn(from, deliveryType);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, to), CancellationToken.None);
+        var command = new UpdateOrderStatusCommand(
+            order.Id, to, to == OrderStatus.Transportando ? DriverId : null);
+
+        await Handler().Handle(command, CancellationToken.None);
 
         order.Status.Should().Be(to);
     }
 
-    /// <summary>
-    /// Cancelar es legal desde cualquier estado no terminal (D11), así que el handler no lo
-    /// bloquea: la tabla ya lo dice y duplicar la regla aquí sería una segunda fuente de verdad.
-    /// </summary>
+    /// <summary>Cancelar es legal desde cualquier estado no terminal, y viaja con su razón.</summary>
     [Fact]
-    public async Task Handle_FromAnyNonTerminalState_ShouldAcceptCancelled()
+    public async Task Handle_FromAnyNonTerminalState_ShouldAcceptCanceladoWithItsReason()
     {
-        Order order = OrderIn(OrderStatus.Ready);
+        Order order = OrderIn(OrderStatus.Preparado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Cancelled), CancellationToken.None);
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Cancelado, CancellationReason: Reason),
+            CancellationToken.None);
 
-        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.Status.Should().Be(OrderStatus.Cancelado);
+        order.CancellationReason.Should().Be(Reason);
+    }
+
+    /// <summary>Pasar a reparto asigna el repartidor que viaja en el comando.</summary>
+    [Fact]
+    public async Task Handle_ToTransportando_ShouldAssignTheDriverFromTheCommand()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Delivery);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Transportando, DriverId),
+            CancellationToken.None);
+
+        order.Status.Should().Be(OrderStatus.Transportando);
+        order.DriverId.Should().Be(DriverId);
+    }
+
+    /// <summary>Entregar deja el pedido pagado: la regla vive en el dominio, no en el handler.</summary>
+    [Fact]
+    public async Task Handle_ToEntregado_ShouldLeaveTheOrderPaid()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Pickup);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado),
+            CancellationToken.None);
+
+        order.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
     }
 
     [Fact]
     public async Task Handle_WithAValidTransition_ShouldReturnSuccess()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
         var result = await Handler().Handle(
-            new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
         result.Data.Should().BeTrue();
@@ -143,12 +184,12 @@ public class UpdateOrderStatusCommandHandlerTests
     [Fact]
     public async Task Handle_WithAValidTransition_ShouldMarkTheOrderAsModifiedBeforeSaving()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Accepted)), Times.Once);
+        _orderRepository.Verify(x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Preparado)), Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -160,41 +201,40 @@ public class UpdateOrderStatusCommandHandlerTests
     [Fact]
     public async Task Handle_ShouldReadTheOrderInsideTheStoreOfTheSession()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
         _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
         _orderRepository.Verify(
             x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
     }
 
-    /// <summary>El cambio de estado NO toca el pago: son ejes independientes (D3/D12).</summary>
+    /// <summary>Una transición que no entrega NO toca el pago.</summary>
     [Fact]
-    public async Task Handle_ShouldNotTouchThePaymentStatus()
+    public async Task Handle_WithANonDeliveringTransition_ShouldNotTouchThePaymentStatus()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         order.PaymentStatus = OrderPaymentStatus.Pending;
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
         order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
     }
 
-    /// <summary>Ni el repartidor: T5 es el dueño de esa columna.</summary>
+    /// <summary>Una transición que no es de reparto no toca el repartidor ya asignado.</summary>
     [Fact]
-    public async Task Handle_ShouldNotTouchTheAssignedDriver()
+    public async Task Handle_WithANonTransportingTransition_ShouldNotTouchTheAssignedDriver()
     {
-        var driverId = Guid.NewGuid();
-        Order order = OrderIn(OrderStatus.New);
-        order.DriverId = driverId;
+        Order order = OrderIn(OrderStatus.Creado);
+        order.DriverId = DriverId;
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Accepted), CancellationToken.None);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
-        order.DriverId.Should().Be(driverId);
+        order.DriverId.Should().Be(DriverId);
     }
 
     #endregion
@@ -202,20 +242,23 @@ public class UpdateOrderStatusCommandHandlerTests
     #region Error Handling
 
     /// <summary>
-    /// La máquina de estados del DOMINIO es la única puerta: saltar de `New` a `Delivered` es
+    /// La máquina de estados del DOMINIO es la única puerta: saltar de `Creado` a `Entregado` es
     /// imposible aunque el handler lo permita.
     /// </summary>
     [Theory]
-    [InlineData(OrderStatus.New, OrderStatus.Preparing)]
-    [InlineData(OrderStatus.New, OrderStatus.Delivered)]
-    [InlineData(OrderStatus.Accepted, OrderStatus.Delivered)]
-    [InlineData(OrderStatus.Ready, OrderStatus.Accepted)]
-    public async Task Handle_WithAnInvalidTransition_ShouldReportBadRequest(OrderStatus from, OrderStatus to)
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Creado, OrderStatus.Entregado)]
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Creado, OrderStatus.Transportando)]
+    [InlineData(OrderDeliveryType.Pickup, OrderStatus.Creado, OrderStatus.Transportando)]
+    [InlineData(OrderDeliveryType.Delivery, OrderStatus.Preparado, OrderStatus.Entregado)]
+    public async Task Handle_WithAnInvalidTransition_ShouldReportBadRequest(
+        OrderDeliveryType deliveryType, OrderStatus from, OrderStatus to)
     {
-        Order order = OrderIn(from);
+        Order order = OrderIn(from, deliveryType);
         Returns(order);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(order.Id, to), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, to, to == OrderStatus.Transportando ? DriverId : null),
+            CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -223,32 +266,65 @@ public class UpdateOrderStatusCommandHandlerTests
 
     /// <summary>Un estado terminal no se mueve: ni hacia atrás ni hacia otro terminal.</summary>
     [Theory]
-    [InlineData(OrderStatus.Delivered, OrderStatus.New)]
-    [InlineData(OrderStatus.Delivered, OrderStatus.Cancelled)]
-    [InlineData(OrderStatus.Cancelled, OrderStatus.New)]
-    [InlineData(OrderStatus.Cancelled, OrderStatus.Accepted)]
+    [InlineData(OrderStatus.Entregado, OrderStatus.Creado)]
+    [InlineData(OrderStatus.Entregado, OrderStatus.Cancelado)]
+    [InlineData(OrderStatus.Cancelado, OrderStatus.Creado)]
+    [InlineData(OrderStatus.Cancelado, OrderStatus.Preparado)]
     public async Task Handle_FromATerminalState_ShouldReportBadRequest(OrderStatus from, OrderStatus to)
     {
         Order order = OrderIn(from);
         Returns(order);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(order.Id, to), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(
+            new UpdateOrderStatusCommand(
+                order.Id, to, CancellationReason: to == OrderStatus.Cancelado ? Reason : null),
+            CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>Cancelar sin razón es un 400, no un pedido cancelado sin motivo.</summary>
+    [Fact]
+    public async Task Handle_ToCanceladoWithoutReason_ShouldReportBadRequest()
+    {
+        Order order = OrderIn(OrderStatus.Preparado);
+        Returns(order);
+
+        Func<Task> act = () => Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Cancelado), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        order.Status.Should().Be(OrderStatus.Preparado);
+    }
+
+    /// <summary>Pasar a reparto sin repartidor es un 400, no un pedido en la calle sin dueño.</summary>
+    [Fact]
+    public async Task Handle_ToTransportandoWithoutDriver_ShouldReportBadRequest()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Delivery);
+        Returns(order);
+
+        Func<Task> act = () => Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Transportando), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        order.Status.Should().Be(OrderStatus.Preparado);
     }
 
     /// <summary>Una transición rechazada NO toca el estado ni escribe nada.</summary>
     [Fact]
     public async Task Handle_WithAnInvalidTransition_ShouldLeaveTheOrderUntouched()
     {
-        Order order = OrderIn(OrderStatus.New);
+        Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Delivered), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        order.Status.Should().Be(OrderStatus.New);
+        order.Status.Should().Be(OrderStatus.Creado);
         _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -262,7 +338,7 @@ public class UpdateOrderStatusCommandHandlerTests
     {
         Returns(null);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Accepted), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Preparado), CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -273,7 +349,7 @@ public class UpdateOrderStatusCommandHandlerTests
     {
         Returns(null);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Accepted), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Preparado), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
         _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
@@ -289,7 +365,7 @@ public class UpdateOrderStatusCommandHandlerTests
     {
         _httpContextService.Setup(x => x.StoreId).Returns(string.Empty);
 
-        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Accepted), CancellationToken.None);
+        Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Preparado), CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -303,7 +379,7 @@ public class UpdateOrderStatusCommandHandlerTests
     /// <summary>
     /// Un entero que no es un `OrderStatus` no es un estado: sin esta regla llegaría a la tabla de
     /// transiciones y saldría como 400 por la excepción del dominio, con un mensaje de transición
-    /// ("from New to 42") en vez de un mensaje de entrada inválida.
+    /// ("from Creado to 42") en vez de un mensaje de entrada inválida.
     /// </summary>
     [Fact]
     public void Validator_WithAnUndefinedStatus_ShouldFail()
@@ -317,12 +393,9 @@ public class UpdateOrderStatusCommandHandlerTests
     }
 
     [Theory]
-    [InlineData(OrderStatus.New)]
-    [InlineData(OrderStatus.Accepted)]
-    [InlineData(OrderStatus.Preparing)]
-    [InlineData(OrderStatus.Ready)]
-    [InlineData(OrderStatus.Delivered)]
-    [InlineData(OrderStatus.Cancelled)]
+    [InlineData(OrderStatus.Creado)]
+    [InlineData(OrderStatus.Preparado)]
+    [InlineData(OrderStatus.Entregado)]
     public void Validator_WithADefinedStatus_ShouldPass(OrderStatus status)
     {
         UpdateOrderStatusCommandValidator validator = new(_localizer.Object);
@@ -330,17 +403,44 @@ public class UpdateOrderStatusCommandHandlerTests
         validator.Validate(new UpdateOrderStatusCommand(Guid.NewGuid(), status)).IsValid.Should().BeTrue();
     }
 
-    /// <summary>
-    /// El validador NO juzga si la transición es alcanzable: eso depende del estado actual del
-    /// pedido, que solo el handler sabe. Rechazar `Cancelled` aquí dejaría al dueño sin poder
-    /// cancelar.
-    /// </summary>
     [Fact]
-    public void Validator_ShouldNotDecideWhetherTheTransitionIsReachable()
+    public void Validator_WithCanceladoAndAReason_ShouldPass()
     {
         UpdateOrderStatusCommandValidator validator = new(_localizer.Object);
 
-        validator.Validate(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Cancelled)).IsValid.Should().BeTrue();
+        validator.Validate(new UpdateOrderStatusCommand(
+            Guid.NewGuid(), OrderStatus.Cancelado, CancellationReason: Reason)).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validator_WithCanceladoAndNoReason_ShouldFail()
+    {
+        UpdateOrderStatusCommandValidator validator = new(_localizer.Object);
+
+        var result = validator.Validate(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Cancelado));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateOrderStatusCommand.CancellationReason));
+    }
+
+    [Fact]
+    public void Validator_WithTransportandoAndADriver_ShouldPass()
+    {
+        UpdateOrderStatusCommandValidator validator = new(_localizer.Object);
+
+        validator.Validate(new UpdateOrderStatusCommand(
+            Guid.NewGuid(), OrderStatus.Transportando, DriverId)).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validator_WithTransportandoAndNoDriver_ShouldFail()
+    {
+        UpdateOrderStatusCommandValidator validator = new(_localizer.Object);
+
+        var result = validator.Validate(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Transportando));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateOrderStatusCommand.DriverId));
     }
 
     #endregion

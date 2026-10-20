@@ -1,4 +1,4 @@
-using Application.Dtos.OnlineOrdering;
+﻿using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderStatus;
 using Domain.Common.Enums;
@@ -64,7 +64,7 @@ public class GetPublicOrderStatusQueryHandlerTests
     private Order PublishedOrder(
         string code = _code,
         string phone = _phone,
-        OrderStatus status = OrderStatus.New,
+        OrderStatus status = OrderStatus.Creado,
         OrderPaymentStatus paymentStatus = OrderPaymentStatus.Pending,
         OrderDeliveryType deliveryType = OrderDeliveryType.Delivery,
         decimal total = 250m)
@@ -102,14 +102,14 @@ public class GetPublicOrderStatusQueryHandlerTests
     public async Task Handle_WithTheRightCodeAndPhone_ShouldReturnTheOrderStatus()
     {
         PublishedStore();
-        OrderInStore(PublishedOrder(status: OrderStatus.Preparing, paymentStatus: OrderPaymentStatus.Paid));
+        OrderInStore(PublishedOrder(status: OrderStatus.Preparado, paymentStatus: OrderPaymentStatus.Paid));
 
         var result = await Handler().Handle(Query(), CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
         result.Data.Should().NotBeNull();
         result.Data!.Code.Should().Be(_code);
-        result.Data.Status.Should().Be(OrderStatus.Preparing);
+        result.Data.Status.Should().Be(OrderStatus.Preparado);
         result.Data.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
         result.Data.DeliveryType.Should().Be(OrderDeliveryType.Delivery);
         result.Data.Total.Should().Be(250m);

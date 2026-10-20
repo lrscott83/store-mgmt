@@ -1316,6 +1316,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CancellationReason")
+                        .HasColumnType("text");
+
                     b.Property<string>("Code")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
