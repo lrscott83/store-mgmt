@@ -14,6 +14,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  SCHEMA_ORG_CONTEXT,
+  SCHEMA_TYPE_ORGANIZATION,
+  SCHEMA_TYPE_SOFTWARE_APPLICATION,
+} from './landing-schema.mjs';
 
 const DEFAULT_BASE_URL = 'https://pos.playground.sceiba.net';
 
@@ -43,17 +48,17 @@ export function buildLandingJsonLd({ baseUrl = DEFAULT_BASE_URL, meta = LANDING_
   const url = `${base}/`;
 
   return {
-    '@context': 'https://schema.org',
+    '@context': SCHEMA_ORG_CONTEXT,
     '@graph': [
       {
-        '@type': 'Organization',
+        '@type': SCHEMA_TYPE_ORGANIZATION,
         '@id': `${base}/#organization`,
         name: meta.siteName,
         url,
         logo: `${base}${meta.imagePath}`,
       },
       {
-        '@type': 'SoftwareApplication',
+        '@type': SCHEMA_TYPE_SOFTWARE_APPLICATION,
         '@id': `${base}/#software`,
         name: meta.siteName,
         description: meta.description,
@@ -62,7 +67,7 @@ export function buildLandingJsonLd({ baseUrl = DEFAULT_BASE_URL, meta = LANDING_
         inLanguage: 'es',
         url,
         publisher: {
-          '@type': 'Organization',
+          '@type': SCHEMA_TYPE_ORGANIZATION,
           '@id': `${base}/#organization`,
           name: meta.siteName,
         },

@@ -1,4 +1,8 @@
 import type { PublicPlanPricing } from './public-plan-pricing';
+import {
+  SCHEMA_TYPE_OFFER,
+  SCHEMA_TYPE_SOFTWARE_APPLICATION,
+} from '../../../scripts/landing-schema.mjs';
 
 export interface LandingOffer {
   readonly name: string;
@@ -53,10 +57,10 @@ export function applyPlanOffersToDocument(
   }
 
   const graph = readGraph(payload);
-  const application = graph.find((node) => node['@type'] === 'SoftwareApplication');
+  const application = graph.find((node) => node['@type'] === SCHEMA_TYPE_SOFTWARE_APPLICATION);
   if (!application) return false;
 
-  application['offers'] = offers.map((offer) => ({ '@type': 'Offer', ...offer }));
+  application['offers'] = offers.map((offer) => ({ '@type': SCHEMA_TYPE_OFFER, ...offer }));
 
   try {
     script.textContent = JSON.stringify(payload);

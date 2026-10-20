@@ -165,6 +165,28 @@ ni configuración de despliegue). Cambio de contenido público + metadata de bui
   passed, 6 skipped. Un test ajeno (`channel-rates`, timeout de 5 s bajo carga) falló en la corrida
   completa y pasa aislado 24/24: flake de tiempo, no relacionado con este cambio.
 
+### Iteración 3 — hallazgos advisory del RDD
+
+La review nativa aprobó la slice (`review-580989d6afd87df5`, autoridad quemada) con 8 hallazgos
+advisory no bloqueantes. Se cierran los dos `WARNING`:
+
+- **Acoplamiento por literales de schema** → `scripts/landing-schema.mjs` (+ `landing-schema.d.mts`
+  para el lado TypeScript) es la única fuente de `https://schema.org`, `Organization`,
+  `SoftwareApplication` y `Offer`. El build que escribe el grafo y el runtime que lo completa leen
+  las mismas constantes: renombrar un tipo ya no puede degradar a "sin offers" en silencio.
+- **Dimensiones del OG sin verificar** → test que lee el IHDR real de `public/og-image.png` y exige
+  que ancho y alto coincidan con `LANDING_META.ogImageWidth/Height` (1200×630). Un PNG corrupto o de
+  otro tamaño ahora rompe CI.
+
+Sugerencias restantes (no bloqueantes, sin acción): catch inalcanzable en `JSON.stringify`, parámetro
+`priceCurrency` sin uso, booleano de retorno descartado, `document` global sin guard, re-escapado del
+`<` al re-serializar y falta de test de doble inyección.
+
+- Evidencia: enfocados 27/27; `node scripts/generate-landing-page.mjs` OK; `pnpm lint` 0;
+  `pnpm typecheck` 0; suite completa 394 archivos / 5694 passed, 6 skipped. Un test ajeno
+  (`store-plan`, timeout bajo carga) falló en la corrida completa y pasa aislado 12/12: mismo
+  patrón de flake ambiental que `channel-rates` en la iteración anterior.
+
 ---
 
 ## 5. Pendiente (no incluido aquí)
