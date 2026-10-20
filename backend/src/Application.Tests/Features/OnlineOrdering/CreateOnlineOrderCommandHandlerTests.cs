@@ -84,12 +84,14 @@ public class CreateOnlineOrderCommandHandlerTests
             .ReturnsAsync(false);
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        // Gating de M3: por defecto la tienda TIENE "Gestión de Pedidos", que es lo que permite que
-        // este comando escriba. El caso contrario se monta con `WithoutGestionPedidosModule()`.
+        // Gating de pedidos: por defecto la tienda TIENE "Pedidos WhatsApp" (19), que es lo que
+        // habilita el carrito y la persistencia del pedido. "Gestión de Pedidos" (20) solo
+        // habilita las vistas de gestión, no el alta. El caso contrario se monta con
+        // `WithoutPedidosWhatsAppModule()`.
         // Por vía ANÓNIMA, igual que en producción: con la de sesión el conjunto saldría vacío.
         _moduleRepository
             .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
-            .ReturnsAsync([(int)ModuleType.GestionPedidos]);
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp]);
     }
 
     private CreateOnlineOrderCommandHandler Handler() => new(
@@ -102,13 +104,14 @@ public class CreateOnlineOrderCommandHandlerTests
         _localizer.Object);
 
     /// <summary>
-    /// La tienda NO tiene activo "Gestión de Pedidos": este comando no debe persistir nada (M3).
-    /// Solo con el 19 el pedido se arma y se manda por `wa.me` en cliente, sin pasar por aquí.
+    /// La tienda NO tiene activo "Pedidos WhatsApp" (19): no hay carrito ni pedidos nuevos, así que
+    /// este comando no debe persistir nada. Una tienda con el 20 pero sin el 19 no puede recibir
+    /// pedidos por el catálogo.
     /// </summary>
-    private void WithoutGestionPedidosModule()
+    private void WithoutPedidosWhatsAppModule()
         => _moduleRepository
             .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
-            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp]);
+            .ReturnsAsync([(int)ModuleType.GestionPedidos]);
 
     /// <summary>
     /// Tienda con catálogo publicado en `<paramref name="slug"/>`: el caso normal del storefront.
@@ -1054,15 +1057,15 @@ public class CreateOnlineOrderCommandHandlerTests
 
     #endregion
 
-    #region Gating de módulo (M3): la orden se persiste SOLO con "Gestión de Pedidos"
+    #region Gating de módulo: la orden se persiste con "Pedidos WhatsApp" (19)
 
     /// <summary>
-    /// Con el módulo ACTIVO el alta sigue funcionando exactamente igual: el gating no cambia el
+    /// Con el módulo 19 ACTIVO el alta sigue funcionando exactamente igual: el gating no cambia el
     /// camino de éxito, solo añade una puerta. Sin esto, el resto de la suite pasaría por un
     /// handler que nunca aceptara un pedido.
     /// </summary>
     [Fact]
-    public async Task Handle_WithTheOrderManagementModule_ShouldPersistTheOrder()
+    public async Task Handle_WithTheWhatsAppOrdersModule_ShouldPersistTheOrder()
     {
         PublishedStore();
         EnabledSettings();
@@ -1076,19 +1079,37 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     /// <summary>
-    /// SIN el módulo, 400 y NADA persistido (M3). Con solo "Pedidos WhatsApp" el pedido se arma y
-    /// se manda por `wa.me` en cliente; si llega un `POST` aquí, es un cliente saltándose el
-    /// gating, y aceptarlo guardaría un pedido que nadie va a gestionar.
+    /// SIN el módulo 20, el pedido SÍ se persiste: la gestión es una vista posterior, no la puerta
+    /// del alta. Con el 19 activo el carrito existe y el pedido debe quedar guardado aunque nadie
+    /// pueda verlo todavía en la cola de gestión.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithoutTheOrderManagementModule_ShouldStillPersistTheOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        var result = await Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Once);
+        _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SIN "Pedidos WhatsApp" (19), 400 y NADA persistido. Sin el carrito no hay pedido que el
+    /// cliente pueda haber enviado; si llega un `POST` aquí, es un cliente saltándose el gating.
     ///
     /// Se exige que no se escriba en NINGÚN punto: ni `AddAsync`, ni `SaveChangesAsync`, ni el
     /// código. La puerta va ANTES de resolver el catálogo, así que ni se llega a mirar el producto.
     /// </summary>
     [Fact]
-    public async Task Handle_WithoutTheOrderManagementModule_ShouldRejectAndPersistNothing()
+    public async Task Handle_WithoutTheWhatsAppOrdersModule_ShouldRejectAndPersistNothing()
     {
         PublishedStore();
         EnabledSettings();
-        WithoutGestionPedidosModule();
+        WithoutPedidosWhatsAppModule();
         Guid productId = Publish("Arroz", 100m);
 
         Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
@@ -1106,11 +1127,11 @@ public class CreateOnlineOrderCommandHandlerTests
     /// abriera el interruptor equivocado.
     /// </summary>
     [Fact]
-    public async Task Handle_WithoutTheOrderManagementModule_ShouldReportTheModuleMessage()
+    public async Task Handle_WithoutTheWhatsAppOrdersModule_ShouldReportTheModuleMessage()
     {
         PublishedStore();
         EnabledSettings();
-        WithoutGestionPedidosModule();
+        WithoutPedidosWhatsAppModule();
         Guid productId = Publish("Arroz", 100m);
 
         Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
@@ -1129,7 +1150,7 @@ public class CreateOnlineOrderCommandHandlerTests
     {
         PublishedStore();
         _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
-        WithoutGestionPedidosModule();
+        WithoutPedidosWhatsAppModule();
         Guid productId = Publish("Arroz", 100m);
 
         Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);

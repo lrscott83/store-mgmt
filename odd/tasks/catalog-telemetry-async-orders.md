@@ -31,8 +31,8 @@ S10. **Tests.** Every behavior above gets a new test. Existing E2E tests and E2E
 | ID | Spec | Route | Task | Status |
 | --- | --- | --- | --- | --- |
 | T1 | S1 | inline | Guard `useStoreUsageTracker` against `/catalog/*`; add hook tests (navigation + activity). | done — RED 2 failed / GREEN 14/14; commit `93d6cade` |
-| T2 | S2, S3 | inline | Backend: replace the module-20 order gate with module 19; update unit tests. | pending |
-| T3 | S2, S3, S4 | inline | Frontend: background persistence without module 20; WhatsApp opens immediately; keep module-20 sync flow. | pending |
+| T2 | S2, S3 | inline | Backend: replace the module-20 order gate with module 19; update unit tests. | done — RED 31 failed / GREEN 47/47 in the handler suite |
+| T3 | S2, S3, S4 | inline | Frontend: background persistence without module 20; WhatsApp opens immediately; keep module-20 sync flow. | done — 110 passed (storefront + catalog + service suites) |
 | T4 | S6, S9 | inline | `CatalogEvent` entity, enums, EF config, `DbSet`, repository, migration + generated SQL script. | pending |
 | T5 | S6, S8 | inline | Public `POST /api/v1/public/catalog/{slug}/events`: validation, hashing, source/device classification, bot filter. | pending |
 | T6 | S6, S8 | inline | Client `catalog-telemetry` module: fire-and-forget events wired into the public catalog. | pending |
@@ -53,3 +53,5 @@ L2 (approval + corrections, verbatim):
 L3 (progress): CodeGraph initialized at the repository root (`D:\Projects\AutoBusinessPro\Store\store-mgmt`). Feature branch created from `dev`.
 
 L4 (T1 progress): `useStoreUsageTracker` now short-circuits both seams when `isPublicCatalogPath(pathname)` is true. RED: 2 new tests failed (catalog navigation and catalog activity both stamped `user-1/store-1`). GREEN: 14/14 in `use-store-usage-tracker.test.tsx`. POS routes still stamp.
+
+L5 (T2/T3 progress): backend gate moved from module 20 to module 19 (`EnsurePedidosWhatsAppAsync`); `Handle_WithoutTheOrderManagementModule_ShouldStillPersistTheOrder` failed first (RED: 31 failures in the handler suite), then GREEN 47/47. Frontend without module 20 now calls `catalogHttpService.createPublicOrderInBackground` and opens WhatsApp in the same tick (no `await`); with module 20 the synchronous flow and staff exception are unchanged. Focused frontend suites: 110 passed / 6 skipped.

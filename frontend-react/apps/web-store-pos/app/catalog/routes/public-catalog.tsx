@@ -424,9 +424,9 @@ export function PublicCatalogPage() {
 
       {/* El checkout solo existe si la tienda ofrece el carrito: con `enabled: false` o sin el
           módulo 19 no hay ni botón ni modal, porque el backend no lo aceptaría (y el cliente no
-          puede permitirse descubrir eso escribiendo a mano un pedido). Cuál de los dos flujos usa
-          por dentro —POST con "Gestión de Pedidos" (20) o `wa.me` sin él (M3)— lo decide el
-          propio checkout leyendo `config.gestionPedidosEnabled`. */}
+          puede permitirse descubrir eso escribiendo a mano un pedido). Cuál de los dos modos usa
+          por dentro —alta SÍNCRONA con "Gestión de Pedidos" (20) o persistencia en SEGUNDO PLANO
+          + `wa.me` sin él— lo decide el propio checkout leyendo `config.gestionPedidosEnabled`. */}
       {orderingConfig && orderingEnabled && (
         <StorefrontCheckout
           open={checkoutOpen}

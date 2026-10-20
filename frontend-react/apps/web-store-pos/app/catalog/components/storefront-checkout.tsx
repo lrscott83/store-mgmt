@@ -24,14 +24,13 @@ const PHONE_MIN_DIGITS = 7;
  * automático —la tienda SIN número o un resumen que no se pudo componer (R3-1)—, con el envío
  * BLOQUEADO.
  *
- * `code === null` es un ESTADO DISTINTO y no un dato que falte: es el modo SIN PERSISTENCIA (M3,
- * sin el módulo "Gestión de Pedidos"), donde no hay `Order`, así que no hay código que dictar y el
- * aviso no puede decir "pedido guardado". Los dos casos comparten la mecánica (enlace o bloqueo) y
- * se distinguen solo en el texto, que es justo lo que separa "tu pedido está en el sistema" de
- * "tu pedido vive en el chat".
+ * `code === null` es un ESTADO DISTINTO y no un dato que falte: es el modo sin "Gestión de
+ * Pedidos" (20), donde el alta se persiste en SEGUNDO PLANO y no hay respuesta con código que
+ * dictar. El pedido SÍ queda guardado; el aviso no puede decir "pedido {code} guardado" porque no
+ * recibió el código, y se limita a confirmar el handoff.
  */
 interface WhatsAppSend {
-  /** Código del pedido PERSISTIDO. null en el modo sin módulo 20 (M3): no hay pedido guardado. */
+  /** Código del pedido PERSISTIDO en el flujo síncrono. null en el alta en segundo plano. */
   readonly code: string | null;
   readonly link: string | null;
 }
@@ -49,14 +48,14 @@ interface StorefrontCheckoutProps {
   readonly lines: readonly StorefrontCartLine[];
   /**
    * Se llama con la orden creada para que el padre la pinte y vacíe el carrito. Solo existe con el
-   * módulo "Gestión de Pedidos" (20) activo: es el que crea el `Order`. En el modo SIN
-   * PERSISTENCIA no hay orden que reportar y se llama a `onSentWithoutOrder` en su lugar.
+   * módulo "Gestión de Pedidos" (20) activo: es el flujo SÍNCRONO, el único que recibe el código.
+   * En el alta en segundo plano (sin 20) se llama a `onSentWithoutOrder` en su lugar.
    */
   readonly onCreated: (order: PublicOrderCreated) => void;
   /**
-   * El pedido salió por `wa.me` SIN guardarse (M3): no hay `Order`, así que `onCreated` no puede
-   * llamarse y el carrito NO se vacía, porque es la única copia del pedido que el cliente tiene
-   * mientras la tienda no lo confirme y vaciarlo tiraría su trabajo si el handoff no se completó.
+   * El pedido salió por `wa.me` sin esperar la respuesta del alta (sin módulo 20): el `POST` se
+   * persiste en segundo plano y no hay `Order` con código que reportar. El carrito NO se vacía,
+   * porque es la copia que el cliente tiene del pedido mientras la tienda no lo confirme.
    *
    * Si el padre lo pasa, cierra el checkout: el aviso vive FUERA del modal y sobrevive al cierre,
    * que es lo mismo que hace `onCreated` en el flujo persistido.
@@ -70,10 +69,9 @@ interface StorefrontCheckoutProps {
    * Por defecto `false`: el catálogo público lo es para cualquiera, y quien no es staff de la
    * tienda sigue con el flujo de envío intacto.
    *
-   * OJO con el cruce con M3: este modo SOLO significa "el pedido se guarda y no se manda". Sin el
-   * módulo 20 no hay pedido que registrar, así que el flujo es el de cualquier cliente, con su
-   * propia etiqueta en el botón: "Registrar pedido" sería una etiqueta que miente sobre lo que va
-   * a pasar.
+   * OJO con el cruce sin módulo 20: en ese modo el pedido se persiste en segundo plano y el
+   * handoff por WhatsApp SÍ se hace también para staff — no hay panel donde verlo y el chat es la
+   * única constancia inmediata. La etiqueta del botón lo anuncia.
    */
   readonly staffMode?: boolean;
 }
@@ -126,30 +124,25 @@ export function StorefrontCheckout({
   const deliverySelected = deliveryType === PublicOrderDeliveryType.Delivery;
 
   /**
-   * ¿Se PERSISTE el pedido? Solo con el módulo "Gestión de Pedidos" (20, M3).
+   * ¿Gestiona la tienda los pedidos? Solo con el módulo "Gestión de Pedidos" (20).
    *
    * El flag viene del config anónimo, o sea de los módulos ACTIVOS de la fila `StoreModule` de la
    * tienda, que son lo que compró: el storefront no puede deducirlo, igual que no puede deducir el
-   * del carrito. Sin este módulo el backend rechaza el alta con un 400 (`OnlineOrdersModuleNot-
-   * Enabled`), así que NO se intenta: el pedido se arma en cliente y viaja como resumen por
-   * `wa.me`, sin `Order` y sin código.
+   * del carrito.
    *
-   * La regla es la MISMA para el staff: sin módulo 20 no hay pedido que registrar, así que el modo
-   * staff no cambia nada aquí (solo el texto del botón, que anuncia lo que va a pasar).
+   * Con el 20 el alta es SÍNCRONA: se espera la respuesta, se muestra el código y el pedido se
+   * puede gestionar. SIN el 20 el alta sigue existiendo —el 19 es el que habilita el carrito— pero
+   * se persiste en SEGUNDO PLANO: el pedido y el handoff por WhatsApp salen en el mismo gesto y el
+   * cliente no espera a la base. Las vistas de gestión siguen ocultas hasta que se active el 20.
    */
-  const persistsOrders = config.gestionPedidosEnabled;
+  const managesOrders = config.gestionPedidosEnabled;
 
   /**
-   * ¿Sale el resumen por WhatsApp? Para el cliente anónimo siempre; para el STAFF de la tienda
-   * solo cuando el pedido NO se persistió.
-   *
-   * El modo staff significa "el pedido queda en el sistema de esta tienda, que lo está
-   * managing": mandarlo también a WhatsApp sería duplicarlo. Pero sin el módulo 20 no hay sistema
-   * al que quede — no se ha creado ningún `Order` — así que el `wa.me` es el ÚNICO camino que le
-   * queda al pedido y se le da a cualquiera. La alternativa (suprimir el aviso por ser staff)
-   * dejaría un botón que no hace nada visible, que es peor que un handoff de más.
+   * ¿Sale el resumen por WhatsApp? Con gestión, para el cliente anónimo siempre y para el STAFF
+   * solo cuando el pedido NO se persistió. SIN gestión, siempre: no hay panel donde verlo y el
+   * chat es la única constancia inmediata, también para staff.
    */
-  const sendsByWhatsapp = !staffMode || !persistsOrders;
+  const sendsByWhatsapp = managesOrders ? !staffMode : true;
 
   // Un aviso del pedido ANTERIOR no puede quedar flotando mientras se hace el siguiente: abrir
   // el checkout es empezar un pedido nuevo.
@@ -189,25 +182,25 @@ export function StorefrontCheckout({
     setSubmitting(true);
 
     // ── 1) EL PEDIDO ────────────────────────────────────────────────────────────────────────
-    // Aislado en su propio try/catch: un fallo aquí SÍ es un fallo del alta y se muestra como tal.
-    //
-    // `created === null` NO es un fallo: es el modo SIN PERSISTENCIA (M3). Sin el módulo 20 no
-    // se llama al servicio NADA —ni para fallar: un `POST` ahí solo conseguiría el 400 que el
-    // backend devuelve por diseño— y lo que sigue arma el resumen con el carrito del cliente.
+    // El cuerpo es el MISMO en los dos modos: solo `productId` + `quantity`, nunca precios. El
+    // servidor recalcula el total con el catálogo publicado, y la dirección solo viaja con
+    // domicilio (con recogida el backend la ignora y el cliente no la escribe porque ni la ve).
+    const orderPayload = {
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      deliveryType,
+      ...(deliverySelected ? { deliveryAddress: deliveryAddress.trim() } : {}),
+      ...(notes.trim() ? { notes: notes.trim() } : {}),
+      items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
+    };
+
+    // Con "Gestión de Pedidos" (20) el alta es SÍNCRONA: se espera la respuesta para tener el
+    // código y abrir la consulta del pedido. SIN el 20 se persiste en SEGUNDO PLANO y se sigue
+    // de inmediato al handoff por WhatsApp: el cliente no espera a que la base confirme.
     let created: PublicOrderCreated | null = null;
-    if (persistsOrders) {
+    if (managesOrders) {
       try {
-        // Solo `productId` + `quantity`: ni precio, ni total, ni moneda. El servidor los recalcula
-        // con el catálogo publicado, y la dirección solo viaja con domicilio (con recogida el
-        // backend la ignora y el cliente no la escribe porque ni la ve).
-        const result = await catalogHttpService.createPublicOrder(storeSlug, {
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          deliveryType,
-          ...(deliverySelected ? { deliveryAddress: deliveryAddress.trim() } : {}),
-          ...(notes.trim() ? { notes: notes.trim() } : {}),
-          items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
-        });
+        const result = await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
 
         if (!result.succeeded) {
           setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
@@ -223,39 +216,38 @@ export function StorefrontCheckout({
         setSubmitting(false);
       }
     } else {
-      // Sin POST no hay nada en vuelo, así que la guarda se suelta YA: dejarlo puesto dejaría el
-      // botón apagado para siempre sin que nadie pueda volver a pulsarlo.
+      // Sin 20 no hay nada que esperar: el alta arranca en segundo plano y la guarda se suelta
+      // YA para que el botón no quede apagado. Un fallo del POST no se pinta: el pedido viaja
+      // igual por WhatsApp, que es el canal de entrega que el cliente ya conocía.
+      catalogHttpService.createPublicOrderInBackground(storeSlug, orderPayload);
       submittingRef.current = false;
       setSubmitting(false);
     }
 
     // ── 2) EL AVISO ─────────────────────────────────────────────────────────────────────────
-    // A PARTIR DE AQUÍ el pedido YA está guardado, así que NADA de lo que viene puede reportarse
-    // como un fallo del alta: `CHECKOUT.FAILED` aquí sería una mentira que además empuja al
-    // cliente a reintentar, y el reintento CREA un pedido duplicado (F4-R2). El aviso es un
-    // mensaje, no el pedido: si no se arma o no se abre, el pedido sigue existiendo y la tienda
-    // lo ve igual en su panel.
-    //
-    // En el modo SIN PERSISTENCIA (M3) no hay pedido que reintentar, así que la regla de "nada
-    // aquí es un fallo del alta" se cumple por la razón contraria y más fuerte: lo único que
-    // queda por hacer es el aviso.
+    // En el flujo SÍNCRONO el pedido YA está guardado. En el ASÍNCRONO ya salió el handoff y la
+    // persistencia es best-effort. En los dos, nada de lo que viene puede reportarse como un
+    // fallo del alta: `CHECKOUT.FAILED` aquí sería una mentira que además empuja al cliente a
+    // reintentar, y el reintento CREA un pedido duplicado (F4-R2). El aviso es un mensaje, no el
+    // pedido: si no se arma o no se abre, el pedido sigue existiendo (o sigue viajando por
+    // WhatsApp) y la tienda lo ve igual en su panel cuando corresponda.
     //
     // Por eso el alta se reporta SIEMPRE —también en modo staff, donde no hay aviso que armar—
     // y solo el paso de aviso va protegido.
     try {
-      // Con el pedido YA guardado, en modo staff eso es TODO lo que hay que hacer: el cliente
-      // está delante y el pedido es suyo, así que no se arma el enlace, no se abre `wa.me` y no
-      // se pinta aviso. `onCreated` es lo que el padre ya usaba como confirmación (cierra el
-      // checkout y abre el estado del pedido recién creado), así que el mismo gesto confirma
-      // igual en los dos modos.
+      // Con gestión y modo staff, el pedido ya está guardado y eso es TODO: el cliente está
+      // delante y el pedido es suyo, así que no se arma el enlace, no se abre `wa.me` y no se
+      // pinta aviso. `onCreated` es lo que el padre ya usaba como confirmación (cierra el
+      // checkout y abre el estado del pedido recién creado). Sin gestión, el staff también manda
+      // el resumen: no hay panel donde verlo.
       if (sendsByWhatsapp) {
         // Aquí lo único que queda es mandar el aviso. `buildWhatsAppOrderLink` devuelve
         // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada — el
         // envío queda bloqueado y el pedido sigue existiendo (la tienda lo ve en su panel).
         //
-        // Los DATOS del resumen son los del SERVIDOR cuando el pedido se persistió (snapshot
-        // guardado) y los del CARRITO cuando no (M3), porque en ese modo es lo único que hay:
-        // no hay `Order` al que cruzarlos y el resumen ES el pedido.
+        // Los DATOS del resumen son los del SERVIDOR cuando el alta fue SÍNCRONA (snapshot
+        // guardado) y los del CARRITO cuando se persiste en segundo plano (sin módulo 20): en ese
+        // modo no hay respuesta con la que cruzarlos, y el resumen ES lo que viaja por WhatsApp.
         const link = buildWhatsAppOrderLink({
           whatsappNumber: created ? created.whatsappNumber : config.whatsappNumber,
           storeName: storeName ?? storeSlug,
@@ -327,11 +319,11 @@ export function StorefrontCheckout({
       if (sendsByWhatsapp) setWhatsapp({ code: created?.code ?? null, link: null });
     }
 
-    // El gesto se reporta según lo que PASÓ, no siempre igual: con pedido guardado se llama a
-    // `onCreated` (el padre lo pinta, vacía el carrito y abre su consulta) y sin él —M3— no hay
-    // `Order` que reportar, así que se avisa por `onSentWithoutOrder` y el carrito se queda
-    // intacto. Confundir los dos sería peor que no decir nada: el padre abriría la consulta de un
-    // pedido que no existe.
+    // El gesto se reporta según lo que PASÓ, no siempre igual: con el alta SÍNCRONA se llama a
+    // `onCreated` (el padre lo pinta, vacía el carrito y abre su consulta) y sin ella —alta en
+    // segundo plano— no hay DTO con código que reportar, así que se avisa por
+    // `onSentWithoutOrder` y el carrito se queda intacto. Confundir los dos sería peor que no
+    // decir nada: el padre abriría la consulta de un pedido cuyo código nunca recibió.
     if (created) onCreated(created);
     else onSentWithoutOrder?.();
   }
@@ -393,11 +385,12 @@ export function StorefrontCheckout({
               disabled={submitting}
               data-testid="checkout-submit"
             >
-              {/* La etiqueta anuncia lo que va a HACER, y sin el módulo 20 eso no es "registrar"
-                  ni "crear": es mandar el resumen por WhatsApp. El modo staff se queda con sus
-                  dos etiquetas solo cuando hay pedido que registrar de verdad. */}
+              {/* La etiqueta anuncia lo que va a HACER: sin el módulo 20 el alta es en segundo
+                  plano y lo que el cliente ve es el envío por WhatsApp; con el 20, el pedido se
+                  registra y se puede consultar. El modo staff se queda con sus dos etiquetas solo
+                  cuando hay pedido que registrar y gestionar de verdad. */}
               {intl.formatMessage({
-                id: !persistsOrders
+                id: !managesOrders
                   ? submitting
                     ? 'CHECKOUT.SUBMITTING_WHATSAPP'
                     : 'CHECKOUT.SUBMIT_WHATSAPP'
@@ -544,9 +537,9 @@ export function StorefrontCheckout({
             {whatsapp.link === null ? (
               <div className="mt-2" data-testid="checkout-whatsapp-blocked">
                 <InfoBox variant="danger">
-                  {/* Sin pedido guardado (M3) NO se puede decir "pedido K7M2QX guardado": no hay
-                      pedido guardado. El texto distingue los dos estados en vez de repetir el
-                      mismo con un hueco donde iba el código. */}
+                  {/* Sin código (alta en segundo plano) NO se puede decir "pedido K7M2QX
+                      guardado": no hay código que dictar. El texto distingue los dos estados en
+                      vez de repetir el mismo con un hueco donde iba el código. */}
                   {whatsapp.code === null
                     ? intl.formatMessage({ id: 'CHECKOUT.WHATSAPP_BLOCKED_NO_ORDER' })
                     : intl.formatMessage({ id: 'CHECKOUT.WHATSAPP_BLOCKED' }, { code: whatsapp.code })}

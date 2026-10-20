@@ -41,6 +41,7 @@ const catalogMock = vi.hoisted(() => ({
   getPublicProduct: vi.fn(),
   getPublicOrderingConfig: vi.fn(),
   createPublicOrder: vi.fn(),
+  createPublicOrderInBackground: vi.fn(),
   getPublicOrderStatus: vi.fn(),
 }));
 
@@ -1358,8 +1359,8 @@ describe('PublicCatalogPage', () => {
       expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
     });
 
-    // Con los dos módulos el flujo es el de siempre: POST al backend y el código del pedido
-    // guardado. Se fija aquí porque es el CONTRAPUNTO del caso sin persistencia de abajo.
+    // Con los dos módulos el flujo es el de siempre: POST síncrono al backend y el código del
+    // pedido guardado. Se fija aquí porque es el CONTRAPUNTO del alta en segundo plano de abajo.
     it('con el módulo "Gestión de Pedidos" el checkout hace POST y muestra el código', async () => {
       catalogMock.createPublicOrder.mockResolvedValue(
         envelope({
@@ -1391,10 +1392,10 @@ describe('PublicCatalogPage', () => {
       );
     });
 
-    // Con solo "Pedidos WhatsApp" (19) el carrito existe pero el pedido NO se persiste (M3): sin
-    // `POST`, sin `Order`, sin código. Lo que sale es el resumen por `wa.me` con el número del
-    // CONFIG (T5), que es la única fuente disponible en este modo.
-    it('con solo "Pedidos WhatsApp" el pedido NO se persiste: sale el wa.me del cliente', async () => {
+    // Con solo "Pedidos WhatsApp" (19) el carrito existe y el pedido se persiste en SEGUNDO
+    // PLANO: no se espera respuesta, así que no hay código que mostrar. Lo que sale es el resumen
+    // por `wa.me` con el número del CONFIG (T5), en el mismo gesto.
+    it('con solo "Pedidos WhatsApp" persiste en segundo plano y sale el wa.me del cliente', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
       catalogMock.getPublicOrderingConfig.mockResolvedValue(
         envelope({
@@ -1417,16 +1418,24 @@ describe('PublicCatalogPage', () => {
       fireEvent.click(within(checkout).getByTestId('checkout-submit'));
 
       await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
-      // El backend NI SE LLAMA: sin el módulo 20 lo rechaza con un 400 y no hay nada que crear.
+      // El alta síncrona NO se usa, pero la persistencia en segundo plano SÍ arranca.
       expect(catalogMock.createPublicOrder).not.toHaveBeenCalled();
+      expect(catalogMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
+      expect(catalogMock.createPublicOrderInBackground).toHaveBeenCalledWith(
+        'mi-tienda',
+        expect.objectContaining({
+          customerName: 'Ana',
+          items: [{ productId: 'cp1', quantity: 1 }],
+        }),
+      );
       const url = openSpy.mock.calls[0][0] as string;
       expect(url).toContain('https://wa.me/5359876543?text=');
       const summary = new URL(url).searchParams.get('text') ?? '';
-      // El carrito del cliente (1 × 82.50), no el snapshot del servidor: ese snapshot no existe.
+      // El carrito del cliente (1 × 82.50), no el snapshot del servidor: esa respuesta no existe.
       expect(summary).toContain('1 × Camisa azul');
       expect(summary).toContain('Cliente: Ana');
 
-      // El aviso no promete un pedido guardado y el carrito se conserva.
+      // El aviso no muestra un código que no existe y el carrito se conserva.
       expect(await screen.findByTestId('checkout-whatsapp-pending')).toBeInTheDocument();
       expect(screen.queryByTestId('order-code')).not.toBeInTheDocument();
       expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toHaveLength(1);

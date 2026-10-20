@@ -23,6 +23,7 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
 
 const serviceMock = vi.hoisted(() => ({
   createPublicOrder: vi.fn(),
+  createPublicOrderInBackground: vi.fn(),
   getPublicOrderStatus: vi.fn(),
 }));
 
@@ -774,9 +775,9 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
       // ── F4-R4 / T5 ──────────────────────────────────────────────────────────────────────
       // Dónde viaja el número de la tienda. F4-T2 lo dejó SOLO en la respuesta de creación;
-      // T5 (2026-10-10) lo añadió TAMBIÉN al config público, porque el modo sin persistencia (M3)
-      // no hace `POST` y no tiene respuesta de creación de la que sacarlo. La PRUEBA de que el
-      // config público lo lleva está en el handler backend
+      // T5 (2026-10-10) lo añadió TAMBIÉN al config público, porque el alta en segundo plano
+      // (sin módulo 20) no espera la respuesta de creación y no tiene de dónde sacarlo. La PRUEBA
+      // de que el config público lo lleva está en el handler backend
       // (`GetPublicOrderingConfigQueryHandlerTests`) y en los tests de página que arman el `wa.me`
       // con `config.whatsappNumber`. Aquí se fija, con CLAVES REALES, lo que ve el CLIENTE: el alta
       // lleva el número y los importes del servidor; el config no los lleva.
@@ -784,7 +785,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(Object.keys(CREATED_WITH_NUMBER)).toContain('whatsappNumber');
         // Los importes del SERVIDOR solo se conocen al crear el pedido: el config público no los
         // lleva, así que el resumen del flujo persistido no podría armarse con la respuesta del
-        // alta... y el del modo sin persistencia los toma del propio carrito.
+        // alta... y el del alta en segundo plano los toma del propio carrito.
         expect(Object.keys(CONFIG)).not.toContain('lines');
         expect(Object.keys(CONFIG)).not.toContain('subtotal');
         expect(Object.keys(CREATED_WITH_NUMBER)).toEqual(
@@ -816,13 +817,12 @@ describe('storefront cart / checkout / order status (F3)', () => {
     });
   });
 
-  // ── M3: GATING POR MÓDULOS EN EL CHECKOUT ───────────────────────────────────────────────
-  // "Pedidos WhatsApp" (19) abre el carrito; "Gestión de Pedidos" (20) es lo que hace que el
-  // pedido se PERSISTA. Con solo el 19 el checkout NO hace `POST`: arma el `wa.me` con el carrito
-  // del cliente y no guarda nada. El backend lo rechaza con 400 si se intentara
-  // (`OnlineOrdersModuleNotEnabled`), así que el cliente ni lo intenta.
-  describe('gating por módulos (M2/M3)', () => {
-    /** Config con carrito (19) y SIN persistencia (20): el modo que manda el pedido por `wa.me`. */
+  // ── GATING POR MÓDULOS EN EL CHECKOUT ───────────────────────────────────────────────────
+  // "Pedidos WhatsApp" (19) abre el carrito. "Gestión de Pedidos" (20) decide si el alta es
+  // SÍNCRONA (se espera código y se abre la consulta) o en SEGUNDO PLANO (se persiste y se manda
+  // el resumen por `wa.me` en el mismo gesto). El pedido se guarda en los dos modos.
+  describe('gating por módulos (19/20)', () => {
+    /** Config con carrito (19) y SIN gestión (20): el modo que persiste en segundo plano. */
     const CONFIG_WITHOUT_ORDER_MANAGEMENT: PublicOrderingConfig = {
       ...CONFIG,
       gestionPedidosEnabled: false,
@@ -849,19 +849,32 @@ describe('storefront cart / checkout / order status (F3)', () => {
       fireEvent.click(screen.getByTestId('checkout-submit'));
     }
 
-    it('sin "Gestión de Pedidos" NO hace POST: el pedido no se persiste', async () => {
+    it('sin "Gestión de Pedidos" persiste en segundo plano y abre WhatsApp en el mismo gesto', () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-      serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED));
       const onCreated = vi.fn();
-      renderCheckout({ onCreated });
+      const onSentWithoutOrder = vi.fn();
+      renderCheckout({ onCreated, onSentWithoutOrder });
 
       submitValidOrder();
 
-      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      // Sin `await`: el handoff NO espera a la base. La persistencia arranca en segundo plano y el
+      // aviso de WhatsApp se abre en el mismo tick del clic.
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledWith(
+        'mi-tienda',
+        expect.objectContaining({
+          customerName: 'Ana',
+          customerPhone: '5351234567',
+          items: [{ productId: 'p1', quantity: 2 }],
+        }),
+      );
+      // El alta síncrona (la que devuelve código) no se usa en este modo.
       expect(serviceMock.createPublicOrder).not.toHaveBeenCalled();
-      // Y no se reporta una orden que no existe: el padre no puede abrir la consulta de un
-      // pedido que nadie guardó.
+      // No se reporta una orden con código que no se recibió: el padre cierra el checkout y deja
+      // el carrito intacto.
       expect(onCreated).not.toHaveBeenCalled();
+      expect(onSentWithoutOrder).toHaveBeenCalledTimes(1);
     });
 
     it('sin "Gestión de Pedidos" el resumen se arma con el CARRITO y el número del CONFIG', async () => {
@@ -871,6 +884,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
       submitValidOrder();
 
       await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
       const [url, target, features] = openSpy.mock.calls[0] as [string, string, string];
       // El número sale del CONFIG (T5), no de una respuesta de alta que en este modo no existe.
       expect(url).toContain('https://wa.me/5359876543?text=');
@@ -884,13 +898,13 @@ describe('storefront cart / checkout / order status (F3)', () => {
       expect(summary).toContain(`Subtotal: ${money(165)}`);
       expect(summary).toContain(`TOTAL: ${money(165)}`);
       expect(summary).toContain('Cliente: Ana');
-      // Sin pedido guardado no hay código que dictar, así que la cabecera no inventa uno.
+      // Sin respuesta síncrona no hay código que dictar, así que la cabecera no inventa uno.
       expect(summary).not.toContain('K7M2QX');
     });
 
-    // El aviso NO puede decir "pedido K7M2QX guardado": en este modo no hay pedido guardado, y esa
-    // frase dejaría al cliente esperando un código que la tienda nunca va a(dictar.
-    it('el aviso sin código no promete un pedido guardado', async () => {
+    // El aviso NO puede decir "pedido K7M2QX guardado": en este modo no hay código que el cliente
+    // pueda dictar, y esa frase lo dejaría esperando uno que la tienda nunca va a recibir.
+    it('el aviso sin código no promete un código que no existe', async () => {
       vi.spyOn(window, 'open').mockImplementation(() => null);
       renderCheckout();
 
@@ -908,11 +922,12 @@ describe('storefront cart / checkout / order status (F3)', () => {
       );
     });
 
-    it('el botón anuncia el envío por WhatsApp, no un registro que no va a pasar', () => {
+    it('el botón anuncia el envío por WhatsApp, no un registro síncrono', () => {
       renderCheckout();
       expect(screen.getByTestId('checkout-submit')).toHaveTextContent('Enviar por WhatsApp');
 
-      // Ni el cliente anónimo ni el staff: sin módulo 20 no hay pedido que registrar.
+      // Ni el cliente anónimo ni el staff: sin módulo 20 el alta es en segundo plano y lo único
+      // visible es el envío por WhatsApp.
       cleanup();
       renderCheckout({ staffMode: true });
       expect(screen.getByTestId('checkout-submit')).toHaveTextContent('Enviar por WhatsApp');
@@ -927,6 +942,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
       submitValidOrder();
 
       await waitFor(() => expect(onSentWithoutOrder).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
       // El carrito no se vacía desde aquí: el componente no lo tiene. Lo que NO puede pasar es
       // vaciarlo como si el pedido estuviera confirmado, y eso lo decide el padre.
     });
@@ -938,22 +954,23 @@ describe('storefront cart / checkout / order status (F3)', () => {
       submitValidOrder();
 
       expect(await screen.findByTestId('checkout-whatsapp-blocked')).toHaveTextContent(
-        'no se ha guardado',
+        'envío quedó bloqueado',
       );
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
       expect(openSpy).not.toHaveBeenCalled();
       expect(screen.queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
     });
 
-    // El staff SIN el módulo 20 es el cruce de los dos modos: "registrar" solo tiene sentido si hay
-    // algo que registrar. Sin él el pedido no existe en ninguna parte, así que el handoff se hace
-    // igual —si no, el botón sería un no-op silencioso para quien sí puede mandar el resumen.
-    it('el staff sin "Gestión de Pedidos" también manda el resumen por WhatsApp', async () => {
+    // El staff SIN el módulo 20: el alta se persiste en segundo plano y el handoff por WhatsApp
+    // también se hace — no hay panel donde verlo y el chat es la constancia inmediata.
+    it('el staff sin "Gestión de Pedidos" persiste en segundo plano y manda el resumen', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
       renderCheckout({ staffMode: true });
 
       submitValidOrder();
 
       await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrderInBackground).toHaveBeenCalledTimes(1);
       expect(serviceMock.createPublicOrder).not.toHaveBeenCalled();
       expect(await screen.findByTestId('checkout-whatsapp-pending')).toBeInTheDocument();
     });

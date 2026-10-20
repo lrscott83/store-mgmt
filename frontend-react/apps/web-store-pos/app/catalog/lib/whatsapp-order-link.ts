@@ -43,8 +43,8 @@ export interface WhatsAppOrderLinkInput {
   readonly storeName: string;
   /**
    * Código del pedido: se dicta por WhatsApp y es lo que la tienda cruza con su panel. Es
-   * OPCIONAL: en el modo SIN PERSISTENCIA (M3, solo módulo 19) no hay `Order`, así que no hay
-   * código que dictar y el encabezado NO lo inventa.
+   * OPCIONAL: en el alta en SEGUNDO PLANO (solo módulo 19) no hay respuesta síncrona con código,
+   * así que el encabezado NO lo inventa aunque el pedido se guarde en segundo plano.
    */
   readonly code?: string | null;
   readonly lines: readonly WhatsAppOrderLine[];

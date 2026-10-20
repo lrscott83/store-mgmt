@@ -171,7 +171,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             Guid tenantId = store.TenantId;
 
             StoreCatalogSettings settings = await LoadEnabledSettingsAsync(storeId);
-            await EnsureGestionPedidosAsync(storeId);
+            await EnsurePedidosWhatsAppAsync(storeId);
             OrderDeliveryType deliveryType = ResolveDeliveryType(request.DeliveryType, settings);
             ValidateDeliveryAddress(deliveryType, request.DeliveryAddress);
 
@@ -283,16 +283,16 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         }
 
         /// <summary>
-        /// Este comando ESCRIBE en <c>Order</c>, así que exige el módulo "Gestión de Pedidos"
-        /// (M3). Es la contraparte de servidor del gating que hace el frontend: con el carrito
-        /// abierto pero SIN este módulo el checkout no debería hacer <c>POST</c> —arma el
-        /// <c>wa.me</c> en cliente y no se guarda nada—, así que un <c>POST</c> aquí es un cliente
-        /// que se salta el gating (o uno viejo que no lo conoce). Sin <c>Order</c> no hay nada que
-        /// gestionar: ningún Pedido, ninguna venta, ningún reparto.
+        /// Este comando ESCRIBE en <c>Order</c>, así que exige el módulo "Pedidos WhatsApp" (19):
+        /// es el que habilita el CARRITO y, con él, la persistencia del pedido. "Gestión de
+        /// Pedidos" (20) es una capacidad DISTINTA —las vistas de cola, repartidores y ventas— y
+        /// por eso NO es la puerta del alta: una tienda con el 19 y sin el 20 sigue registrando
+        /// pedidos (el storefront los persiste en segundo plano), simplemente no tiene dónde
+        /// gestionarlos todavía. Al activar el 20 aparecen.
         ///
-        /// OJO — esto NO es una autorización de seguridad, es la puerta de negocio de M3. Los
-        /// módulos son de TIENDA (fila <c>StoreModule.IsActive</c>), no del plan, y el comando es
-        /// público: sin esta comprobación, quitarle el módulo a una tienda no impediría seguir
+        /// OJO — esto NO es una autorización de seguridad, es la puerta de negocio del carrito.
+        /// Los módulos son de TIENDA (fila <c>StoreModule.IsActive</c>), no del plan, y el comando
+        /// es público: sin esta comprobación, quitarle el módulo a una tienda no impediría seguir
         /// guardándole pedidos.
         ///
         /// Lectura PÚBLICA (`GetPublicActiveModuleIdsByStoreIdAsync`), por el MISMO motivo que la
@@ -300,19 +300,15 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         /// ANÓNIMA. Con la lectura de sesión el conjunto saldría VACÍO y TODO pedido sería
         /// rechazado — sin error ni aviso— aunque la tienda tuviera el módulo comprado.
         ///
-        /// El módulo 19 ("Pedidos WhatsApp") NO se exige aquí, y es deliberado: el 19 habilita el
-        /// CARRITO (M2), no la persistencia. Quien solo tiene el 19 debe poder pedir por
-        /// WhatsApp, y ese camino no pasa por este comando.
-        ///
         /// Se comprueba DESPUÉS de la configuración y ANTES de cualquier escritura: una tienda sin
         /// el módulo recibe 400 sin que se llegue a crear el <c>Order</c>.
         /// </summary>
-        private async Task EnsureGestionPedidosAsync(Guid storeId)
+        private async Task EnsurePedidosWhatsAppAsync(Guid storeId)
         {
             IReadOnlyCollection<int> activeModuleIds =
                 await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(storeId);
 
-            if (!activeModuleIds.Contains((int)ModuleType.GestionPedidos))
+            if (!activeModuleIds.Contains((int)ModuleType.PedidosWhatsApp))
                 throw new ApiException(_localizer["OnlineOrdersModuleNotEnabled", storeId], HttpStatusCode.BadRequest);
         }
 
