@@ -48,8 +48,16 @@ function readJsonLd(script: HTMLScriptElement) {
   return JSON.parse(script.textContent ?? '{}');
 }
 
+function readApplication(script: HTMLScriptElement) {
+  return readJsonLd(script)['@graph'].find(
+    (node: { '@type': string }) => node['@type'] === 'SoftwareApplication',
+  );
+}
+
 afterEach(() => {
-  document.head.querySelectorAll('script[type="application/ld+json"]').forEach((node) => node.remove());
+  document.head
+    .querySelectorAll('script[type="application/ld+json"]')
+    .forEach((node) => node.remove());
 });
 
 describe('buildPlanOffers', () => {
@@ -82,18 +90,15 @@ describe('applyPlanOffersToDocument', () => {
   it('adds offers to the SoftwareApplication node and keeps the rest of the graph intact', () => {
     const script = seedJsonLd();
 
-    expect(applyPlanOffersToDocument(PLANS, document)).toBe(true);
+    applyPlanOffersToDocument(PLANS);
 
     const payload = readJsonLd(script);
-    const app = payload['@graph'].find(
-      (node: { '@type': string }) => node['@type'] === 'SoftwareApplication',
-    );
     const organization = payload['@graph'].find(
       (node: { '@type': string }) => node['@type'] === 'Organization',
     );
 
     expect(organization).toEqual(BASE_JSON_LD['@graph'][0]);
-    expect(app.offers).toEqual([
+    expect(readApplication(script).offers).toEqual([
       { '@type': 'Offer', name: 'Gratis', price: '0.00', priceCurrency: 'USD' },
       { '@type': 'Offer', name: 'Pago', price: '5.00', priceCurrency: 'USD' },
       { '@type': 'Offer', name: 'Superior', price: '10.00', priceCurrency: 'USD' },
@@ -103,39 +108,56 @@ describe('applyPlanOffersToDocument', () => {
   it('replaces the offers on a second run instead of stacking them', () => {
     const script = seedJsonLd();
 
-    applyPlanOffersToDocument(PLANS, document);
-    applyPlanOffersToDocument([plan({ name: 'Pago', currentPrice: 7 })], document);
+    applyPlanOffersToDocument(PLANS);
+    applyPlanOffersToDocument([plan({ name: 'Pago', currentPrice: 7 })]);
 
-    const app = readJsonLd(script)['@graph'].find(
-      (node: { '@type': string }) => node['@type'] === 'SoftwareApplication',
-    );
-    expect(app.offers).toEqual([
+    expect(readApplication(script).offers).toEqual([
       { '@type': 'Offer', name: 'Pago', price: '7.00', priceCurrency: 'USD' },
     ]);
   });
 
+  it('re-escapes the script terminator when the graph is written back', () => {
+    const script = seedJsonLd({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'SoftwareApplication',
+          name: 'VendeDTo',
+          description: 'Cierre </script><script>alert(1)</script>',
+        },
+      ],
+    });
+
+    applyPlanOffersToDocument(PLANS);
+
+    expect(script.textContent).not.toContain('</script>');
+    expect(readApplication(script).description).toBe('Cierre </script><script>alert(1)</script>');
+  });
+
   it('leaves the document untouched when there is no JSON-LD script (dev server)', () => {
-    expect(applyPlanOffersToDocument(PLANS, document)).toBe(false);
+    applyPlanOffersToDocument(PLANS);
+
     expect(document.head.querySelectorAll('script[type="application/ld+json"]')).toHaveLength(0);
   });
 
   it('does not throw on malformed JSON or a graph without SoftwareApplication', () => {
     const broken = seedJsonLd('{ not json');
 
-    expect(applyPlanOffersToDocument(PLANS, document)).toBe(false);
+    expect(() => applyPlanOffersToDocument(PLANS)).not.toThrow();
     expect(broken.textContent).toBe('{ not json');
 
     broken.remove();
     seedJsonLd({ '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization' }] });
 
-    expect(applyPlanOffersToDocument(PLANS, document)).toBe(false);
+    expect(() => applyPlanOffersToDocument(PLANS)).not.toThrow();
   });
 
   it('does nothing when the plan list is empty (endpoint down)', () => {
     const script = seedJsonLd();
     const before = script.textContent;
 
-    expect(applyPlanOffersToDocument([], document)).toBe(false);
+    applyPlanOffersToDocument([]);
+
     expect(script.textContent).toBe(before);
   });
 });

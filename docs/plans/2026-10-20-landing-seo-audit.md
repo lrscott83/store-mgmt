@@ -187,6 +187,42 @@ Sugerencias restantes (no bloqueantes, sin acción): catch inalcanzable en `JSON
   (`store-plan`, timeout bajo carga) falló en la corrida completa y pasa aislado 12/12: mismo
   patrón de flake ambiental que `channel-rates` en la iteración anterior.
 
+### Iteración 4 — las seis sugerencias restantes
+
+| Sugerencia | Resolución |
+|---|---|
+| Catch inalcanzable en `JSON.stringify` | eliminado |
+| `priceCurrency` sin uso | parámetro fuera; constante `PRICE_CURRENCY` |
+| Booleano de retorno descartado | `applyPlanOffersToDocument` devuelve `void`; los tests afirman el DOM, no un flag |
+| `document` global sin guard | `doc?: Document` con guarda `typeof document` |
+| Re-escapado del `<` | `JSON.stringify(...).replace(/</g, '\\u003c')`, igual que el build |
+| Doble inyección sin test | test que inyecta dos veces y exige un solo bloque `ld+json` |
+
+- Evidencia: enfocados 46/46; `lint` 0; `typecheck` 0. Sonda de mutación sobre el re-escapado:
+  quitando el `.replace`, el test falla (el test muerde).
+
+---
+
+## 6. Flakes de la suite completa — diagnóstico
+
+No son del cambio ni del producto. Evidencia recogida en tres corridas completas:
+
+| Corrida | Duración | Fallos |
+|---|---|---|
+| 1 | 322 s | 0 |
+| 2 | 515 s | `channel-rates` (timeout 5 s) |
+| 3 | 895 s | `feature-loader-timing`, `module-catalog`, `channel-rates` (los tres, timeout 5 s) |
+
+- Los tres fallos de la corrida 3 son **`Test timed out in 5000ms`**, en archivos sin relación entre
+  sí ni con la landing, y los tres pasan aislados (24/24, 12/12).
+- La máquina tenía **53 procesos `node`**: 25 de `codegraph` (uno con ~3 554 s de CPU acumulada) y
+  16 `npx`. Es un Ryzen 7 5800U (8C/16T) sobrecargado.
+- El tiempo de suite creció 2,8× con el mismo código: es contención de CPU, no una regresión.
+
+**Recomendación:** no tocar la suite. Si se quiere blindar contra máquinas cargadas, subir
+`testTimeout`/`hookTimeout` en `vitest.config.ts` (hoy 5 s por defecto) es la palanca, pero alarga la
+detección de un cuelgue real; es una decisión de infraestructura, no de este cambio.
+
 ---
 
 ## 5. Pendiente (no incluido aquí)

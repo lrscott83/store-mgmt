@@ -128,6 +128,16 @@ describe('injectLandingMeta', () => {
     expect(html).not.toContain('<br>');
   });
 
+  it('keeps a single JSON-LD block when the injected HTML is injected again', () => {
+    const once = injectLandingMeta(SHELL, { baseUrl: BASE });
+    const twice = injectLandingMeta(once, { baseUrl: BASE });
+
+    expect(twice.match(/<script type="application\/ld\+json">/g)).toHaveLength(1);
+    expect(twice.split('<title>')).toHaveLength(2);
+    expect(twice.split('name="description"')).toHaveLength(2);
+    expect(twice).toContain(`<link rel="canonical" href="${BASE}/" />`);
+  });
+
   it('ships an Open Graph image whose real pixels match the declared dimensions', async () => {
     const png = await readFile(resolve(process.cwd(), 'public/og-image.png'));
 
