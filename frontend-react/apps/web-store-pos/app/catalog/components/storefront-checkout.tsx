@@ -242,8 +242,9 @@ export function StorefrontCheckout({
       // el resumen: no hay panel donde verlo.
       if (sendsByWhatsapp) {
         // Aquí lo único que queda es mandar el aviso. `buildWhatsAppOrderLink` devuelve
-        // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada — el
-        // envío queda bloqueado y el pedido sigue existiendo (la tienda lo ve en su panel).
+        // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada: el
+        // envío queda bloqueado. Con gestión el pedido sigue existiendo y la tienda lo ve en su
+        // panel; sin gestión se persiste en segundo plano y la tienda lo recibe por el chat.
         //
         // Los DATOS del resumen son los del SERVIDOR cuando el alta fue SÍNCRONA (snapshot
         // guardado) y los del CARRITO cuando se persiste en segundo plano (sin módulo 20): en ese
@@ -268,7 +269,7 @@ export function StorefrontCheckout({
               })),
           subtotal: created ? created.subtotal : subtotal,
           total: created ? created.total : subtotal,
-          // Sin pedido guardado NO hay moneda del servidor: la del catálogo de la línea, que es
+          // Sin respuesta SÍNCRONA no hay moneda del servidor: la del catálogo de la línea, que es
           // de donde salió ese precio. Sin costo de envío (A3), el total es el subtotal.
           currency: created ? created.currency : currencyFromCode(currency),
           deliveryType: deliverySelected ? 'delivery' : 'pickup',
@@ -304,12 +305,13 @@ export function StorefrontCheckout({
         setWhatsapp({ code: created?.code ?? null, link });
       }
     } catch (err) {
-      // El resumen no se pudo componer (`created.lines` que no es un array, por ejemplo). El
-      // pedido YA está guardado, así que callar aquí dejaba al cliente sin handoff de WhatsApp Y
-      // sin error visible (R3-1). Ahora el aviso se pinta igualmente con el código y sin enlace:
-      // `link: null` ya significa "envío bloqueado, el pedido existe", que es exactamente lo que
-      // el cliente puede hacer —decir el código por otro medio— y lo que la tienda ve en su
-      // panel. El `console.warn` deja constancia de por qué el resumen no se armó.
+      // El resumen no se pudo componer (`created.lines` que no es un array, por ejemplo). En el
+      // flujo síncrono el pedido YA está guardado; en el asíncrono el handoff ya salió y la
+      // persistencia es best-effort. Callar aquí dejaba al cliente sin aviso Y sin error visible
+      // (R3-1). Ahora el aviso se pinta igualmente con el código (si lo hay) y sin enlace:
+      // `link: null` significa "envío bloqueado", que es exactamente lo que el cliente puede
+      // hacer —decir el código por otro medio o reenviar el resumen—. El `console.warn` deja
+      // constancia de por qué el resumen no se armó.
       // El `!sendsByWhatsapp` es el mismo criterio del bloque de arriba: en modo staff con el
       // pedido guardado no hay aviso que pintar, ni siquiera al fallar.
       console.warn(
