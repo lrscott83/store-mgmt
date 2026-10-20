@@ -61,7 +61,10 @@ public sealed class StoreAuthorizationTests
             var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).PutAsJsonAsync($"/api/v1/stores/{sa.StoreId}", new
             {
                 Id = Guid.Empty, Name = newName, Address = "owner-addr", Description = "SHOULD-BE-IGNORED",
-                Approved = true, ModuleIds = new[] { StoreSeed.ManagementModuleId }, IsActive = false
+                Approved = true, ModuleIds = new[] { StoreSeed.ManagementModuleId }, IsActive = false,
+                // The public location block (Address included) is opt-in since T8: the flag is
+                // not a privilege, it only says this payload owns the block.
+                UpdateLocation = true
             });
             r.StatusCode.Should().Be(HttpStatusCode.OK);
             var row = await StoreSeed.GetStoreRowAsync(_f, sa.StoreId);

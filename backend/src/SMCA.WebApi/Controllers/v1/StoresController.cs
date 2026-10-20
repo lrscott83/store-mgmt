@@ -1,6 +1,8 @@
 ﻿using Application.Dtos.ApplicationManagement.Tenants;
 using Application.Dtos.StoreManagement;
+using Application.Dtos.WebCatalog;
 using Application.Features.ApplicationManagement.Tenants.Queries.GetTenantById;
+using Application.Features.WebCatalog.Queries.GetCatalogStats;
 using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
 using Application.Features.StoreManagement.Stores.Commands.ToggleStorePlan;
 using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
@@ -177,9 +179,14 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdatedStoreAsync(Guid id, [FromBody] UpdateStoreCommand command)
         {
-            return Ok(await Sender.Send(
-                new UpdateStoreCommand(id, command.Name, command.Address, command.Description,
-                command.Approved, command.ModuleIds, command.IsActive, command.PaymentStartDate)));
+            // public-catalog-static-pages (T8): the bound command is forwarded as-is; only the
+            // route id and the plan override are pinned. The previous hand-kept 16-argument
+            // projection silently dropped UpdateLocation and the six location fields, so the
+            // flag was always false over HTTP and the catalog panel's save persisted nothing.
+            // Passing the record through means a field added to UpdateStoreCommand cannot be
+            // forgotten here again. PlanId stays null on purpose: plan changes have their own
+            // dedicated path and this PUT must not start applying a body-supplied plan id.
+            return Ok(await Sender.Send(command with { Id = id, PlanId = null }));
         }
 
         /// <summary>
@@ -364,6 +371,19 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreCatalogTemplateAsync(Guid storeId)
             => Ok(await Sender.Send(new GetStoreCatalogTemplateQuery(storeId)));
+
+        /// <summary>
+        /// Estadísticas del catálogo de UNA tienda (SuperAdmin): visitas, visitantes únicos,
+        /// páginas vistas, pedidos online, conversión, orígenes, top productos y serie diaria.
+        /// La ruta es per-tienda, igual que `catalog-template` y `module-pricing`.
+        /// </summary>
+        [HttpGet("{storeId}/catalog-stats")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<CatalogStatsDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetCatalogStatsAsync(Guid storeId,
+            [FromQuery] int days = GetCatalogStatsQuery.DefaultDays)
+            => Ok(await Sender.Send(new GetCatalogStatsQuery(storeId, days)));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]

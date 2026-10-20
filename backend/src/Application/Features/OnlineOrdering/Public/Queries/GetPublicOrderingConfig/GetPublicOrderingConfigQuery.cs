@@ -105,14 +105,16 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 // conjunto sale vacío y los dos flags quedan en false, que es lo correcto para una
                 // tienda que no compró ninguno de los dos módulos.
                 PedidosWhatsAppEnabled = activeModuleIds.Contains((int)ModuleType.PedidosWhatsApp),
+                // El 20 decide el MODO del alta (síncrona vs. segundo plano), NO si se persiste:
+                // con el 19 el pedido se guarda igual. Las vistas de gestión sí dependen del 20.
                 GestionPedidosEnabled = activeModuleIds.Contains((int)ModuleType.GestionPedidos),
                 // NÚMERO DE WHATSAPP (revierte F4-T2, 2026-10-10). Sale de la MISMA fila que el
-                // resto de la configuración, sin ninguna lectura extra, y con la justificación
-                // del modo SIN PERSISTENCIA: con solo el módulo 19 el checkout NO hace POST, así
-                // que no hay respuesta de creación de la que sacarlo y sin este campo el frontend
-                // no puede armar el `wa.me`. Sin fila (o con el número en blanco) sale null: no hay
-                // a quién escribir, y el storefront bloquea el envío en vez de abrir un chat
-                // contra un destinatario vacío.
+                // resto de la configuración, sin ninguna lectura extra. En el alta en SEGUNDO
+                // PLANO (sin el módulo 20) no hay respuesta de creación con la que armarlo, así
+                // que el número tiene que viajar también aquí; sin él, el frontend no puede
+                // componer el `wa.me`. Sin fila (o con el número en blanco) sale null: no hay a
+                // quién escribir, y el storefront bloquea el envío en vez de abrir un chat contra
+                // un destinatario vacío.
                 WhatsappNumber = string.IsNullOrWhiteSpace(settings?.WhatsappNumber)
                     ? null
                     : settings.WhatsappNumber,

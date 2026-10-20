@@ -148,6 +148,20 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
 
         /// <summary>
+        /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el NUMERADOR de la
+        /// conversión del catálogo (pedidos / visitas): no cuenta ventas del POS ni pedidos de otro
+        /// tipo. `IgnoreQueryFilters` porque el panel es SuperAdmin y el aislamiento lo da el
+        /// `storeId`.
+        /// </summary>
+        public async Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc)
+            => await _orders
+                .IgnoreQueryFilters()
+                .CountAsync(o => o.StoreId == storeId
+                    && o.OrderType == OrderType.WhatsApp
+                    && o.Date >= fromUtc
+                    && o.Date <= toUtc);
+
+        /// <summary>
         /// Agregado de los pedidos de UNA tienda en un rango (F6, T1). TODO el agregado ocurre en la
         /// BASE: cuatro consultas contadas y agrupadas, ninguna que devuelva filas de pedido.
         ///

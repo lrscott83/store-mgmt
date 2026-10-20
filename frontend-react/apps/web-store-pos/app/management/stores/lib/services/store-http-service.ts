@@ -46,7 +46,7 @@ interface CreateStorePayload {
   approved: boolean;
 }
 
-interface UpdateStorePayload {
+export interface UpdateStorePayload {
   id: string;
   name: string;
   address: string;

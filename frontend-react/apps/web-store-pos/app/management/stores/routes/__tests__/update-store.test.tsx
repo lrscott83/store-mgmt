@@ -230,7 +230,7 @@ describe('UpdateStorePage — data form WITHOUT the plan section', () => {
   });
 });
 
-describe('UpdateStorePage — T8: public location block rides the data save', () => {
+describe('UpdateStorePage — T8a: the location block passes through the data save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
@@ -251,7 +251,7 @@ describe('UpdateStorePage — T8: public location block rides the data save', ()
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
   });
 
-  it('sends updateLocation with the whole block converted to the wire shape', async () => {
+  it('no captura la ubicación y reenvía el bloque guardado tal cual al guardar los datos', async () => {
     const { UpdateStorePage } = await import('../update-store');
     render(
       <Wrapper>
@@ -262,9 +262,11 @@ describe('UpdateStorePage — T8: public location block rides the data save', ()
     await waitFor(() => {
       expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
     });
-    fireEvent.change(screen.getByLabelText(/teléfono público/i), {
-      target: { value: '+53 5555 9999' },
-    });
+    // La captura vive ahora en la vista del catálogo web: el formulario ya no la muestra.
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/latitud/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Apertura Lunes')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
 
     await waitFor(() => {
@@ -272,12 +274,65 @@ describe('UpdateStorePage — T8: public location block rides the data save', ()
     });
     const payload = mockUpdateStore.mock.calls[0][1];
     expect(payload.updateLocation).toBe(true);
-    expect(payload.publicPhone).toBe('+53 5555 9999');
+    // El bloque guardado viaja entero, sin tocar: lo capturado en el catálogo no se pierde.
+    expect(payload.publicPhone).toBe('+53 5555 1234');
     expect(payload.addressCity).toBe('La Habana');
-    // Coordinates travel as numbers, not as the form's strings.
     expect(payload.latitude).toBe(23.13);
     expect(payload.longitude).toBe(-82.38);
     expect(payload.openingHours).toEqual([{ day: 'Monday', opens: '09:00', closes: '17:00' }]);
+    expect(payload.name).toBe('Existing Store');
+  });
+
+  it('reenvía la ubicación del GET fresco hecho justo antes de guardar', async () => {
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        succeeded: true,
+        data: makeStore({ name: 'Existing Store', publicPhone: '+53 0000 0000' }),
+      })
+      .mockResolvedValueOnce({
+        succeeded: true,
+        data: makeStore({ name: 'Existing Store', publicPhone: '+53 7777 7777' }),
+      });
+    const { UpdateStorePage } = await import('../update-store');
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => {
+      expect(mockUpdateStore).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpdateStore.mock.calls[0][1].publicPhone).toBe('+53 7777 7777');
+  });
+
+  it('no guarda si el GET previo al guardado falla', async () => {
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValueOnce({ succeeded: true, data: makeStore({ name: 'Existing Store' }) })
+      .mockResolvedValueOnce({ succeeded: false });
+    const { UpdateStorePage } = await import('../update-store');
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(mockUpdateStore).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,10 @@ vi.mock('react-router', () => ({
   useParams: () => useParamsMock(),
 }));
 
+vi.mock('~/catalog/lib/catalog-telemetry', () => ({
+  trackCatalogEvent: vi.fn(),
+}));
+
 vi.mock('~/shared/lib/stores/auth-store', () => ({
   useAuthStore: (selector: (state: { user: null; isAuthenticated: boolean }) => unknown) =>
     selector({ user: null, isAuthenticated: false }),

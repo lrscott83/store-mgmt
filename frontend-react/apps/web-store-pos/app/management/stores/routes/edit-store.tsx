@@ -6,9 +6,10 @@ import { ownerStoresGate } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { toStoredLocationPayload } from '~/management/stores/lib/store-location-payload';
 import { StoreForm } from '~/management/stores/components/store-form';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import type { Store, Owner, OpeningHoursEntry } from '@store-mgmt/domain';
+import type { Store, Owner } from '@store-mgmt/domain';
 
 export const clientLoader = ownerStoresGate();
 
@@ -111,18 +112,19 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
     approved: boolean;
     paymentStartDate: string;
     isActive: boolean;
-    publicPhone: string;
-    addressCity: string;
-    addressProvince: string;
-    latitude: string;
-    longitude: string;
-    openingHours: OpeningHoursEntry[];
   }) {
     setError('');
     setIsLoading(true);
     try {
       if (isEditMode) {
         if (!store) return;
+        // La ubicación no se captura aquí: se reenvía el bloque GUARDADO y fresco (GET justo
+        // antes de guardar) para que este save no lo pise con el snapshot de la carga.
+        const fresh = await storeHttpService.getStore(storeId);
+        if (!fresh.succeeded) {
+          setError(intl.formatMessage({ id: 'STORES.ERROR' }));
+          return;
+        }
         await storeHttpService.updateStore(storeId, {
           id: storeId,
           name: values.name,
@@ -134,17 +136,13 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
           // binding; the backend only applies non-null.
           paymentStartDate: values.paymentStartDate || undefined,
           isActive: values.isActive,
-          // T8: the store-data view owns the public location block, so it always
-          // opts in (updateLocation) and sends the whole block — including the
-          // empty values, which clear the stored data. Callers that only rename
-          // omit the flag and never touch it.
+          // The public location block moved to the web catalog view: this form no
+          // longer captures it. The endpoint applies the WHOLE block — Address
+          // included — whenever updateLocation is on, so the form still opts in
+          // and re-sends the STORED values unchanged (fresh GET above): the address
+          // edit keeps applying and the location captured in the catalog survives.
           updateLocation: true,
-          publicPhone: values.publicPhone || undefined,
-          addressCity: values.addressCity || undefined,
-          addressProvince: values.addressProvince || undefined,
-          latitude: values.latitude ? Number(values.latitude) : undefined,
-          longitude: values.longitude ? Number(values.longitude) : undefined,
-          openingHours: values.openingHours,
+          ...toStoredLocationPayload(fresh.data),
         });
         // Angular parity: after edit, refresh user session via the consolidated
         // getUserByToken() action (auth-store.ts) — no page reload.

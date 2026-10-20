@@ -33,8 +33,9 @@ namespace SMCA.WebApi.E2ETests.Orders;
 ///     al rate limit.
 ///   * Producto en una categoría CON slug: `GetPublishedByIdsAsync` exige producto activo y en
 ///     venta de categoría activa con slug público.
-///   * Filas `StoreModule` para 19 (PedidosWhatsApp) y 20 (GestionPedidos): sin la fila de
-///     `GestionPedidos` el POST responde 400 y la tienda sembrada no puede persistir un pedido.
+///   * Filas `StoreModule` para 19 (PedidosWhatsApp) y 20 (GestionPedidos): sin la fila del 19
+///     el POST responde 400 y la tienda sembrada no puede persistir un pedido; el 20 solo
+///     habilita las vistas de gestión.
 ///   * (opcional) Un `Order` creado con `Order.CreateOnline` + líneas, para la lectura pública por
 ///     código.
 ///
@@ -95,13 +96,14 @@ internal static class PublicOrderingSeed
         store.CatalogSlug = slug;
         db.Set<Store>().Add(store);
 
-        // Módulos de pedidos 19/20 (M6). Sin estas filas la tienda sembrada NO persistiría:
-        // `CreateOnlineOrderCommandHandler.EnsureGestionPedidosAsync` consulta
+        // Módulos de pedidos 19/20 (M6). Sin la fila del 19 la tienda sembrada NO persistiría:
+        // `CreateOnlineOrderCommandHandler.EnsurePedidosWhatsAppAsync` consulta
         // `GetPublicActiveModuleIdsByStoreIdAsync` y responde 400 "OnlineOrdersModuleNotEnabled"
-        // cuando `GestionPedidos` no está en el resultado. La puerta es la FILA de `StoreModule`,
-        // no el catálogo del plan: `Store.Create` no crea filas `StoreModule` por sí solo, así que
-        // una tienda creada directo en la base nace sin módulos aunque el plan los incluya.
-        // `IsActive` no se fija: `AuditableEntity` lo inicializa en `true`, que es lo que
+        // cuando `PedidosWhatsApp` no está en el resultado. El 20 se siembra para las vistas de
+        // gestión (cola, repartidores, ventas), no para el alta. La puerta es la FILA de
+        // `StoreModule`, no el catálogo del plan: `Store.Create` no crea filas `StoreModule` por sí
+        // solo, así que una tienda creada directo en la base nace sin módulos aunque el plan los
+        // incluya. `IsActive` no se fija: `AuditableEntity` lo inicializa en `true`, que es lo que
         // `GetPublicActiveModuleIdsByStoreIdAsync` filtra. Precios a 0 — irrelevantes para el gating.
         db.Set<StoreModule>().Add(
             StoreModule.Create(store.Id, (int)ModuleType.PedidosWhatsApp, 0, true, 0, 0, 0, tenantId));

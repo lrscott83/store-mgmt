@@ -13,6 +13,7 @@ import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CatalogLocationCard } from '../components/catalog-location-card';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
 import { MAX_CATALOG_IMAGE_BYTES, MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
@@ -1270,6 +1271,11 @@ export function WebCatalogPage() {
           onMove={handleShowcaseMove}
         />
       ))}
+
+      {/* Ubicación pública (T8a): se captura aquí —antes de los productos— y no en el formulario
+          de tienda; el dato sigue guardándose en `Store` y alimenta la ficha LocalBusiness de la
+          página generada. Su guardado es propio, como el de la marca. */}
+      {storeId && <CatalogLocationCard storeId={storeId} />}
 
       {isLoading && <Spinner label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />}
 
