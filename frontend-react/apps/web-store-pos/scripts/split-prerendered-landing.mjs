@@ -31,7 +31,7 @@ export function splitPrerenderedLanding({ prerendered, fallback }) {
         'prerender is no longer emitting a clean shell',
     );
   }
-  if (!prerendered.includes('<h1')) {
+  if (!/<h1[\s>]/i.test(prerendered)) {
     throw new Error(
       'split-prerendered-landing: the prerendered landing has no <h1> - ' +
         'prerendering produced an empty body',

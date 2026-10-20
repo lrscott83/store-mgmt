@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { PublicPlanPricing } from '../public-plan-pricing';
 import { applyPlanOffersToDocument, buildPlanOffers } from '../landing-json-ld';
 
@@ -159,5 +159,30 @@ describe('applyPlanOffersToDocument', () => {
     applyPlanOffersToDocument([]);
 
     expect(script.textContent).toBe(before);
+  });
+
+  it('writes into an explicitly passed document and leaves the global one alone', () => {
+    const globalScript = seedJsonLd();
+    const otherDocument = document.implementation.createHTMLDocument('otra');
+    const otherScript = otherDocument.createElement('script');
+    otherScript.type = 'application/ld+json';
+    otherScript.textContent = JSON.stringify(BASE_JSON_LD);
+    otherDocument.head.appendChild(otherScript);
+
+    applyPlanOffersToDocument(PLANS, otherDocument);
+
+    expect(readApplication(otherScript).offers).toHaveLength(3);
+    expect(readApplication(globalScript).offers).toBeUndefined();
+  });
+
+  it('returns quietly when there is no DOM at all (SSR/prerender evaluation)', () => {
+    const originalDocument = globalThis.document;
+    vi.stubGlobal('document', undefined);
+
+    try {
+      expect(() => applyPlanOffersToDocument(PLANS)).not.toThrow();
+    } finally {
+      vi.stubGlobal('document', originalDocument);
+    }
   });
 });

@@ -65,7 +65,6 @@ export function applyPlanOffersToDocument(
   application['offers'] = offers.map((offer) => ({ '@type': SCHEMA_TYPE_OFFER, ...offer }));
 
   // Mismo escape que el build: un `</script>` literal dentro del JSON cerraria el elemento.
-  // Mismo escape que el build: un `</script>` literal dentro del JSON cerraria el elemento.
   script.textContent = JSON.stringify(payload).replace(/</g, '\\u003c');
 }
 

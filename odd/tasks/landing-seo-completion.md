@@ -99,6 +99,31 @@ Los dos deben mostrar el host de producción y coincidir.
 **Riesgo:** item 5 (delivery/entorno): cambia la cadena de build, el CSP efectivo de la landing y la
 generación del sitemap/robots que consume el despliegue.
 
+## Correcciones posteriores al RDD (review `review-d6fb98bfd1849d6b`, aprobada)
+
+La review aprobó el candidato con 13 hallazgos advisory. Se corrigieron los que eran defecto o
+fragilidad real, no cosmética:
+
+- **`/private-police` fuera del `Disallow`** (R3-001): esa ruta ES la política de privacidad
+  (`app/routes.ts:191` → `legal/routes/privacy-policy.tsx`), pública. Bloquearla contradecía S4.
+  Test nuevo: `Robots_leaves_the_public_legal_pages_crawlable`.
+- **El gate ya no depende del copy** (R2-002 / R3-003): `'Tu POS'` como oráculo habría hecho fallar el
+  build con "the body was not prerendered" ante un simple cambio de marketing. El `<h1>` estructural
+  basta; test nuevo que demuestra que reescribir el hero NO rompe el gate.
+- **Un solo detector de `<h1>`** (R2-005): `split-prerendered-landing.mjs` usa la misma expresión
+  cas-insensitive que la política.
+- **`robots.txt` con documento exacto** (R3-002): el test volvió a fijar el archivo completo.
+- **Ramas sin cubrir de `applyPlanOffersToDocument`** (R3-006): tests del documento explícito y del
+  caso sin DOM (evaluación SSR/prerender).
+- Limpieza: comentario duplicado y constante exportada sin uso.
+
+**No corregido a propósito:** R2-001 (nombres internos del script de build), R2-006 (rutas duplicadas
+entre scripts), R3-005 (los 15 s de timeout: decisión del owner) y R3-004 (S2 sigue siendo un gate
+estructural: la hidratación en navegador no está probada por ningún test; se declara como límite).
+
+**Evidencia tras las correcciones:** backend 19/19 en el filtro del builder; frontend 152/152 en
+`scripts` + `app/home`; `lint` 0; `typecheck` 0; `pnpm build` completo verde.
+
 ## Log
 
 - **L1 (2026-10-20, owner, verbatim):** "vamos con todo eso en un ODD con revision y todo"

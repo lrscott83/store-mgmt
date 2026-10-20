@@ -30,6 +30,12 @@ describe('findLandingPrerenderViolations', () => {
     );
   });
 
+  it('does not care about the hero copy: rewording it is not a prerender failure', () => {
+    const landing = GOOD_LANDING.replace('Tu POS offline.', 'Vende desde el primer día.');
+
+    expect(findLandingPrerenderViolations({ landing, shell: GOOD_SHELL })).toEqual([]);
+  });
+
   it('reports duplicated or missing title and JSON-LD blocks', () => {
     const landing = GOOD_LANDING.replace(
       '</head>',

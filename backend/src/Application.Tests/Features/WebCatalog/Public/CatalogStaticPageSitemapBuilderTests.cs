@@ -109,6 +109,43 @@ public sealed class CatalogStaticPageSitemapBuilderTests
     }
 
     [Fact]
+    public void Robots_leaves_the_public_legal_pages_crawlable()
+    {
+        var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
+
+        // /private-police es la política de privacidad y /terms-conditions los términos: públicas.
+        robots.Should().NotContain("Disallow: /private-police");
+        robots.Should().NotContain("Disallow: /terms-conditions");
+    }
+
+    [Fact]
+    public void Robots_publishes_the_exact_document()
+    {
+        var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
+
+        robots.Should().Be(
+            "User-agent: *\n" +
+            "Allow: /\n" +
+            "Disallow: /admin\n" +
+            "Disallow: /auth\n" +
+            "Disallow: /diagnostics\n" +
+            "Disallow: /expenses\n" +
+            "Disallow: /health\n" +
+            "Disallow: /help\n" +
+            "Disallow: /inventory\n" +
+            "Disallow: /login\n" +
+            "Disallow: /management\n" +
+            "Disallow: /profile\n" +
+            "Disallow: /register\n" +
+            "Disallow: /reports\n" +
+            "Disallow: /sales\n" +
+            "Disallow: /stats\n" +
+            "Disallow: /sync\n" +
+            "\n" +
+            "Sitemap: https://vdt.playground.sceiba.net/sitemap.xml\n");
+    }
+
+    [Fact]
     public void Robots_ignores_a_trailing_slash_in_the_base_url()
     {
         var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base + "/");

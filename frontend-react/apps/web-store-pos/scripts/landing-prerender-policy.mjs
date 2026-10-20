@@ -1,6 +1,9 @@
 // Pure policy for the prerendered landing build gate (Vitest-covered). Kept free of I/O so the
 // rules can be read and tested as data, mirroring csp-nginx.mjs / externalize-inline-scripts.mjs.
-export const JSON_LD_TYPE = 'application/ld+json';
+//
+// The only structural claim about "the body rendered" is the <h1> tag, never the copy: rewording
+// the hero must not fail a prerender gate with a misleading "the body was not prerendered".
+const H1_TAG_RE = /<h1[\s>]/i;
 
 const JSON_LD_SCRIPT_RE = /<script[^>]*type=["']application\/ld\+json["'][^>]*>/gi;
 const ANY_SCRIPT_RE = /<script\b[^>]*>/gi;
@@ -27,11 +30,8 @@ export function findLandingPrerenderViolations({ landing, shell }) {
     return violations;
   }
 
-  if (!/<h1[\s>]/i.test(landing)) {
+  if (!H1_TAG_RE.test(landing)) {
     violations.push('landing.html has no <h1>: the body was not prerendered');
-  }
-  if (!landing.includes('Tu POS')) {
-    violations.push('landing.html does not contain the hero copy: the body was not prerendered');
   }
   if (titles(landing) !== 1) {
     violations.push(`landing.html carries ${titles(landing)} <title> tags, expected exactly 1`);
@@ -49,7 +49,7 @@ export function findLandingPrerenderViolations({ landing, shell }) {
     );
   }
 
-  if (/<h1[\s>]/i.test(shell)) {
+  if (H1_TAG_RE.test(shell)) {
     violations.push('index.html (SPA shell) carries landing markup: the split did not run');
   }
   if (titles(shell) !== 0) {

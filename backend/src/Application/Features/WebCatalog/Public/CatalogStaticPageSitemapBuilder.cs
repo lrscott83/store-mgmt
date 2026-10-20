@@ -47,8 +47,7 @@ namespace Application.Features.WebCatalog.Public
         private static readonly string[] PrivateRoutePrefixes =
         {
             "/admin", "/auth", "/diagnostics", "/expenses", "/health", "/help", "/inventory",
-            "/login", "/management", "/private-police", "/profile", "/register", "/reports",
-            "/sales", "/stats", "/sync",
+            "/login", "/management", "/profile", "/register", "/reports", "/sales", "/stats", "/sync",
         };
 
         public static string BuildRobots(string publicBaseUrl)
