@@ -92,11 +92,15 @@ Hay que verificarlo en el despliegue real, no en el repo.
 ## 3. Decisiones tomadas en esta iteración
 
 1. **Se implementan H2, H3 y H4** (lo pedido: puntos 1-3 del informe).
-2. **`offers` en JSON-LD queda fuera de esta iteración.** Los precios reales viven en la API
-   (`fetchPublicPlanPricing`) y el generador es un script de build sin acceso a la base de datos.
-   Hardcodear precios es peor que no publicarlos: se desactualizan en silencio. La vía correcta es que
-   la API genere el JSON-LD de la landing junto a las páginas de catálogo (mismo patrón ya usado en
-   `CatalogStaticPageWriter`). Queda como tarea siguiente.
+2. **`offers` en JSON-LD: implementado en runtime, no en el build.** Los precios reales viven en la API
+   (`/v1/public/plans`) y cambian sin deploy. Congelarlos en el build los desactualiza en silencio y
+   hace que el build dependa de la red. En su lugar, el JSON-LD estático (Organization +
+   SoftwareApplication) se completa con `offers` cuando la landing recibe los mismos precios que ya
+   pinta en la sección "Precios": una sola fuente, sin drift.
+   **Límite conocido:** los `offers` aparecen tras ejecutar JS, igual que los precios visibles. Google
+   los lee (renderiza y parsea el DOM renderizado); un crawler sin JS no los ve. Es el mismo techo que
+   el punto P1 (cuerpo estático); si algún día se resuelve P1 de raíz, `offers` debería generarse del
+   lado servidor.
 3. **El `<h1>` conserva el eslogan como segunda línea**, para no destruir la jerarquía visual: la
    primera línea pasa a llevar la keyword. El eyebrow (`<p>`) gana "punto de venta" (término de
    búsqueda real en español) sin repetir literalmente el `<h1>`.
@@ -114,6 +118,7 @@ Hay que verificarlo en el despliegue real, no en el repo.
 | 2 | `<h1>` con keyword + eyebrow "Punto de venta" | `app/home/routes/landing-deep.tsx` |
 | 3 | OG 1200×630 + dimensiones + alt + `summary_large_image` + twitter completo | `scripts/generate-landing-page.mjs`, `public/og-image.png` |
 | 4 | Tests de los tres puntos | `scripts/generate-landing-page.test.mjs`, `app/home/routes/__tests__/landing-deep.test.tsx` |
+| 5 | `offers` con precios vivos en el JSON-LD | `app/home/lib/landing-json-ld.ts`, `app/home/components/plan-pricing-section.tsx` |
 
 ### Detalle de la implementación
 
@@ -145,6 +150,21 @@ Hay que verificarlo en el despliegue real, no en el repo.
 **Riesgo:** ninguno de la lista de alto riesgo (sin datos, seguridad, contratos de API, concurrencia
 ni configuración de despliegue). Cambio de contenido público + metadata de build, con tests.
 
+### Iteración 2 — `offers`
+
+- `app/home/lib/landing-json-ld.ts`: `buildPlanOffers()` (orden por `order`, `price` como string de 2
+  decimales, descarta precios no numéricos o negativos) y `applyPlanOffersToDocument()`, que fusiona
+  `offers` en el nodo `SoftwareApplication` del JSON-LD existente. No crea el script si no existe (dev
+  server), es idempotente y devuelve `false` sin tocar el DOM ante JSON inválido o grafo sin
+  `SoftwareApplication`.
+- `PlanPricingSection`: al resolver `fetchPublicPlanPricing` aplica los `offers`. Si el endpoint cae
+  no se publica nada y la landing sigue igual.
+- Tests: 7 casos de la librería + 1 de integración en la sección de precios (RED observado antes de
+  cablear).
+- Evidencia: enfocados 33/33; `pnpm lint` 0; `pnpm typecheck` 0; suite completa 394 archivos / 5693
+  passed, 6 skipped. Un test ajeno (`channel-rates`, timeout de 5 s bajo carga) falló en la corrida
+  completa y pasa aislado 24/24: flake de tiempo, no relacionado con este cambio.
+
 ---
 
 ## 5. Pendiente (no incluido aquí)
@@ -152,7 +172,7 @@ ni configuración de despliegue). Cambio de contenido público + metadata de bui
 | # | Tema | Nota |
 |---|---|---|
 | P1 | Cuerpo estático en el HTML | prerender real o bloque semántico inyectado. Es el cambio caro y el único que resuelve H1 de raíz |
-| P2 | JSON-LD `offers` con precios | generado por la API, no por el script de build |
+| P2 | JSON-LD `offers` generados del lado servidor | hoy se inyectan en runtime desde `/v1/public/plans`; solo los ve un crawler que ejecute JS (Google sí) |
 | P3 | `sitemap.xml` con `/` incluido | el builder actual solo lista catálogos |
 | P4 | `robots.txt` con `Disallow` de rutas privadas | o `X-Robots-Tag: noindex` en el fallback SPA |
 | P5 | Verificar `PUBLIC_BASE_URL` en el build de producción | riesgo de canonical a staging |
