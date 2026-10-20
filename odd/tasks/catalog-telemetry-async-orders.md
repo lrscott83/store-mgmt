@@ -38,7 +38,7 @@ S10. **Tests.** Every behavior above gets a new test. Existing E2E tests and E2E
 | T6 | S6, S8 | inline | Client `catalog-telemetry` module: fire-and-forget events wired into the public catalog. | done — 67 tests; commit `51692863` |
 | T7 | S7 | inline | SuperAdmin stats query + `GET /v1/stores/{storeId}/catalog-stats`. | done — 6 handler tests; commit `f47751d2` |
 | T8 | S7 | inline | Minimal SuperAdmin catalog-stats page (store selector, KPIs, sources, top products). | done — page test + typecheck/lint; commit `f47751d2` |
-| T9 | all | inline | Full verification: focused tests, full suites, migration apply, script idempotency. | done — see L9 |
+| T9 | all | inline | Full verification: focused tests, full suites, migration apply, script idempotency. | done — RDD reviews approved/acknowledged; correction `d9db3d10`; see L9/L11 |
 
 ## Log
 
@@ -65,3 +65,5 @@ L8 (T7/T8 progress): `GET /v1/stores/{storeId}/catalog-stats?days=30` (SuperAdmi
 L9 (T9 progress): backend `Application.Tests` 1454/1454. Migration applied to `smca_test`; script `backend/scripts/36-20261020-Add-CatalogEvents.sql` generated from the migration and patched with the history `ON CONFLICT`. Frontend full suite: 5697 passed / 8 failed in 5 files; the telemetry-related `public-catalog-template.test.tsx` was fixed by mocking the tracker and now passes. The remaining 4 files (`feature-loader-timing`, `owner-edit`, `channel-rates`, `decryption-failure-policy`) pass individually; failures were parallel/resource flakes, not behavior regressions.
 
 L10 (close): work-unit commits `5071b743` (usage exclusion), `483cbd1b` (async orders without module 20), `51692863` (anonymous telemetry), `f47751d2` (SuperAdmin stats + page). Typecheck and lint pass; focused E2E `CatalogTelemetryE2ETests` passes against PostgreSQL. Feature complete on `feat/catalog-telemetry-async-orders`; push/PR/merge are the user's decision.
+
+L11 (RDD): RDD is enabled globally. The consolidated branch candidate was rejected by the native engine with `lens_context_budget_exceeded` (56 files / 6317 lines), so the feature was reviewed in work-unit slices: orders (`483cbd1b`, 4 lenses), usage (`5071b743`, readability/reliability), stats (`f47751d2`, risk/readability/reliability), and telemetry split into schema/endpoint/storefront (`3d740a07`/`0177e19a`/`8bf7d3fd`). The orders review found a critical duplicate-submit bug: the async branch released the submit guard before the background POST settled. Correction commit `d9db3d10` was validated and approved; the targeted validator burned the receipt. All other slices were approved with advisory findings only. The temporary review worktree was removed after every receipt was acknowledged.
