@@ -118,11 +118,41 @@ fragilidad real, no cosmética:
 - Limpieza: comentario duplicado y constante exportada sin uso.
 
 **No corregido a propósito:** R2-001 (nombres internos del script de build), R2-006 (rutas duplicadas
-entre scripts), R3-005 (los 15 s de timeout: decisión del owner) y R3-004 (S2 sigue siendo un gate
-estructural: la hidratación en navegador no está probada por ningún test; se declara como límite).
+entre scripts), R3-005 (los 15 s de timeout: decisión del owner).
 
 **Evidencia tras las correcciones:** backend 19/19 en el filtro del builder; frontend 152/152 en
 `scripts` + `app/home`; `lint` 0; `typecheck` 0; `pnpm build` completo verde.
+
+## Cierre de los dos límites (2026-10-20)
+
+### S2 — la hidratación SÍ estaba rota, y ahora está probada
+
+`scripts/verify-landing-hydration.mjs` sirve `build/client` tal cual, abre `/` en Chromium y falla si
+hay errores de hidratación. Primera corrida: **React #418** ("Hydration failed because the server
+rendered HTML didn't match the client") y `document.title` vacío. Diagnóstico por bisección:
+
+- con el shell servido en `/`: sin #418 → el documento prerenderizado era el culpable;
+- con el HTML prerenderizado sin nuestras etiquetas de `<head>`: #418 seguía → el desajuste estaba en
+  el **cuerpo**, no en la metadata inyectada;
+- build en modo desarrollo: el diff señaló un `<button … disabled>` que el cliente renderizaba y el
+  prerender no. Era `InstallAppButton`, que decide con `canInstall` (capacidades del navegador,
+  inexistentes al prerenderizar).
+
+Arreglo: la píldora no se pinta hasta después del montaje (`mounted` + `useEffect`), con test que fija
+que el primer render es vacío (`renderToStaticMarkup` → `''`). Después: **hidrata sin errores**, h1
+"Tu POS offline.", 6 secciones, 2 204 caracteres, `applicationCategory BusinessApplication`.
+
+Se puede repetir con `pnpm verify:hydration`.
+
+### S5 — el canonical ahora se comprueba con un comando
+
+`scripts/check-public-canonical.mjs <url>` baja `/` y falla si `canonical`, `og:url` u `og:image`
+no apuntan al host esperado, con el arreglo escrito en el mensaje. `pnpm check:canonical <url>`.
+
+**Qué hace falta en el despliegue:** definir `PUBLIC_BASE_URL=https://<host-real>` en el `.env` del
+servidor y reconstruir (lo leen `docker-compose.yml:53` para el build del frontend y `:114` para
+`CatalogStaticPage__PublicBaseUrl` de la API). Después, `pnpm check:canonical https://<host-real>`
+debe decir OK.
 
 ## Log
 
