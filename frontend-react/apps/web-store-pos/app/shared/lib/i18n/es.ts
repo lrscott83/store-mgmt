@@ -688,7 +688,7 @@ const messages: Record<string, string> = {
   'CHECKOUT.SUBMITTING_WHATSAPP': 'Enviando pedido…',
   'CHECKOUT.WHATSAPP_SENT':
     'Abrimos WhatsApp con el resumen de tu pedido. Esta tienda lo confirma contigo directamente por ahí.',
-  'CHECKOUT.WHATSAPP_BLOCKED_NO_ORDER':
+  'CHECKOUT.WHATSAPP_BLOCKED_NO_CODE':
     'Esta tienda no tiene un número de WhatsApp, así que el envío quedó bloqueado: guarda el resumen y escríbele por otro medio.',
   // Envío del pedido por WhatsApp (F4). El texto del RESUMEN que viaja en el enlace va en
   // `catalog/lib/whatsapp-order-link.ts`: lo lee la tienda en su chat, no es interfaz de la app.

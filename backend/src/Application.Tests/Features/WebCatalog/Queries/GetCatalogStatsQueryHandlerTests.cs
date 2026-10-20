@@ -1,6 +1,5 @@
 using Application.Features.WebCatalog.Queries.GetCatalogStats;
 using Domain.Common.Enums;
-using Domain.Entities.Products;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Moq;
@@ -42,9 +41,10 @@ namespace Application.Tests.Features.WebCatalog.Queries
             _orderRepository
                 .Setup(x => x.CountOnlineOrdersAsync(_storeId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
                 .ReturnsAsync(2);
-            Product product = Product.Create(productId, "Camisa", Guid.NewGuid(), 100m, 1, true, false,
-                "b1", Guid.NewGuid());
-            _productRepository.Setup(x => x.GetByIdAsync(productId)).ReturnsAsync(product);
+            _productRepository
+                .Setup(x => x.GetNamesByIdsAsync(
+                    It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Dictionary<Guid, string> { [productId] = "Camisa" });
 
             var result = await Handler().Handle(new GetCatalogStatsQuery(_storeId, 30), CancellationToken.None);
 

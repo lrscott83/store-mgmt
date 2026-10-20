@@ -2,7 +2,6 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.WebCatalog;
 using Application.ResponseModels;
 using Domain.Common.Enums;
-using Domain.Entities.Products;
 using Domain.Interfaces.Repositories;
 
 namespace Application.Features.WebCatalog.Queries.GetCatalogStats
@@ -58,15 +57,20 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStats
                     visitsBySource.GetValueOrDefault(source)))
                 .ToList();
 
-            var topProducts = new List<CatalogProductStatsDto>(snapshot.TopProducts.Count);
-            foreach (CatalogProductViews productViews in snapshot.TopProducts)
-            {
-                Product? product = await _productRepository.GetByIdAsync(productViews.ProductId);
-                topProducts.Add(new CatalogProductStatsDto(
+            List<Guid> topProductIds = snapshot.TopProducts
+                .Select(product => product.ProductId)
+                .Distinct()
+                .ToList();
+            IReadOnlyDictionary<Guid, string> productNames = topProductIds.Count == 0
+                ? new Dictionary<Guid, string>()
+                : await _productRepository.GetNamesByIdsAsync(topProductIds, cancellationToken);
+
+            List<CatalogProductStatsDto> topProducts = snapshot.TopProducts
+                .Select(productViews => new CatalogProductStatsDto(
                     productViews.ProductId,
-                    product?.Name ?? string.Empty,
-                    productViews.Views));
-            }
+                    productNames.GetValueOrDefault(productViews.ProductId, string.Empty),
+                    productViews.Views))
+                .ToList();
 
             Dictionary<DateTime, int> visitsByDay = snapshot.Daily
                 .ToDictionary(day => day.Day.Date, day => day.Visits);

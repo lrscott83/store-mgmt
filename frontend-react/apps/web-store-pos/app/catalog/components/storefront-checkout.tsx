@@ -547,7 +547,7 @@ export function StorefrontCheckout({
                       guardado": no hay código que dictar. El texto distingue los dos estados en
                       vez de repetir el mismo con un hueco donde iba el código. */}
                   {whatsapp.code === null
-                    ? intl.formatMessage({ id: 'CHECKOUT.WHATSAPP_BLOCKED_NO_ORDER' })
+                    ? intl.formatMessage({ id: 'CHECKOUT.WHATSAPP_BLOCKED_NO_CODE' })
                     : intl.formatMessage({ id: 'CHECKOUT.WHATSAPP_BLOCKED' }, { code: whatsapp.code })}
                 </InfoBox>
               </div>

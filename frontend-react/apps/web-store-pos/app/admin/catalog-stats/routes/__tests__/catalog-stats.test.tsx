@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { AdminCatalogStatsPage } from '../catalog-stats';
@@ -55,12 +55,16 @@ describe('AdminCatalogStatsPage', () => {
     });
   });
 
-  it('muestra los KPIs, el origen y los productos más vistos de la tienda', async () => {
-    render(
+  function renderPage() {
+    return render(
       <IntlProvider locale="es" messages={esMessages}>
         <AdminCatalogStatsPage />
       </IntlProvider>,
     );
+  }
+
+  it('muestra los KPIs, el origen y los productos más vistos de la tienda', async () => {
+    renderPage();
 
     expect(await screen.findByTestId('catalog-stat-VISITS')).toHaveTextContent('12');
     expect(screen.getByTestId('catalog-stat-VISITORS')).toHaveTextContent('9');
@@ -71,5 +75,77 @@ describe('AdminCatalogStatsPage', () => {
     expect(screen.getByText('WhatsApp')).toBeInTheDocument();
     expect(screen.getByText('Camisa azul')).toBeInTheDocument();
     expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30);
+  });
+
+  it('muestra error cuando falla la lista de tiendas', async () => {
+    serviceMock.listStores.mockResolvedValue({
+      succeeded: false,
+      data: [],
+      message: 'boom',
+      actionCode: 500,
+      errors: [],
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText('No se pudieron cargar las estadísticas.'),
+    ).toBeInTheDocument();
+    expect(serviceMock.getStats).not.toHaveBeenCalled();
+  });
+
+  it('muestra el estado vacío cuando no hay tiendas', async () => {
+    serviceMock.listStores.mockResolvedValue({
+      succeeded: true,
+      data: [],
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('No hay tiendas para mostrar.')).toBeInTheDocument();
+    expect(serviceMock.getStats).not.toHaveBeenCalled();
+  });
+
+  it('muestra error cuando falla la consulta de estadísticas', async () => {
+    serviceMock.getStats.mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: 'boom',
+      actionCode: 500,
+      errors: [],
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText('No se pudieron cargar las estadísticas.'),
+    ).toBeInTheDocument();
+  });
+
+  it('muestra el estado vacío cuando no hay productos vistos', async () => {
+    serviceMock.getStats.mockResolvedValue({
+      succeeded: true,
+      data: { ...STATS, topProducts: [] },
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Todavía no hay productos vistos.')).toBeInTheDocument();
+  });
+
+  it('recarga con la ventana de 7 días al pulsar el botón', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+    serviceMock.getStats.mockClear();
+
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 7));
   });
 });

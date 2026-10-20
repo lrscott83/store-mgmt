@@ -64,6 +64,13 @@ namespace Domain.Interfaces.Repositories
         /// productos con su categoría e imágenes.
         /// </summary>
         Task<CatalogProductCounts> CountForCatalogStatusAsync(Guid storeId);
+
+        /// <summary>
+        /// Nombres de producto por id, en UNA consulta. Lo usa el panel de estadísticas para
+        /// resolver el top de productos sin N+1.
+        /// </summary>
+        Task<IReadOnlyDictionary<Guid, string>> GetNamesByIdsAsync(
+            IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Contadores del catálogo, sin materializar filas.</summary>

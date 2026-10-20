@@ -215,5 +215,21 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(product => product.Category)
                 .ToListAsync();
         }
+
+        /// <inheritdoc />
+        public async Task<IReadOnlyDictionary<Guid, string>> GetNamesByIdsAsync(
+            IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+        {
+            if (ids.Count == 0)
+                return new Dictionary<Guid, string>();
+
+            var rows = await _products
+                .IgnoreQueryFilters()
+                .Where(product => ids.Contains(product.Id))
+                .Select(product => new { product.Id, product.Name })
+                .ToListAsync(cancellationToken);
+
+            return rows.ToDictionary(row => row.Id, row => row.Name);
+        }
     }
 }
