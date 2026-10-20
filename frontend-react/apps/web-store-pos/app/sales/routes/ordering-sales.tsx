@@ -543,14 +543,13 @@ function SalesHistoryRow({ order }: { order: OnlineOrderListItem }) {
   );
 }
 
-/** Los seis estados en el orden de la D11: el habitual primero en el filtro. */
+/** Los cinco estados en el orden de la secuencia: el habitual primero en el filtro. */
 const ORDER_STATUS_VALUES: readonly OnlineOrderStatus[] = [
-  OnlineOrderStatus.New,
-  OnlineOrderStatus.Accepted,
-  OnlineOrderStatus.Preparing,
-  OnlineOrderStatus.Ready,
-  OnlineOrderStatus.Delivered,
-  OnlineOrderStatus.Cancelled,
+  OnlineOrderStatus.Creado,
+  OnlineOrderStatus.Preparado,
+  OnlineOrderStatus.Transportando,
+  OnlineOrderStatus.Entregado,
+  OnlineOrderStatus.Cancelado,
 ];
 
 type Intl = ReturnType<typeof useIntl>;
@@ -567,12 +566,11 @@ function formatOrderDate(value: string): string {
 /** El número del enum es lo que viaja al servidor; lo que ve quien consulta es el texto de i18n. */
 function statusLabel(intl: Intl, status: OnlineOrderStatus): string {
   const ids: Record<OnlineOrderStatus, string> = {
-    [OnlineOrderStatus.New]: 'ORDERING_ORDERS.STATUS_NEW',
-    [OnlineOrderStatus.Accepted]: 'ORDERING_ORDERS.STATUS_ACCEPTED',
-    [OnlineOrderStatus.Preparing]: 'ORDERING_ORDERS.STATUS_PREPARING',
-    [OnlineOrderStatus.Ready]: 'ORDERING_ORDERS.STATUS_READY',
-    [OnlineOrderStatus.Delivered]: 'ORDERING_ORDERS.STATUS_DELIVERED',
-    [OnlineOrderStatus.Cancelled]: 'ORDERING_ORDERS.STATUS_CANCELLED',
+    [OnlineOrderStatus.Creado]: 'ORDERING_ORDERS.STATUS_CREADO',
+    [OnlineOrderStatus.Preparado]: 'ORDERING_ORDERS.STATUS_PREPARADO',
+    [OnlineOrderStatus.Transportando]: 'ORDERING_ORDERS.STATUS_TRANSPORTANDO',
+    [OnlineOrderStatus.Entregado]: 'ORDERING_ORDERS.STATUS_ENTREGADO',
+    [OnlineOrderStatus.Cancelado]: 'ORDERING_ORDERS.STATUS_CANCELADO',
   };
   return intl.formatMessage({ id: ids[status] });
 }
