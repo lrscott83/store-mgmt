@@ -228,6 +228,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Admin (Angular MENU.ADMIN.*)
   'MENU.ADMIN_DASHBOARD': 'Dashboard',
+  'MENU.ADMIN_CATALOG_STATS': 'Estadísticas del catálogo',
   'MENU.ADMIN_STORES': 'Tiendas',
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
@@ -1803,6 +1804,31 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.AVERAGE': 'Promedio',
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
   'ADMIN_DASHBOARD.NO_OWNERS': 'Sin tiendas activas',
+
+  // Admin — Catalog stats (SuperAdmin only). Visitas anónimas del catálogo público.
+  'ADMIN_CATALOG_STATS.HEADER': 'Estadísticas del catálogo',
+  'ADMIN_CATALOG_STATS.FILTERS': 'Tienda y periodo',
+  'ADMIN_CATALOG_STATS.STORE': 'Tienda',
+  'ADMIN_CATALOG_STATS.LAST_DAYS': 'Últimos {days} días',
+  'ADMIN_CATALOG_STATS.SUMMARY_TITLE': '{store} · últimos {days} días',
+  'ADMIN_CATALOG_STATS.VISITS': 'Visitas',
+  'ADMIN_CATALOG_STATS.VISITORS': 'Visitantes únicos',
+  'ADMIN_CATALOG_STATS.PAGE_VIEWS': 'Páginas vistas',
+  'ADMIN_CATALOG_STATS.ORDERS': 'Pedidos',
+  'ADMIN_CATALOG_STATS.CONVERSION': 'Conversión',
+  'ADMIN_CATALOG_STATS.SOURCES': 'De dónde vienen',
+  'ADMIN_CATALOG_STATS.TOP_PRODUCTS': 'Productos más vistos',
+  'ADMIN_CATALOG_STATS.NO_PRODUCTS': 'Todavía no hay productos vistos.',
+  'ADMIN_CATALOG_STATS.DAILY': 'Visitas por día',
+  'ADMIN_CATALOG_STATS.ERROR': 'No se pudieron cargar las estadísticas.',
+  'ADMIN_CATALOG_STATS.SOURCE_DIRECT': 'Directo',
+  'ADMIN_CATALOG_STATS.SOURCE_WHATSAPP': 'WhatsApp',
+  'ADMIN_CATALOG_STATS.SOURCE_INSTAGRAM': 'Instagram',
+  'ADMIN_CATALOG_STATS.SOURCE_FACEBOOK': 'Facebook',
+  'ADMIN_CATALOG_STATS.SOURCE_GOOGLE': 'Google',
+  'ADMIN_CATALOG_STATS.SOURCE_OTHER_SEARCH': 'Otros buscadores',
+  'ADMIN_CATALOG_STATS.SOURCE_REFERRAL': 'Referidos',
+  'ADMIN_CATALOG_STATS.SOURCE_CAMPAIGN': 'Campañas',
 
   // Admin — Resellers
   // admin-owners-resellers-parity (Stage 5 Admin), Phase 4 — LIST_TITLE/CREATE_TITLE

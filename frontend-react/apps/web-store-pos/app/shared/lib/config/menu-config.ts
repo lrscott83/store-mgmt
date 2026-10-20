@@ -65,6 +65,16 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Panel de control del superadministrador. Aquí puedes ver un resumen general del sistema: total de propietarios, tiendas, gestores y estadísticas clave de actividad.',
       },
+      // SuperAdmin-only: visitas anónimas del catálogo público (page views, origen, top productos).
+      // La ruta usa superAdminLoader y el endpoint del backend exige SuperAdmin.
+      {
+        label: 'MENU.ADMIN_CATALOG_STATS',
+        path: '/admin/catalog-stats',
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin,
+        helpContent:
+          'Estadísticas del catálogo público. Consulta visitas, visitantes únicos, páginas vistas, pedidos y conversión por tienda, además del origen del tráfico y los productos más vistos.',
+      },
       {
         label: 'MENU.ADMIN_STORES',
         path: '/admin/stores',

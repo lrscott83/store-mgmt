@@ -157,6 +157,9 @@ export default [
     // Admin â€” Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
 
+    // Admin — Catalog stats (SuperAdmin only): visitas anónimas del catálogo público.
+    route('admin/catalog-stats', 'admin/catalog-stats/routes/catalog-stats.tsx'),
+
     // Admin â€” Messages (SuperAdmin-only ownerâ†”admin inbox)
     route('admin/messages', 'admin/messages/routes/messages.tsx'),
 

@@ -80,6 +80,12 @@ namespace Domain.Interfaces.Repositories
         /// el filtro registrado y el filtro ejecutado sean el mismo.
         /// </summary>
         Task<OrderAggregateStats> GetStatsByStoreIdAsync(Guid storeId, OrderStatsFilter filter);
+
+        /// <summary>
+        /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el numerador de la
+        /// conversión del catálogo: no cuenta ventas del POS ni pedidos de otro tipo.
+        /// </summary>
+        Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc);
     }
 
     /// <summary>
