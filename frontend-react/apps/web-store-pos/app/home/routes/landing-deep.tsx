@@ -685,13 +685,14 @@ export default function LandingDeep() {
             <div>
               <p className="landing-animate-in mb-6 flex items-center gap-3 text-sm font-semibold text-text-muted [animation-delay:100ms]">
                 <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
-                POS offline + catálogo web con pedidos por WhatsApp
+                Punto de venta + catálogo web con pedidos por WhatsApp
               </p>
-              <h1 className="landing-animate-in mb-6 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
-                Vende más.
-                <br />
-                Controla <span className="text-accent italic">todo.</span>
+              <h1 className="landing-animate-in mb-4 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
+                Tu POS <span className="text-accent italic">offline.</span>
               </h1>
+              <p className="landing-animate-in mb-6 text-2xl font-semibold tracking-tight text-text sm:text-3xl [animation-delay:300ms]">
+                Vende más. Controla todo.
+              </p>
               <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-text-muted sm:text-xl [animation-delay:400ms]">
                 Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y
                 reportes — siempre disponibles en tu dispositivo.

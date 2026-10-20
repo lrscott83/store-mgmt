@@ -34,12 +34,24 @@ public sealed class CatalogStaticPageSitemapBuilderTests
     }
 
     [Fact]
-    public void Sitemap_without_published_catalogs_is_a_valid_empty_urlset()
+    public void Sitemap_lists_the_landing_first_so_the_product_page_is_discoverable()
+    {
+        var xml = CatalogStaticPageSitemapBuilder.BuildSitemap(Base, new[] { "mercado-uno" });
+
+        xml.Should().Contain("<url><loc>https://vdt.playground.sceiba.net/</loc></url>");
+        xml.IndexOf("<loc>https://vdt.playground.sceiba.net/</loc>", StringComparison.Ordinal)
+            .Should().BeLessThan(
+                xml.IndexOf("<loc>https://vdt.playground.sceiba.net/catalog/mercado-uno</loc>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Sitemap_without_published_catalogs_still_lists_the_landing()
     {
         var xml = CatalogStaticPageSitemapBuilder.BuildSitemap(Base, Array.Empty<string>());
 
         xml.Should().Contain("<urlset");
-        xml.Should().NotContain("<url>");
+        xml.Should().Contain("<url><loc>https://vdt.playground.sceiba.net/</loc></url>");
+        xml.Should().NotContain("/catalog/");
         xml.Should().EndWith("</urlset>\n");
     }
 
@@ -74,9 +86,61 @@ public sealed class CatalogStaticPageSitemapBuilderTests
     {
         var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
 
+        robots.Should().StartWith("User-agent: *\nAllow: /\n");
+        robots.Should().EndWith("Sitemap: https://vdt.playground.sceiba.net/sitemap.xml\n");
+    }
+
+    [Fact]
+    public void Robots_keeps_the_private_app_routes_out_of_the_index()
+    {
+        var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
+
+        // Rutas de la app detrás de login: no son contenido público.
+        robots.Should().Contain("Disallow: /login\n");
+        robots.Should().Contain("Disallow: /register\n");
+        robots.Should().Contain("Disallow: /sales\n");
+        robots.Should().Contain("Disallow: /admin\n");
+        robots.Should().Contain("Disallow: /management\n");
+        robots.Should().Contain("Disallow: /profile\n");
+        robots.Should().Contain("Disallow: /diagnostics\n");
+        // Lo público sigue permitido.
+        robots.Should().NotContain("Disallow: /catalog");
+        robots.Should().NotContain("Disallow: /\n");
+    }
+
+    [Fact]
+    public void Robots_leaves_the_public_legal_pages_crawlable()
+    {
+        var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
+
+        // /private-police es la política de privacidad y /terms-conditions los términos: públicas.
+        robots.Should().NotContain("Disallow: /private-police");
+        robots.Should().NotContain("Disallow: /terms-conditions");
+    }
+
+    [Fact]
+    public void Robots_publishes_the_exact_document()
+    {
+        var robots = CatalogStaticPageSitemapBuilder.BuildRobots(Base);
+
         robots.Should().Be(
             "User-agent: *\n" +
             "Allow: /\n" +
+            "Disallow: /admin\n" +
+            "Disallow: /auth\n" +
+            "Disallow: /diagnostics\n" +
+            "Disallow: /expenses\n" +
+            "Disallow: /health\n" +
+            "Disallow: /help\n" +
+            "Disallow: /inventory\n" +
+            "Disallow: /login\n" +
+            "Disallow: /management\n" +
+            "Disallow: /profile\n" +
+            "Disallow: /register\n" +
+            "Disallow: /reports\n" +
+            "Disallow: /sales\n" +
+            "Disallow: /stats\n" +
+            "Disallow: /sync\n" +
             "\n" +
             "Sitemap: https://vdt.playground.sceiba.net/sitemap.xml\n");
     }

@@ -16,6 +16,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    // The default 5 s is too tight for this suite on a busy workstation: 5.7k jsdom tests
+    // competing with other node processes (codegraph watchers, npx workers) produced unrelated
+    // `Test timed out in 5000ms` failures in files that pass in isolation - three different
+    // files across three full runs, with suite wall time growing 2.8x on the same code. A real
+    // hang still fails, just later. Individual `waitFor` timeouts are unaffected.
+    testTimeout: 15000,
+    hookTimeout: 15000,
     // NARROW addition: only `scripts/**/*.test.mjs` (plain JS, build-script
     // helpers, never part of the app's client module graph or DOM-lib
     // typecheck — design.md's "Unit: build scripts: NONE" rejection was about

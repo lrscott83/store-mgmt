@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { injectLandingMeta, LANDING_META, resolveBaseUrl } from './generate-landing-page.mjs';
 
 const SHELL =
@@ -7,6 +9,14 @@ const SHELL =
   '<body><div id="root"></div></body></html>';
 
 const BASE = 'https://pos.playground.sceiba.net';
+
+/** Lee ancho y alto reales del IHDR del PNG: los tags declaran numeros, no los prueban. */
+function readPngSize(buffer) {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  expect([...buffer.subarray(0, 8)]).toEqual(signature);
+  expect(buffer.subarray(12, 16).toString('ascii')).toBe('IHDR');
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
 
 describe('injectLandingMeta', () => {
   it('inserts the landing metadata inside head and leaves the body untouched', () => {
@@ -18,7 +28,7 @@ describe('injectLandingMeta', () => {
     expect(html).toContain(`<meta property="og:title" content="${LANDING_META.title}" />`);
     expect(html).toContain(`<meta property="og:site_name" content="${LANDING_META.siteName}" />`);
     expect(html).toContain('<meta property="og:locale" content="es_ES" />');
-    expect(html).toContain('<meta name="twitter:card" content="summary" />');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
 
     expect(html.indexOf('<title>')).toBeLessThan(html.indexOf('</head>'));
     expect(html).toContain('<meta charset="utf-8"/>');
@@ -31,9 +41,59 @@ describe('injectLandingMeta', () => {
 
     expect(html).toContain(`<link rel="canonical" href="${BASE}/" />`);
     expect(html).toContain(`<meta property="og:url" content="${BASE}/" />`);
+    expect(html).toContain(`<meta property="og:image" content="${BASE}${LANDING_META.ogImagePath}" />`);
+  });
+
+  it('declares a 1200x630 social image with alt text and a large Twitter card', () => {
+    const html = injectLandingMeta(SHELL, { baseUrl: BASE });
+
+    expect(LANDING_META.imagePath).toBe('/icons/icon-512x512.png');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    expect(html).toContain('<meta property="og:image:width" content="1200" />');
+    expect(html).toContain('<meta property="og:image:height" content="630" />');
+    expect(html).toContain(`<meta property="og:image:alt" content="${LANDING_META.ogImageAlt}" />`);
+    expect(html).toContain(`<meta name="twitter:title" content="${LANDING_META.title}" />`);
+    expect(html).toContain(`<meta name="twitter:description" content="${LANDING_META.description}" />`);
     expect(html).toContain(
-      `<meta property="og:image" content="${BASE}${LANDING_META.imagePath}" />`,
+      `<meta name="twitter:image" content="${BASE}${LANDING_META.ogImagePath}" />`,
     );
+  });
+
+  it('adds JSON-LD describing the product and the organization', () => {
+    const html = injectLandingMeta(SHELL, { baseUrl: BASE });
+    const payload = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+
+    expect(payload).not.toBeNull();
+    const data = JSON.parse(payload[1]);
+    const graph = data['@graph'];
+    const app = graph.find((node) => node['@type'] === 'SoftwareApplication');
+    const org = graph.find((node) => node['@type'] === 'Organization');
+
+    expect(app).toBeDefined();
+    expect(org).toBeDefined();
+    expect(app.name).toBe(LANDING_META.siteName);
+    expect(app.description).toBe(LANDING_META.description);
+    expect(app.applicationCategory).toBe('BusinessApplication');
+    expect(app.url).toBe(`${BASE}/`);
+    expect(app.inLanguage).toBe('es');
+    expect(app.publisher['@type']).toBe('Organization');
+    expect(org.name).toBe(LANDING_META.siteName);
+    expect(org.url).toBe(`${BASE}/`);
+    expect(org.logo).toBe(`${BASE}${LANDING_META.imagePath}`);
+  });
+
+  it('keeps a hostile description from closing the JSON-LD script element', () => {
+    const html = injectLandingMeta(SHELL, {
+      baseUrl: BASE,
+      meta: { title: 'T', description: 'Cierre </script><script>alert(1)</script>' },
+    });
+
+    expect(html.match(/<script type="application\/ld\+json">/g)).toHaveLength(1);
+    expect(html).not.toContain('<script>alert(1)</script>');
+    const payload = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1];
+    const graph = JSON.parse(payload)['@graph'];
+    const app = graph.find((node) => node['@type'] === 'SoftwareApplication');
+    expect(app.description).toContain('</script>');
   });
 
   it('normalizes a trailing slash in the base URL', () => {
@@ -66,6 +126,27 @@ describe('injectLandingMeta', () => {
     expect(html).toContain('content="Pizza &amp; pasta &lt;3"');
     expect(html).toContain('content="Casa &quot;Pepe&quot; &amp; Cía &lt;br&gt;"');
     expect(html).not.toContain('<br>');
+  });
+
+  it('keeps a single JSON-LD block when the injected HTML is injected again', () => {
+    const once = injectLandingMeta(SHELL, { baseUrl: BASE });
+    const twice = injectLandingMeta(once, { baseUrl: BASE });
+
+    expect(twice.match(/<script type="application\/ld\+json">/g)).toHaveLength(1);
+    expect(twice.split('<title>')).toHaveLength(2);
+    expect(twice.split('name="description"')).toHaveLength(2);
+    expect(twice).toContain(`<link rel="canonical" href="${BASE}/" />`);
+  });
+
+  it('ships an Open Graph image whose real pixels match the declared dimensions', async () => {
+    const png = await readFile(resolve(process.cwd(), 'public/og-image.png'));
+
+    expect(readPngSize(png)).toEqual({
+      width: LANDING_META.ogImageWidth,
+      height: LANDING_META.ogImageHeight,
+    });
+    expect(LANDING_META.ogImageWidth).toBe(1200);
+    expect(LANDING_META.ogImageHeight).toBe(630);
   });
 
   it('throws when the shell has no </head>', () => {

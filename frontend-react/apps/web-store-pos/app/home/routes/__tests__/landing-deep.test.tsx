@@ -141,9 +141,10 @@ describe('LandingDeep — public landing route', () => {
   });
 
   describe('Hero section', () => {
-    it('renders the hero heading, brand and "Ver características" anchor', () => {
+    it('renders the hero heading with the product keyword, brand and "Ver características" anchor', () => {
       renderLanding();
-      expect(screen.getByRole('heading', { name: /vende más/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: /tu pos offline/i })).toBeInTheDocument();
+      expect(screen.getByText(/vende más\. controla todo\./i)).toBeInTheDocument();
       expect(screen.getByText('VendeDTo')).toBeInTheDocument();
       const seeFeatures = screen.getByRole('link', { name: /ver características/i });
       expect(seeFeatures).toHaveAttribute('href', '#caracteristicas');
