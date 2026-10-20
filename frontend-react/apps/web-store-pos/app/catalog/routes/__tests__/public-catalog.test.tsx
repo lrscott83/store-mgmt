@@ -45,6 +45,11 @@ const catalogMock = vi.hoisted(() => ({
   getPublicOrderStatus: vi.fn(),
 }));
 
+const trackCatalogEventMock = vi.hoisted(() => vi.fn());
+vi.mock('~/catalog/lib/catalog-telemetry', () => ({
+  trackCatalogEvent: trackCatalogEventMock,
+}));
+
 vi.mock('~/sales/lib/services/catalog-http-service', async () => {
   const actual = await vi.importActual<
     typeof import('~/sales/lib/services/catalog-http-service')
@@ -355,6 +360,32 @@ describe('PublicCatalogPage', () => {
       'src',
       `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/p/b.jpg`,
     );
+  });
+
+  it('registra page_view, product_view, add_to_cart y checkout_open sin bloquear', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-card-cp1');
+
+    await waitFor(() =>
+      expect(trackCatalogEventMock).toHaveBeenCalledWith('mi-tienda', { name: 'page_view' }),
+    );
+
+    fireEvent.click(screen.getByTestId('catalog-card-cp1'));
+    await screen.findByTestId('catalog-detail-modal');
+    expect(trackCatalogEventMock).toHaveBeenCalledWith('mi-tienda', {
+      name: 'product_view',
+      productId: 'cp1',
+    });
+
+    fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+    expect(trackCatalogEventMock).toHaveBeenCalledWith('mi-tienda', {
+      name: 'add_to_cart',
+      productId: 'cp1',
+    });
+
+    fireEvent.click(screen.getByTestId('catalog-cart-button'));
+    fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+    expect(trackCatalogEventMock).toHaveBeenCalledWith('mi-tienda', { name: 'checkout_open' });
   });
 
   it('el popup no cae a la galería cuando el producto no tiene imagen principal', async () => {

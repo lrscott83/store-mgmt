@@ -30,15 +30,15 @@ S10. **Tests.** Every behavior above gets a new test. Existing E2E tests and E2E
 
 | ID | Spec | Route | Task | Status |
 | --- | --- | --- | --- | --- |
-| T1 | S1 | inline | Guard `useStoreUsageTracker` against `/catalog/*`; add hook tests (navigation + activity). | done — RED 2 failed / GREEN 14/14; commit `93d6cade` |
-| T2 | S2, S3 | inline | Backend: replace the module-20 order gate with module 19; update unit tests. | done — RED 31 failed / GREEN 47/47 in the handler suite |
-| T3 | S2, S3, S4 | inline | Frontend: background persistence without module 20; WhatsApp opens immediately; keep module-20 sync flow. | done — 110 passed (storefront + catalog + service suites) |
-| T4 | S6, S9 | inline | `CatalogEvent` entity, enums, EF config, `DbSet`, repository, migration + generated SQL script. | pending |
-| T5 | S6, S8 | inline | Public `POST /api/v1/public/catalog/{slug}/events`: validation, hashing, source/device classification, bot filter. | pending |
-| T6 | S6, S8 | inline | Client `catalog-telemetry` module: fire-and-forget events wired into the public catalog. | pending |
-| T7 | S7 | inline | SuperAdmin stats query + `GET /v1/stores/{storeId}/catalog-stats`. | pending |
-| T8 | S7 | inline | Minimal SuperAdmin catalog-stats page (store selector, KPIs, sources, top products). | pending |
-| T9 | all | inline | Full verification: focused tests, full suites, migration apply, script idempotency. | pending |
+| T1 | S1 | inline | Guard `useStoreUsageTracker` against `/catalog/*`; add hook tests (navigation + activity). | done — RED 2 failed / GREEN 14/14; commit `5071b743` |
+| T2 | S2, S3 | inline | Backend: replace the module-20 order gate with module 19; update unit tests. | done — RED 31 failed / GREEN 47/47; commit `483cbd1b` |
+| T3 | S2, S3, S4 | inline | Frontend: background persistence without module 20; WhatsApp opens immediately; keep module-20 sync flow. | done — 110 passed; commit `483cbd1b` |
+| T4 | S6, S9 | inline | `CatalogEvent` entity, enums, EF config, `DbSet`, repository, migration + generated SQL script. | done — migration applied; script 36 generated |
+| T5 | S6, S8 | inline | Public `POST /api/v1/public/catalog/{slug}/events`: validation, hashing, source/device classification, bot filter. | done — 137 WebCatalog public tests + E2E |
+| T6 | S6, S8 | inline | Client `catalog-telemetry` module: fire-and-forget events wired into the public catalog. | done — 67 tests (tracker + page wiring) |
+| T7 | S7 | inline | SuperAdmin stats query + `GET /v1/stores/{storeId}/catalog-stats`. | done — 6 handler tests |
+| T8 | S7 | inline | Minimal SuperAdmin catalog-stats page (store selector, KPIs, sources, top products). | done — page test + typecheck/lint |
+| T9 | all | inline | Full verification: focused tests, full suites, migration apply, script idempotency. | in progress |
 
 ## Log
 
@@ -55,3 +55,11 @@ L3 (progress): CodeGraph initialized at the repository root (`D:\Projects\AutoBu
 L4 (T1 progress): `useStoreUsageTracker` now short-circuits both seams when `isPublicCatalogPath(pathname)` is true. RED: 2 new tests failed (catalog navigation and catalog activity both stamped `user-1/store-1`). GREEN: 14/14 in `use-store-usage-tracker.test.tsx`. POS routes still stamp.
 
 L5 (T2/T3 progress): backend gate moved from module 20 to module 19 (`EnsurePedidosWhatsAppAsync`); `Handle_WithoutTheOrderManagementModule_ShouldStillPersistTheOrder` failed first (RED: 31 failures in the handler suite), then GREEN 47/47. Frontend without module 20 now calls `catalogHttpService.createPublicOrderInBackground` and opens WhatsApp in the same tick (no `await`); with module 20 the synchronous flow and staff exception are unchanged. Focused frontend suites: 110 passed / 6 skipped.
+
+L6 (T4/T5 progress): `CatalogEvent` + enums + EF config + repository + migration `20261020141816_Add-CatalogEvents` (FK ON DELETE CASCADE). Public beacon `POST /api/v1/public/catalog/{slug}/events` with server-side SHA-256 visitor/session hashes, UTM/referrer classification, device parsing and bot filter. Tests: 137 WebCatalog public tests pass; E2E `CatalogTelemetryE2ETests` passes against PostgreSQL (stats read after two public events).
+
+L7 (T6 progress): `catalog-telemetry.ts` sends page_view, product_view, add_to_cart and checkout_open with `fetch keepalive` and no cookie/localStorage identifier. Wired into `public-catalog.tsx`; staff visits are excluded. Tests: 4 tracker tests + page wiring test; 67 focused tests pass.
+
+L8 (T7/T8 progress): `GET /v1/stores/{storeId}/catalog-stats?days=30` (SuperAdmin) returns visits, unique visitors, page views, online orders, conversion, sources, top products and dense daily series. New `/admin/catalog-stats` page with store selector and 7/30-day window. Tests: 6 handler tests + 1 page test; typecheck and lint pass.
+
+L9 (T9 progress): backend `Application.Tests` 1454/1454. Migration applied to `smca_test`; script `backend/scripts/36-20261020-Add-CatalogEvents.sql` generated from the migration and patched with the history `ON CONFLICT`. Frontend full suite: 5697 passed / 8 failed in 5 files; the telemetry-related `public-catalog-template.test.tsx` was fixed by mocking the tracker and now passes. The remaining 4 files (`feature-loader-timing`, `owner-edit`, `channel-rates`, `decryption-failure-policy`) pass individually; failures were parallel/resource flakes, not behavior regressions.
