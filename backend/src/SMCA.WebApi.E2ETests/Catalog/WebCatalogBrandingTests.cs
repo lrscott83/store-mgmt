@@ -76,7 +76,9 @@ public sealed class WebCatalogBrandingTests
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            await SeedBrandingAsync(fixture, "brand/logo-old.png", "brand/banner-old.png", 2);
+            // Columnas sembradas en 1 (NO el default 2) para que la aserción demuestre que el PUT
+            // parcial NO tocó la columna, en vez de coincidir con un valor por defecto.
+            await SeedBrandingAsync(fixture, "brand/logo-old.png", "brand/banner-old.png", 1);
 
             using var content = BrandForm(("removeLogo", "true"));
             var response = await ClientFor(fixture).PutAsync("/api/v1/catalog/branding", content);
@@ -88,7 +90,7 @@ public sealed class WebCatalogBrandingTests
             after.LogoKey.Should().BeNull();
             // El PUT es PARCIAL: el banner y las columnas que no se mencionan no se tocan.
             after.BannerKey.Should().Be("brand/banner-old.png");
-            after.MobileColumns.Should().Be(2);
+            after.MobileColumns.Should().Be(1);
         }
         finally
         {
@@ -102,7 +104,7 @@ public sealed class WebCatalogBrandingTests
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            await SeedBrandingAsync(fixture, "brand/logo-old.png", "brand/banner-old.png", 2);
+            await SeedBrandingAsync(fixture, "brand/logo-old.png", "brand/banner-old.png", 1);
 
             using var content = BrandForm(("removeBanner", "true"));
             var response = await ClientFor(fixture).PutAsync("/api/v1/catalog/branding", content);
@@ -113,6 +115,7 @@ public sealed class WebCatalogBrandingTests
             var after = await ReadBrandingAsync(fixture.StoreId);
             after.BannerKey.Should().BeNull();
             after.LogoKey.Should().Be("brand/logo-old.png");
+            after.MobileColumns.Should().Be(1);
         }
         finally
         {
