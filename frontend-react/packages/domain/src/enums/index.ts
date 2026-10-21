@@ -3,6 +3,8 @@ export enum ERoles {
   OwnerAdmin = 2,
   StoreUser = 3,
   ReSeller = 4,
+  /** Gestor de ventas: rol Owner-level (no por tienda), espejo de RoleType.GestorVentas=5. */
+  GestorVentas = 5,
 }
 
 export enum EFeatures {
@@ -69,6 +71,8 @@ export enum EFeatures {
    * `StoreUser` (`OnlineOrdersAdmin`).
    */
   OnlineOrders = 123,
+  /** Gestores de ventas — espejo de FeatureType.GestoresVentas=125 (módulo 21, Owner-only). */
+  GestoresVentas = 125,
 }
 
 export enum EModules {
@@ -108,6 +112,8 @@ export enum EModules {
    * `OnlineOrders` (123), que está en este módulo y no en `WebCatalog`.
    */
   GestionPedidos = 20,
+  /** Módulo Gestores de ventas — espejo de ModuleType.GestoresVentas=21 (Superior/VIP, opt-in). */
+  GestoresVentas = 21,
 }
 
 export enum PaymentType {

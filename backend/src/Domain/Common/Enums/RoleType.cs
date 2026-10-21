@@ -16,5 +16,8 @@ namespace Domain.Common.Enums
 
         [Display(Name = "Comercializador del servicio", Description = "Este Role permitirá acceder a las funcionalidades para un usuario comercializador del servicio.")]
         ReSeller = 4,
+
+        [Display(Name = "Gestor de ventas", Description = "Este Role permitirá acceder a sus pedidos, sus comisiones y al catálogo web de las tiendas de su Owner.")]
+        GestorVentas = 5,
     }
 }
