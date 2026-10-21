@@ -1,6 +1,7 @@
 using Domain.Common.Enums;
 using Domain.Entities.OrderItems;
 using Domain.Entities.OrderSalesCommissions;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
 using Domain.Entities.ProductSalesCommissions;
 using Domain.Entities.SalesManagers;
@@ -72,9 +73,17 @@ public sealed class SalesCommissionPersistenceE2ETests
                     Currency.CUP,
                     fixture.TenantId);
 
+                OrderSalesManager attribution = OrderSalesManager.Create(
+                    order.Id,
+                    manager.Id,
+                    fixture.OwnerId,
+                    fixture.StoreId,
+                    fixture.TenantId);
+
                 db.Set<SalesManager>().Add(manager);
                 db.Set<ProductSalesCommission>().Add(config);
                 db.Set<OrderSalesCommission>().Add(commission);
+                db.Set<OrderSalesManager>().Add(attribution);
                 await db.SaveChangesAsync();
             }
 
@@ -96,6 +105,13 @@ public sealed class SalesCommissionPersistenceE2ETests
                 config.Type.Should().Be(SalesCommissionType.Fixed);
                 config.Value.Should().Be(5m);
                 config.Currency.Should().Be(Currency.CUP);
+
+                OrderSalesManager attribution = await db.Set<OrderSalesManager>()
+                    .IgnoreQueryFilters()
+                    .SingleAsync(x => x.OrderId == orderId);
+                attribution.SalesManagerId.Should().Be(managerId);
+                attribution.OwnerId.Should().Be(fixture.OwnerId);
+                attribution.StoreId.Should().Be(fixture.StoreId);
 
                 OrderSalesCommission commission = await db.Set<OrderSalesCommission>()
                     .IgnoreQueryFilters()
@@ -134,6 +150,8 @@ public sealed class SalesCommissionPersistenceE2ETests
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.Set<OrderSalesManager>().IgnoreQueryFilters()
+                    .Where(x => x.OrderId == orderId).ExecuteDeleteAsync();
                 await db.Set<OrderSalesCommission>().IgnoreQueryFilters()
                     .Where(x => x.OrderId == orderId).ExecuteDeleteAsync();
                 await db.Set<ProductSalesCommission>().IgnoreQueryFilters()

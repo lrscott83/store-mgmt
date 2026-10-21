@@ -106,6 +106,7 @@ namespace Infrastructure
             services.AddScoped<ISalesManagerRepository, SalesManagerRepository>();
             services.AddScoped<IProductSalesCommissionRepository, ProductSalesCommissionRepository>();
             services.AddScoped<IOrderSalesCommissionRepository, OrderSalesCommissionRepository>();
+            services.AddScoped<IOrderSalesManagerRepository, OrderSalesManagerRepository>();
         }
     }
 }
