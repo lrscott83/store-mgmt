@@ -57,7 +57,10 @@
 | T2c | E2E existentes de matriz de planes actualizados con autorización explícita (módulo 21/feature 125) | S1, S12, S13 | inline | done — `7fdeb27b` |
 | T3 | Dominio y persistencia del módulo: `SalesManager`, `ProductSalesCommission`, `OrderSalesCommission`; configuraciones y repositorios | S6, S8 | inline | done — `b42f35e2 + 3b9dbe04` |
 | T4 | Owner crea gestores: comando/API, usuario con rol 5 a nivel Owner, claims/features | S2, S3 | inline | done — `ee5d834b` |
-| T5 | Pedido del gestor: creación autenticada desde el catálogo + atribución en tabla del módulo + WhatsApp al Owner | S3, S4 | inline | pending |
+| T5 | Pedido del gestor: creación autenticada desde el catálogo + atribución en tabla del módulo + WhatsApp al Owner | S3, S4 | inline | in progress |
+| T5a | Atribución `OrderSalesManager`: entidad/configuración/repositorio/migración | S4, S8 | inline | done — `c0434d6a` |
+| T5b | Alta del pedido con atribución + endpoint gestor-only + verificación Owner-tienda | S3, S4 | inline | pending |
+| T5c | Frontend: catálogo del gestor + envío por WhatsApp al Owner | S3, S4 | inline | pending |
 | T6 | Generación de comisión al pasar a `Entregado`: hook transaccional, idempotente, gate del módulo, configuración al momento de entrega, snapshot, fijo por unidad, % por unidad, sin conversión | S5, S7, S10 | inline | pending |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | pending |
 | T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
@@ -97,7 +100,20 @@ Una corrida previa solo del proyecto E2E abortó por crash del test host; el com
 
 ## Follow-ups del review RDD de T3-A
 
-Lineage `review-9e0f51a8e8e97b9c` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 12 hallazgos advisory. Se trasladan a las tareas que los consumen:
+Lineage `review-9e0f51a8e8e97b9c` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 12 hallazgos advisory.
+
+| Hallazgo | Severidad | Fase | Estado |
+| --- | --- | --- | --- |
+| R1-INACTIVE-MANAGER-RESOLUTION | WARNING | T4 | ✅ Resuelto en `ee5d834b` |
+| R1-TENANT-FILTER-BYPASS-ORDERITEM | WARNING | T6 | ⏳ Pendiente |
+| R1-COMMISSION-AMOUNT-UNVERIFIED | WARNING | T6 | ⏳ Pendiente |
+| R1-MARKPAID-PAYER-UNBOUND | SUGGESTION | T7 | ⏳ Pendiente |
+| R1-ROLLBACK-DELETES-USERROLE | WARNING | — | Documentado (rollback esperado) |
+| R3-REPO-FILTERS-UNTESTED | WARNING | T4/T7 | 🟡 Parcial: T4 cubre auth/list; estados de comisión en T7 |
+| R3-SCHEMA-MIGRATION-UNPROVED | WARNING | T3-B | ✅ Resuelto (migración aplicada + suite 772/772) |
+| Sugerencias T3 | SUGGESTION | T6/T7/T8 | ⏳ Pendientes |
+
+Se trasladan a las tareas que los consumen:
 
 - **R1-INACTIVE-MANAGER-RESOLUTION (WARNING) → T4:** `SalesManagerRepository.GetByUserIdAsync` no filtra `IsActive`; el claims/login debe rechazar un gestor inactivo y un test debe fijarlo.
 - **R1-TENANT-FILTER-BYPASS-ORDERITEM (WARNING) → T6:** `GetByOrderItemIdAsync` usa `IgnoreQueryFilters`; la generación debe correr con tenant/orden validada y apoyarse en el índice único, no en un lookup global.
@@ -129,3 +145,4 @@ Lineage `review-9e0f51a8e8e97b9c` · lentes `review-risk` + `review-reliability`
 - **L17 (2026-10-21, T3 cerrada):** entidades `SalesManager` (Owner-level, `UserId` único), `ProductSalesCommission` (tabla propia; `ProductId` único; tipo % o fijo + moneda) y `OrderSalesCommission` (una por `OrderItemId` único; snapshot del cálculo; `MarkPaid` completo). Enums `SalesCommissionType`/`SalesCommissionStatus`; configuraciones EF con filtro por tenant y FKs Restrict; repositorios + DI. Migración `20261021203736_Add-Sales-Commissions-Tables` aplicada a `smca_test`; script `39-...sql`. `Product` y `Order` sin columnas nuevas. Pruebas: `SalesCommissionTests` (7) y E2E de round-trip con PostgreSQL (1/1). Suite completa con el comando documentado: `Domain` 192/192, `Application` 1473/1473, E2E 771/771. Commit `b42f35e2 + 3b9dbe04`.
 - **L18 (2026-10-21, RDD de T3):** el review del T3 completo falló por `lens_context_budget_exceeded` (30 archivos / 5,559 líneas); se dividió en T3-A (`b42f35e2`, dominio/persistencia) y T3-B (`3b9dbe04`, migración generada). T3-A: lentes risk+reliability, **approved**, autoridad quemada (`review-9e0f51a8e8e97b9c`), 12 hallazgos advisory (6 WARNING) trasladados a T4/T6/T7. T3-B: assessment medium, `under_budget`, sin review debido. Suite completa: Domain 192/192, Application 1473/1473, E2E 771/771.
 - **L19 (2026-10-21, T4 cerrada):** gestor Owner-level cableado. `AuthenticationService` entra al gestor activo sin tienda y rechaza el inactivo (`GetByUserIdAsync(..., includeInactive: true)` + `IsActive`); claim `gestor_ventas` en `ClaimsTransformerService`/`HttpContextService`; `CurrentUserDto.IsGestorVentas` en `/me`; `UserRoleRepository.IsGestorVentas`. API Owner-only `POST/GET/PUT /api/v1/SalesManagers` (crear, listar, activar/desactivar) con `User` + `UserRole` 5 + `SalesManager`, gateada por `StoreRoleFeatures.GestoresVentasAdmin`. Tests: 2 unitarios de auth (activo sin tienda / inactivo), E2E de creación + login + `/me` + desactivación. Suite completa: Domain 192/192, Application 1475/1475, E2E 772/772. Commit `ee5d834b`. La bandera/home del frontend queda para T9.
+- **L20 (2026-10-21, T5a cerrada):** tabla propia `OrderSalesManager` (`OrderId` único) para atribuir el pedido al gestor; entidad, configuración EF con filtro por tenant, repositorio y DI. Migración `20261021231114_Add-OrderSalesManager-Attribution` aplicada a `smca_test`; script `40-...sql`. E2E de persistencia actualizado con la atribución (1/1). Los tests de auth de T4 que faltaban en el commit quedaron en `3b4c3dc6`. Commit `c0434d6a`. T5b (alta del pedido + endpoint) y T5c (frontend/WhatsApp) pendientes.
