@@ -53,12 +53,23 @@ namespace SMCA.WebApi.Controllers.v1
         [RequestSizeLimit(2L * ProductEntityLimits.MaxImageSizeInBytes + 131072)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogBrandingDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateBrandingAsync(
-            IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner, int? mobileColumns)
+            IFormFile? logo,
+            IFormFile? banner,
+            [FromForm] bool removeLogo,
+            [FromForm] bool removeBanner,
+            [FromForm] int? mobileColumns)
         {
             // Si el multipart no trae archivo, el binding deja el IFormFile en null y se traduce a
             // `null`: "no menciono este lado". Un archivo de longitud 0 (o de formato inválido) lo
             // rechaza `CatalogImageUploadRules` con el 400 localizado. `mobileColumns` ausente queda
             // en null = "no toco este ajuste".
+            //
+            // `[FromForm]` en los tres campos SIMPLES es obligatorio y por eso está explícito: el
+            // proveedor de formulario solo se consulta para parámetros marcados, así que sin el
+            // atributo el multipart llegaba con `removeLogo`/`mobileColumns` y el comando los recibía
+            // en `false`/`null` — el PUT parcial respondía 400 "la petición no trae ningún cambio" a
+            // CUALQUIER cambio de marca. No se detectó antes porque los tests del comando se saltan
+            // el binding; el E2E `WebCatalogBrandingTests` es el que lo fija.
             return Ok(await Sender.Send(new UpdateStoreCatalogBrandingCommand(
                 ToUpload(logo),
                 removeLogo,
