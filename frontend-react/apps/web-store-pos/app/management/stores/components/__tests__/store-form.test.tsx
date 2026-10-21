@@ -337,50 +337,37 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
 // exercise directly. The store DATA form no longer renders the picker, so it
 // carries no DG-7 wiring to test here.
 
-// ─── T8 (public-catalog-static-pages): public location block ──────────────────
+// ─── T8a (web-catalog-location-panel): el form dejó de capturar la ubicación ──────────────────
 
-describe('StoreForm — T8: public location fields, edit mode only', () => {
-  it('hydrates the location inputs from the store', async () => {
+// T8a (web-catalog-location-panel): la captura del bloque público se movió a la vista del
+// catálogo web (`app/sales/components/catalog-location-card.tsx`). Estos tests fijan que el
+// form quedó como estaba antes del feature: sin campos de ubicación y sin enviarlos.
+
+describe('StoreForm — T8a: el bloque de ubicación ya no vive en el form', () => {
+  it('edit mode no muestra ningún campo de ubicación', async () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
         <StoreForm
           {...baseProps}
           isEditMode={true}
-          initialValues={{
-            name: 'Existing Store',
-            publicPhone: '+53 5555 1234',
-            addressCity: 'La Habana',
-            addressProvince: 'Plaza',
-            latitude: 23.13,
-            longitude: -82.38,
-            openingHours: [{ day: 'Monday', opens: '09:00', closes: '17:00' }],
-          }}
+          initialValues={{ name: 'Existing Store' }}
         />
       </Wrapper>,
     );
-    expect(screen.getByLabelText(/teléfono público/i)).toHaveValue('+53 5555 1234');
-    expect(screen.getByLabelText(/ciudad/i)).toHaveValue('La Habana');
-    expect(screen.getByLabelText(/provincia/i)).toHaveValue('Plaza');
-    expect(screen.getByLabelText(/latitud/i)).toHaveValue(23.13);
-    expect(screen.getByLabelText(/longitud/i)).toHaveValue(-82.38);
-    expect(screen.getByLabelText('Apertura Lunes')).toHaveValue('09:00');
-    expect(screen.getByLabelText('Cierre Lunes')).toHaveValue('17:00');
-  });
 
-  it('hides the location block outside edit mode', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm {...baseProps} isEditMode={false} />
-      </Wrapper>,
-    );
     expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ciudad/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/provincia/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/latitud/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/longitud/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Apertura Lunes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ubicación y contacto')).not.toBeInTheDocument();
+    // Los campos que el form SÍ posee siguen ahí.
+    expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
   });
 
-  it('submits the location payload with only the days that have both times', async () => {
+  it('el submit solo envía los datos que el form posee — sin claves de ubicación', async () => {
     const { StoreForm } = await import('../store-form');
     const onSubmit = vi.fn();
     render(
@@ -388,84 +375,23 @@ describe('StoreForm — T8: public location fields, edit mode only', () => {
         <StoreForm
           {...baseProps}
           isEditMode={true}
-          initialValues={{
-            name: 'Existing Store',
-            openingHours: [{ day: 'Tuesday', opens: '08:00', closes: '12:00' }],
-          }}
+          initialValues={{ name: 'Existing Store' }}
           onSubmit={onSubmit}
         />
       </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText(/teléfono público/i), {
-      target: { value: '+53 5555 1234' },
-    });
-    fireEvent.change(screen.getByLabelText(/ciudad/i), { target: { value: 'La Habana' } });
-    fireEvent.change(screen.getByLabelText(/latitud/i), { target: { value: '23.13' } });
-    fireEvent.change(screen.getByLabelText(/longitud/i), { target: { value: '-82.38' } });
-    fireEvent.change(screen.getByLabelText('Apertura Lunes'), { target: { value: '09:00' } });
-    fireEvent.change(screen.getByLabelText('Cierre Lunes'), { target: { value: '17:00' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
-    expect(onSubmit.mock.calls[0][0]).toMatchObject({
-      publicPhone: '+53 5555 1234',
-      addressCity: 'La Habana',
-      latitude: '23.13',
-      longitude: '-82.38',
-      openingHours: [
-        { day: 'Monday', opens: '09:00', closes: '17:00' },
-        { day: 'Tuesday', opens: '08:00', closes: '12:00' },
-      ],
-    });
-  });
-
-  it('blocks submit when only one coordinate is set', async () => {
-    const { StoreForm } = await import('../store-form');
-    const onSubmit = vi.fn();
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isEditMode={true}
-          initialValues={{ name: 'Existing Store' }}
-          onSubmit={onSubmit}
-        />
-      </Wrapper>,
-    );
-    fireEvent.change(screen.getByLabelText(/latitud/i), { target: { value: '23.13' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
-
-    await waitFor(() => {
-      expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'La latitud y la longitud deben venir juntas.',
-      );
-    });
-  });
-
-  it('blocks submit when a day has only one of its two times', async () => {
-    const { StoreForm } = await import('../store-form');
-    const onSubmit = vi.fn();
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isEditMode={true}
-          initialValues={{ name: 'Existing Store' }}
-          onSubmit={onSubmit}
-        />
-      </Wrapper>,
-    );
-    fireEvent.change(screen.getByLabelText('Apertura Lunes'), { target: { value: '09:00' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
-
-    await waitFor(() => {
-      expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Cada día con horario necesita apertura y cierre.',
-      );
-    });
+    const values = onSubmit.mock.calls[0][0];
+    expect(values).not.toHaveProperty('publicPhone');
+    expect(values).not.toHaveProperty('addressCity');
+    expect(values).not.toHaveProperty('addressProvince');
+    expect(values).not.toHaveProperty('latitude');
+    expect(values).not.toHaveProperty('longitude');
+    expect(values).not.toHaveProperty('openingHours');
+    expect(values.name).toBe('Existing Store');
   });
 });

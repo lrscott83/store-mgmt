@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Services.Tenants;
 using Domain.Common.Enums;
 using Domain.Entities.Orders;
@@ -83,7 +83,7 @@ public class OrderStatsRepositoryTests
     /// <summary>Atajo para el caso base: un pedido vendido de esta tienda.</summary>
     private static Order OrderOf(Guid tenantId, decimal total, DateTime date) => OrderOf(
         StoreId, tenantId, total,
-        OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, date);
+        OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, date);
 
     #region Store Isolation
 
@@ -98,7 +98,7 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order mine = OrderOf(tenantId, 100m, Day1);
         Order theirs = OrderOf(OtherStoreId, tenantId, 5_000m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
 
         var (db, repository) = RepositoryOver(tenantId, mine, theirs);
 
@@ -120,7 +120,7 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order mine = OrderOf(tenantId, 100m, Day1);
         Order theirs = OrderOf(OtherStoreId, tenantId, 5_000m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
 
         var (db, repository) = RepositoryOver(tenantId, mine, theirs);
 
@@ -149,11 +149,11 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order delivered = OrderOf(StoreId, tenantId, 100m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
         Order pending = OrderOf(StoreId, tenantId, 200m,
-            OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2);
+            OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2);
         Order cancelled = OrderOf(StoreId, tenantId, 999m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3, Currency.USD);
+            OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3, Currency.USD);
 
         var (db, repository) = RepositoryOver(tenantId, delivered, pending, cancelled);
 
@@ -179,13 +179,13 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order paid = OrderOf(StoreId, tenantId, 100m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
         Order unpaid = OrderOf(StoreId, tenantId, 200m,
-            OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2);
+            OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2);
         Order cancelledUnpaid = OrderOf(StoreId, tenantId, 999m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3);
+            OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3);
         Order cancelledPaid = OrderOf(StoreId, tenantId, 777m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day3);
+            OrderStatus.Cancelado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day3);
 
         var (db, repository) = RepositoryOver(tenantId, paid, unpaid, cancelledUnpaid, cancelledPaid);
 
@@ -208,7 +208,7 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order cancelled = OrderOf(StoreId, tenantId, 500m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
+            OrderStatus.Cancelado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1);
 
         var (db, repository) = RepositoryOver(tenantId, cancelled);
 
@@ -241,10 +241,10 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 10m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 20m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
-            OrderOf(StoreId, tenantId, 30m, OrderStatus.Preparing, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
-            OrderOf(StoreId, tenantId, 40m, OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day3),
+            OrderOf(StoreId, tenantId, 10m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 20m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
+            OrderOf(StoreId, tenantId, 30m, OrderStatus.Preparado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 40m, OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day3),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -252,10 +252,10 @@ public class OrderStatsRepositoryTests
         OrderAggregateStats stats = await repository.GetStatsByStoreIdAsync(StoreId, new OrderStatsFilter());
 
         stats.ByStatus.Should().HaveCount(3, "solo hay tres estados presentes en el rango");
-        stats.ByStatus[OrderStatus.New].Should().Be(2);
-        stats.ByStatus[OrderStatus.Preparing].Should().Be(1);
-        stats.ByStatus[OrderStatus.Cancelled].Should().Be(1);
-        stats.ByStatus.Should().NotContainKey(OrderStatus.Delivered);
+        stats.ByStatus[OrderStatus.Creado].Should().Be(2);
+        stats.ByStatus[OrderStatus.Preparado].Should().Be(1);
+        stats.ByStatus[OrderStatus.Cancelado].Should().Be(1);
+        stats.ByStatus.Should().NotContainKey(OrderStatus.Entregado);
         db.Dispose();
     }
 
@@ -265,10 +265,10 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 10m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 20m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
-            OrderOf(StoreId, tenantId, 30m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3),
-            OrderOf(StoreId, tenantId, 40m, OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
+            OrderOf(StoreId, tenantId, 10m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 20m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
+            OrderOf(StoreId, tenantId, 30m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3),
+            OrderOf(StoreId, tenantId, 40m, OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -291,9 +291,9 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 10m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 20m, OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
-            OrderOf(StoreId, tenantId, 30m, OrderStatus.Ready, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
+            OrderOf(StoreId, tenantId, 10m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 20m, OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 30m, OrderStatus.Preparado, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -330,19 +330,19 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 100m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 200m, OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 100m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 200m, OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day2),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
 
         OrderAggregateStats stats = await repository.GetStatsByStoreIdAsync(
-            StoreId, new OrderStatsFilter(Status: OrderStatus.New));
+            StoreId, new OrderStatsFilter(Status: OrderStatus.Creado));
 
         stats.OrdersCount.Should().Be(1);
         stats.TotalSales.Should().Be(100m);
-        stats.ByStatus.Should().ContainKey(OrderStatus.New);
-        stats.ByStatus.Should().NotContainKey(OrderStatus.Delivered);
+        stats.ByStatus.Should().ContainKey(OrderStatus.Creado);
+        stats.ByStatus.Should().NotContainKey(OrderStatus.Entregado);
         db.Dispose();
     }
 
@@ -358,8 +358,8 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 100m, OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 200m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 100m, OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 200m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -381,9 +381,9 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 100m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
-            OrderOf(StoreId, tenantId, 200m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
-            OrderOf(StoreId, tenantId, 300m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day3),
+            OrderOf(StoreId, tenantId, 100m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1),
+            OrderOf(StoreId, tenantId, 200m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
+            OrderOf(StoreId, tenantId, 300m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day3),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -410,10 +410,10 @@ public class OrderStatsRepositoryTests
         Guid tenantId = Guid.NewGuid();
         Order[] orders =
         {
-            OrderOf(StoreId, tenantId, 100m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
-            OrderOf(StoreId, tenantId, 200m, OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
-            OrderOf(StoreId, tenantId, 300m, OrderStatus.Delivered, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
-            OrderOf(StoreId, tenantId, 400m, OrderStatus.New, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
+            OrderOf(StoreId, tenantId, 100m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 200m, OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2),
+            OrderOf(StoreId, tenantId, 300m, OrderStatus.Entregado, OrderPaymentStatus.Pending, OrderDeliveryType.Delivery, Day2),
+            OrderOf(StoreId, tenantId, 400m, OrderStatus.Creado, OrderPaymentStatus.Paid, OrderDeliveryType.Delivery, Day3),
         };
 
         var (db, repository) = RepositoryOver(tenantId, orders);
@@ -421,7 +421,7 @@ public class OrderStatsRepositoryTests
         OrderAggregateStats stats = await repository.GetStatsByStoreIdAsync(
             StoreId,
             new OrderStatsFilter(
-                Status: OrderStatus.New,
+                Status: OrderStatus.Creado,
                 PaymentStatus: OrderPaymentStatus.Pending,
                 DeliveryType: OrderDeliveryType.Delivery));
 
@@ -504,9 +504,9 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order older = OrderOf(StoreId, tenantId, 10m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1, Currency.CUP);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1, Currency.CUP);
         Order newer = OrderOf(StoreId, tenantId, 20m,
-            OrderStatus.New, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2, Currency.USD);
+            OrderStatus.Creado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day2, Currency.USD);
 
         var (db, repository) = RepositoryOver(tenantId, older, newer);
 
@@ -526,9 +526,9 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order sold = OrderOf(StoreId, tenantId, 10m,
-            OrderStatus.Delivered, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1, Currency.CUP);
+            OrderStatus.Entregado, OrderPaymentStatus.Paid, OrderDeliveryType.Pickup, Day1, Currency.CUP);
         Order cancelled = OrderOf(StoreId, tenantId, 20m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3, Currency.USD);
+            OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day3, Currency.USD);
 
         var (db, repository) = RepositoryOver(tenantId, sold, cancelled);
 
@@ -553,7 +553,7 @@ public class OrderStatsRepositoryTests
     {
         Guid tenantId = Guid.NewGuid();
         Order cancelled = OrderOf(StoreId, tenantId, 20m,
-            OrderStatus.Cancelled, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1, Currency.EUR);
+            OrderStatus.Cancelado, OrderPaymentStatus.Pending, OrderDeliveryType.Pickup, Day1, Currency.EUR);
 
         var (db, repository) = RepositoryOver(tenantId, cancelled);
 

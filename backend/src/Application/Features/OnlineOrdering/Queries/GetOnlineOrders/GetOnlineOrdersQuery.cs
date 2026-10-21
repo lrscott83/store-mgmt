@@ -45,6 +45,12 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
     /// `Search` contrasta contra <see cref="Order.Code"/> y <see cref="Order.CustomerPhone"/> porque
     /// son las dos cosas que una persona repite al teléfono: el código que se le dictó y el
     /// número de quien pidió.
+    ///
+    /// `ExactRange` cambia el significado de `From`/`To`: por defecto son DÍAS y se normalizan a
+    /// día completo; con <c>exactRange=true</c> son INSTANTES y se usan tal cual. La vista de
+    /// gestión lo necesita para "hoy según el reloj del teléfono": el navegador ya convirtió su día
+    /// local a los dos instantes UTC que lo delimitan, y volver a truncarlos a fecha movería la
+    /// ventana al día UTC de la tienda.
     /// </summary>
     public sealed record GetOnlineOrdersQuery(
         OrderStatus? Status = null,
@@ -55,7 +61,8 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
         DateTime? To = null,
         string? Search = null,
         int Page = 1,
-        int PageSize = OnlineOrderPaging.DefaultPageSize) : IQuery<OnlineOrderPageDto>;
+        int PageSize = OnlineOrderPaging.DefaultPageSize,
+        bool ExactRange = false) : IQuery<OnlineOrderPageDto>;
 
     public class GetOnlineOrdersQueryHandler : IQueryHandler<GetOnlineOrdersQuery, OnlineOrderPageDto>
     {
@@ -90,8 +97,8 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
                     query.PaymentStatus,
                     query.DeliveryType,
                     query.DriverId,
-                    NormalizeFrom(query.From),
-                    NormalizeTo(query.To),
+                    query.ExactRange ? query.From : NormalizeFrom(query.From),
+                    query.ExactRange ? query.To : NormalizeTo(query.To),
                     NormalizeSearch(query.Search)),
                 (page - 1) * pageSize,
                 pageSize);

@@ -50,14 +50,13 @@ export interface OrderingSettingsPayload {
 // `ORDERING_ORDERS.STATUS_*` de i18n. Reordenar o reutilizar un valor rompería datos históricos,
 // igual que en `Currency` del paquete de dominio.
 
-/** Espejo de `Domain.Common.Enums.OrderStatus`. Sin estado "En camino" (D18). */
+/** Espejo de `Domain.Common.Enums.OrderStatus`. `Cancelado` vale 10 y no 4 para dejar hueco. */
 export enum OnlineOrderStatus {
-  New = 0,
-  Accepted = 1,
-  Preparing = 2,
-  Ready = 3,
-  Delivered = 4,
-  Cancelled = 5,
+  Creado = 0,
+  Preparado = 1,
+  Transportando = 2,
+  Entregado = 3,
+  Cancelado = 10,
 }
 
 /** Espejo de `Domain.Common.Enums.OrderPaymentStatus`. Eje INDEPENDIENTE del estado (D3/D12). */
@@ -141,6 +140,8 @@ export interface OnlineOrderFilters {
   search?: string;
   page?: number;
   pageSize?: number;
+  /** Con `true`, `from`/`to` son instantes exactos en vez de días completos. */
+  exactRange?: boolean;
 }
 
 /** Página de pedidos: `total` es el TOTAL FILTRADO, no el de la tienda (F5, T1). */
@@ -149,6 +150,23 @@ export interface OnlineOrderPage {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** Línea del detalle. Espejo de `OnlineOrderLineDto`: precio y total son el snapshot del pedido. */
+export interface OnlineOrderDetailLine {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  currency: number;
+  lineTotal: number;
+}
+
+/** Detalle de un pedido. Espejo de `OnlineOrderDetailDto`. */
+export interface OnlineOrderDetail extends OnlineOrderListItem {
+  deliveryAddress: string | null;
+  notes: string | null;
+  lines: OnlineOrderDetailLine[];
 }
 
 /**
@@ -228,23 +246,31 @@ export interface OnlineOrderStats {
 }
 
 /**
- * Transiciones alcanzables desde un estado — MISMA tabla que `Order.AllowedTransitionsFrom` (F2).
+ * Transiciones alcanzables desde un estado - MISMA tabla que `Order.AllowedTransitionsFrom`. Depende
+ * del tipo de entrega porque `Transportando` sólo existe con entrega a domicilio.
  *
  * Se replica aquí, no en el backend, para que la vista OFREZCA solo lo que el servidor aceptaría:
  * un botón que el servidor va a rechazar con un 400 es una trampa para quien opera la tienda. El
- * servidor sigue siendo la autoridad (`Order.ChangeStatus` es la única puerta): esta tabla decide
- * qué se PINTA, no qué se aplica. Los estados terminales no tienen salida.
+ * servidor sigue siendo la autoridad: esta tabla decide qué se PINTA, no qué se aplica.
  */
-export const ORDER_STATUS_TRANSITIONS: Readonly<
-  Record<OnlineOrderStatus, readonly OnlineOrderStatus[]>
-> = {
-  [OnlineOrderStatus.New]: [OnlineOrderStatus.Accepted, OnlineOrderStatus.Cancelled],
-  [OnlineOrderStatus.Accepted]: [OnlineOrderStatus.Preparing, OnlineOrderStatus.Cancelled],
-  [OnlineOrderStatus.Preparing]: [OnlineOrderStatus.Ready, OnlineOrderStatus.Cancelled],
-  [OnlineOrderStatus.Ready]: [OnlineOrderStatus.Delivered, OnlineOrderStatus.Cancelled],
-  [OnlineOrderStatus.Delivered]: [],
-  [OnlineOrderStatus.Cancelled]: [],
-};
+export function allowedTransitionsFrom(
+  status: OnlineOrderStatus,
+  deliveryType: OnlineOrderDeliveryType,
+): readonly OnlineOrderStatus[] {
+  switch (status) {
+    case OnlineOrderStatus.Creado:
+      return [OnlineOrderStatus.Preparado, OnlineOrderStatus.Cancelado];
+    case OnlineOrderStatus.Preparado:
+      return deliveryType === OnlineOrderDeliveryType.Delivery
+        ? [OnlineOrderStatus.Transportando, OnlineOrderStatus.Cancelado]
+        : [OnlineOrderStatus.Entregado, OnlineOrderStatus.Cancelado];
+    case OnlineOrderStatus.Transportando:
+      return [OnlineOrderStatus.Entregado, OnlineOrderStatus.Cancelado];
+    case OnlineOrderStatus.Entregado:
+    case OnlineOrderStatus.Cancelado:
+      return [];
+  }
+}
 
 /**
  * Endpoints de gestión de la configuración de pedidos (módulo 18, F1) y de la gestión de los
@@ -348,14 +374,33 @@ export const orderingHttpService = {
     return response.data;
   },
 
-  /** Mueve el pedido por la tabla de estados (F2). El servidor rechaza las transiciones inválidas. */
+  /**
+   * Detalle de un pedido con sus líneas, el domicilio y las notas. Un id de otra tienda responde
+   * 404, indistinguible de uno inexistente.
+   */
+  async getOrder(id: string): Promise<BaseResponseModel<OnlineOrderDetail>> {
+    const response = await apiClient.get<BaseResponseModel<OnlineOrderDetail>>(
+      `/v1/online-orders/${id}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Mueve el pedido por la máquina de estados. El servidor rechaza las transiciones inválidas y
+   * exige la razón al cancelar y el repartidor al pasar a reparto.
+   */
   async updateStatus(
     id: string,
     status: OnlineOrderStatus,
+    options: { driverId?: string; cancellationReason?: string } = {},
   ): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.patch<BaseResponseModel<boolean>>(
       `/v1/online-orders/${id}/status`,
-      { status },
+      {
+        status,
+        ...(options.driverId ? { driverId: options.driverId } : {}),
+        ...(options.cancellationReason ? { cancellationReason: options.cancellationReason } : {}),
+      },
     );
     return response.data;
   },
@@ -424,11 +469,14 @@ export const orderingHttpService = {
  * `Enum.Parse` que el binder resuelve a null — y en `from`/`to` una cadena vacía NO es null. Lo
  * que no se manda, no filtra; lo que se manda en blanco, filtra por algo que nadie pidió.
  */
-function withoutEmptyFilters(filters: OnlineOrderFilters): Record<string, string | number> {
-  const params: Record<string, string | number> = {};
+function withoutEmptyFilters(
+  filters: OnlineOrderFilters,
+): Record<string, string | number | boolean> {
+  const params: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === null) continue;
     if (typeof value === 'string' && value.trim() === '') continue;
+    if (typeof value === 'boolean' && !value) continue;
     params[key] = value;
   }
   return params;

@@ -73,7 +73,7 @@ function makeOrder(overrides: Partial<OnlineOrderListItem> = {}): OnlineOrderLis
     deliveryType: OnlineOrderDeliveryType.Delivery,
     total: 1500,
     currency: Currency.USD,
-    status: OnlineOrderStatus.Delivered,
+    status: OnlineOrderStatus.Entregado,
     paymentStatus: OnlineOrderPaymentStatus.Paid,
     driverId: 'd1',
     driverName: 'Juan',
@@ -90,7 +90,7 @@ const SECOND_ORDER = makeOrder({
   customerPhone: '5357654321',
   deliveryType: OnlineOrderDeliveryType.Pickup,
   total: 800,
-  status: OnlineOrderStatus.Cancelled,
+  status: OnlineOrderStatus.Cancelado,
   paymentStatus: OnlineOrderPaymentStatus.Pending,
   driverId: null,
   driverName: null,
@@ -109,14 +109,13 @@ const STATS: OnlineOrderStats = {
   paidAmount: 2900,
   pendingCount: 3,
   pendingAmount: 1300,
-  // Los seis estados en el orden del enum, con ceros incluidos (eje FIJO de la tarjeta).
+  // Los cinco estados en el orden del enum, con ceros incluidos (eje FIJO de la tarjeta).
   byStatus: [
-    { status: OnlineOrderStatus.New, count: 1 },
-    { status: OnlineOrderStatus.Accepted, count: 2 },
-    { status: OnlineOrderStatus.Preparing, count: 3 },
-    { status: OnlineOrderStatus.Ready, count: 4 },
-    { status: OnlineOrderStatus.Delivered, count: 1 },
-    { status: OnlineOrderStatus.Cancelled, count: 1 },
+    { status: OnlineOrderStatus.Creado, count: 1 },
+    { status: OnlineOrderStatus.Preparado, count: 2 },
+    { status: OnlineOrderStatus.Transportando, count: 3 },
+    { status: OnlineOrderStatus.Entregado, count: 1 },
+    { status: OnlineOrderStatus.Cancelado, count: 1 },
   ],
   byDeliveryType: [
     { deliveryType: OnlineOrderDeliveryType.Pickup, count: 5 },
@@ -209,7 +208,7 @@ describe('OrderingSalesPage (Ventas)', () => {
     expect(screen.getByTestId('sales-metric-pending-amount')).toHaveTextContent('1 300 USD');
   });
 
-  it('el desglose pinta los seis estados y las dos modalidades, con los ceros', async () => {
+  it('el desglose pinta los cinco estados y las dos modalidades, con los ceros', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('sales-metric-orders')).toHaveTextContent('12'));
 
@@ -217,13 +216,13 @@ describe('OrderingSalesPage (Ventas)', () => {
     // los separa con `justify-between`. Se comparan por separado y no como un texto pegado.
     const byStatus = screen.getByTestId('sales-breakdown-status');
     const statusRow = (value: number) => within(byStatus).getByTestId(`sales-status-${value}`);
-    expect(within(statusRow(0)).getByText('Nuevo')).toBeInTheDocument();
+    expect(within(statusRow(0)).getByText('Creado')).toBeInTheDocument();
     expect(within(statusRow(0)).getByText('1')).toBeInTheDocument();
-    expect(within(statusRow(3)).getByText('Listo')).toBeInTheDocument();
-    expect(within(statusRow(3)).getByText('4')).toBeInTheDocument();
+    expect(within(statusRow(2)).getByText('Transportando')).toBeInTheDocument();
+    expect(within(statusRow(2)).getByText('3')).toBeInTheDocument();
     // El cancelado SÍ se cuenta en el desglose: es el único sitio donde se ve.
-    expect(within(statusRow(5)).getByText('Cancelado')).toBeInTheDocument();
-    expect(within(statusRow(5)).getByText('1')).toBeInTheDocument();
+    expect(within(statusRow(10)).getByText('Cancelado')).toBeInTheDocument();
+    expect(within(statusRow(10)).getByText('1')).toBeInTheDocument();
 
     const byDelivery = screen.getByTestId('sales-breakdown-delivery');
     const deliveryRow = (value: number) => within(byDelivery).getByTestId(`sales-delivery-${value}`);
@@ -248,15 +247,15 @@ describe('OrderingSalesPage (Ventas)', () => {
     expect(orderingMock.getSalesStats).toHaveBeenCalledTimes(1);
 
     fireEvent.change(screen.getByTestId('sales-filter-status'), {
-      target: { value: String(OnlineOrderStatus.Preparing) },
+      target: { value: String(OnlineOrderStatus.Preparado) },
     });
 
     await waitFor(() =>
-      expect(lastStatsCall()).toEqual({ status: OnlineOrderStatus.Preparing }),
+      expect(lastStatsCall()).toEqual({ status: OnlineOrderStatus.Preparado }),
     );
     await waitFor(() =>
       expect(lastListCall()).toEqual({
-        status: OnlineOrderStatus.Preparing,
+        status: OnlineOrderStatus.Preparado,
         page: 1,
         pageSize: 20,
       }),
@@ -346,9 +345,9 @@ describe('OrderingSalesPage (Ventas)', () => {
     expect(screen.queryByTestId('sales-breakdown-status')).not.toBeInTheDocument();
     // Y se puede seguir filtrando el histórico sin las métricas.
     fireEvent.change(screen.getByTestId('sales-filter-status'), {
-      target: { value: String(OnlineOrderStatus.Cancelled) },
+      target: { value: String(OnlineOrderStatus.Cancelado) },
     });
-    await waitFor(() => expect(lastListCall()).toHaveProperty('status', OnlineOrderStatus.Cancelled));
+    await waitFor(() => expect(lastListCall()).toHaveProperty('status', OnlineOrderStatus.Cancelado));
   });
 
   it('un rechazo del servidor en las métricas también degrada solo la cabecera', async () => {

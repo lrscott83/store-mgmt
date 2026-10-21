@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats;
@@ -101,7 +101,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
             PendingCount = 1,
             PendingAmount = 300m,
             Currency = Currency.USD,
-            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Delivered] = 3, [OrderStatus.Cancelled] = 1 },
+            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Entregado] = 3, [OrderStatus.Cancelado] = 1 },
             ByDeliveryType = new Dictionary<OrderDeliveryType, int> { [OrderDeliveryType.Pickup] = 2, [OrderDeliveryType.Delivery] = 2 },
         });
 
@@ -157,7 +157,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
 
     /// <summary>
     /// Sin filtros, el filtro que sale hacia la base tiene TODO a null. Rellenar con valores
-    /// neutros sería peor que no filtrar: <c>OrderStatus.New</c> o <c>OrderPaymentStatus.Pending</c>
+    /// neutros sería peor que no filtrar: <c>OrderStatus.Creado</c> o <c>OrderPaymentStatus.Pending</c>
     /// son valores REALES del enum y esconderían los pedidos ya avanzado de estado.
     /// </summary>
     [Fact]
@@ -179,11 +179,11 @@ public class GetOnlineOrderStatsQueryHandlerTests
     [Fact]
     public async Task Handle_WithAStatus_ShouldForwardIt()
     {
-        await Handler().Handle(new GetOnlineOrderStatsQuery(Status: OrderStatus.Ready), CancellationToken.None);
+        await Handler().Handle(new GetOnlineOrderStatsQuery(Status: OrderStatus.Preparado), CancellationToken.None);
 
         _orderRepository.Verify(
             x => x.GetStatsByStoreIdAsync(
-                _storeId, It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Ready)),
+                _storeId, It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Preparado)),
             Times.Once);
     }
 
@@ -217,14 +217,14 @@ public class GetOnlineOrderStatsQueryHandlerTests
         await Handler().Handle(new GetOnlineOrderStatsQuery(
             From: new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
             To: new DateTime(2026, 10, 7, 0, 0, 0, DateTimeKind.Utc),
-            Status: OrderStatus.Ready,
+            Status: OrderStatus.Preparado,
             PaymentStatus: OrderPaymentStatus.Pending,
             DeliveryType: OrderDeliveryType.Pickup), CancellationToken.None);
 
         _orderRepository.Verify(
             x => x.GetStatsByStoreIdAsync(
                 _storeId,
-                It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Ready
+                It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Preparado
                     && f.PaymentStatus == OrderPaymentStatus.Pending
                     && f.DeliveryType == OrderDeliveryType.Pickup
                     && f.From == new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc)
@@ -348,7 +348,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
             OrdersCount = 3,
             NonCancelledCount = 2,
             TotalSales = 300m,
-            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Cancelled] = 1 },
+            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Cancelado] = 1 },
         });
 
         var result = await Handler().Handle(new GetOnlineOrderStatsQuery(), CancellationToken.None);
@@ -357,7 +357,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
         result.Data.NonCancelledCount.Should().Be(2);
         result.Data.TotalSales.Should().Be(300m);
         result.Data.ByStatus.Should().ContainSingle(
-            entry => entry.Status == OrderStatus.Cancelled && entry.Count == 1);
+            entry => entry.Status == OrderStatus.Cancelado && entry.Count == 1);
     }
 
     /// <summary>
@@ -396,7 +396,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
             OrdersCount = 2,
             NonCancelledCount = 0,
             TotalSales = 0m,
-            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Cancelled] = 2 },
+            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Cancelado] = 2 },
         });
 
         var result = await Handler().Handle(new GetOnlineOrderStatsQuery(), CancellationToken.None);
@@ -469,7 +469,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
         result.Data!.ByStatus.Should().HaveCount(Enum.GetValues<OrderStatus>().Length);
         result.Data!.ByStatus.Should().OnlyContain(entry => entry.Count == 0);
         result.Data!.ByStatus.Select(entry => entry.Status)
-            .Should().Contain([OrderStatus.New, OrderStatus.Cancelled]);
+            .Should().Contain([OrderStatus.Creado, OrderStatus.Cancelado]);
         result.Data!.ByDeliveryType.Should().HaveCount(Enum.GetValues<OrderDeliveryType>().Length);
         result.Data!.ByDeliveryType.Should().OnlyContain(entry => entry.Count == 0);
     }
@@ -484,7 +484,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
         Returns(new OrderAggregateStats
         {
             OrdersCount = 2,
-            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Delivered] = 1, [OrderStatus.New] = 1 },
+            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Entregado] = 1, [OrderStatus.Creado] = 1 },
             ByDeliveryType = new Dictionary<OrderDeliveryType, int> { [OrderDeliveryType.Delivery] = 1, [OrderDeliveryType.Pickup] = 1 },
         });
 
@@ -500,14 +500,14 @@ public class GetOnlineOrderStatsQueryHandlerTests
         Returns(new OrderAggregateStats
         {
             OrdersCount = 3,
-            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.New] = 2, [OrderStatus.Delivered] = 1 },
+            ByStatus = new Dictionary<OrderStatus, int> { [OrderStatus.Creado] = 2, [OrderStatus.Entregado] = 1 },
         });
 
         var result = await Handler().Handle(new GetOnlineOrderStatsQuery(), CancellationToken.None);
 
-        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.New && entry.Count == 2);
-        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.Delivered && entry.Count == 1);
-        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.Cancelled && entry.Count == 0);
+        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.Creado && entry.Count == 2);
+        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.Entregado && entry.Count == 1);
+        result.Data!.ByStatus.Should().ContainSingle(entry => entry.Status == OrderStatus.Cancelado && entry.Count == 0);
     }
 
     /// <summary>
@@ -542,9 +542,9 @@ public class GetOnlineOrderStatsQueryHandlerTests
         Guid tenantId = Guid.NewGuid();
         Guid otherStoreId = Guid.NewGuid();
 
-        Order mine = Order(status: OrderStatus.Delivered, paymentStatus: OrderPaymentStatus.Paid, tenantId: tenantId);
+        Order mine = Order(status: OrderStatus.Entregado, paymentStatus: OrderPaymentStatus.Paid, tenantId: tenantId);
         Order theirs = Order(storeId: otherStoreId, tenantId: tenantId,
-            total: 5_000m, status: OrderStatus.Delivered, paymentStatus: OrderPaymentStatus.Paid);
+            total: 5_000m, status: OrderStatus.Entregado, paymentStatus: OrderPaymentStatus.Paid);
 
         var (db, repository) = RepositoryOver(tenantId, mine, theirs);
 
@@ -567,8 +567,8 @@ public class GetOnlineOrderStatsQueryHandlerTests
     {
         Guid tenantId = Guid.NewGuid();
 
-        Order sold = Order(total: 100m, status: OrderStatus.Delivered, paymentStatus: OrderPaymentStatus.Paid, tenantId: tenantId);
-        Order cancelled = Order(total: 999m, status: OrderStatus.Cancelled, paymentStatus: OrderPaymentStatus.Pending, tenantId: tenantId);
+        Order sold = Order(total: 100m, status: OrderStatus.Entregado, paymentStatus: OrderPaymentStatus.Paid, tenantId: tenantId);
+        Order cancelled = Order(total: 999m, status: OrderStatus.Cancelado, paymentStatus: OrderPaymentStatus.Pending, tenantId: tenantId);
 
         var (db, repository) = RepositoryOver(tenantId, sold, cancelled);
 
@@ -610,7 +610,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
     /// </summary>
     private Order Order(
         decimal total = 100m,
-        OrderStatus status = OrderStatus.New,
+        OrderStatus status = OrderStatus.Creado,
         OrderPaymentStatus paymentStatus = OrderPaymentStatus.Pending,
         Guid? storeId = null,
         Guid? tenantId = null)

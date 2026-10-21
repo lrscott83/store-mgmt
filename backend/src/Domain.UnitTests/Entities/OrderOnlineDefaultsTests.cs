@@ -1,4 +1,4 @@
-using Domain.Common.Enums;
+﻿using Domain.Common.Enums;
 using Domain.Entities.Orders;
 using FluentAssertions;
 
@@ -39,7 +39,7 @@ namespace Domain.UnitTests.Entities
         {
             Order order = CreateOnline();
 
-            order.Status.Should().Be(OrderStatus.New);
+            order.Status.Should().Be(OrderStatus.Creado);
             order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
             order.DeliveryType.Should().Be(OrderDeliveryType.Pickup);
         }
@@ -119,7 +119,7 @@ namespace Domain.UnitTests.Entities
 
             order.Code.Should().BeNull();
             order.DeliveryType.Should().Be(OrderDeliveryType.Pickup);
-            order.Status.Should().Be(OrderStatus.New);
+            order.Status.Should().Be(OrderStatus.Creado);
             order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
             order.CustomerName.Should().BeNull();
             order.CustomerPhone.Should().BeNull();

@@ -1,6 +1,8 @@
 import type { BaseResponseModel } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
+const API_URL = (import.meta.env['API_URL'] as string | undefined) ?? '';
+
 /**
  * Estado del catálogo de la tienda seleccionada (cabecera de la vista Catálogo Web).
  * Espejo de `Application/Dtos/WebCatalog/CatalogDtos.cs` (CatalogStatusDto).
@@ -308,18 +310,18 @@ export interface PublicOrderingConfig {
    */
   pedidosWhatsAppEnabled: boolean;
   /**
-   * La tienda tiene ACTIVO el módulo "Gestión de Pedidos" (20). Es el interruptor de la
-   * PERSISTENCIA (M3): solo con este módulo el checkout hace `POST` y hay `Order` que
-   * gestionar. Sin él NO se hace `POST`: el resumen se arma en cliente y viaja por `wa.me`,
-   * sin código porque no hay pedido guardado.
+   * La tienda tiene ACTIVO el módulo "Gestión de Pedidos" (20). Decide el MODO del alta, no si se
+   * persiste: con el módulo el checkout espera la respuesta (alta síncrona, código y consulta del
+   * pedido); sin él el `POST` se dispara en SEGUNDO PLANO y el resumen sale por `wa.me` en el mismo
+   * gesto. Las vistas de gestión siguen ocultas hasta que el módulo esté activo.
    */
   gestionPedidosEnabled: boolean;
   /**
    * Número de WhatsApp de la tienda, con prefijo internacional, TAL CUAL lo guardó el dueño.
    *
    * Viaja AQUÍ y no solo en la respuesta de creación desde T5 (2026-10-10), que revierte F4-T2:
-   * el modo sin persistencia (M3) no hace `POST` y por tanto no tiene respuesta de creación de
-   * la que sacarlo — sin este campo el frontend no podría armar el `wa.me` de ese modo.
+   * en el alta en segundo plano (sin módulo 20) no hay respuesta de creación de la que sacarlo —
+   * sin este campo el frontend no podría armar el `wa.me` de ese modo.
    *
    * `null`/`undefined` = la tienda no lo tiene configurado: el enlace queda BLOQUEADO y el aviso
    * lo dice. NUNCA se "limpia" aquí: el backend lo publica tal cual y `wa.me` lo normaliza a
@@ -697,6 +699,37 @@ export const catalogHttpService = {
       payload,
     );
     return response.data;
+  },
+
+  /**
+   * Persiste el pedido SIN esperar la respuesta (modo sin "Gestión de Pedidos", 20).
+   *
+   * El storefront abre `wa.me` en el mismo gesto: el pedido viaja por WhatsApp y la fila se
+   * escribe en segundo plano. Un fallo aquí NO se muestra al cliente —el canal de entrega sigue
+   * siendo WhatsApp— y por eso el request va con `skipLoading` y el error se traga.
+   *
+   * No hay `await` a propósito: bloquear el handoff hasta que la base confirme era justo lo que
+   * el modo asíncrono elimina. El backend sigue validando el pedido; si lo rechaza, la tienda lo
+   * recibe igual por WhatsApp.
+   */
+  createPublicOrderInBackground(storeSlug: string, payload: CreatePublicOrderRequest): Promise<void> {
+    try {
+      return fetch(`${API_URL}/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      })
+        .then(() => undefined)
+        .catch((err: unknown) => {
+          // Best-effort: el pedido ya salió por WhatsApp. Dejamos señal para diagnosticar una
+          // caída del endpoint sin bloquear ni asustar al cliente.
+          console.warn('[catalog-http-service] no se pudo persistir el pedido en segundo plano', err);
+        });
+    } catch (err) {
+      console.warn('[catalog-http-service] no se pudo iniciar el pedido en segundo plano', err);
+      return Promise.resolve();
+    }
   },
 
   /**

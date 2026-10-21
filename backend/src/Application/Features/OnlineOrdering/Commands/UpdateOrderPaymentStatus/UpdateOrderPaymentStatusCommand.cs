@@ -72,10 +72,17 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus
             if (order is null)
                 throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
 
-            // Asignación directa y no `ChangePaymentStatus(...)`: el pago no tiene máquina de
-            // estados, y envolver un setter en un método "por simetría" con el estado ocultaría
-            // justamente lo que hace distinto a esta columna.
-            order.PaymentStatus = request.PaymentStatus;
+            // El pago no tiene máquina de estados —un pedido en `Creado` puede estar pagado por
+            // adelantado—, pero SÍ tiene una invariante: un pedido entregado ya está pagado. La
+            // puerta es `ChangePaymentStatus`, que es la que la hace cumplir.
+            try
+            {
+                order.ChangePaymentStatus(request.PaymentStatus);
+            }
+            catch (DeliveredOrderCannotBeUnpaidException exception)
+            {
+                throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
+            }
 
             // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
             // sin marcar NO escribiría nada — sin error y sin aviso.

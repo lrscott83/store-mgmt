@@ -46,7 +46,7 @@ namespace Domain.Entities.Orders
         /// <summary>Recogida o envío a domicilio. Solo lo usa el pedido online.</summary>
         public OrderDeliveryType DeliveryType { get; set; } = OrderDeliveryType.Pickup;
         /// <summary>Estado del pedido online (D11). El POS nunca lo mueve.</summary>
-        public OrderStatus Status { get; set; } = OrderStatus.New;
+        public OrderStatus Status { get; set; } = OrderStatus.Creado;
         /// <summary>Pago manual Pendiente/Paid (D3/D12), independiente de <see cref="Status"/>.</summary>
         public OrderPaymentStatus PaymentStatus { get; set; } = OrderPaymentStatus.Pending;
         /// <summary>Nombre de quien pide. null en las ventas del POS.</summary>
@@ -57,6 +57,12 @@ namespace Domain.Entities.Orders
         public string? DeliveryAddress { get; set; }
         /// <summary>Notas del pedido (la vía del POS usa <see cref="Description"/>).</summary>
         public string? Notes { get; set; }
+        /// <summary>
+        /// Razón por la que el pedido se canceló, en texto libre. Solo tiene valor cuando
+        /// <see cref="Status"/> es <see cref="OrderStatus.Cancelado"/>: la escribe
+        /// <see cref="ChangeStatus"/> y no se puede fijar a mano.
+        /// </summary>
+        public string? CancellationReason { get; set; }
         /// <summary>Repartidor asignado (F7). null hasta que se asigne.</summary>
         public Guid? DriverId { get; set; }
         /// <summary>Repartidor asignado (F7).</summary>
@@ -123,7 +129,7 @@ namespace Domain.Entities.Orders
             order.Currency = currency;
             order.Code = code;
             order.DeliveryType = deliveryType;
-            order.Status = OrderStatus.New;
+            order.Status = OrderStatus.Creado;
             order.PaymentStatus = OrderPaymentStatus.Pending;
             order.CustomerName = customerName;
             order.CustomerPhone = customerPhone;
@@ -144,38 +150,101 @@ namespace Domain.Entities.Orders
         }
 
         /// <summary>
-        /// Mueve el pedido por la tabla de estados de la D11. Es la ÚNICA puerta: nadie asigna
+        /// Mueve el pedido por la tabla de estados. Es la ÚNICA puerta: nadie asigna
         /// <see cref="Status"/> a mano, así que ningún handler puede saltarse la máquina.
         ///
-        ///   New       → Accepted, Cancelled
-        ///   Accepted  → Preparing, Cancelled
-        ///   Preparing → Ready, Cancelled
-        ///   Ready     → Delivered, Cancelled
-        ///   Delivered → (terminal)
-        ///   Cancelled → (terminal)
+        ///   Creado       → Preparado, Cancelado
+        ///   Preparado    → Transportando (solo Delivery), Entregado (solo Pickup), Cancelado
+        ///   Transportando → Entregado, Cancelado
+        ///   Entregado    → (terminal)
+        ///   Cancelado    → (terminal)
         ///
-        /// No existe "En camino" (D18) y los estados terminales no se mueven. Cualquier otra
-        /// transición lanza <see cref="InvalidOrderStatusTransitionException"/> y NO toca el estado.
+        /// Reglas que esta puerta hace cumplir, además de la tabla:
+        ///
+        ///   * Cancelar exige una razón de texto libre, no vacía; se guarda en
+        ///     <see cref="CancellationReason"/>. Una razón recibida en cualquier otra transición es
+        ///     un error del llamador, no algo que se ignore en silencio.
+        ///   * Pasar a <see cref="OrderStatus.Transportando"/> exige el repartidor y lo asigna.
+        ///   * Pasar a <see cref="OrderStatus.Entregado"/> deja el pedido pagado.
+        ///
+        /// Cualquier otra transición lanza <see cref="InvalidOrderStatusTransitionException"/> y NO
+        /// toca el estado.
         /// </summary>
-        public void ChangeStatus(OrderStatus next)
+        /// <param name="next">Estado de destino.</param>
+        /// <param name="driverId">Repartidor. Obligatorio con <see cref="OrderStatus.Transportando"/>.</param>
+        /// <param name="cancellationReason">Razón. Obligatoria con <see cref="OrderStatus.Cancelado"/>.</param>
+        public void ChangeStatus(
+            OrderStatus next,
+            Guid? driverId = null,
+            string? cancellationReason = null)
         {
-            if (!AllowedTransitionsFrom(Status).Contains(next))
+            if (!AllowedTransitionsFrom(Status, DeliveryType).Contains(next))
                 throw new InvalidOrderStatusTransitionException(Status, next);
 
+            if (next != OrderStatus.Cancelado && cancellationReason is not null)
+                throw new UnexpectedStatusOptionException(next, nameof(cancellationReason));
+
+            if (next != OrderStatus.Transportando && driverId is not null)
+                throw new UnexpectedStatusOptionException(next, nameof(driverId));
+
+            if (next == OrderStatus.Cancelado)
+            {
+                string reason = cancellationReason?.Trim() ?? string.Empty;
+                if (reason.Length == 0)
+                    throw new MissingCancellationReasonException(Status);
+
+                CancellationReason = reason;
+            }
+
+            if (next == OrderStatus.Transportando)
+            {
+                if (driverId is null || driverId == Guid.Empty)
+                    throw new MissingDeliveryDriverException(Status);
+
+                DriverId = driverId;
+            }
+
             Status = next;
+
+            // Entregar equivale a haber cobrado: el pago deja de ser un eje que alguien pueda
+            // dejar en Pending por descuido.
+            if (next == OrderStatus.Entregado)
+                PaymentStatus = OrderPaymentStatus.Paid;
         }
 
-        /// <summary>Los estados alcanzables desde <paramref name="status"/> (vacío = terminal).</summary>
-        public static IReadOnlyList<OrderStatus> AllowedTransitionsFrom(OrderStatus status) => status switch
+        /// <summary>
+        /// Los estados alcanzables desde <paramref name="status"/> (vacío = terminal).
+        ///
+        /// Depende del tipo de entrega porque <see cref="OrderStatus.Transportando"/> sólo existe
+        /// con <see cref="OrderDeliveryType.Delivery"/>: en recogida,
+        /// <see cref="OrderStatus.Preparado"/> pasa directo a <see cref="OrderStatus.Entregado"/>.
+        /// </summary>
+        public static IReadOnlyList<OrderStatus> AllowedTransitionsFrom(
+            OrderStatus status, OrderDeliveryType deliveryType) => status switch
         {
-            OrderStatus.New => [OrderStatus.Accepted, OrderStatus.Cancelled],
-            OrderStatus.Accepted => [OrderStatus.Preparing, OrderStatus.Cancelled],
-            OrderStatus.Preparing => [OrderStatus.Ready, OrderStatus.Cancelled],
-            OrderStatus.Ready => [OrderStatus.Delivered, OrderStatus.Cancelled],
-            OrderStatus.Delivered => [],
-            OrderStatus.Cancelled => [],
+            OrderStatus.Creado => [OrderStatus.Preparado, OrderStatus.Cancelado],
+            OrderStatus.Preparado => deliveryType == OrderDeliveryType.Delivery
+                ? [OrderStatus.Transportando, OrderStatus.Cancelado]
+                : [OrderStatus.Entregado, OrderStatus.Cancelado],
+            OrderStatus.Transportando => [OrderStatus.Entregado, OrderStatus.Cancelado],
+            OrderStatus.Entregado => [],
+            OrderStatus.Cancelado => [],
             _ => throw new InvalidOrderStatusTransitionException(status, status),
         };
+
+        /// <summary>
+        /// Cambia el pago del pedido. Sigue siendo un eje independiente del estado —un pedido en
+        /// <see cref="OrderStatus.Creado"/> puede estar pagado por adelantado—, con UNA excepción:
+        /// un pedido <see cref="OrderStatus.Entregado"/> ya está pagado por definición, así que
+        /// devolverlo a <see cref="OrderPaymentStatus.Pending"/> sería contradecir la entrega.
+        /// </summary>
+        public void ChangePaymentStatus(OrderPaymentStatus next)
+        {
+            if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
+                throw new DeliveredOrderCannotBeUnpaidException();
+
+            PaymentStatus = next;
+        }
     }
 
     public sealed record OrderCreatedDomainEvent(Guid OrderId, Guid StoreId) : IDomainEvent;
@@ -187,7 +256,7 @@ namespace Domain.Entities.Orders
     public sealed record OrderLine(Guid ProductId, string Name, int Quantity, decimal Price, Currency Currency);
 
     /// <summary>
-    /// Transición de estado no permitida por la tabla de la D11.
+    /// Transición de estado no permitida por la tabla de <see cref="Order.AllowedTransitionsFrom"/>.
     ///
     /// Es de DOMINIO, no `Application.Exceptions.ApiException`: `Domain` no puede referenciar
     /// `Application` (la dependencia va en el sentido contrario), y meter `ApiException` aquí
@@ -208,6 +277,78 @@ namespace Domain.Entities.Orders
 
         /// <summary>Estado que se pidió y no es alcanzable.</summary>
         public OrderStatus To { get; }
+    }
+
+    /// <summary>
+    /// Se pidió cancelar sin una razón de texto libre. Cancelar sin motivo deja un pedido muerto
+    /// que nadie puede auditar, así que el dominio no lo permite.
+    ///
+    /// Igual que <see cref="InvalidOrderStatusTransitionException"/>, es una excepción de DOMINIO y
+    /// el handler que traduce a HTTP la convierte en un 400.
+    /// </summary>
+    public sealed class MissingCancellationReasonException : Exception
+    {
+        public MissingCancellationReasonException(OrderStatus from)
+            : base($"Cancelling an order from status '{from}' requires a non-empty cancellation reason.")
+        {
+            From = from;
+        }
+
+        /// <summary>Estado en el que estaba el pedido.</summary>
+        public OrderStatus From { get; }
+    }
+
+    /// <summary>
+    /// Se pidió pasar a <see cref="OrderStatus.Transportando"/> sin repartidor. Un pedido en
+    /// reparto sin repartidor no se puede seguir, así que la transición no se aplica.
+    /// </summary>
+    public sealed class MissingDeliveryDriverException : Exception
+    {
+        public MissingDeliveryDriverException(OrderStatus from)
+            : base($"Moving an order from status '{from}' to 'Transportando' requires a delivery driver.")
+        {
+            From = from;
+        }
+
+        /// <summary>Estado en el que estaba el pedido.</summary>
+        public OrderStatus From { get; }
+    }
+
+    /// <summary>
+    /// El llamador mandó un dato que la transición pedida no usa (una razón al no cancelar, o un
+    /// repartidor al no pasar a reparto).
+    ///
+    /// Se lanza en vez de ignorarlo a propósito: aceptar el dato en silencio y no guardarlo hace
+    /// creer al cliente que se aplicó, y el error aparece mucho después, en forma de pedido sin
+    /// razón o sin repartidor.
+    /// </summary>
+    public sealed class UnexpectedStatusOptionException : Exception
+    {
+        public UnexpectedStatusOptionException(OrderStatus next, string option)
+            : base($"Option '{option}' is not used when moving an order to status '{next}'.")
+        {
+            Next = next;
+            Option = option;
+        }
+
+        /// <summary>Estado de destino de la transición.</summary>
+        public OrderStatus Next { get; }
+
+        /// <summary>Nombre del dato que no aplica.</summary>
+        public string Option { get; }
+    }
+
+    /// <summary>
+    /// Se intentó devolver a <see cref="OrderPaymentStatus.Pending"/> un pedido ya
+    /// <see cref="OrderStatus.Entregado"/>. Entregar equivale a cobrar: el pago de un pedido
+    /// entregado no se deshace desde el panel.
+    /// </summary>
+    public sealed class DeliveredOrderCannotBeUnpaidException : Exception
+    {
+        public DeliveredOrderCannotBeUnpaidException()
+            : base("A delivered order is paid by definition and cannot be set back to pending.")
+        {
+        }
     }
 
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isPublicCatalogPath } from '~/shared/lib/pwa/public-catalog-route';
 import {
   cleanOldStoreUsage,
   flushUsage,
@@ -43,6 +44,10 @@ export function useStoreUsageTracker(): void {
   const { pathname } = useLocation();
   const userId = useAuthStore((state) => state.user?.id);
   const selectedStoreId = useAuthStore((state) => state.user?.selectedStoreId);
+  // The public catalog is the customer's storefront, not POS activity. A logged-in
+  // owner/staff member (or a shared device with a live session) opening
+  // /catalog/<slug> must not inflate the daily "active store" usage metric.
+  const onPublicCatalog = isPublicCatalogPath(pathname);
   // Last stamp timestamp per `userId:selectedStoreId`, so a store switch (or a
   // user switch) never inherits another context's throttle window.
   const lastActivityStamp = useRef(new Map<string, number>());
@@ -50,16 +55,18 @@ export function useStoreUsageTracker(): void {
   // Navigation seam (existing behavior; the armed-only gate is extended to
   // readiness so a persisted session re-arms the tracker after a reload).
   useEffect(() => {
+    if (onPublicCatalog) return;
     if (!userId || !selectedStoreId) return;
     if (!isTrackingReady()) return;
     registerStoreActivity(userId, selectedStoreId);
-  }, [pathname, userId, selectedStoreId]);
+  }, [onPublicCatalog, pathname, userId, selectedStoreId]);
 
   // Activity seam: any pointer/keyboard interaction while a valid tracking
   // context exists stamps today, at most once every
-  // STORE_USAGE_ACTIVITY_THROTTLE_MS per context. Attached/detached on
-  // mount/unmount only — never module scope.
+  // STORE_USAGE_ACTIVITY_THROTTLE_MS per context. Attached/detached when the
+  // context or the catalog route changes — never module scope.
   useEffect(() => {
+    if (onPublicCatalog) return;
     if (!userId || !selectedStoreId) return;
     if (!isTrackingReady()) return;
 
@@ -78,11 +85,14 @@ export function useStoreUsageTracker(): void {
       window.removeEventListener('pointerdown', onUserActivity);
       window.removeEventListener('keydown', onUserActivity);
     };
-  }, [userId, selectedStoreId]);
+  }, [onPublicCatalog, userId, selectedStoreId]);
 
   // Readiness flush: push pending days the moment a valid context exists
   // (covers reload / version-update re-arm), not only on navigation.
   // `flushUsage` no-ops on an empty buffer and respects the `sending` mutex.
+  // Deliberately NOT gated on `onPublicCatalog`: flushing does not stamp a new
+  // day — it only sends days the POS already recorded — so it cannot turn a
+  // catalog visit into usage.
   useEffect(() => {
     if (!userId || !selectedStoreId) return;
     if (!isTrackingReady()) return;

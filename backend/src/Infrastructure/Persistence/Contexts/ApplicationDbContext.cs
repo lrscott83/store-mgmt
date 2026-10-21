@@ -34,6 +34,7 @@ using Domain.Entities.InventoryEntries;
 using Domain.Entities.Authentication;
 using Domain.Entities.StoreUsages;
 using Domain.Entities.Plans;
+using Domain.Entities.CatalogEvents;
 
 namespace Infrastructure.Persistence.Contexts
 {
@@ -154,6 +155,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new StoreCatalogSettingsEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreCatalogImageEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new DeliveryDriverEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new CatalogEventEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -177,6 +179,7 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StoreCatalogSettings> StoreCatalogSettings { get; set; }
         internal DbSet<StoreCatalogImage> StoreCatalogImage { get; set; }
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
+        internal DbSet<CatalogEvent> CatalogEvent { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
         internal DbSet<ProductImage> ProductImage { get; set; }

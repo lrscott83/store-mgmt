@@ -9,6 +9,7 @@ import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
 import { CatalogSeeProducts } from '~/catalog/components/catalog-see-products';
 import type { CatalogTemplateProps } from '~/catalog/templates/catalog-template';
+import type { PublicCatalogProduct } from '~/sales/lib/services/catalog-http-service';
 
 /**
  * Las TRES secciones de la carta (D2), y ni una más. El ancla es el `id` que monta cada bloque:
@@ -25,9 +26,50 @@ const NAV_LINK_CLASSES =
   'rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:bg-primary-light hover:text-text';
 
 /**
+ * ¿La tarjeta lleva alguna etiqueta? El contenedor y el contenido usan el MISMO predicado, para
+ * que nunca quede un hueco vacío cuando el producto no es nuevo ni tiene descuento.
+ */
+function hasBadges(product: PublicCatalogProduct): boolean {
+  return product.isNew || product.hasDiscount;
+}
+
+/**
+ * Etiquetas "Nuevo" / descuento de la tarjeta. Viven aquí porque la tarjeta las coloca en dos
+ * sitios según haya foto o no: encima de la imagen cuando existe, y en el flujo del texto cuando
+ * el producto no la tiene (sin foto no se reserva ningún hueco).
+ */
+function ProductBadges({ product }: { readonly product: PublicCatalogProduct }) {
+  const intl = useIntl();
+  return (
+    <>
+      {product.isNew && (
+        <span
+          className="rounded-full bg-primary px-2 py-1 text-xs text-white"
+          data-testid={`catalog-badge-new-${product.id}`}
+        >
+          {intl.formatMessage({ id: 'CATALOG_PUBLIC.NEW' })}
+        </span>
+      )}
+      {product.hasDiscount && (
+        <span
+          className="rounded-full bg-danger px-2 py-1 text-xs text-white"
+          data-testid={`catalog-badge-discount-${product.id}`}
+        >
+          -{product.percentDiscount}%
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
  * Plantilla `default`: la carta pública tal como la conoce el cliente hoy (cabecera fija con
  * navegación por secciones, buscador + filtro por categoría, rejilla y paginación). Es la vista que
- * se pinta cuando la tienda no eligió otra plantilla, y su DOM es IDÉNTICO al de antes del refactor.
+ * se pinta cuando la tienda no eligió otra plantilla.
+ *
+ * Cambió a propósito el 2026-10-21: un producto SIN imagen ya no pinta el bloque de medios (antes
+ * reservaba un hueco con el aviso "no tiene imágenes"), y sus etiquetas Nuevo/descuento bajan al
+ * flujo del texto en vez de flotar sobre una foto inexistente.
  */
 export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
   const {
@@ -283,39 +325,23 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
                 className="group relative h-full w-full overflow-hidden rounded-lg bg-surface text-left shadow-card transition-transform duration-300 hover:scale-[1.02]"
                 data-testid={`catalog-card-${product.id}`}
               >
-                <div className="relative w-full overflow-hidden">
-                  {product.imageUrl ? (
+                {product.imageUrl && (
+                  <div
+                    className="relative w-full overflow-hidden"
+                    data-testid={`catalog-card-media-${product.id}`}
+                  >
                     <img
                       src={toImageUrl(product.imageUrl) ?? undefined}
                       alt={product.name}
                       className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                  ) : (
-                    <div className="flex h-40 w-full items-center justify-center bg-surface-hover text-sm text-text-muted sm:h-64">
-                      {intl.formatMessage({ id: 'CATALOG_PUBLIC.NO_IMAGE' })}
-                    </div>
-                  )}
-                  {(product.isNew || product.hasDiscount) && (
-                    <div className="absolute left-2 top-2 z-10 flex gap-2">
-                      {product.isNew && (
-                        <span
-                          className="rounded-full bg-primary px-2 py-1 text-xs text-white"
-                          data-testid={`catalog-badge-new-${product.id}`}
-                        >
-                          {intl.formatMessage({ id: 'CATALOG_PUBLIC.NEW' })}
-                        </span>
-                      )}
-                      {product.hasDiscount && (
-                        <span
-                          className="rounded-full bg-danger px-2 py-1 text-xs text-white"
-                          data-testid={`catalog-badge-discount-${product.id}`}
-                        >
-                          -{product.percentDiscount}%
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    {hasBadges(product) && (
+                      <div className="absolute left-2 top-2 z-10 flex gap-2">
+                        <ProductBadges product={product} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Nombre y precio APILADOS y a la IZQUIERDA (decisión del owner, 2026-10-06; sustituye
                     el reparto en la misma fila del 2026-10-01). Con dos columnas en móvil la
@@ -323,6 +349,13 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
                     debajo de su contenido— se salía de su caja y pintaba encima del precio,
                     que al ser `shrink-0` nunca cedía espacio. En columna no compiten. */}
                 <div className="p-3 sm:p-4">
+                  {/* Sin imagen la tarjeta NO reserva el hueco de la foto: las etiquetas bajan al
+                      flujo del texto en vez de quedarse flotando sobre un bloque vacío. */}
+                  {!product.imageUrl && hasBadges(product) && (
+                    <div className="mb-2 flex gap-2">
+                      <ProductBadges product={product} />
+                    </div>
+                  )}
                   <div
                     className="flex flex-col gap-1"
                     data-testid={`catalog-card-pricing-${product.id}`}
