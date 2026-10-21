@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type {
@@ -153,5 +153,77 @@ describe('PublicCatalogPage — selección de plantilla', () => {
 
     expect(await screen.findByTestId('catalog-grid')).toBeInTheDocument();
     expect(screen.queryByTestId('boutique-grid')).not.toBeInTheDocument();
+  });
+});
+
+describe('PublicCatalogPage — producto sin imágenes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    globalThis.IntersectionObserver =
+      NoopIntersectionObserver as unknown as typeof IntersectionObserver;
+    useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
+    catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
+    catalogMock.getPublicProducts.mockResolvedValue(
+      envelope({ items: [PRODUCT], total: 1, page: 1, pageSize: 12 }),
+    );
+    catalogMock.getPublicProduct.mockResolvedValue(envelope(PRODUCT));
+  });
+
+  it('la tarjeta por defecto de un producto sin imagen no pinta ningún bloque de medios', async () => {
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(envelope(config('default')));
+    renderPage();
+
+    const card = await screen.findByTestId('catalog-card-cp1');
+    // Contrato ESTRUCTURAL: sin foto la tarjeta tiene UN solo hijo, el bloque de texto. Si el
+    // hueco (o el aviso) volviera, habría dos — por eso esto falla contra el comportamiento viejo.
+    expect(card.children).toHaveLength(1);
+    expect(within(card).getByTestId('catalog-card-pricing-cp1')).toBeInTheDocument();
+    expect(card.querySelector('img')).toBeNull();
+  });
+
+  it('la tarjeta boutique de un producto sin imagen no pinta ningún bloque de medios', async () => {
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(envelope(config('boutique')));
+    renderPage();
+
+    const card = await screen.findByTestId('boutique-card-cp1');
+    // El primer <button> del <li> es el que abre el detalle; el de "añadir" viene después.
+    const trigger = card.querySelector('button');
+    expect(trigger?.children).toHaveLength(1);
+    expect(card.querySelector('img')).toBeNull();
+  });
+
+  it('sin imagen, las etiquetas Nuevo y descuento siguen en la tarjeta', async () => {
+    catalogMock.getPublicProducts.mockResolvedValue(
+      envelope({
+        items: [{ ...PRODUCT, isNew: true, hasDiscount: true, percentDiscount: 10 }],
+        total: 1,
+        page: 1,
+        pageSize: 12,
+      }),
+    );
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(envelope(config('default')));
+    renderPage();
+
+    // Precondición del caso: el producto NO tiene foto en la plantilla por defecto.
+    const card = await screen.findByTestId('catalog-card-cp1');
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.querySelector('[data-testid^="catalog-card-media-"]')).toBeNull();
+
+    expect(await screen.findByTestId('catalog-badge-new-cp1')).toBeInTheDocument();
+    const discount = screen.getByTestId('catalog-badge-discount-cp1');
+    expect(discount).toBeInTheDocument();
+    // Y van en el flujo del texto, no flotando sobre una foto que no existe.
+    expect(discount.parentElement).not.toHaveClass('absolute');
+  });
+
+  it('sin imagen y sin etiquetas, la tarjeta no deja ningún contenedor vacío', async () => {
+    // PRODUCT no es nuevo ni tiene descuento, y no tiene imagen: el contenedor de etiquetas no
+    // debe existir (quedaba un div vacío con "mb-2", o sea 8 px de hueco sobre el precio).
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(envelope(config('default')));
+    renderPage();
+
+    const card = await screen.findByTestId('catalog-card-cp1');
+    const pricing = within(card).getByTestId('catalog-card-pricing-cp1');
+    expect(pricing.parentElement?.firstElementChild).toBe(pricing);
   });
 });

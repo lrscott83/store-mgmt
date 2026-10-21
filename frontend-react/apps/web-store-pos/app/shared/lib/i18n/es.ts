@@ -608,7 +608,6 @@ const messages: Record<string, string> = {
   'CATALOG_PUBLIC.NEXT': 'Siguiente',
   'CATALOG_PUBLIC.PAGE': 'Página {page} de {pages}',
   'CATALOG_PUBLIC.GALLERY': 'Galería',
-  'CATALOG_PUBLIC.NO_IMAGE': 'Este producto no tiene imágenes.',
   'CATALOG_PUBLIC.ZOOM_IN': 'Ampliar imagen',
   'CATALOG_PUBLIC.ZOOM_OUT': 'Reducir imagen',
   'CATALOG_PUBLIC.FOOTER': 'Catálogo publicado con VendeDTo',

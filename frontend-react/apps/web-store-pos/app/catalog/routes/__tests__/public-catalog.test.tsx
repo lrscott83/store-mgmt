@@ -417,8 +417,13 @@ describe('PublicCatalogPage', () => {
     await waitFor(() =>
       expect(within(modal).getByTestId('catalog-detail-description')).toBeInTheDocument(),
     );
-    expect(within(modal).queryByTestId('catalog-detail-image')).not.toBeInTheDocument();
-    expect(within(modal).getByText('Este producto no tiene imágenes.')).toBeInTheDocument();
+    // Sin imagen principal el popup no pinta NADA por la imagen: no hay botón de zoom, y el ÚNICO
+    // párrafo del modal es la descripción (el aviso de "sin imágenes" era otro <p>, así que si
+    // volviera este test falla).
+    expect(within(modal).queryByTestId('catalog-detail-image-toggle')).not.toBeInTheDocument();
+    const paragraphs = Array.from(modal.querySelectorAll('p'));
+    expect(paragraphs).toHaveLength(1);
+    expect(paragraphs[0]).toHaveAttribute('data-testid', 'catalog-detail-description');
   });
 
   it('filtra por categoría y vuelve a la primera página', async () => {

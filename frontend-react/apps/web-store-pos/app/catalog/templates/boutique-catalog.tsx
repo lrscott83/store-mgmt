@@ -238,16 +238,12 @@ export function BoutiqueCatalogTemplate(props: CatalogTemplateProps) {
                 onClick={() => onOpenDetail(product)}
                 className="block w-full text-left"
               >
-                {product.imageUrl ? (
+                {product.imageUrl && (
                   <img
                     src={toImageUrl(product.imageUrl) ?? undefined}
                     alt={product.name}
                     className="h-48 w-full object-cover"
                   />
-                ) : (
-                  <div className="flex h-48 w-full items-center justify-center bg-surface-hover text-sm text-text-muted">
-                    {intl.formatMessage({ id: 'CATALOG_PUBLIC.NO_IMAGE' })}
-                  </div>
                 )}
                 <div className="p-4">
                   <div className="flex flex-wrap items-center gap-2">

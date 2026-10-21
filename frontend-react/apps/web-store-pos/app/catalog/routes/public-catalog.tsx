@@ -334,7 +334,7 @@ export function PublicCatalogPage() {
       >
         {detail && (
           <div className="space-y-4">
-            {activeImage ? (
+            {activeImage && (
               <button
                 type="button"
                 onClick={() => setZoomed((value) => !value)}
@@ -353,10 +353,6 @@ export function PublicCatalogPage() {
                   data-testid="catalog-detail-image"
                 />
               </button>
-            ) : (
-              <p className="text-sm text-text-muted">
-                {intl.formatMessage({ id: 'CATALOG_PUBLIC.NO_IMAGE' })}
-              </p>
             )}
 
             {detail.imageUrls.length > 1 && (
