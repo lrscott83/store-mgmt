@@ -89,6 +89,8 @@ public sealed class PlanChangeMatrixTests
         // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 en Superior y VIP, igual que
         // Catálogo web (modulos-pedidos-whatsapp-gestion).
         (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
+        // Gestores de ventas (2026-10-21, feature S1): módulo 21 en Superior y VIP.
+        (int)ModuleType.GestoresVentas,
     ];
 
     private static readonly int[] VipUniverse =
@@ -101,6 +103,8 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.Elaboration, (int)ModuleType.WebCatalog,
         // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 también en VIP (planes autocontenidos).
         (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
+        // Gestores de ventas (2026-10-21, feature S1): módulo 21 también en VIP.
+        (int)ModuleType.GestoresVentas,
     ];
 
     // ── Module → features the LIVE Feature table exposes as AvailableToStore ──
@@ -135,6 +139,8 @@ public sealed class PlanChangeMatrixTests
         [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog],
         [(int)ModuleType.PedidosWhatsApp] = [(int)FeatureType.PedidosWhatsApp],
         [(int)ModuleType.GestionPedidos] = [(int)FeatureType.OnlineOrders],
+        // Gestores de ventas (módulo 21, feature 125): OwnerAdmin-only.
+        [(int)ModuleType.GestoresVentas] = [(int)FeatureType.GestoresVentas],
     };
 
     // ── The 9 real transitions lacking exact target-universe coverage ──────────
