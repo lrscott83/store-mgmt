@@ -50,7 +50,7 @@
 
 | ID | Tarea | Specs | Ruta | Estado |
 | --- | --- | --- | --- | --- |
-| T1 | Snapshot de `OrderItem`: entidad + configuración EF + migración + script + población en `CreateOnlineOrderCommand` + tests | S11 | inline | pending |
+| T1 | Snapshot de `OrderItem`: entidad + configuración EF + migración + script + población en `CreateOnlineOrderCommand` + tests | S11 | inline | done — `d401b65e` |
 | T2 | Catálogo del módulo: módulo 21, features, rol 5, `StorePlanModule` Superior/VIP, sin `StoreModule`; migración + script + tests | S1, S2 | inline | pending |
 | T3 | Dominio y persistencia del módulo: `SalesManager`, `ProductSalesCommission`, `OrderSalesCommission`; configuraciones y repositorios | S6, S8 | inline | pending |
 | T4 | Owner crea gestores: comando/API, usuario con rol 5 a nivel Owner, claims/features | S2, S3 | inline | pending |
@@ -82,3 +82,4 @@
 - **L7:** "1. 3 veces, la comision es por producto 2. ... orderitem en la BD debe guardar la moneda, el porciento de descuento y el descuento, todo el snapshot para poder calcular el precio del producto."
 - **L8:** "la comision tiene un % o un valor fijo" — no hay comisión con % y fijo a la vez, ni descuento propio de la comisión.
 - **L9 (2026-10-21):** Autorización para implementar con ODD. Rama `feat/gestor-ventas-module` creada desde `dev` (`d0ad31e0`). Documento creado antes del primer write de código.
+- **L10 (2026-10-21, T1 cerrada):** `OrderItem` guarda `BasePrice` (numeric 18,6), `PercentDiscountPrice` y `DiscountPrice` (integer), nullables; `Price` sigue siendo el precio final. `OrderLine` y `CreateOnlineOrderCommand` transportan el snapshot desde `Product`. Migración `20261021180754_Add-OrderItem-Price-Snapshot` aplicada a `smca_test`; script `backend/scripts/37-20261021-Add-OrderItem-Price-Snapshot.sql` generado desde la migración. RED observado: tests no compilaban (`BasePrice`/`PercentDiscountPrice`/`DiscountPrice` y `OrderLine` de 8 argumentos inexistentes). GREEN: `Domain.UnitTests` 184/184; `Application.Tests` 1471/1471. Commit `d401b65e`.
