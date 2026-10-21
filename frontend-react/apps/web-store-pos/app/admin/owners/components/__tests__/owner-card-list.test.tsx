@@ -110,6 +110,21 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
       screen.getByText(`${esMessages['OWNER.LOGIN_LABEL']}: "Lizardo"`),
     ).toBeInTheDocument();
   });
+
+  it('makes a trailing space in the login visible inside the quotes', async () => {
+    const { OwnerCardList } = await import('../owner-card-list');
+    const { container } = render(
+      <Wrapper>
+        <OwnerCardList {...baseProps} owners={[makeOwner({ login: 'Lizardo ' })]} />
+      </Wrapper>,
+    );
+    // El espacio va ENTRE la "o" y la comilla de cierre, no al final del nodo: por eso
+    // sobrevive al colapso de espacios de HTML y el dueño puede verlo.
+    expect(
+      screen.getByText(`${esMessages['OWNER.LOGIN_LABEL']}: "Lizardo "`),
+    ).toBeInTheDocument();
+    expect(container.textContent).toContain('"Lizardo "');
+  });
 });
 
 // Parity fix (presentation-parity-bucket-e item 4): owners.component.html:70 renders
