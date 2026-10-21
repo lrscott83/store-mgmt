@@ -98,6 +98,18 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
     );
     expect(screen.getByText(/ADMIN/)).toBeInTheDocument();
   });
+
+  it('renders the owner login between double quotes', async () => {
+    const { OwnerCardList } = await import('../owner-card-list');
+    render(
+      <Wrapper>
+        <OwnerCardList {...baseProps} owners={[makeOwner({ login: 'Lizardo' })]} />
+      </Wrapper>,
+    );
+    expect(
+      screen.getByText(`${esMessages['OWNER.LOGIN_LABEL']}: "Lizardo"`),
+    ).toBeInTheDocument();
+  });
 });
 
 // Parity fix (presentation-parity-bucket-e item 4): owners.component.html:70 renders
