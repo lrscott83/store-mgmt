@@ -82,11 +82,18 @@ Lineage `review-62781ea0de5eef8a` · lentes `review-risk` + `review-reliability`
 - **R3-SNAPSHOT-FREEZE** (SUGGESTION, reliability): falta un test que mute el producto después de crear el pedido y verifique que el snapshot del `OrderItem` no cambia. → T1b.
 - **R3-NULL-VS-ZERO-CONTRACT** (SUGGESTION, reliability): `0/0` significa "cero conocido" (producto sin descuentos); `null` significa "legacy/sin snapshot". T6 debe tratar `null` como sin comisión y no confundirlo con un descuento cero. → documentar y cubrir en T6.
 
-## E2E — estado y límite conocido
+## E2E — estado verde (comando documentado del README raíz)
 
 Los 7 tests existentes de matriz de planes se actualizaron con autorización explícita del usuario (commit `7fdeb27b`): se añadió módulo 21/feature 125 a los universos Superior/VIP en `PlanChangeMatrixTests`, `StorePlanCatalogTests` y `MeAfterOwnerPlanChangeTests`. El filtro focalizado de esos tres archivos pasa **12/12**.
 
-El full E2E sigue sin evidencia verde: la segunda corrida completa abortó con **Test host process crashed** tras 197 tests (0 failed). El `--blame-crash` no produjo un fallo de aserción; la secuencia más reciente deja `Auth.AuthLoginReSellerTests.Active_re_seller_logs_in_with_no_store_graph` con `Completed="False"`. Es un crash del host de test, no un test rojo; queda como límite de verificación abierto.
+La verificación completa se hizo con el comando único documentado en el README raíz (`dotnet test backend/src/SMCA.sln`, los 3 proyectos):
+
+- `Domain.UnitTests`: **185/185**
+- `Application.Tests`: **1473/1473**
+- `SMCA.WebApi.E2ETests`: **770/770**
+- wall: **398.3 s**
+
+Una corrida previa solo del proyecto E2E abortó por crash del test host; el comando documentado de la solución **no** reproduce el crash. Lección registrada: la verificación completa se corre con el comando de la solución, no con el proyecto E2E aislado.
 
 ## Log
 
@@ -104,4 +111,5 @@ El full E2E sigue sin evidencia verde: la segunda corrida completa abortó con *
 - **L12 (2026-10-21, T1b cerrada):** follow-ups del review de T1. Nuevo E2E `Orders/OrderItemPriceSnapshotE2ETests` (write/read real contra PostgreSQL) 1/1; tests de aplicación para snapshot congelado tras mutar el producto y para `0/0` como cero conocido. `Application.Tests` 1473/1473. Commit `f826348b`.
 - **L13 (2026-10-21, T2 cerrada):** módulo 21 "Gestores de ventas" (`Price 20`, `PercentDiscountPrice 50` → neto 10), feature 125, rol 5 "Gestor de ventas", `StorePlanModule` (3,4), **sin** `StoreModule` ni `StoreRoleFeature` por defecto. Migración `20261021185058_Add-Gestores-Ventas-Module` aplicada a `smca_test`; script `backend/scripts/38-20261021-Add-Gestores-Ventas-Module.sql` generado. Enums backend + espejo frontend. E2E `GestoresVentasModuleCatalogTests` 1/1; `Domain.UnitTests` 184/184; `Application.Tests` 1473/1473; `pnpm typecheck` 5/5. Commit `5215a074`.
 - **L14 (2026-10-21, RDD de T2 y T2b):** assessment `medium`; escalado a `high` por el ítem 2 (rol 5 y permiso `StoreRoleFeatures`). Consentimiento otorgado; lentes `review-risk` + `review-reliability`; resultado **approved**, autoridad quemada (`review-ef421233ca6b5558`). T2b (`02a02cb6`): rollback borra `UserRole` de rol 5 antes del rol (FK Restrict), E2E de catálogo scopeado a una tienda del test, test del generador `GestoresVentasAdmin → feature 125 solo OwnerAdmin`, comentario del test de freeze acotado. Full E2E: **763/770**, 7 fallos en tests existentes de matriz de planes. No se tocaron en ese momento.
-- **L15 (2026-10-21, T2c):** con autorización explícita del usuario se actualizaron SOLO `PlanChangeMatrixTests.cs`, `StorePlanCatalogTests.cs` y `MeAfterOwnerPlanChangeTests.cs` para incluir módulo 21/feature 125 en los universos Superior/VIP. Estas son las únicas modificaciones a E2E existentes y no debilitan ninguna aserción. Filtro focalizado 12/12. Commit `7fdeb27b`. El full E2E posterior abortó por crash del test host tras 197 tests (0 failed); ver "E2E — estado y límite conocido".
+- **L15 (2026-10-21, T2c):** con autorización explícita del usuario se actualizaron SOLO `PlanChangeMatrixTests.cs`, `StorePlanCatalogTests.cs` y `MeAfterOwnerPlanChangeTests.cs` para incluir módulo 21/feature 125 en los universos Superior/VIP. Estas son las únicas modificaciones a E2E existentes y no debilitan ninguna aserción. Filtro focalizado 12/12. Commit `7fdeb27b`. El full E2E posterior abortó por crash del test host tras 197 tests (0 failed) al correr el proyecto E2E aislado; la verificación con el comando documentado de la solución (`dotnet test backend/src/SMCA.sln`) dio **770/770**.
+- **L16 (2026-10-21, verificación completa):** `dotnet test backend/src/SMCA.sln` → `Domain.UnitTests` 185/185, `Application.Tests` 1473/1473, `SMCA.WebApi.E2ETests` **770/770**, wall 398.3 s. El crash anterior era del proyecto E2E aislado; el comando único del README raíz es el autoritativo y queda como la forma de verificar este feature.
