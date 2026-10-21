@@ -51,6 +51,7 @@
 | ID | Tarea | Specs | Ruta | Estado |
 | --- | --- | --- | --- | --- |
 | T1 | Snapshot de `OrderItem`: entidad + configuración EF + migración + script + población en `CreateOnlineOrderCommand` + tests | S11 | inline | done — `d401b65e` |
+| T1b | Follow-ups del review de T1: round-trip EF/PostgreSQL del snapshot, freeze tras mutar el producto y contrato `null` vs `0` | S11, S13 | inline | pending |
 | T2 | Catálogo del módulo: módulo 21, features, rol 5, `StorePlanModule` Superior/VIP, sin `StoreModule`; migración + script + tests | S1, S2 | inline | pending |
 | T3 | Dominio y persistencia del módulo: `SalesManager`, `ProductSalesCommission`, `OrderSalesCommission`; configuraciones y repositorios | S6, S8 | inline | pending |
 | T4 | Owner crea gestores: comando/API, usuario con rol 5 a nivel Owner, claims/features | S2, S3 | inline | pending |
@@ -71,6 +72,14 @@
 - D5 — El acceso del gestor a los catálogos de las tiendas del Owner se resuelve por pertenencia al Owner, no por `StoreModule`.
 - D6 — El precio del módulo se aplica con la regla única existente (`CurrentPriceServiceUtils.GetCurrentPrice`): 20 con 50% = 10.
 
+## Follow-ups del review RDD de T1
+
+Lineage `review-62781ea0de5eef8a` · lentes `review-risk` + `review-reliability` · resultado **approved**, autoridad quemada. Sin bloqueantes. Hallazgos no bloqueantes (trabajo posterior, no reabren este candidato):
+
+- **R3-PERSISTENCE-ROUNDTRIP** (WARNING, reliability): no hay test que escriba y relea las columnas nuevas contra PostgreSQL/EF. Agregar un E2E nuevo que cree un pedido online y relea `BasePrice`, `PercentDiscountPrice` y `DiscountPrice`. → T1b.
+- **R3-SNAPSHOT-FREEZE** (SUGGESTION, reliability): falta un test que mute el producto después de crear el pedido y verifique que el snapshot del `OrderItem` no cambia. → T1b.
+- **R3-NULL-VS-ZERO-CONTRACT** (SUGGESTION, reliability): `0/0` significa "cero conocido" (producto sin descuentos); `null` significa "legacy/sin snapshot". T6 debe tratar `null` como sin comisión y no confundirlo con un descuento cero. → documentar y cubrir en T6.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -83,3 +92,4 @@
 - **L8:** "la comision tiene un % o un valor fijo" — no hay comisión con % y fijo a la vez, ni descuento propio de la comisión.
 - **L9 (2026-10-21):** Autorización para implementar con ODD. Rama `feat/gestor-ventas-module` creada desde `dev` (`d0ad31e0`). Documento creado antes del primer write de código.
 - **L10 (2026-10-21, T1 cerrada):** `OrderItem` guarda `BasePrice` (numeric 18,6), `PercentDiscountPrice` y `DiscountPrice` (integer), nullables; `Price` sigue siendo el precio final. `OrderLine` y `CreateOnlineOrderCommand` transportan el snapshot desde `Product`. Migración `20261021180754_Add-OrderItem-Price-Snapshot` aplicada a `smca_test`; script `backend/scripts/37-20261021-Add-OrderItem-Price-Snapshot.sql` generado desde la migración. RED observado: tests no compilaban (`BasePrice`/`PercentDiscountPrice`/`DiscountPrice` y `OrderLine` de 8 argumentos inexistentes). GREEN: `Domain.UnitTests` 184/184; `Application.Tests` 1471/1471. Commit `d401b65e`.
+- **L11 (2026-10-21, RDD de T1):** assessment `medium`; escalado a `high` por el ítem 1 (migración con columnas persistidas). Consentimiento otorgado. Lentes `review-risk` + `review-reliability`; resultado **approved**, autoridad quemada (`revision a9244845...`). 0 bloqueantes; 3 hallazgos advisory registrados como T1b y para T6.
