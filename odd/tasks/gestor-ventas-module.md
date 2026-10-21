@@ -1,0 +1,84 @@
+# Feature — Módulo Gestores de Ventas
+
+- **Objetivo:** módulo nuevo, opt-in por tienda (Superior/VIP), que permite al Owner (coordinador) dar acceso a gestores de ventas autenticados para que hagan pedidos desde el catálogo web y los envíen por WhatsApp; al pasar el pedido a `Entregado` se genera la comisión del gestor, y el Owner la marca como pagada.
+- **Rama:** `feat/gestor-ventas-module` (desde `dev` @ `d0ad31e0`).
+- **Entrega:** work-unit commits en la rama; push/PR = decisión del humano.
+- **Runner:** `dotnet test` (backend) · `pnpm --filter @store-mgmt/web-store-pos test` / `typecheck` / `lint` (frontend React).
+- **Reglas del repo:** Angular `frontend/` es legacy y NO se lee ni se toca. E2E existentes (backend y Playwright) son intocables; solo se agregan tests nuevos. `Product` no recibe columnas de este módulo. `ReSeller` no se toca. Todo lo existente debe seguir funcionando igual.
+
+## Specs
+
+**S1 — Módulo opt-in.** Crear el módulo de Gestores de Ventas con precio `20` y descuento del `50%` (neto `10`), disponible en los planes **Superior** y **VIP**. No se asigna a ninguna tienda por defecto: solo se crea el módulo.
+> "solo es crear el modulo y con precio 20 y un 50% de descuento" · "Superior y VIP" · "por defecto no se le pondrá a ninguna tienda"
+
+**S2 — Rol nuevo a nivel Owner.** `Gestor de ventas` es un rol nuevo. El **Owner es el coordinador** de los gestores; no hay otro rol de coordinador ni interviene `StoreUser`. El gestor pertenece al **Owner entero**, no a una tienda.
+> "esto de gestor de ventas es un nuevo role y en este caso el owner sera el coordinador de los gestores" · "el gestor es del Owner entero, no es por tienda" · "en ningun momento te mencione StoreUser... te dije Owner"
+
+**S3 — Acceso del gestor.** El gestor autenticado solo ve: (a) su vista de pedidos y comisiones, y (b) el catálogo web de **todas las tiendas de su Owner**. Nada más.
+> "El gestor tambien tiene una vista para sus pedidos y sus comiciones y solo tendra acceso a esa vista y al catalogo web de todas las tiendas."
+
+**S4 — Pedido del gestor.** El gestor arma el pedido desde el catálogo web y lo **envía por WhatsApp al Owner**. El Owner lo gestiona con el flujo de pedidos existente hasta ponerlo en `Entregado`.
+> "el gestor hace el pedido y lo envia por whatsapp al owner. Despues el owner segun corrsponda hace la gestion hasta que lo pone en entregado."
+
+**S5 — Disparador de la comisión.** `Entregado` significa pagado; en esa transición se adiciona la comisión que debe cobrar el gestor. Aplica la configuración vigente **en el momento de la entrega**.
+> "Eso es que esta pagado y en ese momento entonces se debe adicionar la comision que debe cobrar el gestor" · "la del momento de la entrega"
+
+**S6 — Configuración por producto, en tablas del módulo.** Cada producto puede tener una comisión de tipo **porcentaje** o **valor fijo** (uno u otro), con su **moneda de pago**. Todo va en tablas propias del módulo; no se agregan columnas a `Product`.
+> "la comision tiene un % o un valor fijo" · "Cada producto debe tener una comision en porciento y/o en total y una moneda para pagar." · "Todas las tablas nuevas deben ser propias de este modulo, no es adicionar cosas a la tabla producto"
+
+**S7 — Cálculo.** La base es el **precio final del producto** de la línea del pedido (snapshot), por unidad y multiplicado por la cantidad. Si es fijo, se paga por unidad (3 unidades = 3 veces). Si es porcentaje, se aplica al precio final unitario. **No se convierte moneda**: si la moneda configurada no coincide con la de la línea, se muestra la comisión en la moneda configurada. Redondeo a 2 decimales. Producto sin comisión configurada: todo normal, comisión `0`.
+> "la comision se calcula sobre el precio del producto calculado como debe ser porque puede tener el producto % de descuento y descuento" · "1. 3 veces, la comision es por producto" · "SI la moneda no cincide no importa lo tuyo es mostrar la comision y ya y no hay que convertir nada" · "Si no tiene comision se hace todo normal y entonces todo da 0 que no afecta en nada"
+
+**S8 — Registro de la comisión.** Cada comisión referencia el `OrderItemId` y guarda su propio monto y moneda. Una comisión por `OrderItem`. El registro existente y la comisión quedan congelados: cambios posteriores de configuración no los alteran.
+> "las comiciones debe tener el id del ordenItem" · "un snapshot de los valores y la moneda del precio del producto en ese momento"
+
+**S9 — Pago por el Owner.** El Owner marca la comisión como pagada con **una sola acción**, por el **total**. Sin pagos parciales. Se registra fecha, quién la registró y nota.
+> "4. Completa, con una accion y punto." · "despues el owner puede decir que la comision a ese gestor se pago"
+
+**S10 — Gate del módulo.** Solo genera comisión el pedido de una tienda que tenga el módulo activo. Si el módulo no está activo, **no se inserta nada** de comisión. Al desactivarlo no se borran las comisiones ya generadas; las pendientes siguen siendo pagables.
+> "Esto es un feature nuevo si la tienda tiene el modulo gestores activo." · "Si no esta ese modulo no se inserta nada a la comicion ni nada por el estilo"
+
+**S11 — Snapshot de la línea.** `OrderItem` debe guardar en BD el snapshot del precio del producto en ese momento: precio base, porcentaje de descuento, descuento fijo y moneda. `Price` sigue siendo el precio final cobrado (sin cambiar su significado). Pedidos viejos quedan con los campos nuevos en `null` y no se tocan.
+> "orderitem en la BD debe guardar la moneda, el porciento de descuento y el descuento, todo el snapshot para poder calcular el precio del producto"
+
+**S12 — Sin regresión.** `ReSeller` no se toca. El flujo actual de catálogo, pedidos, estados, WhatsApp, planes y precios sigue funcionando igual. El módulo solo agrega comportamiento cuando está activo.
+> "por favor, no te vayas del scope. Eso es un además, todo lo que esta debe seguir funcionando como esta."
+
+**S13 — Pruebas.** Solo se agregan tests nuevos. Los E2E existentes (backend `SMCA.WebApi.E2ETests` y Playwright `frontend-react/e2e`) no se modifican, renombran, saltan ni debilitan. Cobertura nueva para: snapshot, configuración por producto, generación al entregar, gate del módulo, pago completo, acceso del gestor y no-regresión.
+
+## Tasks
+
+| ID | Tarea | Specs | Ruta | Estado |
+| --- | --- | --- | --- | --- |
+| T1 | Snapshot de `OrderItem`: entidad + configuración EF + migración + script + población en `CreateOnlineOrderCommand` + tests | S11 | inline | pending |
+| T2 | Catálogo del módulo: módulo 21, features, rol 5, `StorePlanModule` Superior/VIP, sin `StoreModule`; migración + script + tests | S1, S2 | inline | pending |
+| T3 | Dominio y persistencia del módulo: `SalesManager`, `ProductSalesCommission`, `OrderSalesCommission`; configuraciones y repositorios | S6, S8 | inline | pending |
+| T4 | Owner crea gestores: comando/API, usuario con rol 5 a nivel Owner, claims/features | S2, S3 | inline | pending |
+| T5 | Pedido del gestor: creación autenticada desde el catálogo + atribución en tabla del módulo + WhatsApp al Owner | S3, S4 | inline | pending |
+| T6 | Generación de comisión al pasar a `Entregado`: hook transaccional, idempotente, gate del módulo, configuración al momento de entrega, snapshot, fijo por unidad, % por unidad, sin conversión | S5, S7, S10 | inline | pending |
+| T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | pending |
+| T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
+| T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
+| T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | pending |
+| T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending |
+
+## Decisiones de diseño (no son requisitos nuevos)
+
+- D1 — La comisión se registra en la **misma transacción** que la transición a `Entregado` cuando el módulo está activo y el pedido tiene gestor. Si la comisión no puede registrarse, la transición falla: no se pierde dinero. Para tiendas sin el módulo o pedidos sin gestor, el flujo no cambia.
+- D2 — La atribución del pedido al gestor va en una tabla propia del módulo (`OrderSalesManager` o equivalente), no en una columna nueva de `Order`.
+- D3 — La configuración de comisión es por producto de la tienda (`ProductId`), en tabla propia del módulo.
+- D4 — El gestor es un `User` con rol 5 y un registro de módulo ligado al Owner/Tenant; no es `StoreUser` ni `ReSeller`.
+- D5 — El acceso del gestor a los catálogos de las tiendas del Owner se resuelve por pertenencia al Owner, no por `StoreModule`.
+- D6 — El precio del módulo se aplica con la regla única existente (`CurrentPriceServiceUtils.GetCurrentPrice`): 20 con 50% = 10.
+
+## Log
+
+- **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
+- **L2:** No existía plan para este feature. `docs/plans/2026-10-16-owner-reseller-dual-role-comisiones-plan.md` es otro feature (Owner + ReSeller) y no se toca.
+- **L3:** "Esto de gestor de ventas es nuevo... ReSeller es el que busca clientes para que usen este sistima. Y el gestor de ventas es el que usando el catalogo web hace pedidos de productos a un coordinador de gestores."
+- **L4:** "el gestor hace el pedido y lo envia por whatsapp al owner. Despues el owner segun corrsponda hace la gestion hasta que lo pone en entregado. Eso es que esta pagado y en ese momento entonces se debe adicionar la comision..."
+- **L5:** "en ningun momento te mencione StoreUser... te dije Owner" — se elimina `StoreUser` de todo el diseño; solo el Owner crea gestores y marca comisiones pagadas.
+- **L6:** "el gestor es del Owner entero, no es por tienda." El gestor accede a los catálogos de todas las tiendas de su Owner.
+- **L7:** "1. 3 veces, la comision es por producto 2. ... orderitem en la BD debe guardar la moneda, el porciento de descuento y el descuento, todo el snapshot para poder calcular el precio del producto."
+- **L8:** "la comision tiene un % o un valor fijo" — no hay comisión con % y fijo a la vez, ni descuento propio de la comisión.
+- **L9 (2026-10-21):** Autorización para implementar con ODD. Rama `feat/gestor-ventas-module` creada desde `dev` (`d0ad31e0`). Documento creado antes del primer write de código.
