@@ -149,12 +149,19 @@ public class CreateOnlineOrderCommandHandlerTests
     /// FILTRANDO por los ids pedidos: así una línea que el catálogo ya no publica sale como
     /// "no encontrada", igual que en producción (donde la consulta trae solo los publicados).
     /// </summary>
-    private Guid Publish(string name, decimal price, Currency? currency = null)
+    private Guid Publish(
+        string name,
+        decimal price,
+        Currency? currency = null,
+        int percentDiscountPrice = 0,
+        int discountPrice = 0)
     {
         var category = ProductCategory.Create(_storeId, "General", 1, _tenantId, "general");
         Product product = Product.Create(name, _categoryId, price, 1, true, true, "B-1", _tenantId);
         product.Category = category;
         product.Currency = currency ?? Currency.CUP;
+        product.PercentDiscountPrice = percentDiscountPrice;
+        product.DiscountPrice = discountPrice;
         _published.Add(product);
 
         _productRepository
@@ -238,6 +245,36 @@ public class CreateOnlineOrderCommandHandlerTests
         persisted.OrderItems.Single().Price.Should().Be(100m);
         persisted.OrderItems.Single().Quantity.Should().Be(2);
         persisted.OrderItems.Single().Currency.Should().Be(Currency.CUP);
+    }
+
+    /// <summary>
+    /// S11 del feature Gestores de Ventas: el `OrderItem` guarda el precio base, el % de descuento
+    /// y el descuento fijo del producto en el momento del pedido, además del precio final y la
+    /// moneda. Es el snapshot con el que se calcula la comisión.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldSnapshotTheProductPriceComponentsOnTheOrderItem()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m, percentDiscountPrice: 1250, discountPrice: 500);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        persisted.Should().NotBeNull();
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(1250);
+        item.DiscountPrice.Should().Be(500);
+        item.Price.Should().Be(82.5m, "el precio final sigue siendo el que muestra el catálogo");
+        item.Currency.Should().Be(Currency.CUP);
     }
 
     /// <summary>

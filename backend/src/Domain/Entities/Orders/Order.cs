@@ -140,7 +140,8 @@ namespace Domain.Entities.Orders
             foreach (OrderLine line in lines)
             {
                 OrderItem item = OrderItem.Create(
-                    order.Id, line.ProductId, line.Name, line.Quantity, line.Price, orderIndex++, tenantId);
+                    order.Id, line.ProductId, line.Name, line.Quantity, line.Price, orderIndex++, tenantId,
+                    line.BasePrice, line.PercentDiscountPrice, line.DiscountPrice);
                 item.Currency = line.Currency;
                 order.OrderItems.Add(item);
             }
@@ -253,7 +254,20 @@ namespace Domain.Entities.Orders
     /// Línea de pedido YA resuelta por el servidor: lo que el catálogo dice del producto, no lo que
     /// envió el cliente. Es el snapshot que se persiste en <c>OrderItem</c> (D6).
     /// </summary>
-    public sealed record OrderLine(Guid ProductId, string Name, int Quantity, decimal Price, Currency Currency);
+    /// <summary>
+    /// Línea ya resuelta por el servidor. `Price` es el precio final cobrado; los tres campos
+    /// opcionales son el snapshot del precio del producto en ese momento (base, % de descuento
+    /// escalado y descuento fijo escalado), que permite recalcularlo desde la línea.
+    /// </summary>
+    public sealed record OrderLine(
+        Guid ProductId,
+        string Name,
+        int Quantity,
+        decimal Price,
+        Currency Currency,
+        decimal? BasePrice = null,
+        int? PercentDiscountPrice = null,
+        int? DiscountPrice = null);
 
     /// <summary>
     /// Transición de estado no permitida por la tabla de <see cref="Order.AllowedTransitionsFrom"/>.

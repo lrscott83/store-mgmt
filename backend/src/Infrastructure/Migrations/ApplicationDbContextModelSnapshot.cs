@@ -1272,6 +1272,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BasePrice")
+                        .HasColumnType("decimal(18,6)");
+
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
 
@@ -1279,6 +1282,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DiscountPrice")
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
@@ -1292,6 +1298,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("OrderIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PercentDiscountPrice")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("Price")

@@ -18,6 +18,21 @@ namespace Domain.Entities.OrderItems
         public decimal Price { get; set; }
         /// <summary>Moneda de Price (plan 2026-09-16). Default CUP.</summary>
         public Currency Currency { get; set; } = Currency.CUP;
+        /// <summary>
+        /// Precio base del producto en el momento del pedido (sin descuentos), para poder
+        /// recalcular el precio final desde el snapshot. null en pedidos anteriores al snapshot.
+        /// </summary>
+        public decimal? BasePrice { get; set; }
+        /// <summary>
+        /// % de descuento escalado del producto en el momento del pedido
+        /// (CatalogScales.PERCENT_SCALE: 1250 == 12.50 %). null en pedidos anteriores.
+        /// </summary>
+        public int? PercentDiscountPrice { get; set; }
+        /// <summary>
+        /// Descuento fijo escalado del producto en el momento del pedido
+        /// (CatalogScales.DISCOUNT_PRICE_SCALE: 500 == 5.00). null en pedidos anteriores.
+        /// </summary>
+        public int? DiscountPrice { get; set; }
         public int OrderIndex { get; set; }
         public ICollection<InventoryEntryCost> InventoryProductCosts { get; set; }
 
@@ -31,7 +46,10 @@ namespace Domain.Entities.OrderItems
             int quantity,
             decimal price,
             int orderIndex,
-            Guid tenantId
+            Guid tenantId,
+            decimal? basePrice,
+            int? percentDiscountPrice,
+            int? discountPrice
         ) : base(id)
         {
             ProductId = productId;
@@ -41,6 +59,9 @@ namespace Domain.Entities.OrderItems
             OrderIndex = orderIndex;
             OrderId = orderId;
             TenantId = tenantId;
+            BasePrice = basePrice;
+            PercentDiscountPrice = percentDiscountPrice;
+            DiscountPrice = discountPrice;
             InventoryProductCosts = new List<InventoryEntryCost>();
         }
 
@@ -52,10 +73,15 @@ namespace Domain.Entities.OrderItems
             decimal price,
             int orderIndex,
             Guid orderId,
-            Guid tenantId
+            Guid tenantId,
+            decimal? basePrice = null,
+            int? percentDiscountPrice = null,
+            int? discountPrice = null
         )
         {
-            var orderItem = new OrderItem(id, orderId, productId, name, quantity, price, orderIndex, tenantId);
+            var orderItem = new OrderItem(
+                id, orderId, productId, name, quantity, price, orderIndex, tenantId,
+                basePrice, percentDiscountPrice, discountPrice);
             orderItem.Raise(new OrderItemCreatedDomainEvent(orderItem.Id, orderId));
             return orderItem;
         }
@@ -67,10 +93,15 @@ namespace Domain.Entities.OrderItems
             int quantity,
             decimal price,
             int orderIndex,
-            Guid tenantId
+            Guid tenantId,
+            decimal? basePrice = null,
+            int? percentDiscountPrice = null,
+            int? discountPrice = null
         )
         {
-            return Create(Guid.NewGuid(), productId, name, quantity, price, orderIndex, orderId, tenantId);
+            return Create(
+                Guid.NewGuid(), productId, name, quantity, price, orderIndex, orderId, tenantId,
+                basePrice, percentDiscountPrice, discountPrice);
         }
     }
 

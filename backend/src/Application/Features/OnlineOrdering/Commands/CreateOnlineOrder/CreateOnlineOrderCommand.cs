@@ -198,7 +198,12 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                     // combinados, ver CatalogPricing): si el servidor calculara con `Price` crudo,
                     // el total persistido no coincidiría con el que la persona vio.
                     product.FinalPrice,
-                    product.Currency));
+                    product.Currency,
+                    // Snapshot del precio en ese momento (S11 del feature Gestores de Ventas):
+                    // permite recalcular el precio final desde la línea y no depender del producto.
+                    product.Price,
+                    product.PercentDiscountPrice,
+                    product.DiscountPrice));
             }
 
             EnsureSingleCurrency(resolvedLines);

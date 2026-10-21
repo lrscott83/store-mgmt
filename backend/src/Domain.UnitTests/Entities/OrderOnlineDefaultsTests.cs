@@ -70,6 +70,37 @@ namespace Domain.UnitTests.Entities
             order.OrderItems.Select(i => i.Name).Should().BeEquivalentTo(["Azúcar", "Arroz"]);
             order.OrderItems.Should().OnlyContain(i => i.Currency == Currency.CUP);
             order.OrderItems.Should().OnlyContain(i => i.OrderId == order.Id);
+            // Pedidos sin snapshot (los antiguos y el camino que no lo envía) quedan en null.
+            order.OrderItems.Should().OnlyContain(i =>
+                i.BasePrice == null && i.PercentDiscountPrice == null && i.DiscountPrice == null);
+        }
+
+        /// <summary>
+        /// S11 del feature Gestores de Ventas: la línea guarda el snapshot completo del precio del
+        /// producto en ese momento (base, % de descuento, descuento fijo y moneda). `Price` sigue
+        /// siendo el precio final cobrado.
+        /// </summary>
+        [Fact]
+        public void CreateOnline_ShouldSnapshotTheProductPriceComponentsOnEveryLine()
+        {
+            Guid productId = Guid.NewGuid();
+            Order order = Order.CreateOnline(
+                storeId: Guid.NewGuid(),
+                tenantId: Guid.NewGuid(),
+                code: "AB12CD",
+                deliveryType: OrderDeliveryType.Pickup,
+                customerName: "Ana",
+                customerPhone: "+5350000000",
+                total: 165m,
+                currency: Currency.CUP,
+                lines: [new OrderLine(productId, "Azúcar", 2, 82.5m, Currency.CUP, 100m, 1250, 500)]);
+
+            var item = order.OrderItems.Single();
+            item.BasePrice.Should().Be(100m);
+            item.PercentDiscountPrice.Should().Be(1250);
+            item.DiscountPrice.Should().Be(500);
+            item.Price.Should().Be(82.5m, "Price sigue siendo el precio final cobrado");
+            item.Currency.Should().Be(Currency.CUP);
         }
 
         /// <summary>`ItemsCount` es la suma de cantidades: es lo que se usa en los listados.</summary>
