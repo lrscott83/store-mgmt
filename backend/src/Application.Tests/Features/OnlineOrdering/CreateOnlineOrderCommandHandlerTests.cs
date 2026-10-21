@@ -278,6 +278,65 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     /// <summary>
+    /// R3-SNAPSHOT-FREEZE (review de T1): el snapshot queda congelado. Cambiar el producto después
+    /// de crear el pedido no altera la línea ya construida; la comisión no puede depender del
+    /// catálogo vivo.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldKeepTheSnapshotFrozen_WhenTheProductChangesAfterTheOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m, percentDiscountPrice: 1250, discountPrice: 500);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        Product published = _published.Single(p => p.Id == productId);
+        published.Price = 999m;
+        published.PercentDiscountPrice = 0;
+        published.DiscountPrice = 0;
+
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(1250);
+        item.DiscountPrice.Should().Be(500);
+        item.Price.Should().Be(82.5m);
+    }
+
+    /// <summary>
+    /// R3-NULL-VS-ZERO-CONTRACT (review de T1): un pedido nuevo de un producto sin descuentos
+    /// guarda `0/0` (cero conocido), no `null` (legacy/sin snapshot).
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldPersistZeroDiscountsAsKnownZero_NotNull()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 1);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(0);
+        item.DiscountPrice.Should().Be(0);
+    }
+
+    /// <summary>
     /// F2-R4 — el cliente NO manda total, ni precio de línea, ni moneda: se recalcula desde el
     /// catálogo (2 x 100 = 200). Y no se afirma por reflexión ("la clase no tiene `Total`"), sino
     /// con el cuerpo REAL que manda el cliente: seDeserializean dos cuerpos gemelos —uno con
