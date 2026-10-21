@@ -54,6 +54,7 @@
 | T1b | Follow-ups del review de T1: round-trip EF/PostgreSQL del snapshot, freeze tras mutar el producto y contrato `null` vs `0` | S11, S13 | inline | done — `f826348b` |
 | T2 | Catálogo del módulo: módulo 21, features, rol 5, `StorePlanModule` Superior/VIP, sin `StoreModule`; migración + script + tests | S1, S2 | inline | done — `5215a074` |
 | T2b | Follow-ups del review de T2: scoping del E2E de catálogo, mapeo del generador y rollback de rol 5 | S1, S2, S13 | inline | done — `02a02cb6` |
+| T2c | E2E existentes de matriz de planes actualizados con autorización explícita (módulo 21/feature 125) | S1, S12, S13 | inline | done — `7fdeb27b` |
 | T3 | Dominio y persistencia del módulo: `SalesManager`, `ProductSalesCommission`, `OrderSalesCommission`; configuraciones y repositorios | S6, S8 | inline | pending |
 | T4 | Owner crea gestores: comando/API, usuario con rol 5 a nivel Owner, claims/features | S2, S3 | inline | pending |
 | T5 | Pedido del gestor: creación autenticada desde el catálogo + atribución en tabla del módulo + WhatsApp al Owner | S3, S4 | inline | pending |
@@ -81,19 +82,11 @@ Lineage `review-62781ea0de5eef8a` · lentes `review-risk` + `review-reliability`
 - **R3-SNAPSHOT-FREEZE** (SUGGESTION, reliability): falta un test que mute el producto después de crear el pedido y verifique que el snapshot del `OrderItem` no cambia. → T1b.
 - **R3-NULL-VS-ZERO-CONTRACT** (SUGGESTION, reliability): `0/0` significa "cero conocido" (producto sin descuentos); `null` significa "legacy/sin snapshot". T6 debe tratar `null` como sin comisión y no confundirlo con un descuento cero. → documentar y cubrir en T6.
 
-## Bloqueo abierto — E2E existentes de matriz de planes
+## E2E — estado y límite conocido
 
-El full E2E (770 tests) termina en **763 passed / 7 failed**. Los 7 fallos son tests existentes que fijan la matriz de módulos/features de los planes y que ahora no incluyen el módulo 21/feature 125:
+Los 7 tests existentes de matriz de planes se actualizaron con autorización explícita del usuario (commit `7fdeb27b`): se añadió módulo 21/feature 125 a los universos Superior/VIP en `PlanChangeMatrixTests`, `StorePlanCatalogTests` y `MeAfterOwnerPlanChangeTests`. El filtro focalizado de esos tres archivos pasa **12/12**.
 
-- `Plans/PlanChangeMatrixTests.SuperAdmin_upgrades_pago_to_vip_store_keeps_vip_modules_and_features`
-- `Plans/PlanChangeMatrixTests.SuperAdmin_upgrades_gratis_to_superior_store_keeps_superior_modules_and_features`
-- `Plans/PlanChangeMatrixTests.SuperAdmin_upgrades_superior_to_vip_store_keeps_vip_modules_and_features`
-- `Plans/PlanChangeMatrixTests.SuperAdmin_upgrades_gratis_to_vip_store_keeps_vip_modules_and_features`
-- `Plans/PlanChangeMatrixTests.SuperAdmin_downgrades_vip_to_superior_store_keeps_superior_modules_and_features`
-- `Plans/StorePlanCatalogTests.StorePlanModule_seed_matches_documented_plan_matrix`
-- `Auth/MeAfterOwnerPlanChangeTests.Me_follows_the_plan_across_superadmin_flips_with_same_owner_token`
-
-Causa: los universos `SuperiorUniverse`/`VipUniverse` y la matriz documentada no conocen el módulo 21. **No se tocaron**: modificar E2E existentes requiere autorización explícita (AGENTS.md). Sin esa autorización, T2 no se puede cerrar como verde.
+El full E2E sigue sin evidencia verde: la segunda corrida completa abortó con **Test host process crashed** tras 197 tests (0 failed). El `--blame-crash` no produjo un fallo de aserción; la secuencia más reciente deja `Auth.AuthLoginReSellerTests.Active_re_seller_logs_in_with_no_store_graph` con `Completed="False"`. Es un crash del host de test, no un test rojo; queda como límite de verificación abierto.
 
 ## Log
 
@@ -110,4 +103,5 @@ Causa: los universos `SuperiorUniverse`/`VipUniverse` y la matriz documentada no
 - **L11 (2026-10-21, RDD de T1):** assessment `medium`; escalado a `high` por el ítem 1 (migración con columnas persistidas). Consentimiento otorgado. Lentes `review-risk` + `review-reliability`; resultado **approved**, autoridad quemada (`revision a9244845...`). 0 bloqueantes; 3 hallazgos advisory registrados como T1b y para T6.
 - **L12 (2026-10-21, T1b cerrada):** follow-ups del review de T1. Nuevo E2E `Orders/OrderItemPriceSnapshotE2ETests` (write/read real contra PostgreSQL) 1/1; tests de aplicación para snapshot congelado tras mutar el producto y para `0/0` como cero conocido. `Application.Tests` 1473/1473. Commit `f826348b`.
 - **L13 (2026-10-21, T2 cerrada):** módulo 21 "Gestores de ventas" (`Price 20`, `PercentDiscountPrice 50` → neto 10), feature 125, rol 5 "Gestor de ventas", `StorePlanModule` (3,4), **sin** `StoreModule` ni `StoreRoleFeature` por defecto. Migración `20261021185058_Add-Gestores-Ventas-Module` aplicada a `smca_test`; script `backend/scripts/38-20261021-Add-Gestores-Ventas-Module.sql` generado. Enums backend + espejo frontend. E2E `GestoresVentasModuleCatalogTests` 1/1; `Domain.UnitTests` 184/184; `Application.Tests` 1473/1473; `pnpm typecheck` 5/5. Commit `5215a074`.
-- **L14 (2026-10-21, RDD de T2 y T2b):** assessment `medium`; escalado a `high` por el ítem 2 (rol 5 y permiso `StoreRoleFeatures`). Consentimiento otorgado; lentes `review-risk` + `review-reliability`; resultado **approved**, autoridad quemada (`review-ef421233ca6b5558`). T2b (`02a02cb6`): rollback borra `UserRole` de rol 5 antes del rol (FK Restrict), E2E de catálogo scopeado a una tienda del test, test del generador `GestoresVentasAdmin → feature 125 solo OwnerAdmin`, comentario del test de freeze acotado. Full E2E: **763/770**, 7 fallos en tests existentes de matriz de planes (ver "Bloqueo abierto"). No se tocaron esos tests.
+- **L14 (2026-10-21, RDD de T2 y T2b):** assessment `medium`; escalado a `high` por el ítem 2 (rol 5 y permiso `StoreRoleFeatures`). Consentimiento otorgado; lentes `review-risk` + `review-reliability`; resultado **approved**, autoridad quemada (`review-ef421233ca6b5558`). T2b (`02a02cb6`): rollback borra `UserRole` de rol 5 antes del rol (FK Restrict), E2E de catálogo scopeado a una tienda del test, test del generador `GestoresVentasAdmin → feature 125 solo OwnerAdmin`, comentario del test de freeze acotado. Full E2E: **763/770**, 7 fallos en tests existentes de matriz de planes. No se tocaron en ese momento.
+- **L15 (2026-10-21, T2c):** con autorización explícita del usuario se actualizaron SOLO `PlanChangeMatrixTests.cs`, `StorePlanCatalogTests.cs` y `MeAfterOwnerPlanChangeTests.cs` para incluir módulo 21/feature 125 en los universos Superior/VIP. Estas son las únicas modificaciones a E2E existentes y no debilitan ninguna aserción. Filtro focalizado 12/12. Commit `7fdeb27b`. El full E2E posterior abortó por crash del test host tras 197 tests (0 failed); ver "E2E — estado y límite conocido".
