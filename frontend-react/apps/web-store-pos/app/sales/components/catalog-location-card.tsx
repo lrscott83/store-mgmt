@@ -99,10 +99,14 @@ function sameLocationValues(a: LocationValues, b: LocationValues): boolean {
  * COMPLETO bajo `updateLocation`, así que el guardado reenvía el bloque editado y deja pasar
  * sin tocar el resto de los datos de la tienda (nombre, dirección, descripción, aprobado,
  * activo) tal como vienen de un GET fresco hecho justo antes de guardar.
+ *
+ * Nace COLAPSADO (decisión del owner, 2026-10-21): sus campos son una sugerencia opcional para el
+ * SEO, no la tarea principal de la vista, así que el panel arranca plegado y el dueño lo abre
+ * cuando va a capturarlos.
  */
 export function CatalogLocationCard({ storeId }: { storeId: string }) {
   const intl = useIntl();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
   const [values, setValues] = useState<LocationValues | null>(null);
   const [baseline, setBaseline] = useState<LocationValues | null>(null);

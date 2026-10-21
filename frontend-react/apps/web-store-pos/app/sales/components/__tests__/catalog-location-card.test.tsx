@@ -34,6 +34,11 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 /** El botón de guardado se consulta por su etiqueta visible, no por un testid. */
 const SAVE_BUTTON = { name: /guardar ubicación/i };
 
+/** El panel nace colapsado (2026-10-21): sus campos solo existen tras desplegarlo. */
+function expandPanel() {
+  fireEvent.click(screen.getByTestId('location-toggle'));
+}
+
 describe('CatalogLocationCard — ubicación pública del catálogo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,7 +46,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     storeMock.updateStore.mockResolvedValue({ succeeded: true, data: true });
   });
 
-  it('hidrata los campos desde el GET, nace expandido y sin cambios pendientes', async () => {
+  it('nace colapsado y, al desplegarlo, hidrata los campos desde el GET sin cambios pendientes', async () => {
     const { CatalogLocationCard } = await import('../catalog-location-card');
     render(
       <Wrapper>
@@ -50,6 +55,11 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     );
 
     const toggle = screen.getByTestId('location-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Colapsado el cuerpo NO está montado: los campos no existen todavía.
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
+
+    expandPanel();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     expect(await screen.findByLabelText(/teléfono público/i)).toHaveValue('+53 5555 1234');
@@ -64,7 +74,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     expect(screen.getByRole('button', SAVE_BUTTON)).toBeDisabled();
   });
 
-  it('se pliega y despliega con el toggle de la cabecera', async () => {
+  it('se despliega y se pliega con el toggle de la cabecera', async () => {
     const { CatalogLocationCard } = await import('../catalog-location-card');
     render(
       <Wrapper>
@@ -73,15 +83,15 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
     );
 
     const toggle = screen.getByTestId('location-toggle');
-    await screen.findByLabelText(/teléfono público/i);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    expandPanel();
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByLabelText(/teléfono público/i)).toBeInTheDocument();
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByLabelText(/teléfono público/i)).toBeInTheDocument();
   });
 
   it('guarda el bloque editado y deja pasar el resto del GET fresco; toast y recarga', async () => {
@@ -92,6 +102,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     const phone = await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(phone, { target: { value: '+53 5555 9999' } });
     fireEvent.change(screen.getByLabelText(/^latitud$/i), { target: { value: '23.5' } });
@@ -143,6 +154,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
       target: { value: '+53 5555 0000' },
     });
@@ -168,6 +180,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
       target: { value: '+53 5555 0000' },
     });
@@ -187,6 +200,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
       target: { value: '+53 5555 9999' },
     });
@@ -208,6 +222,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     fireEvent.change(await screen.findByLabelText(/teléfono público/i), {
       target: { value: '+53 5555 9999' },
     });
@@ -225,6 +240,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     const phone = await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(phone, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
@@ -244,6 +260,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     await screen.findByLabelText(/^longitud$/i);
     fireEvent.change(screen.getByLabelText(/^longitud$/i), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
@@ -262,6 +279,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     await screen.findByLabelText(/teléfono público/i);
     fireEvent.change(screen.getByLabelText('Apertura Martes'), { target: { value: '09:00' } });
     fireEvent.click(screen.getByRole('button', SAVE_BUTTON));
@@ -286,6 +304,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     expect(await screen.findByLabelText(/^latitud$/i)).toHaveValue(null);
     expect(screen.getByLabelText(/^longitud$/i)).toHaveValue(null);
   });
@@ -299,6 +318,7 @@ describe('CatalogLocationCard — ubicación pública del catálogo', () => {
       </Wrapper>,
     );
 
+    expandPanel();
     expect(await screen.findByText('No se pudo cargar la ubicación')).toBeInTheDocument();
     expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
   });

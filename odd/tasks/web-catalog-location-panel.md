@@ -28,9 +28,9 @@ que lo edita.
 - **S5** — Verificación: tests nuevos del panel; tests de la vista, del form y de la ruta de
   edición actualizados; `typecheck`, `lint` y suites de `web-store-pos` en verde.
 
-**Supuestos (ajustables en una línea):** el panel nace expandido (el owner pidió "panel
-colapsable", no plegado); su posición es inmediatamente antes de los productos (después del
-showcase); el backend no se toca.
+**Supuestos (ajustables en una línea):** el panel nace colapsado (decisión del owner 2026-10-21,
+L9; reemplaza el supuesto original de "expandido"); su posición es inmediatamente antes de los
+productos (después del showcase); el backend no se toca.
 
 ## Tasks
 
@@ -101,6 +101,10 @@ showcase); el backend no se toca.
   - R3-E: el test del panel consulta por label/rol; los testids de los inputs salieron del markup.
   Commits `7f31ec9d` (frontend) y `b5b4b006` (backend). Evidencia: focalizados 5 archivos / 92 tests ✓,
   `turbo typecheck` 5/5 ✓, eslint 0, E2E del PUT Failed 0 / Passed 4 ✓ contra `smca_test` real.
+- **L9 (2026-10-21, owner, textual):** "En las configuraciones del catalogo web debes poner colapsado
+  el tab de Ubiccion y contacto por defecto." El panel nace COLAPSADO (`useState(false)`); el cuerpo
+  sigue montándose solo al desplegarlo y el botón de guardado permanece en la cabecera. Tests del
+  panel y de la vista actualizados (arranque colapsado + despliegue para capturar).
 - **Siguiente paso:** al desplegar, aplicar la migración `35-20261019-Add-Store-Location-Fields.sql`
   (pendiente). El E2E del catálogo web no cubre el bloque; lo cubren los unit tests del panel y los tres
   E2E del PUT (persistencia, no-pisar sin flag y borrado al omitir un campo).
