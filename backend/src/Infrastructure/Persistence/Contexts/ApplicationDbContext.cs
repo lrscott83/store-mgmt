@@ -35,6 +35,9 @@ using Domain.Entities.Authentication;
 using Domain.Entities.StoreUsages;
 using Domain.Entities.Plans;
 using Domain.Entities.CatalogEvents;
+using Domain.Entities.SalesManagers;
+using Domain.Entities.ProductSalesCommissions;
+using Domain.Entities.OrderSalesCommissions;
 
 namespace Infrastructure.Persistence.Contexts
 {
@@ -156,6 +159,9 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new StoreCatalogImageEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new DeliveryDriverEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new CatalogEventEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new SalesManagerEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new ProductSalesCommissionEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new OrderSalesCommissionEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -180,6 +186,9 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StoreCatalogImage> StoreCatalogImage { get; set; }
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
         internal DbSet<CatalogEvent> CatalogEvent { get; set; }
+        internal DbSet<SalesManager> SalesManager { get; set; }
+        internal DbSet<ProductSalesCommission> ProductSalesCommission { get; set; }
+        internal DbSet<OrderSalesCommission> OrderSalesCommission { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
         internal DbSet<ProductImage> ProductImage { get; set; }

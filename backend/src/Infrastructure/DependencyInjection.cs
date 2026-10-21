@@ -102,6 +102,10 @@ namespace Infrastructure
             services.AddScoped<IDeliveryDriverRepository, DeliveryDriverRepository>();
             // Telemetría anónima del catálogo público (page views, productos, carrito, checkout).
             services.AddScoped<ICatalogEventRepository, CatalogEventRepository>();
+            // Módulo Gestores de ventas (Owner-level): gestor, configuración por producto y comisión.
+            services.AddScoped<ISalesManagerRepository, SalesManagerRepository>();
+            services.AddScoped<IProductSalesCommissionRepository, ProductSalesCommissionRepository>();
+            services.AddScoped<IOrderSalesCommissionRepository, OrderSalesCommissionRepository>();
         }
     }
 }
