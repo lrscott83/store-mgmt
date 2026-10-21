@@ -38,6 +38,7 @@ namespace Infrastructure.Persistence
             public bool IsSuperAdmin => false;
             public bool IsOwnerAdmin => false;
             public bool IsReSeller => false;
+            public bool IsGestorVentas => false;
             public bool IsSuperAdminOrOwnerAdmin => IsSuperAdmin || IsOwnerAdmin;
             public string TenantId => string.Empty;
             public string StoreId => string.Empty;

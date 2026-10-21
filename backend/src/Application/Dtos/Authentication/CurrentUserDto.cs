@@ -13,6 +13,7 @@ namespace Application.Dtos.Authentication
         public bool IsSuperAdmin { get; set; }
         public bool IsOwnerAdmin { get; set; }
         public bool IsReSeller { get; set; }
+        public bool IsGestorVentas { get; set; }
         public Guid SelectedStoreId { get; set; }
         public List<int> FeatureIds { get; set; } = new List<int>();
         public List<int> StoreModuleIds { get; set; } = new List<int>();

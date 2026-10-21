@@ -18,11 +18,11 @@ namespace Infrastructure.Persistence.Repositories
         /// Resolución por usuario para login/claims. `IgnoreQueryFilters` porque el login no
         /// siempre trae tenant en el contexto y el `UserId` es único.
         /// </summary>
-        public Task<SalesManager?> GetByUserIdAsync(Guid userId)
+        public Task<SalesManager?> GetByUserIdAsync(Guid userId, bool includeInactive = false)
             => _salesManagers
                 .Include(x => x.User)
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.UserId == userId);
+                .FirstOrDefaultAsync(x => x.UserId == userId && (includeInactive || x.IsActive));
 
         public async Task<IReadOnlyList<SalesManager>> GetByOwnerIdAsync(Guid ownerId, bool includeInactive = false)
             => await _salesManagers

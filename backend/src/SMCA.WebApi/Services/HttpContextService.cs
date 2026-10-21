@@ -50,6 +50,7 @@ namespace SMCA.WebApi.Services
         public bool IsSuperAdminOrOwnerAdmin => IsSuperAdmin || IsOwnerAdmin;
 
         public bool IsReSeller => GetClaimValue(StringValueUtils.ReSellerClaim) == "true";
+        public bool IsGestorVentas => GetClaimValue(StringValueUtils.GestorVentasClaim) == "true";
 
         private string GetHeaderValue(string headerKey)
         {
