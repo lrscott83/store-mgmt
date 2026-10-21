@@ -333,11 +333,14 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     expect(screen.queryByTestId(`catalog-product-${PRODUCT.id}`)).not.toBeInTheDocument();
   });
 
-  it('la ubicación pública se captura antes de los productos y arranca expandida', async () => {
+  it('la ubicación pública se captura antes de los productos y arranca colapsada', async () => {
     renderPage();
 
     const toggle = await screen.findByTestId('location-toggle');
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Colapsada de entrada: sus campos no están montados; el guardado propio sigue en la cabecera.
+    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('location-save')).toBeInTheDocument();
 
     // La tarjeta vive antes de los productos — el orden pedido por el owner.
     const categoryToggle = await screen.findByTestId(
@@ -347,11 +350,10 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       toggle.compareDocumentPosition(categoryToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    // Plegada oculta sus campos; el guardado propio sigue en la cabecera.
+    // Desplegada captura sus campos.
     fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByLabelText(/teléfono público/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId('location-save')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByLabelText(/teléfono público/i)).toBeInTheDocument();
   });
 
   it('sincronizar envía el catálogo local de la tienda y resume el resultado', async () => {
