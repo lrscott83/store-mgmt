@@ -95,6 +95,19 @@ La verificación completa se hizo con el comando único documentado en el README
 
 Una corrida previa solo del proyecto E2E abortó por crash del test host; el comando documentado de la solución **no** reproduce el crash. Lección registrada: la verificación completa se corre con el comando de la solución, no con el proyecto E2E aislado.
 
+## Follow-ups del review RDD de T3-A
+
+Lineage `review-9e0f51a8e8e97b9c` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 12 hallazgos advisory. Se trasladan a las tareas que los consumen:
+
+- **R1-INACTIVE-MANAGER-RESOLUTION (WARNING) → T4:** `SalesManagerRepository.GetByUserIdAsync` no filtra `IsActive`; el claims/login debe rechazar un gestor inactivo y un test debe fijarlo.
+- **R1-TENANT-FILTER-BYPASS-ORDERITEM (WARNING) → T6:** `GetByOrderItemIdAsync` usa `IgnoreQueryFilters`; la generación debe correr con tenant/orden validada y apoyarse en el índice único, no en un lookup global.
+- **R1-COMMISSION-AMOUNT-UNVERIFIED (WARNING) → T6:** el `Amount` no se valida contra `Type/Value/UnitPrice/Quantity`; T6 debe calcularlo y añadir la invariante + test.
+- **R1-MARKPAID-PAYER-UNBOUND (SUGGESTION) → T7:** el handler debe exigir que el pagador sea el Owner; test de pagador ajeno.
+- **R1-ROLLBACK-DELETES-USERROLE (WARNING):** el rollback de la migración de rol 5 borra `UserRole` de rol 5. Es el orden FK necesario; un rollback elimina asignaciones reales. Documentado, no se cambia ahora.
+- **R3-REPO-FILTERS-UNTESTED (WARNING) → T4/T7:** faltan tests de `GetByUserIdAsync`/`GetByOwnerIdAsync`/filtros por estado; se cubren al construir las vistas.
+- **R3-SCHEMA-MIGRATION-UNPROVED (WARNING):** resuelto por T3-B (migración generada, aplicada a `smca_test`) + E2E de round-trip 1/1 + suite completa 771/771.
+- **Sugerencias (T6/T7/T8):** bordes 0/100 y cantidad/precio negativos, `paidAt` por defecto, longitud de nota, precisión de `Value` frente a `Amount`, validación de enums y no acoplar el E2E a los defaults del seed.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -114,3 +127,4 @@ Una corrida previa solo del proyecto E2E abortó por crash del test host; el com
 - **L15 (2026-10-21, T2c):** con autorización explícita del usuario se actualizaron SOLO `PlanChangeMatrixTests.cs`, `StorePlanCatalogTests.cs` y `MeAfterOwnerPlanChangeTests.cs` para incluir módulo 21/feature 125 en los universos Superior/VIP. Estas son las únicas modificaciones a E2E existentes y no debilitan ninguna aserción. Filtro focalizado 12/12. Commit `7fdeb27b`. El full E2E posterior abortó por crash del test host tras 197 tests (0 failed) al correr el proyecto E2E aislado; la verificación con el comando documentado de la solución (`dotnet test backend/src/SMCA.sln`) dio **770/770**.
 - **L16 (2026-10-21, verificación completa):** `dotnet test backend/src/SMCA.sln` → `Domain.UnitTests` 185/185, `Application.Tests` 1473/1473, `SMCA.WebApi.E2ETests` **770/770**, wall 398.3 s. El crash anterior era del proyecto E2E aislado; el comando único del README raíz es el autoritativo y queda como la forma de verificar este feature.
 - **L17 (2026-10-21, T3 cerrada):** entidades `SalesManager` (Owner-level, `UserId` único), `ProductSalesCommission` (tabla propia; `ProductId` único; tipo % o fijo + moneda) y `OrderSalesCommission` (una por `OrderItemId` único; snapshot del cálculo; `MarkPaid` completo). Enums `SalesCommissionType`/`SalesCommissionStatus`; configuraciones EF con filtro por tenant y FKs Restrict; repositorios + DI. Migración `20261021203736_Add-Sales-Commissions-Tables` aplicada a `smca_test`; script `39-...sql`. `Product` y `Order` sin columnas nuevas. Pruebas: `SalesCommissionTests` (7) y E2E de round-trip con PostgreSQL (1/1). Suite completa con el comando documentado: `Domain` 192/192, `Application` 1473/1473, E2E 771/771. Commit `b42f35e2 + 3b9dbe04`.
+- **L18 (2026-10-21, RDD de T3):** el review del T3 completo falló por `lens_context_budget_exceeded` (30 archivos / 5,559 líneas); se dividió en T3-A (`b42f35e2`, dominio/persistencia) y T3-B (`3b9dbe04`, migración generada). T3-A: lentes risk+reliability, **approved**, autoridad quemada (`review-9e0f51a8e8e97b9c`), 12 hallazgos advisory (6 WARNING) trasladados a T4/T6/T7. T3-B: assessment medium, `under_budget`, sin review debido. Suite completa: Domain 192/192, Application 1473/1473, E2E 771/771.
