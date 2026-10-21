@@ -155,6 +155,23 @@ public class StoreRoleFeatureGeneratorTests
         result.All(srf => srf.TenantId == _testTenantId).Should().BeTrue();
     }
 
+    /// <summary>
+    /// R3-ROLEFEATURE-MAPPING-UNTESTED (review de T2): GestoresVentasAdmin debe resolver la
+    /// feature 125 para OwnerAdmin (2) y para nadie más. El gestor es Owner-level y no consume
+    /// esta feature por tienda.
+    /// </summary>
+    [Fact]
+    public async Task GenerateStoreRoleFeaturesAsync_ShouldMapGestoresVentasToOwnerAdminOnly()
+    {
+        var featureIds = new List<int> { (int)FeatureType.GestoresVentas };
+
+        var result = await _generator.GenerateStoreRoleFeaturesAsync(_testStoreId, _testTenantId, featureIds);
+
+        result.Should().ContainSingle();
+        result[0].RoleId.Should().Be((int)RoleType.OwnerAdmin);
+        result[0].FeatureId.Should().Be((int)FeatureType.GestoresVentas);
+    }
+
     #endregion
 
     #region Feature-to-Role Mapping Tests

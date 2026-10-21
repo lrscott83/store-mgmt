@@ -57,6 +57,8 @@ namespace Infrastructure.Migrations
             DELETE FROM "StorePlanModule" WHERE "ModuleId" = 21;
             DELETE FROM "Feature" WHERE "Id" = 125;
             DELETE FROM "Module" WHERE "Id" = 21;
+            -- Role 5 is Restrict-referenced by UserRole: clear the assignments first.
+            DELETE FROM "UserRole" WHERE "RoleId" = 5;
             DELETE FROM "Role" WHERE "Id" = 5;
             """;
     }

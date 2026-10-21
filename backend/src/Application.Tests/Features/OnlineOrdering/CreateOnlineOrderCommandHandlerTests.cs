@@ -278,9 +278,9 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     /// <summary>
-    /// R3-SNAPSHOT-FREEZE (review de T1): el snapshot queda congelado. Cambiar el producto después
-    /// de crear el pedido no altera la línea ya construida; la comisión no puede depender del
-    /// catálogo vivo.
+    /// R3-SNAPSHOT-FREEZE (review de T1): el snapshot de escalares se copia al crear el pedido y
+    /// no depende de la instancia viva del producto. La independencia de la COMISIÓN frente al
+    /// catálogo vivo se pinza en T6, cuando exista el cálculo; este test no la sustituye.
     /// </summary>
     [Fact]
     public async Task Handle_ShouldKeepTheSnapshotFrozen_WhenTheProductChangesAfterTheOrder()
