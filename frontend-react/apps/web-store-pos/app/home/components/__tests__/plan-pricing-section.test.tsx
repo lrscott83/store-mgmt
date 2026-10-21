@@ -60,6 +60,32 @@ describe('PlanPricingSection', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    document.head
+      .querySelectorAll('script[type="application/ld+json"]')
+      .forEach((node) => node.remove());
+  });
+
+  it('publishes the live plan prices into the landing JSON-LD', async () => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'SoftwareApplication', name: 'VendeDTo' }],
+    });
+    document.head.appendChild(script);
+    vi.mocked(fetch).mockResolvedValue(okResponse(PLANS));
+
+    render(<PlanPricingSection />);
+    await screen.findByTestId('plan-pricing-toggle-Pago');
+
+    const application = JSON.parse(script.textContent ?? '{}')['@graph'].find(
+      (node: { '@type': string }) => node['@type'] === 'SoftwareApplication',
+    );
+    expect(application.offers).toEqual([
+      { '@type': 'Offer', name: 'Gratis', price: '0.00', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Pago', price: '5.00', priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Superior', price: '10.00', priceCurrency: 'USD' },
+    ]);
   });
 
   it('renders one row per plan and opens the suggested plan by default', async () => {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { usePwaInstall } from '~/shared/lib/hooks/use-pwa-install';
 
 /**
@@ -5,11 +6,18 @@ import { usePwaInstall } from '~/shared/lib/hooks/use-pwa-install';
  * (`app.component.html` / `.scss`): fixed bottom-right amber gradient pill, shown
  * only when the app is installable and disabled until a native install prompt is
  * captured. Clicking fires the captured `beforeinstallprompt`.
+ *
+ * `mounted` keeps the first client render identical to the prerendered HTML: `canInstall` reads
+ * browser capabilities that do not exist while prerendering, so rendering the pill straight away
+ * breaks hydration of `/` (React #418). After mount the button appears exactly as before.
  */
 export function InstallAppButton() {
   const { canInstall, canPrompt, promptInstall } = usePwaInstall();
+  const [mounted, setMounted] = useState(false);
 
-  if (!canInstall) return null;
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted || !canInstall) return null;
 
   return (
     <button

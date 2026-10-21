@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Application.Dtos.OnlineOrdering;
 using Domain.Common.Enums;
@@ -106,7 +106,7 @@ public sealed class PublicOrderingReadE2ETests
             order.Code.Should().Be(code);
             order.Total.Should().Be(PublicOrderingSeed.SeededTotal,
                 "el total es el que se guardó: el servidor no lo recalcula en la lectura");
-            order.Status.Should().Be(OrderStatus.New);
+            order.Status.Should().Be(OrderStatus.Creado);
             order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
             order.DeliveryType.Should().Be(OrderDeliveryType.Pickup);
             order.Currency.Should().Be(Currency.CUP);

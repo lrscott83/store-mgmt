@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && node scripts/externalize-bootstrap.mjs && node scripts/generate-landing-page.mjs && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs && node scripts/verify-csp.mjs",
+    "build": "react-router build && node scripts/split-prerendered-landing.mjs && node scripts/externalize-bootstrap.mjs && node scripts/generate-landing-page.mjs && node scripts/verify-landing-prerender.mjs && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs && node scripts/verify-csp.mjs",
     "dev": "react-router dev",
     "dev:local": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
@@ -11,6 +11,8 @@
     "typecheck": "react-router typegen && tsc",
     "clean": "rimraf build .react-router",
     "test": "vitest run",
+    "verify:hydration": "node scripts/verify-landing-hydration.mjs",
+    "check:canonical": "node scripts/check-public-canonical.mjs",
     "generate:legal": "node scripts/generate-legal-content.mjs"
   },
   "dependencies": {

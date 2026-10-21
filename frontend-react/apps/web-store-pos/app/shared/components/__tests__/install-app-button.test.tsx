@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { InstallAppButton } from '../install-app-button';
 import {
   initPwaInstallCapture,
@@ -56,8 +57,7 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
     setServiceWorkerSupported(false);
     setInstalledRelatedApps(null);
     localStorage.clear();
-    vi.restoreAllMocks();
-    resetPwaInstallPromptForTests();
+    vi.restoreAllMocks();    resetPwaInstallPromptForTests();
   });
 
   it('renders the "Instalar App" button when installable, disabled until a prompt is captured', () => {
@@ -172,5 +172,16 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
 
     const btn = await screen.findByRole('button', { name: /instalar app/i });
     await waitFor(() => expect(btn).toBeEnabled());
+  });
+});
+
+describe('InstallAppButton - hydration safety', () => {
+  it('renders nothing on the very first render even when the browser is installable', () => {
+    setServiceWorkerSupported(true);
+    setStandalone(false);
+
+    // The prerendered HTML has no pill: the first client render must agree with it or React #418
+    // regenerates the whole tree. The pill appears from the mount effect onwards.
+    expect(renderToStaticMarkup(<InstallAppButton />)).toBe('');
   });
 });

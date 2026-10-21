@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { MemoryRouter } from 'react-router';
 import { EFeatures } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
@@ -8,10 +9,10 @@ import {
   OnlineOrderDeliveryType,
   OnlineOrderPaymentStatus,
   OnlineOrderStatus,
+  type OnlineOrderDetail,
   type OnlineOrderListItem,
 } from '~/sales/lib/services/ordering-http-service';
 
-/** Sesión mutable: el loader y los tests de gate la reescriben por prueba. */
 const session = vi.hoisted(() => ({
   user: null as UserModel | null,
   logout: vi.fn(),
@@ -34,18 +35,13 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
 
 const orderingMock = vi.hoisted(() => ({
   listOrders: vi.fn(),
+  getOrder: vi.fn(),
   updateStatus: vi.fn(),
-  updatePayment: vi.fn(),
-  assignDriver: vi.fn(),
   listActiveDrivers: vi.fn(),
 }));
 
-// `importOriginal` conserva `ORDER_STATUS_TRANSITIONS`: la tabla de transiciones es parte del
-// CONTRATO y la prueba quiere que la vista use la real, no una copia suya.
 vi.mock('~/sales/lib/services/ordering-http-service', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('~/sales/lib/services/ordering-http-service')
-  >()),
+  ...(await importOriginal<typeof import('~/sales/lib/services/ordering-http-service')>()),
   orderingHttpService: orderingMock,
 }));
 
@@ -70,8 +66,8 @@ const envelope = <T,>(data: T) => ({
   errors: [],
 });
 
-const page = (items: OnlineOrderListItem[], total = items.length) =>
-  envelope({ items, total, page: 1, pageSize: 20 });
+const pageOf = (items: OnlineOrderListItem[], total = items.length, page = 1) =>
+  envelope({ items, total, page, pageSize: 20 });
 
 const failure = (description: string) => ({
   data: null,
@@ -90,7 +86,7 @@ function makeOrder(overrides: Partial<OnlineOrderListItem> = {}): OnlineOrderLis
     deliveryType: OnlineOrderDeliveryType.Delivery,
     total: 1500,
     currency: 1,
-    status: OnlineOrderStatus.New,
+    status: OnlineOrderStatus.Creado,
     paymentStatus: OnlineOrderPaymentStatus.Pending,
     driverId: null,
     driverName: null,
@@ -99,25 +95,27 @@ function makeOrder(overrides: Partial<OnlineOrderListItem> = {}): OnlineOrderLis
   };
 }
 
-const NEW_ORDER = makeOrder();
-const PREPARING_ORDER = makeOrder({
+const CREATED_ORDER = makeOrder();
+const PREPARED_DELIVERY_ORDER = makeOrder({
   id: 'o2',
   code: 'PED-002',
-  status: OnlineOrderStatus.Preparing,
-  paymentStatus: OnlineOrderPaymentStatus.Paid,
-  driverId: 'd1',
-  driverName: 'Juan',
+  status: OnlineOrderStatus.Preparado,
 });
-const DELIVERED_ORDER = makeOrder({
-  id: 'o3',
-  code: 'PED-003',
-  status: OnlineOrderStatus.Delivered,
-});
+const DELIVERED_ORDER = makeOrder({ id: 'o3', code: 'PED-003', status: OnlineOrderStatus.Entregado });
 
 const DRIVERS = [
   { id: 'd1', name: 'Juan', phone: '5351111111', isActive: true },
   { id: 'd2', name: 'Ana', phone: '5352222222', isActive: true },
 ];
+
+const DETAIL: OnlineOrderDetail = {
+  ...DELIVERED_ORDER,
+  deliveryAddress: 'Calle 1',
+  notes: 'Tocar el timbre',
+  lines: [
+    { productId: 'p1', name: 'Cafetera', quantity: 1, price: 1500, currency: 1, lineTotal: 1500 },
+  ],
+};
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -145,11 +143,6 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
-/**
- * Usuario de TIENDA. Sus features NO salen de `user.featureIds` (eso es del owner/reseller): salen
- * de la fila de `roles` cuya tienda es la seleccionada (`isUserAuthorized`, authorization-service.ts:36).
- * Es justo lo que distingue esta vista de la de configuración (F1, solo OwnerAdmin).
- */
 function makeStoreUser(featureIds: number[]): UserModel {
   return makeUser({
     login: 'storeuser@test.com',
@@ -162,313 +155,215 @@ function makeStoreUser(featureIds: number[]): UserModel {
 function renderPage() {
   return render(
     <IntlProvider locale="es" messages={esMessages}>
-      <OrderingOrdersPage />
+      <MemoryRouter>
+        <OrderingOrdersPage />
+      </MemoryRouter>
     </IntlProvider>,
   );
 }
 
-/** La primera llamada al listado: los filtros de la prueba se comparan contra ella. */
-function lastListCall() {
-  return orderingMock.listOrders.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+interface CapturedFilters {
+  status?: OnlineOrderStatus;
+  exactRange?: boolean;
+  from?: string;
+  to?: string;
+  page?: number;
 }
 
-async function waitForList() {
-  return screen.findByTestId('order-row-o1');
+function callForStatus(status: OnlineOrderStatus): CapturedFilters {
+  const calls = orderingMock.listOrders.mock.calls.filter(
+    ([filters]) => (filters as CapturedFilters).status === status,
+  );
+  return (calls.at(-1)?.[0] ?? {}) as CapturedFilters;
 }
 
-/**
- * Opciones REALES del selector de estado: descarta la de invite ("Cambiar estado", valor vacío) y
- * devuelve valor + etiqueta de cada transición. Comparar por valor y por texto a la vez es lo que
- * demuestra que la vista ofrece el estado correcto y lo escribe en el idioma del usuario.
- */
-function transitionValues(selector: HTMLElement): { value: string; label: string }[] {
-  return within(selector)
-    .getAllByRole('option')
-    .filter((option) => option.getAttribute('value') !== '')
-    .map((option) => ({
-      value: option.getAttribute('value') as string,
-      label: option.textContent as string,
-    }));
-}
+beforeEach(() => {
+  vi.clearAllMocks();
 
-describe('OrderingOrdersPage (Pedidos)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    session.user = makeUser();
-    orderingMock.listOrders.mockResolvedValue(page([NEW_ORDER, PREPARING_ORDER, DELIVERED_ORDER]));
-    orderingMock.updateStatus.mockResolvedValue(envelope(true));
-    orderingMock.updatePayment.mockResolvedValue(envelope(true));
-    orderingMock.assignDriver.mockResolvedValue(envelope(true));
-    orderingMock.listActiveDrivers.mockResolvedValue(DRIVERS);
+  orderingMock.listActiveDrivers.mockResolvedValue(DRIVERS);
+  orderingMock.listOrders.mockImplementation(async (filters: CapturedFilters) => {
+    switch (filters.status) {
+      case OnlineOrderStatus.Creado:
+        return pageOf([CREATED_ORDER]);
+      case OnlineOrderStatus.Preparado:
+        return pageOf([PREPARED_DELIVERY_ORDER]);
+      case OnlineOrderStatus.Entregado:
+        return pageOf([DELIVERED_ORDER]);
+      default:
+        return pageOf([]);
+    }
   });
+  orderingMock.getOrder.mockResolvedValue(envelope(DETAIL));
+  orderingMock.updateStatus.mockResolvedValue(envelope(true));
+});
 
-  it('lista los pedidos leídos del servidor con sus columnas', async () => {
+describe('OrderingOrdersPage (gestión de pedidos)', () => {
+  it('pinta un panel por estado con su cantidad', async () => {
     renderPage();
 
-    expect(await waitForList()).toBeInTheDocument();
-    const row = screen.getByTestId('order-row-o1');
-    expect(within(row).getByText('PED-001')).toBeInTheDocument();
-    expect(within(row).getByText('Marta')).toBeInTheDocument();
-    expect(within(row).getByText('5351234567')).toBeInTheDocument();
-    expect(within(row).getByText('Envío a domicilio')).toBeInTheDocument();
-    expect(within(row).getByText('1500')).toBeInTheDocument();
-    expect(within(row).getByText('Nuevo')).toBeInTheDocument();
-    expect(within(row).getByText('Pendiente')).toBeInTheDocument();
-    // Sin repartidor asignado se dice explícitamente, no se deja en blanco.
-    expect(screen.getByTestId('order-driver-name-o1')).toHaveTextContent('Sin asignar');
-    // El repartidor YA resuelto por el servidor se pinta sin pedir los repartidores otra vez.
-    expect(screen.getByTestId('order-driver-name-o2')).toHaveTextContent('Juan');
+    await waitFor(() => expect(screen.getByTestId('order-panel-count-Creado')).toHaveTextContent('1'));
+
+    for (const status of ['Creado', 'Preparado', 'Transportando', 'Entregado', 'Cancelado']) {
+      expect(screen.getByTestId(`order-panel-${status}`)).toBeInTheDocument();
+    }
+
+    expect(screen.getByTestId('order-panel-count-Preparado')).toHaveTextContent('1');
+    expect(screen.getByTestId('order-panel-count-Entregado')).toHaveTextContent('1');
+    expect(screen.getByTestId('order-panel-count-Cancelado')).toHaveTextContent('0');
   });
 
-  it('no manda ningún filtro sin usar y la lectura es siempre contra el servidor', async () => {
+  it('los paneles activos no filtran por fecha', async () => {
     renderPage();
-    await waitForList();
 
-    expect(orderingMock.listOrders).toHaveBeenCalledTimes(1);
-    expect(lastListCall()).toEqual({ page: 1, pageSize: 20 });
+    await waitFor(() => expect(orderingMock.listOrders).toHaveBeenCalledTimes(5));
+
+    expect(callForStatus(OnlineOrderStatus.Creado).from).toBeUndefined();
+    expect(callForStatus(OnlineOrderStatus.Creado).exactRange).toBeUndefined();
+    expect(callForStatus(OnlineOrderStatus.Preparado).from).toBeUndefined();
+    expect(callForStatus(OnlineOrderStatus.Transportando).from).toBeUndefined();
   });
 
-  it('filtrar por estado vuelve a leer del servidor con ese filtro', async () => {
+  it('los paneles Entregado y Cancelado piden sólo el día del dispositivo como instantes exactos', async () => {
     renderPage();
-    await waitForList();
 
-    fireEvent.change(screen.getByTestId('order-filter-status'), {
-      target: { value: String(OnlineOrderStatus.Preparing) },
-    });
+    await waitFor(() => expect(orderingMock.listOrders).toHaveBeenCalledTimes(5));
+
+    for (const status of [OnlineOrderStatus.Entregado, OnlineOrderStatus.Cancelado]) {
+      const filters = callForStatus(status);
+      expect(filters.exactRange).toBe(true);
+      expect(typeof filters.from).toBe('string');
+      expect(typeof filters.to).toBe('string');
+      expect(new Date(filters.from as string).getTime()).toBeLessThan(
+        new Date(filters.to as string).getTime(),
+      );
+    }
+  });
+
+  it('un panel se colapsa y se vuelve a abrir', async () => {
+    renderPage();
+
+    const panel = await screen.findByTestId('order-panel-Creado');
+    const toggle = within(panel).getByRole('button', { expanded: true });
+
+    fireEvent.click(toggle);
+    expect(within(panel).getByRole('button', { expanded: false })).toBeInTheDocument();
+    expect(screen.queryByTestId('order-card-o1')).not.toBeInTheDocument();
+
+    fireEvent.click(within(panel).getByRole('button', { expanded: false }));
+    expect(await screen.findByTestId('order-card-o1')).toBeInTheDocument();
+  });
+
+  it('cada card ofrece ver los detalles y el modal los pide al servidor', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId('order-details-o1'));
+
+    await waitFor(() => expect(orderingMock.getOrder).toHaveBeenCalledWith('o1'));
+    expect(await screen.findByTestId('order-detail-modal')).toBeInTheDocument();
+    expect(await screen.findByText(/Cafetera/)).toBeInTheDocument();
+  });
+
+  it('enviar a reparto exige repartidor y lo manda en la transición', async () => {
+    renderPage();
+
+    const send = await screen.findByTestId(`order-to-${OnlineOrderStatus.Transportando}-o2`);
+    expect(send).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('order-driver-o2'), { target: { value: 'd2' } });
+    expect(send).not.toBeDisabled();
+
+    fireEvent.click(send);
 
     await waitFor(() =>
-      expect(lastListCall()).toEqual({ status: OnlineOrderStatus.Preparing, page: 1, pageSize: 20 }),
-    );
-    // Filtrar vuelve a la primera página: la 3 con filtro no es la 3 sin filtro.
-    expect(orderingMock.listOrders.mock.calls.at(-1)?.[0]).not.toHaveProperty('page', 3);
-  });
-
-  it('los filtros de pago, modalidad, repartidor y fechas viajan con el estado', async () => {
-    renderPage();
-    await waitForList();
-
-    fireEvent.change(screen.getByTestId('order-filter-payment'), {
-      target: { value: String(OnlineOrderPaymentStatus.Paid) },
-    });
-    fireEvent.change(screen.getByTestId('order-filter-delivery'), {
-      target: { value: String(OnlineOrderDeliveryType.Pickup) },
-    });
-    fireEvent.change(screen.getByTestId('order-filter-driver'), { target: { value: 'd2' } });
-    fireEvent.change(screen.getByTestId('order-filter-from'), { target: { value: '2026-10-01' } });
-    fireEvent.change(screen.getByTestId('order-filter-to'), { target: { value: '2026-10-07' } });
-
-    await waitFor(() =>
-      expect(lastListCall()).toEqual({
-        paymentStatus: OnlineOrderPaymentStatus.Paid,
-        deliveryType: OnlineOrderDeliveryType.Pickup,
+      expect(orderingMock.updateStatus).toHaveBeenCalledWith('o2', OnlineOrderStatus.Transportando, {
         driverId: 'd2',
-        from: '2026-10-01',
-        to: '2026-10-07',
-        page: 1,
-        pageSize: 20,
       }),
     );
   });
 
-  it('la búsqueda por código o teléfono se aplica al pulsar Buscar', async () => {
+  it('cancelar exige razón y la manda al servidor', async () => {
     renderPage();
-    await waitForList();
 
-    fireEvent.change(screen.getByTestId('order-search'), { target: { value: 'PED-002' } });
-    // Escribir NO dispara peticiones: se busca al pulsar.
-    expect(lastListCall()).not.toHaveProperty('search');
+    const card = await screen.findByTestId('order-card-o1');
+    fireEvent.click(within(card).getByRole('button', { name: 'Cancelar pedido' }));
 
-    fireEvent.click(screen.getByTestId('order-search-submit'));
+    const confirm = screen.getByTestId('order-cancel-confirm');
+    expect(confirm).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('order-cancel-reason'), {
+      target: { value: '  El cliente desistió  ' },
+    });
+    expect(confirm).not.toBeDisabled();
+
+    fireEvent.click(confirm);
 
     await waitFor(() =>
-      expect(lastListCall()).toEqual({ search: 'PED-002', page: 1, pageSize: 20 }),
+      expect(orderingMock.updateStatus).toHaveBeenCalledWith('o1', OnlineOrderStatus.Cancelado, {
+        cancellationReason: 'El cliente desistió',
+      }),
     );
-  });
-
-  it('cambiar el estado ofrece SOLO las transiciones válidas', async () => {
-    renderPage();
-    await waitForList();
-
-    const selector = within(screen.getByTestId('order-row-o1')).getByTestId('order-status-o1');
-    const options = transitionValues(selector);
-
-    // New → Accepted / Cancelled. Nada de Preparing (inválida) ni de "En camino" (no existe).
-    expect(options).toEqual([
-      { value: String(OnlineOrderStatus.Accepted), label: 'Aceptado' },
-      { value: String(OnlineOrderStatus.Cancelled), label: 'Cancelado' },
-    ]);
-    expect(within(selector).queryByText('En camino')).not.toBeInTheDocument();
-
-    const ready = within(screen.getByTestId('order-row-o2')).getByTestId('order-status-o2');
-    expect(transitionValues(ready)).toEqual([
-      { value: String(OnlineOrderStatus.Ready), label: 'Listo' },
-      { value: String(OnlineOrderStatus.Cancelled), label: 'Cancelado' },
-    ]);
-
-    // Un estado terminal no ofrece ninguna transición: no hay selector que abrir.
-    expect(
-      within(screen.getByTestId('order-row-o3')).queryByTestId('order-status-o3'),
-    ).not.toBeInTheDocument();
-  });
-
-  it('cambiar el estado lo manda al servidor y recarga la lista', async () => {
-    renderPage();
-    await waitForList();
-
-    fireEvent.change(within(screen.getByTestId('order-row-o1')).getByTestId('order-status-o1'), {
-      target: { value: String(OnlineOrderStatus.Accepted) },
-    });
-
-    await waitFor(() => expect(orderingMock.updateStatus).toHaveBeenCalledTimes(1));
-    expect(orderingMock.updateStatus).toHaveBeenCalledWith('o1', OnlineOrderStatus.Accepted);
-    // El servidor manda: tras mover el pedido se vuelve a leer para que la pantalla diga la verdad.
-    await waitFor(() => expect(orderingMock.listOrders.mock.calls.length).toBeGreaterThan(1));
-  });
-
-  it('marcar el pago alterna Paid/Pending y es independiente del estado', async () => {
-    renderPage();
-    await waitForList();
-
-    fireEvent.click(screen.getByTestId('order-payment-o1'));
-
-    await waitFor(() => expect(orderingMock.updatePayment).toHaveBeenCalledTimes(1));
-    expect(orderingMock.updatePayment).toHaveBeenCalledWith('o1', OnlineOrderPaymentStatus.Paid);
-    // Marcar el pago NO toca el estado.
-    expect(orderingMock.updateStatus).not.toHaveBeenCalled();
-
-    // El que ya está pagado vuelve a Pendiente: el botón es un interruptor, no una ida sin vuelta.
-    fireEvent.click(screen.getByTestId('order-payment-o2'));
-
-    await waitFor(() => expect(orderingMock.updatePayment).toHaveBeenCalledTimes(2));
-    expect(orderingMock.updatePayment).toHaveBeenLastCalledWith(
-      'o2',
-      OnlineOrderPaymentStatus.Pending,
-    );
-  });
-
-  it('asignar un repartidor lo manda al servidor y ofrece el catálogo de repartidores', async () => {
-    renderPage();
-    await waitForList();
-    await waitFor(() => expect(orderingMock.listActiveDrivers).toHaveBeenCalled());
-
-    const selector = within(screen.getByTestId('order-row-o1')).getByTestId('order-driver-o1');
-    expect(within(selector).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Sin asignar',
-      'Juan',
-      'Ana',
-    ]);
-
-    fireEvent.change(selector, { target: { value: 'd2' } });
-
-    await waitFor(() => expect(orderingMock.assignDriver).toHaveBeenCalledTimes(1));
-    expect(orderingMock.assignDriver).toHaveBeenCalledWith('o1', 'd2');
-  });
-
-  it('desasignar un repartidor manda null, no una cadena vacía', async () => {
-    renderPage();
-    await waitForList();
-
-    fireEvent.change(
-      within(screen.getByTestId('order-row-o2')).getByTestId('order-driver-o2'),
-      { target: { value: '' } },
-    );
-
-    await waitFor(() => expect(orderingMock.assignDriver).toHaveBeenCalledTimes(1));
-    expect(orderingMock.assignDriver).toHaveBeenCalledWith('o2', null);
-  });
-
-  it('si el endpoint de repartidores falla la página sigue funcionando', async () => {
-    // F7 puede no estar desplegado: el selector degrada a "solo Sin asignar", la tabla NO se cae.
-    orderingMock.listActiveDrivers.mockRejectedValue(
-      Object.assign(new Error('not found'), { response: { status: 404 } }),
-    );
-    renderPage();
-
-    expect(await waitForList()).toBeInTheDocument();
-    const selector = await screen.findByTestId('order-driver-o1');
-    await waitFor(() =>
-      expect(within(selector).getAllByRole('option').map((o) => o.textContent)).toEqual([
-        'Sin asignar',
-      ]),
-    );
-    expect(screen.getByTestId('order-drivers-unavailable')).toBeInTheDocument();
-    // Y la lista se puede seguir filtrando por estado sin el catálogo de repartidores.
-    fireEvent.change(screen.getByTestId('order-filter-status'), {
-      target: { value: String(OnlineOrderStatus.New) },
-    });
-    await waitFor(() => expect(lastListCall()).toHaveProperty('status', OnlineOrderStatus.New));
   });
 
   it('un rechazo del servidor al cambiar el estado se muestra con SU mensaje', async () => {
-    orderingMock.updateStatus.mockResolvedValue(failure('Transición no permitida.'));
+    orderingMock.updateStatus.mockResolvedValue(failure('Transición no permitida'));
+
     renderPage();
-    await waitForList();
 
-    fireEvent.change(within(screen.getByTestId('order-row-o1')).getByTestId('order-status-o1'), {
-      target: { value: String(OnlineOrderStatus.Accepted) },
-    });
+    fireEvent.change(await screen.findByTestId('order-driver-o2'), { target: { value: 'd2' } });
+    fireEvent.click(screen.getByTestId(`order-to-${OnlineOrderStatus.Transportando}-o2`));
 
-    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
-    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Transición no permitida.');
-    expect(showToastSuccessMock).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Transición no permitida'),
+    );
   });
 
-  it('un fallo de red al listar avisa en pantalla y no pinta la tabla', async () => {
-    orderingMock.listOrders.mockResolvedValue(failure('Tienda no seleccionada.'));
+  it('si el endpoint de repartidores falla la página sigue funcionando', async () => {
+    orderingMock.listActiveDrivers.mockRejectedValue(new Error('404'));
+
     renderPage();
 
-    expect(await screen.findByTestId('order-error')).toHaveTextContent('No se pudieron cargar');
-    expect(screen.queryByTestId('order-row-o1')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('order-card-o1')).toBeInTheDocument();
+    expect(screen.getByTestId(`order-to-${OnlineOrderStatus.Transportando}-o2`)).toBeDisabled();
   });
 
-  it('sin pedidos muestra el estado vacío en vez de una tabla vacía', async () => {
-    orderingMock.listOrders.mockResolvedValue(page([]));
+  it('sin pedidos muestra el estado vacío en cada panel', async () => {
+    orderingMock.listOrders.mockResolvedValue(pageOf([]));
+
     renderPage();
 
-    expect(await screen.findByTestId('order-empty')).toHaveTextContent('No hay pedidos');
-    expect(screen.queryByTestId('order-row-o1')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText(esMessages['ORDERING_ORDERS.EMPTY']).length).toBeGreaterThan(0));
   });
 
-  it('el refresco manual vuelve a leer del servidor', async () => {
+  it('la paginación del panel pide la página anterior y la siguiente', async () => {
+    orderingMock.listOrders.mockResolvedValue(pageOf([CREATED_ORDER], 60, 1));
+
     renderPage();
-    await waitForList();
-    expect(orderingMock.listOrders).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('order-refresh'));
+    const panel = await screen.findByTestId('order-panel-Creado');
+    await waitFor(() => expect(within(panel).getByText('Página 1 de 3')).toBeInTheDocument());
 
-    await waitFor(() => expect(orderingMock.listOrders).toHaveBeenCalledTimes(2));
-  });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Siguiente' }));
 
-  it('la paginación avanza y retrocede sobre el listado del servidor', async () => {
-    orderingMock.listOrders.mockResolvedValue(page([NEW_ORDER], 45));
-    renderPage();
-    await waitForList();
-
-    fireEvent.click(screen.getByTestId('order-next-page'));
-    await waitFor(() => expect(lastListCall()).toHaveProperty('page', 2));
-
-    fireEvent.click(screen.getByTestId('order-prev-page'));
-    await waitFor(() => expect(lastListCall()).toHaveProperty('page', 1));
+    await waitFor(() =>
+      expect(callForStatus(OnlineOrderStatus.Creado).page).toBe(2),
+    );
   });
 });
 
 describe('clientLoader de Pedidos (feature 123)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('deja pasar a un OwnerAdmin aunque no lleve la feature (bypass de los owners)', async () => {
     session.user = makeUser({ featureIds: [] });
+
     await expect(clientLoader({ params: {} } as never)).resolves.toBeNull();
   });
 
   it('deja pasar a un StoreUser con la feature de pedidos', async () => {
     session.user = makeStoreUser([EFeatures.OnlineOrders]);
+
     await expect(clientLoader({ params: {} } as never)).resolves.toBeNull();
   });
 
   it('desloguea a un StoreUser que solo tiene la feature de catálogo', async () => {
-    // La feature 122 es la de CONFIGURAR la tienda (solo dueño); no da acceso a gestionar pedidos.
     session.user = makeStoreUser([EFeatures.WebCatalog]);
 
     const result = await clientLoader({ params: {} } as never);

@@ -228,6 +228,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Admin (Angular MENU.ADMIN.*)
   'MENU.ADMIN_DASHBOARD': 'Dashboard',
+  'MENU.ADMIN_CATALOG_STATS': 'Estadísticas del catálogo',
   'MENU.ADMIN_STORES': 'Tiendas',
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
@@ -343,6 +344,37 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVED': 'Marca guardada',
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
+
+  // Ubicación pública del catálogo (public-catalog-static-pages, T8a): teléfono, ciudad, provincia,
+  // coordenadas y horario. La captura se movió del formulario de tienda a esta vista (decisión del
+  // owner, 2026-10-19) y alimenta la ficha LocalBusiness de la página generada.
+  'WEB_CATALOG.LOCATION_TITLE': 'Ubicación y contacto',
+  'WEB_CATALOG.LOCATION_SUBTITLE':
+    'El teléfono, la ubicación y el horario que se muestran con tu catálogo público.',
+  'WEB_CATALOG.LOCATION_PUBLIC_PHONE': 'Teléfono público',
+  'WEB_CATALOG.LOCATION_ADDRESS_CITY': 'Ciudad',
+  'WEB_CATALOG.LOCATION_ADDRESS_PROVINCE': 'Provincia',
+  'WEB_CATALOG.LOCATION_LATITUDE': 'Latitud',
+  'WEB_CATALOG.LOCATION_LONGITUDE': 'Longitud',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS': 'Horario',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS_HINT': 'Deja un día vacío para marcarlo como cerrado.',
+  'WEB_CATALOG.LOCATION_OPENS': 'Apertura',
+  'WEB_CATALOG.LOCATION_CLOSES': 'Cierre',
+  'WEB_CATALOG.LOCATION_DAY_MONDAY': 'Lunes',
+  'WEB_CATALOG.LOCATION_DAY_TUESDAY': 'Martes',
+  'WEB_CATALOG.LOCATION_DAY_WEDNESDAY': 'Miércoles',
+  'WEB_CATALOG.LOCATION_DAY_THURSDAY': 'Jueves',
+  'WEB_CATALOG.LOCATION_DAY_FRIDAY': 'Viernes',
+  'WEB_CATALOG.LOCATION_DAY_SATURDAY': 'Sábado',
+  'WEB_CATALOG.LOCATION_DAY_SUNDAY': 'Domingo',
+  'WEB_CATALOG.LOCATION_COORDINATES_PAIR_REQUIRED': 'La latitud y la longitud deben venir juntas.',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS_INCOMPLETE':
+    'Cada día con horario necesita apertura y cierre.',
+  'WEB_CATALOG.LOCATION_SAVE': 'Guardar ubicación',
+  'WEB_CATALOG.LOCATION_SAVING': 'Guardando...',
+  'WEB_CATALOG.LOCATION_SAVED': 'Ubicación guardada',
+  'WEB_CATALOG.LOCATION_SAVE_ERROR': 'No se pudo guardar la ubicación',
+  'WEB_CATALOG.LOCATION_LOAD_ERROR': 'No se pudo cargar la ubicación',
 
   // Presentación del catálogo público (decisión del owner, 2026-10-12): elementos por fila en móvil.
   // Solo afecta a la plantilla `default`.
@@ -466,6 +498,7 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.SEARCH_LABEL': 'Buscar por código o teléfono',
   'ORDERING_ORDERS.SEARCH_PLACEHOLDER': 'Código del pedido o teléfono del cliente',
   'ORDERING_ORDERS.FILTER_STATUS': 'Estado',
+  'ORDERING_ORDERS.FILTER_ALL': 'Todos',
   'ORDERING_ORDERS.FILTER_PAYMENT': 'Pago',
   'ORDERING_ORDERS.FILTER_DELIVERY_TYPE': 'Entrega',
   'ORDERING_ORDERS.FILTER_DRIVER': 'Repartidor',
@@ -473,37 +506,51 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.FILTER_TO': 'Hasta',
   'ORDERING_ORDERS.COL_CODE': 'Código',
   'ORDERING_ORDERS.COL_CUSTOMER': 'Cliente',
-  'ORDERING_ORDERS.COL_DELIVERY_TYPE': 'Entrega',
+  'ORDERING_ORDERS.COL_PHONE': 'Teléfono',  'ORDERING_ORDERS.COL_DELIVERY_TYPE': 'Entrega',
   'ORDERING_ORDERS.COL_TOTAL': 'Total',
   'ORDERING_ORDERS.COL_STATUS': 'Estado',
   'ORDERING_ORDERS.COL_PAYMENT': 'Pago',
   'ORDERING_ORDERS.COL_DRIVER': 'Repartidor',
   'ORDERING_ORDERS.COL_DATE': 'Fecha',
-  'ORDERING_ORDERS.STATUS_NEW': 'Nuevo',
-  'ORDERING_ORDERS.STATUS_ACCEPTED': 'Aceptado',
-  'ORDERING_ORDERS.STATUS_PREPARING': 'En preparación',
-  'ORDERING_ORDERS.STATUS_READY': 'Listo',
-  'ORDERING_ORDERS.STATUS_DELIVERED': 'Entregado',
-  'ORDERING_ORDERS.STATUS_CANCELLED': 'Cancelado',
+  'ORDERING_ORDERS.STATUS_CREADO': 'Creado',
+  'ORDERING_ORDERS.STATUS_PREPARADO': 'Preparado',
+  'ORDERING_ORDERS.STATUS_TRANSPORTANDO': 'Transportando',
+  'ORDERING_ORDERS.STATUS_ENTREGADO': 'Entregado',
+  'ORDERING_ORDERS.STATUS_CANCELADO': 'Cancelado',
   'ORDERING_ORDERS.PAYMENT_PENDING': 'Pendiente',
   'ORDERING_ORDERS.PAYMENT_PAID': 'Pagado',
   'ORDERING_ORDERS.DELIVERY_PICKUP': 'Recogida en la tienda',
   'ORDERING_ORDERS.DELIVERY_HOME': 'Envío a domicilio',
   'ORDERING_ORDERS.CHANGE_STATUS': 'Cambiar estado',
-  'ORDERING_ORDERS.MARK_PAID': 'Marcar pagado',
-  'ORDERING_ORDERS.MARK_UNPAID': 'Marcar pendiente',
   'ORDERING_ORDERS.ASSIGN_DRIVER': 'Asignar repartidor',
   'ORDERING_ORDERS.NO_DRIVER': 'Sin asignar',
   'ORDERING_ORDERS.NO_CODE': 'Sin código',
   'ORDERING_ORDERS.NO_CUSTOMER': 'Sin cliente',
+  'ORDERING_ORDERS.DETAILS': 'Ver detalles',
+  'ORDERING_ORDERS.CLOSE_DETAILS': 'Cerrar',
+  'ORDERING_ORDERS.CANCEL_ORDER': 'Cancelar pedido',
+  'ORDERING_ORDERS.CANCEL_REASON_LABEL': 'Razón de la cancelación',
+  'ORDERING_ORDERS.CANCEL_REASON_REQUIRED': 'Escribe la razón de la cancelación.',
+  'ORDERING_ORDERS.CANCEL_REASON_SHOWN': 'Razón',
+  'ORDERING_ORDERS.CANCEL_CONFIRM': 'Cancelar el pedido',
+  'ORDERING_ORDERS.CANCEL_DISMISS': 'Volver',
+  'ORDERING_ORDERS.DRIVER_REQUIRED': 'Selecciona el repartidor para enviar el pedido a reparto.',
+  'ORDERING_ORDERS.TO_PREPARADO': 'Marcar preparado',
+  'ORDERING_ORDERS.TO_TRANSPORTANDO': 'Enviar a reparto',
+  'ORDERING_ORDERS.TO_ENTREGADO': 'Marcar entregado',
+  'ORDERING_ORDERS.TODAY_ONLY': 'Sólo hoy',
+  'ORDERING_ORDERS.HISTORY_TITLE': 'Historial de pedidos',
+  'ORDERING_ORDERS.HISTORY_SUBTITLE':
+    'Todos los pedidos de la tienda. Filtra por estado y por rango de fechas.',
+  'ORDERING_ORDERS.HISTORY_LINK': 'Ver historial',
+  'ORDERING_ORDERS.OPEN_PANEL': 'Abrir',
+  'ORDERING_ORDERS.CLOSE_PANEL': 'Cerrar',
   // El catálogo de repartidores (F7) puede no estar desplegado: el selector queda en "Sin
   // asignar" y el resto de la vista sigue funcionando.
   'ORDERING_ORDERS.DRIVERS_UNAVAILABLE':
     'No se pudo cargar el catálogo de repartidores: no puedes asignarlos a un pedido.',
   'ORDERING_ORDERS.STATUS_CHANGED': 'Estado del pedido actualizado',
   'ORDERING_ORDERS.STATUS_FAILED': 'No se pudo cambiar el estado del pedido',
-  'ORDERING_ORDERS.PAYMENT_CHANGED': 'Pago del pedido actualizado',
-  'ORDERING_ORDERS.PAYMENT_FAILED': 'No se pudo actualizar el pago del pedido',
   'ORDERING_ORDERS.DRIVER_CHANGED': 'Repartidor del pedido actualizado',
   'ORDERING_ORDERS.DRIVER_FAILED': 'No se pudo asignar el repartidor',
 
@@ -561,7 +608,6 @@ const messages: Record<string, string> = {
   'CATALOG_PUBLIC.NEXT': 'Siguiente',
   'CATALOG_PUBLIC.PAGE': 'Página {page} de {pages}',
   'CATALOG_PUBLIC.GALLERY': 'Galería',
-  'CATALOG_PUBLIC.NO_IMAGE': 'Este producto no tiene imágenes.',
   'CATALOG_PUBLIC.ZOOM_IN': 'Ampliar imagen',
   'CATALOG_PUBLIC.ZOOM_OUT': 'Reducir imagen',
   'CATALOG_PUBLIC.FOOTER': 'Catálogo publicado con VendeDTo',
@@ -649,15 +695,15 @@ const messages: Record<string, string> = {
   'CHECKOUT.SUBMIT_STAFF': 'Registrar pedido',
   'CHECKOUT.SUBMITTING_STAFF': 'Registrando pedido…',
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
-  // Sin el módulo "Gestión de Pedidos" (20) el checkout NO hace POST: no hay `Order`, así que no
-  // hay código que dictar y el aviso no puede decir "pedido guardado" —sería mentira—. Son las
-  // mismas dos situaciones de siempre (handoff o bloqueo) con un texto que no inventa un pedido.
+  // Sin el módulo "Gestión de Pedidos" (20) el alta se persiste en SEGUNDO PLANO: no hay respuesta
+  // con código, así que el aviso no puede decir "pedido guardado" —no lo sabe—. Son las mismas dos
+  // situaciones de siempre (handoff o bloqueo) con un texto que no inventa un código.
   'CHECKOUT.SUBMIT_WHATSAPP': 'Enviar por WhatsApp',
   'CHECKOUT.SUBMITTING_WHATSAPP': 'Enviando pedido…',
   'CHECKOUT.WHATSAPP_SENT':
     'Abrimos WhatsApp con el resumen de tu pedido. Esta tienda lo confirma contigo directamente por ahí.',
-  'CHECKOUT.WHATSAPP_BLOCKED_NO_ORDER':
-    'Esta tienda no tiene un número de WhatsApp, así que el envío quedó bloqueado y tu pedido no se ha guardado: guarda el resumen y escríbele por otro medio.',
+  'CHECKOUT.WHATSAPP_BLOCKED_NO_CODE':
+    'Esta tienda no tiene un número de WhatsApp, así que el envío quedó bloqueado: guarda el resumen y escríbele por otro medio.',
   // Envío del pedido por WhatsApp (F4). El texto del RESUMEN que viaja en el enlace va en
   // `catalog/lib/whatsapp-order-link.ts`: lo lee la tienda en su chat, no es interfaz de la app.
   // Aquí solo está el estado que ve el cliente en el navegador.
@@ -1474,27 +1520,6 @@ const messages: Record<string, string> = {
   // L6 parity (GENERAL.ACTIVE:154 'Activo')
   'STORES.IS_ACTIVE': 'Activo',
   'STORES.PAYMENT_START_DATE': 'Fecha de inicio de pago',
-  // public-catalog-static-pages (T8): public location block of the store form.
-  // This data feeds the generated catalog page's LocalBusiness JSON-LD.
-  'STORES.LOCATION_TITLE': 'Ubicación y contacto',
-  'STORES.PUBLIC_PHONE': 'Teléfono público',
-  'STORES.ADDRESS_CITY': 'Ciudad',
-  'STORES.ADDRESS_PROVINCE': 'Provincia',
-  'STORES.LATITUDE': 'Latitud',
-  'STORES.LONGITUDE': 'Longitud',
-  'STORES.OPENING_HOURS': 'Horario',
-  'STORES.OPENING_HOURS_HINT': 'Deja un día vacío para marcarlo como cerrado.',
-  'STORES.OPENS': 'Apertura',
-  'STORES.CLOSES': 'Cierre',
-  'STORES.DAY_MONDAY': 'Lunes',
-  'STORES.DAY_TUESDAY': 'Martes',
-  'STORES.DAY_WEDNESDAY': 'Miércoles',
-  'STORES.DAY_THURSDAY': 'Jueves',
-  'STORES.DAY_FRIDAY': 'Viernes',
-  'STORES.DAY_SATURDAY': 'Sábado',
-  'STORES.DAY_SUNDAY': 'Domingo',
-  'STORES.COORDINATES_PAIR_REQUIRED': 'La latitud y la longitud deben venir juntas.',
-  'STORES.OPENING_HOURS_INCOMPLETE': 'Cada día con horario necesita apertura y cierre.',
   'STORES.SAVE': 'Guardar',
   'STORES.SAVING': 'Guardando...',
   'STORES.EDIT': 'Editar',
@@ -1793,6 +1818,32 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.AVERAGE': 'Promedio',
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
   'ADMIN_DASHBOARD.NO_OWNERS': 'Sin tiendas activas',
+
+  // Admin — Catalog stats (SuperAdmin only). Visitas anónimas del catálogo público.
+  'ADMIN_CATALOG_STATS.HEADER': 'Estadísticas del catálogo',
+  'ADMIN_CATALOG_STATS.FILTERS': 'Tienda y periodo',
+  'ADMIN_CATALOG_STATS.STORE': 'Tienda',
+  'ADMIN_CATALOG_STATS.LAST_DAYS': 'Últimos {days} días',
+  'ADMIN_CATALOG_STATS.SUMMARY_TITLE': '{store} · últimos {days} días',
+  'ADMIN_CATALOG_STATS.VISITS': 'Visitas',
+  'ADMIN_CATALOG_STATS.VISITORS': 'Visitantes únicos',
+  'ADMIN_CATALOG_STATS.PAGE_VIEWS': 'Páginas vistas',
+  'ADMIN_CATALOG_STATS.ORDERS': 'Pedidos',
+  'ADMIN_CATALOG_STATS.CONVERSION': 'Conversión',
+  'ADMIN_CATALOG_STATS.SOURCES': 'De dónde vienen',
+  'ADMIN_CATALOG_STATS.TOP_PRODUCTS': 'Productos más vistos',
+  'ADMIN_CATALOG_STATS.NO_PRODUCTS': 'Todavía no hay productos vistos.',
+  'ADMIN_CATALOG_STATS.DAILY': 'Visitas por día',
+  'ADMIN_CATALOG_STATS.NO_STORES': 'No hay tiendas para mostrar.',
+  'ADMIN_CATALOG_STATS.ERROR': 'No se pudieron cargar las estadísticas.',
+  'ADMIN_CATALOG_STATS.SOURCE_DIRECT': 'Directo',
+  'ADMIN_CATALOG_STATS.SOURCE_WHATSAPP': 'WhatsApp',
+  'ADMIN_CATALOG_STATS.SOURCE_INSTAGRAM': 'Instagram',
+  'ADMIN_CATALOG_STATS.SOURCE_FACEBOOK': 'Facebook',
+  'ADMIN_CATALOG_STATS.SOURCE_GOOGLE': 'Google',
+  'ADMIN_CATALOG_STATS.SOURCE_OTHER_SEARCH': 'Otros buscadores',
+  'ADMIN_CATALOG_STATS.SOURCE_REFERRAL': 'Referidos',
+  'ADMIN_CATALOG_STATS.SOURCE_CAMPAIGN': 'Campañas',
 
   // Admin — Resellers
   // admin-owners-resellers-parity (Stage 5 Admin), Phase 4 — LIST_TITLE/CREATE_TITLE

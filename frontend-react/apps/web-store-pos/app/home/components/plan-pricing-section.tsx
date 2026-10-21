@@ -9,6 +9,7 @@ import {
   type PublicPlanModulePricing,
   type PublicPlanPricing,
 } from '../lib/public-plan-pricing';
+import { applyPlanOffersToDocument } from '../lib/landing-json-ld';
 
 /** The plan the landing suggests: its row starts open and carries the "Sugerido" badge. */
 const RECOMMENDED_PLAN = 'Pago';
@@ -55,7 +56,10 @@ export function PlanPricingSection() {
     let cancelled = false;
     fetchPublicPlanPricing()
       .then((data) => {
-        if (!cancelled) setPlans(data);
+        if (!cancelled) {
+          setPlans(data);
+          applyPlanOffersToDocument(data);
+        }
       })
       .catch(() => {
         // The landing must survive the endpoint being down: no prices, no error surface.

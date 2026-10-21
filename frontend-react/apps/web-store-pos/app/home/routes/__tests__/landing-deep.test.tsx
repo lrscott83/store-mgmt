@@ -141,9 +141,10 @@ describe('LandingDeep — public landing route', () => {
   });
 
   describe('Hero section', () => {
-    it('renders the hero heading, brand and "Ver características" anchor', () => {
+    it('renders the hero heading with the product keyword, brand and "Ver características" anchor', () => {
       renderLanding();
-      expect(screen.getByRole('heading', { name: /vende más/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: /tu pos offline/i })).toBeInTheDocument();
+      expect(screen.getByText(/vende más\. controla todo\./i)).toBeInTheDocument();
       expect(screen.getByText('VendeDTo')).toBeInTheDocument();
       const seeFeatures = screen.getByRole('link', { name: /ver características/i });
       expect(seeFeatures).toHaveAttribute('href', '#caracteristicas');
@@ -263,6 +264,35 @@ describe('LandingDeep — public landing route', () => {
       renderLanding();
       const brand = screen.getByText('VendeDTo');
       expect(brand).toHaveClass('text-accent');
+    });
+  });
+
+  describe('WhatsApp contact shortcut', () => {
+    const WHATSAPP_HREF =
+      'https://wa.me/5352432968?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20VendeDTo';
+
+    it('opens the store WhatsApp chat with the prefilled message in a new tab', () => {
+      renderLanding();
+      const link = screen.getByRole('link', { name: /contáctenos por whatsapp/i });
+      expect(link).toHaveAttribute('href', WHATSAPP_HREF);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveClass('text-whatsapp', 'landing-whatsapp');
+    });
+
+    it('sits in the navbar right cluster: after the desktop CTA, before the mobile menu', () => {
+      renderLanding();
+      const nav = screen.getByRole('navigation');
+      const link = within(nav).getByRole('link', { name: /contáctenos por whatsapp/i });
+      const desktopCta = within(nav).getByRole('link', { name: /^comenzar$/i });
+      const mobileMenu = within(nav).getByRole('button', { name: /^menu$/i });
+
+      expect(
+        desktopCta.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        link.compareDocumentPosition(mobileMenu) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
   });
 });

@@ -100,6 +100,8 @@ namespace Infrastructure
             // Showcase del catálogo público (carrusel e imágenes del día). También es catálogo, no POS.
             services.AddScoped<IStoreCatalogImageRepository, StoreCatalogImageRepository>();
             services.AddScoped<IDeliveryDriverRepository, DeliveryDriverRepository>();
+            // Telemetría anónima del catálogo público (page views, productos, carrito, checkout).
+            services.AddScoped<ICatalogEventRepository, CatalogEventRepository>();
         }
     }
 }

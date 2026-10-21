@@ -52,6 +52,9 @@ export default [
     // de arriba: featureLoader(OnlineOrdersAdmin), que además del OwnerAdmin deja entrar al
     // StoreUser (D15) — atender un pedido no es cosa del dueño.
     route('sales/online-orders', 'sales/routes/ordering-orders.tsx'),
+    // Historial de pedidos (feature 123): todos los pedidos con filtro por estado y rango de fechas.
+    // Mismo gate que la gestión: misma tabla, misma gente.
+    route('sales/online-orders/history', 'sales/routes/ordering-history.tsx'),
     // Ventas de los pedidos de WhatsApp (feature 123, F6): el agregado del rango más el histórico.
     // Gate IDÉNTICO al de la fila de arriba y a propósito: leen la misma tabla y la opera la misma
     // gente (OwnerAdmin + StoreUser). Un gate distinto abriría a un rol los mismos datos que la
@@ -156,6 +159,9 @@ export default [
 
     // Admin â€” Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
+
+    // Admin — Catalog stats (SuperAdmin only): visitas anónimas del catálogo público.
+    route('admin/catalog-stats', 'admin/catalog-stats/routes/catalog-stats.tsx'),
 
     // Admin â€” Messages (SuperAdmin-only ownerâ†”admin inbox)
     route('admin/messages', 'admin/messages/routes/messages.tsx'),

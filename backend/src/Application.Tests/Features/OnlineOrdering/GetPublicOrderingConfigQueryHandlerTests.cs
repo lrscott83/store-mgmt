@@ -23,12 +23,12 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      "no existe" y "no hay catálogo".
 ///   2. `Enabled = false` cuando la tienda no tiene fila: publicar el catálogo NO publica los
 ///      pedidos (dos interruptores distintos), y por defecto el segundo está apagado.
-///   3. SÍ expone el número de WhatsApp. Reversión de F4-T2 (T5, 2026-10-10): el modo "solo
-///      Pedidos WhatsApp" no hace `POST`, así que no hay respuesta de creación de la que sacarlo y
-///      sin este campo el storefront no puede armar el `wa.me`.
+///   3. SÍ expone el número de WhatsApp. Reversión de F4-T2 (T5, 2026-10-10): el alta en segundo
+///      plano (sin módulo 20) no espera la respuesta de creación, así que no tiene de dónde sacarlo
+///      y sin este campo el storefront no puede armar el `wa.me`.
 ///   4. Los DOS flags de módulo: `PedidosWhatsAppEnabled` (19) decide si hay carrito (M2) y
-///      `GestionPedidosEnabled` (20) si el checkout persiste (M3). Son de TIENDA, no del plan, así
-///      que el storefront no puede deducirlos y tienen que viajar aquí.
+///      `GestionPedidosEnabled` (20) decide si el alta es síncrona o en segundo plano. Son de
+///      TIENDA, no del plan, así que el storefront no puede deducirlos y tienen que viajar aquí.
 ///
 /// La paleta viene porque el storefront la pinta; el logo y el banner también, como URLs públicas
 /// del endpoint de media construidas con el slug de la tienda. La plantilla (`TemplateId`) viaja

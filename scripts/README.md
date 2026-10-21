@@ -27,7 +27,8 @@ contenedores, sin `server_name`.
 5. Buildea la imagen `localhost/store-mgmt_backend_test:latest`.
 6. Levanta el stack aislado (`podman-compose -p smca-test`).
 7. Smoke test; **si falla, rollback** (BD de test + imágenes del catálogo + imagen `:previous`) y redeploy.
-8. Tag git y `deploy-state.txt`.
+8. **Comprueba la URL pública** (`https://vdt.playground.sceiba.net/api/v1/ping`). Si el stack está sano en `:8095` pero el dominio no responde, el deploy **falla sin rollback**: el problema es el proxy, no el deploy.
+9. Tag git y `deploy-state.txt`.
 
 **Por defecto producción NO se toca** (ni `pg_dump` ni el contenedor). El backup y
 montaje de la BD de producción quedan detrás de `--from-prod`.
@@ -136,7 +137,8 @@ Un `pg_dump` **no** las incluye.
 4. Aplica los scripts SQL pendientes **contra la BD de producción**.
 5. Levanta el stack de producción.
 6. Smoke test; **si falla, rollback automático**.
-7. Tag git y `deploy-state.txt`.
+7. **Comprueba la URL pública** (`https://pos.playground.sceiba.net/api/v1/ping`). Si el stack está sano en `:8085` pero el dominio no responde, el deploy **falla sin rollback**: el problema es el proxy, no el deploy.
+8. Tag git y `deploy-state.txt`.
 
 ### Reglas duras
 
@@ -229,6 +231,21 @@ de test), `./deploy-state.txt` (incluye `IMAGES_BACKUP=`).
 ---
 
 ## 3. Notas comunes
+
+### Verificación de la URL pública (ambos scripts)
+
+El smoke local solo prueba el contenedor en `localhost:<puerto>`. Por eso los dos
+scripts comprueban además **el dominio**, que es lo que el usuario realmente abre:
+
+- `deploy-test.sh` → `https://vdt.playground.sceiba.net/api/v1/ping`
+- `deploy-prod.sh` → `https://pos.playground.sceiba.net/api/v1/ping`
+
+Si el dominio no responde, el deploy **termina en error y sin rollback**: restaurar
+la BD o la imagen anterior no arregla un `backend` mal apuntado en HAProxy, y
+destruiría un deploy sano por una causa ajena. El log imprime el código HTTP y el
+puerto al que debe apuntar el `server` de ese dominio.
+
+Se puede sobreescribir con `PUBLIC_SMOKE_URL=https://otro-host ./deploy-test.sh`.
 
 ### Los `.env` NO se commitean
 

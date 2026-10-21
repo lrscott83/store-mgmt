@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
-import { CloseIcon } from '~/shared/components/ui/icons';
+import { CloseIcon, WhatsappIcon } from '~/shared/components/ui/icons';
 import { PlanPricingSection } from '../components/plan-pricing-section';
 import './landing-deep.css';
 
@@ -18,6 +18,12 @@ const ctaPrimary =
 const ctaOutline =
   'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 border ' +
   'border-border text-text text-sm font-medium transition-colors hover:border-primary hover:text-primary';
+
+// Same number as the authenticated footer's "Contáctanos" link
+// (shared/components/footer.tsx), plus the landing's prefilled opener.
+const WHATSAPP_NUMBER = '5352432968';
+const WHATSAPP_MESSAGE = 'Hola, quiero información sobre VendeDTo';
+const whatsappContactHref = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
 const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = [
   {
@@ -564,114 +570,126 @@ export default function LandingDeep() {
               VendeDTo
             </a>
 
-            <div className="hidden items-center gap-6 lg:flex">
-              <a
-                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
-                href="#caracteristicas"
-              >
-                Características
-              </a>
-              <a
-                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
-                href="#como-funciona"
-              >
-                Cómo funciona
-              </a>
-              <a
-                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
-                href="#precios"
-              >
-                Precios
-              </a>
-              {showLoginButton && (
-                <Link
+            <div className="flex items-center gap-4 lg:gap-6">
+              <div className="hidden items-center gap-6 lg:flex">
+                <a
                   className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
-                  to="/login"
+                  href="#caracteristicas"
                 >
-                  Entrar
-                </Link>
-              )}
-              <a className={ctaPrimary} href="#registro">
-                Comenzar
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M3 8h10M9 4l4 4-4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-            </div>
-
-            <div className="relative lg:hidden">
-              <Button
-                variant="outline"
-                className="px-2 py-2"
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Menu"
-              >
-                {menuOpen ? (
-                  <CloseIcon className="h-5 w-5" />
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  Características
+                </a>
+                <a
+                  className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                  href="#como-funciona"
+                >
+                  Cómo funciona
+                </a>
+                <a
+                  className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                  href="#precios"
+                >
+                  Precios
+                </a>
+                {showLoginButton && (
+                  <Link
+                    className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                    to="/login"
+                  >
+                    Entrar
+                  </Link>
+                )}
+                <a className={ctaPrimary} href="#registro">
+                  Comenzar
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path
-                      d="M3 5h14M3 10h14M3 15h14"
+                      d="M3 8h10M9 4l4 4-4 4"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
                   </svg>
-                )}
-              </Button>
+                </a>
+              </div>
 
-              {menuOpen && (
-                <div className="absolute right-0 top-full min-w-[200px] rounded-md border border-border border-t-2 border-t-accent bg-surface py-4 shadow-card">
-                  <a
-                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
-                    href="#hero"
-                    onClick={closeMenu}
-                  >
-                    Inicio
-                  </a>
-                  <a
-                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
-                    href="#caracteristicas"
-                    onClick={closeMenu}
-                  >
-                    Características
-                  </a>
-                  <a
-                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
-                    href="#como-funciona"
-                    onClick={closeMenu}
-                  >
-                    Cómo funciona
-                  </a>
-                  <a
-                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
-                    href="#precios"
-                    onClick={closeMenu}
-                  >
-                    Precios
-                  </a>
-                  <Link
-                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
-                    to="/login"
-                    onClick={closeMenu}
-                  >
-                    Iniciar sesión
-                  </Link>
-                  <a
-                    className="block px-6 py-2 text-sm font-semibold text-accent hover:bg-accent/5"
-                    href="#registro"
-                    onClick={closeMenu}
-                  >
-                    Comenzar
-                  </a>
-                </div>
-              )}
+              <a
+                href={whatsappContactHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Contáctenos por WhatsApp"
+                className="landing-whatsapp inline-flex h-9 w-9 items-center justify-center rounded-full text-whatsapp transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-whatsapp/50 focus-visible:outline-none"
+              >
+                <WhatsappIcon className="landing-whatsapp__icon h-6 w-6" />
+              </a>
+
+              <div className="relative lg:hidden">
+                <Button
+                  variant="outline"
+                  className="px-2 py-2"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-label="Menu"
+                >
+                  {menuOpen ? (
+                    <CloseIcon className="h-5 w-5" />
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="M3 5h14M3 10h14M3 15h14"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                </Button>
+
+                {menuOpen && (
+                  <div className="absolute right-0 top-full min-w-[200px] rounded-md border border-border border-t-2 border-t-accent bg-surface py-4 shadow-card">
+                    <a
+                      className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                      href="#hero"
+                      onClick={closeMenu}
+                    >
+                      Inicio
+                    </a>
+                    <a
+                      className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                      href="#caracteristicas"
+                      onClick={closeMenu}
+                    >
+                      Características
+                    </a>
+                    <a
+                      className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                      href="#como-funciona"
+                      onClick={closeMenu}
+                    >
+                      Cómo funciona
+                    </a>
+                    <a
+                      className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                      href="#precios"
+                      onClick={closeMenu}
+                    >
+                      Precios
+                    </a>
+                    <Link
+                      className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                      to="/login"
+                      onClick={closeMenu}
+                    >
+                      Iniciar sesión
+                    </Link>
+                    <a
+                      className="block px-6 py-2 text-sm font-semibold text-accent hover:bg-accent/5"
+                      href="#registro"
+                      onClick={closeMenu}
+                    >
+                      Comenzar
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -685,13 +703,14 @@ export default function LandingDeep() {
             <div>
               <p className="landing-animate-in mb-6 flex items-center gap-3 text-sm font-semibold text-text-muted [animation-delay:100ms]">
                 <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
-                POS offline + catálogo web con pedidos por WhatsApp
+                Punto de venta + catálogo web con pedidos por WhatsApp
               </p>
-              <h1 className="landing-animate-in mb-6 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
-                Vende más.
-                <br />
-                Controla <span className="text-accent italic">todo.</span>
+              <h1 className="landing-animate-in mb-4 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
+                Tu POS <span className="text-accent italic">offline.</span>
               </h1>
+              <p className="landing-animate-in mb-6 text-2xl font-semibold tracking-tight text-text sm:text-3xl [animation-delay:300ms]">
+                Vende más. Controla todo.
+              </p>
               <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-text-muted sm:text-xl [animation-delay:400ms]">
                 Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y
                 reportes — siempre disponibles en tu dispositivo.

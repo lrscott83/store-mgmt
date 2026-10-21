@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useParams } from 'react-router';
 import { Button } from '~/shared/components/ui/button';
@@ -12,6 +12,7 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
 import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
+import { trackCatalogEvent, type CatalogTelemetryEvent } from '~/catalog/lib/catalog-telemetry';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import { isCatalogStoreStaff } from '~/catalog/lib/catalog-staff';
 import { resolveTemplate } from '~/catalog/templates/registry';
@@ -121,6 +122,28 @@ export function PublicCatalogPage() {
    */
   const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
 
+  // Una sola regla para las cuatro llamadas: el staff de esta tienda no genera visitas de
+  // cliente. Centralizarla evita que un cambio futuro se aplique a tres call-sites y se olvide
+  // en el cuarto.
+  const trackCustomerEvent = useCallback(
+    (event: CatalogTelemetryEvent) => {
+      if (!staffMode) trackCatalogEvent(storeSlug, event);
+    },
+    [staffMode, storeSlug],
+  );
+
+  /**
+   * La visita se registra UNA vez por carga del catálogo, cuando la carta ya se pintó. El staff
+   * de la tienda queda fuera: ver su propia carta no es una visita de cliente. El ref evita que
+   * un re-render (o la carga del config) cuente la misma visita dos veces.
+   */
+  const pageViewSentFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (state !== 'ready' || staffMode || pageViewSentFor.current === storeSlug) return;
+    pageViewSentFor.current = storeSlug;
+    trackCustomerEvent({ name: 'page_view' });
+  }, [state, storeSlug, staffMode, trackCustomerEvent]);
+
   function addProductToCart(product: PublicCatalogProduct) {
     addToCart(storeSlug, {
       id: product.id,
@@ -129,6 +152,7 @@ export function PublicCatalogPage() {
       unitPrice: product.finalPrice,
       imageUrl: product.imageUrl,
     });
+    trackCustomerEvent({ name: 'add_to_cart', productId: product.id });
     // El aviso va al TOAST global, no a un `<p>` en la cabecera (decisión del owner,
     // 2026-10-08): el botón de la tarjeta ya es solo un ícono, así que el texto pegado a la
     // cabecera era la única confirmación y competía con el propio botón del carrito.
@@ -210,6 +234,7 @@ export function PublicCatalogPage() {
     setActiveImage(product.imageUrl);
     setZoomed(false);
     setDetailOpen(true);
+    trackCustomerEvent({ name: 'product_view', productId: product.id });
     try {
       const result = await catalogHttpService.getPublicProduct(storeSlug, product.id);
       if (result.succeeded) {
@@ -309,7 +334,7 @@ export function PublicCatalogPage() {
       >
         {detail && (
           <div className="space-y-4">
-            {activeImage ? (
+            {activeImage && (
               <button
                 type="button"
                 onClick={() => setZoomed((value) => !value)}
@@ -328,10 +353,6 @@ export function PublicCatalogPage() {
                   data-testid="catalog-detail-image"
                 />
               </button>
-            ) : (
-              <p className="text-sm text-text-muted">
-                {intl.formatMessage({ id: 'CATALOG_PUBLIC.NO_IMAGE' })}
-              </p>
             )}
 
             {detail.imageUrls.length > 1 && (
@@ -417,6 +438,7 @@ export function PublicCatalogPage() {
         onRemove={(productId) => removeFromCart(storeSlug, productId)}
         onClear={() => clearCart(storeSlug)}
         onCheckout={() => {
+          trackCustomerEvent({ name: 'checkout_open' });
           setCartOpen(false);
           setCheckoutOpen(true);
         }}
@@ -424,9 +446,9 @@ export function PublicCatalogPage() {
 
       {/* El checkout solo existe si la tienda ofrece el carrito: con `enabled: false` o sin el
           módulo 19 no hay ni botón ni modal, porque el backend no lo aceptaría (y el cliente no
-          puede permitirse descubrir eso escribiendo a mano un pedido). Cuál de los dos flujos usa
-          por dentro —POST con "Gestión de Pedidos" (20) o `wa.me` sin él (M3)— lo decide el
-          propio checkout leyendo `config.gestionPedidosEnabled`. */}
+          puede permitirse descubrir eso escribiendo a mano un pedido). Cuál de los dos modos usa
+          por dentro —alta SÍNCRONA con "Gestión de Pedidos" (20) o persistencia en SEGUNDO PLANO
+          + `wa.me` sin él— lo decide el propio checkout leyendo `config.gestionPedidosEnabled`. */}
       {orderingConfig && orderingEnabled && (
         <StorefrontCheckout
           open={checkoutOpen}

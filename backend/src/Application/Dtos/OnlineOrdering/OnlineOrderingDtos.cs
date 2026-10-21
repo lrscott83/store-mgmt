@@ -1,4 +1,4 @@
-using Domain.Common.Enums;
+﻿using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogSettings;
 
 namespace Application.Dtos.OnlineOrdering
@@ -432,7 +432,7 @@ namespace Application.Dtos.OnlineOrdering
     /// "Ventas"). Se calculan EN LA BASE: la vista pinta números, no necesita las filas.
     ///
     /// <para><b>LA REGLA</b>: <see cref="TotalSales"/> EXCLUYE los pedidos
-    /// <see cref="OrderStatus.Cancelled"/>, y <see cref="AverageTicket"/> divide por
+    /// <see cref="OrderStatus.Cancelado"/>, y <see cref="AverageTicket"/> divide por
     /// <see cref="NonCancelledCount"/> —el mismo conjunto excluido. <see cref="OrdersCount"/> NO
     /// los excluye, porque "cuántos pedidos entraron" y "cuánto se vendió" son preguntas distintas
     /// y mezclarlas diría que se vendieron pedidos que el dueño canceló. El cancelado sigue

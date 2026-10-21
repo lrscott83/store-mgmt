@@ -1,4 +1,4 @@
-using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrderById;
@@ -81,7 +81,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
         order.DeliveryType = OrderDeliveryType.Delivery;
         order.Total = 2500m;
         order.Currency = Currency.USD;
-        order.Status = OrderStatus.Ready;
+        order.Status = OrderStatus.Preparado;
         order.PaymentStatus = OrderPaymentStatus.Paid;
         order.DriverId = driver.Id;
         order.Driver = driver;
@@ -100,7 +100,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
         dto.DeliveryType.Should().Be(OrderDeliveryType.Delivery);
         dto.Total.Should().Be(2500m);
         dto.Currency.Should().Be(Currency.USD);
-        dto.Status.Should().Be(OrderStatus.Ready);
+        dto.Status.Should().Be(OrderStatus.Preparado);
         dto.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
         dto.DriverId.Should().Be(driver.Id);
         dto.DriverName.Should().Be("Ana");

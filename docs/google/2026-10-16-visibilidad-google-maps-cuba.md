@@ -232,3 +232,61 @@ Lista única a usar al alta o al publicar cada catálogo. Cada dato tiene su uso
 - §4: plan; cada paso está anclado a una fuente o a evidencia del código citada arriba.
 - No verificado desde esta red: la indexación real de vitral.imerbet.com, ALAMESA y TripAdvisor
   (mencionados en análisis previos como canales opcionales, no incluidos en el objetivo).
+
+## 9. Reseñas del negocio en el catálogo web — investigación (2026-10-19)
+
+> **Disparador:** revisar `https://es.restaurantguru.com/Balcon-del-Habano-Havana` (RestaurantGuru —
+> El Balcón de Bruno y Pilar, La Habana) para responder dos preguntas: ¿cómo se pueden listar las
+> reseñas de un negocio en Cuba? y ¿ya tenemos esa capacidad en este plan para usarla en el catálogo
+> web? **Estado: investigación — nada implementado; decisión del owner pendiente.**
+
+### 9.1 Cómo lo logra un agregador (evidencia capturada en vivo, 2026-10-19)
+
+RestaurantGuru es un **agregador de terceros**: no es el negocio ni Google, y no necesita ficha
+verificada. En la página del restaurante se ve el mecanismo:
+
+- **Valoraciones agregadas por fuente:** Google **3.3/5 (82)** y Facebook **4.6/5 (49)**, cada una con
+  su subpágina de reseñas por fuente (`/reviews/google`, `/reviews/facebook`).
+- **"Reseñas de visitantes":** cita reseñas de usuarios marcadas "**en Google**" (con autor y
+  antigüedad), y además ofrece "Agregue su reseña" en su propio sitio. Encabezado con **131 votos** y
+  ranking ("N.º 240 de 1541 restaurantes en La Habana").
+- Resto del dato rastreado: dirección (Plus Code `4JP5+CW4, Calle 21`), teléfono, horario semanal,
+  web (`hostal-habano.com`) e Instagram.
+
+**Por qué es posible en Cuba:** la ficha de empresa verificada está PROHIBIDA (§1.1), pero Google sí
+muestra **lugares y reseñas aportados por usuarios** (§1.2 y §2: La Guarida 4.4 · 1.468 reseñas, El
+Cocinero 4.3 · 372). El agregador se apoya en ese contenido público de Google/Facebook y lo
+republica/enlaza sin ser dueño del lugar.
+
+### 9.2 ¿Ya lo tenemos? Estado real (2026-10-19)
+
+- **En este plan:** las reseñas aparecen **solo como acción del cliente en Maps** — pedir reseñas y
+  fotos en el lugar aportado (§4 Fase D punto 9; §6 acción 3). **No hay** nada sobre mostrarlas en el
+  catálogo web.
+- **En el código:** no existe `aggregateRating`, `ratingValue`, `reviewCount` ni `Review` (grep,
+  2026-10-19, backend + frontend). El JSON-LD `LocalBusiness` ya implementado (T8b, fuera de este
+  plan) emite nombre/URL/imagen/teléfono/dirección/geo/horario, **sin reseñas**. No hay integración
+  con Google Places API ni con agregadores.
+
+**Conclusión:** la capacidad de listar reseñas en el catálogo web **no existe ni estaba planeada**.
+
+### 9.3 Opciones para el catálogo web (con costo y riesgo)
+
+| Opción | Qué implica | Riesgo / costo |
+|---|---|---|
+| **A. Enlace a las reseñas de Google** | Botón "Ver reseñas en Google" que apunta al lugar de Maps (el owner aporta el enlace en la Fase D) | Casi nulo y ToS-limpio; sin API no hay calificación automática (o se ingresa a mano y se desactualiza) |
+| **B. Google Places API** | `rating`, `user_ratings_total` y hasta **5 reseñas** por lugar, con atribución obligatoria | Requiere API key + cuenta de facturación de Google Cloud; **disponibilidad en/para Cuba dudosa** por las sanciones OFAC (la misma razón de §1.1). **Verificar antes de comprometerse** (no verificable desde esta red: Google bloqueó la consulta) |
+| **C. Reseñas propias en la plataforma** | Rating + comentario del cliente desde el catálogo, con moderación; habilita JSON-LD `Review`/`AggregateRating` | Sin dependencias ni riesgo legal; exige modelo de datos, endpoints, UI y anti-spam; arranca vacío. Google solo admite snippets de reseñas **reales y visibles** en la página (nunca de autoservicio/auto-promoción) |
+| **D. Scraping de agregadores (RestaurantGuru/Tripadvisor)** | — | Sin API pública gratuita; el scraping **viola sus ToS**. Descartado |
+
+### 9.4 Recomendación (propuesta, pendiente del owner)
+
+1. Arrancar con **A** (enlace a Maps): coste casi nulo, sin riesgo legal y encaja con la Fase D ya
+   planeada.
+2. Si el catálogo necesita prueba social propia, agregar **C** (reseñas propias con moderación) —
+   única opción que habilita `Review`/`AggregateRating` sin depender de terceros.
+3. **B** solo si se confirma facturación y disponibilidad legal para Cuba.
+4. **D** descartado.
+
+**Confianza:** §9.1 y §9.2 alta (página pública capturada en vivo + grep del código el 2026-10-19);
+§9.3 opción B media (disponibilidad de Places API para Cuba **no verificada** desde esta red).

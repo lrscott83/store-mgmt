@@ -58,6 +58,10 @@ BACKEND_IMAGE="${BACKEND_IMAGE:-localhost/store-mgmt_backend:latest}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-7}"
 SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-300}"
 REACT_PORT="${REACT_PORT:-8085}"
+# Public entrypoint. The routing lives in HAProxy on the VPS, OUTSIDE this repo:
+# the local smoke only proves the container serves :$REACT_PORT, it says nothing
+# about the domain reaching it.
+PUBLIC_SMOKE_URL="${PUBLIC_SMOKE_URL:-https://pos.playground.sceiba.net}"
 PUSH_TAG="${PUSH_TAG:-0}"
 
 # Catalog images (web catalog photos). They live on the podman volume mounted at
@@ -442,6 +446,12 @@ smoke_ok() {
   curl -fsS "http://localhost:$REACT_PORT/api/v1/ping" >/dev/null 2>&1 \
     && curl -fsS "http://localhost:$REACT_PORT/" >/dev/null 2>&1
 }
+
+# Separate signal from smoke_ok on purpose: smoke_ok means "the stack serves on the
+# host port", public_ok means "the domain actually reaches that port through HAProxy".
+public_ok() {
+  curl -fsS --max-time 15 "$PUBLIC_SMOKE_URL/api/v1/ping" >/dev/null 2>&1
+}
 DEADLINE=$((SECONDS + SMOKE_TIMEOUT_SECONDS))
 until smoke_ok; do
   if [ "$SECONDS" -ge "$DEADLINE" ]; then break; fi
@@ -458,6 +468,29 @@ if ! smoke_ok; then
   die "deploy failed; rolled back to $BACKUP_FILE and the :previous image"
 fi
 log "smoke test ok: / (SPA) and /api/v1/ping on :$REACT_PORT"
+
+# --- STEP 7b: public URL check (the domain, not the container) ------------------
+# localhost:$REACT_PORT passing proves the deploy worked. It does NOT prove the
+# site is reachable: HAProxy routes the domain to a backend defined outside this
+# repo, so a wrong/stale `server` line there leaves the domain at 503 while every
+# check above stays green (seen on the test environment, 2026-10-21).
+# Deliberately AFTER the rollback block and NOT part of it: restoring the database
+# and the previous image cannot fix a proxy misroute, and doing so would destroy a
+# healthy production deploy for a failure it did not cause.
+log "STEP 7b — public URL check ($PUBLIC_SMOKE_URL/api/v1/ping)"
+PUBLIC_DEADLINE=$((SECONDS + 30))
+until public_ok; do
+  if [ "$SECONDS" -ge "$PUBLIC_DEADLINE" ]; then break; fi
+  sleep 5
+done
+if ! public_ok; then
+  PUBLIC_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$PUBLIC_SMOKE_URL/api/v1/ping" 2>/dev/null || true)"
+  log "[FATAL] the stack is healthy on 127.0.0.1:$REACT_PORT, but $PUBLIC_SMOKE_URL does not answer (http $PUBLIC_CODE)"
+  log "        the domain is routed by HAProxy on the VPS (/etc/haproxy/haproxy.cfg), outside this repo:"
+  log "        check that its 'server' line for this domain points at 127.0.0.1:$REACT_PORT"
+  die "public URL check failed — NO ROLLBACK: the stack is healthy, the proxy is not"
+fi
+log "public URL ok: $PUBLIC_SMOKE_URL/api/v1/ping"
 
 # --- STEP 8: git tag + deploy state --------------------------------------------
 TAG_NAME="prod-deploy-$(date +%Y%m%d_%H%M%S)"
@@ -476,6 +509,7 @@ BACKUP=$BACKUP_FILE
 IMAGES_BACKUP=$IMAGES_BACKUP_FILE
 IMAGE=${BACKEND_IMAGE%:*}:$SHORT_SHA
 REACT_URL=http://localhost:$REACT_PORT
+PUBLIC_URL=$PUBLIC_SMOKE_URL
 EOF
 log "deploy state written to $SCRIPT_DIR/deploy-state.txt"
 log "tag: $TAG_NAME"
