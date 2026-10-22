@@ -110,3 +110,17 @@ arrays, `extractHtmlAssetUrls` accepts double/single/unquoted attributes,
 `resolveOfflineRouteIds` is exported and reused by the verifier and the
 built-invariants test, and both success messages are back to their original
 wording. Observed: gate OK with 189 entries, `vitest` 124/124, E2E 3/3.
+
+L8: second native review (lineage review-e3ff917f9f7314b5, target
+sha256:b0cc2335…, 13 files, 1668 lines) returned **approved**; the exact
+acknowledgement ran once and reported `authority: burned`. No correction was
+offered. Fourteen informational advisories remain, none blocking: duplicated
+route-manifest discovery between the injector and the gate (R2-001), an
+unreachable CSS/manifest comparison (R2-002), the built-output invariants
+skipping themselves when no build exists (R3-1 / R4-built-invariants-skipped), no
+automated coverage of the verifier's fatal wiring (R3-2), vacuous-by-prefix E2E
+negatives (R3-3), a manifest parser keyed on the `[{"revision"` literal (R3-4),
+`toAssetUrl` boundary branches untested (R3-5), a plan entry with an empty
+`module` degrading silently (R4-empty-module-silent-gap), the allowlist count
+literal triplicated (R2-005), overlapping missing-file buckets (R2-006), and
+duplicated scanners in the invariant test (R2-003/R2-004).
