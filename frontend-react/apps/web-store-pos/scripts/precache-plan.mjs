@@ -72,16 +72,35 @@ export function extractChunkUrls(source) {
 }
 
 /**
+ * Stylesheets reachable from a chunk. A lazily loaded chunk can depend on a CSS
+ * file that neither the route manifest nor the HTML names; the previous glob
+ * precached every stylesheet regardless, so dropping them here would render an
+ * offline route unstyled with a green gate.
+ */
+export function extractCssUrls(source) {
+  const urls = new Set();
+  const specifier = /["']((?:\.\/|\/assets\/|assets\/)[^"'\\/]+\.css)["']/g;
+
+  for (const match of String(source).matchAll(specifier)) {
+    const url = toAssetUrl(match[1], '.css');
+    if (url) urls.add(url);
+  }
+
+  return urls;
+}
+
+/**
  * Local asset references inside an HTML document (`<script src>`,
- * `<link href>`, modulepreload links). The shell's own bootstrap scripts are not
- * imported by any chunk, so the route closure alone would leave them out and an
- * offline load of that document would 404 them.
+ * `<link href>`, modulepreload links). Accepts double-quoted, single-quoted and
+ * unquoted attribute values: the markup is emitted by our own build today, but a
+ * serializer change must not silently drop the shell's bootstrap scripts.
  */
 export function extractHtmlAssetUrls(source) {
   const urls = new Set();
+  const attribute = /(?:src|href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"'`]+))/g;
 
-  for (const match of String(source).matchAll(/(?:src|href)="([^"]+)"/g)) {
-    const value = match[1];
+  for (const match of String(source).matchAll(attribute)) {
+    const value = match[1] ?? match[2] ?? match[3] ?? '';
     const js = toAssetUrl(value, '.js');
     if (js) {
       urls.add(js);
@@ -92,6 +111,32 @@ export function extractHtmlAssetUrls(source) {
   }
 
   return urls;
+}
+
+/**
+ * The route ids a precache plan needs: every declared offline route plus each
+ * layout above it. The `parentId` chain is authoritative because Vite hoists a
+ * layout into its own route entry. Callers that must report a missing module by
+ * route id (the verifier) share this instead of re-walking the manifest.
+ */
+export function resolveOfflineRouteIds(routeManifest, offlineRouteIds) {
+  const routes = routeManifest?.routes ?? {};
+  const ids = [];
+  const seen = new Set();
+
+  for (const routeId of offlineRouteIds) {
+    let currentId = routeId;
+    while (currentId && routes[currentId] && !seen.has(currentId)) {
+      seen.add(currentId);
+      ids.push(currentId);
+      currentId = routes[currentId].parentId;
+    }
+  }
+
+  return {
+    ids,
+    unknownRouteIds: offlineRouteIds.filter((id) => !routes[id]),
+  };
 }
 
 function addUrl(set, value, extension) {
@@ -131,23 +176,15 @@ export async function resolvePrecachePlan({
   // online-only ones, so walking it would pull the whole app back in.
   const leaves = new Set();
 
-  const unknownRouteIds = offlineRouteIds.filter((id) => !routes[id]);
+  const ancestry = resolveOfflineRouteIds(routeManifest, offlineRouteIds);
+  const unknownRouteIds = ancestry.unknownRouteIds;
 
   // A route module cannot render without the modules of every layout above it.
-  // The parent chain is authoritative: Vite hoists a layout into its own route
-  // entry, so `parentId` is the only reliable pointer.
-  for (const routeId of offlineRouteIds) {
-    const visited = new Set();
-    let currentId = routeId;
-
-    while (currentId && routes[currentId] && !visited.has(currentId)) {
-      visited.add(currentId);
-      const route = routes[currentId];
-      addUrl(chunks, route.module, '.js');
-      for (const imported of route.imports ?? []) addUrl(chunks, imported, '.js');
-      for (const stylesheet of route.css ?? []) addUrl(css, stylesheet, '.css');
-      currentId = route.parentId;
-    }
+  for (const routeId of ancestry.ids) {
+    const route = routes[routeId];
+    addUrl(chunks, route.module, '.js');
+    for (const imported of route.imports ?? []) addUrl(chunks, imported, '.js');
+    for (const stylesheet of route.css ?? []) addUrl(css, stylesheet, '.css');
   }
 
   addUrl(chunks, entry.module, '.js');
@@ -212,6 +249,12 @@ export async function resolvePrecachePlan({
       if (walked.has(discovered)) continue;
       chunks.add(discovered);
       queue.push(discovered);
+    }
+
+    // A chunk can depend on a stylesheet that no route manifest entry names.
+    for (const sheet of extractCssUrls(source)) {
+      if (sheet === routeManifestAssetUrl) continue;
+      css.add(sheet);
     }
   }
 

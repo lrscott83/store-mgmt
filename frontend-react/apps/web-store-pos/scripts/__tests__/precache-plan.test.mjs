@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractChunkUrls,
+  extractCssUrls,
+  extractHtmlAssetUrls,
   parseRouteManifest,
+  resolveOfflineRouteIds,
   resolvePrecachePlan,
   toAssetUrl,
 } from '../precache-plan.mjs';
@@ -63,6 +66,67 @@ describe('extractChunkUrls', () => {
     expect([...extractChunkUrls('const label = "sale-abc.js"; const p = "/api/v1/x";')]).toEqual(
       [],
     );
+  });
+});
+
+describe('extractCssUrls', () => {
+  it('finds stylesheets a chunk depends on', () => {
+    const source = `
+      const deps = ["assets/foo-abc.css", "./bar-def.css"];
+      const url = "/assets/baz-ghi.css";
+    `;
+
+    expect([...extractCssUrls(source)].sort()).toEqual([
+      'assets/bar-def.css',
+      'assets/baz-ghi.css',
+      'assets/foo-abc.css',
+    ]);
+  });
+
+  it('does not pick up javascript or unrelated paths', () => {
+    expect([...extractCssUrls('import("./chunk.js"); const x = "styles/main.css";')]).toEqual([]);
+  });
+});
+
+describe('extractHtmlAssetUrls', () => {
+  it('accepts double-quoted, single-quoted and unquoted attributes', () => {
+    const html = `
+      <script src="/pwa-install-capture.js"></script>
+      <script src='/assets/boot-a.js'></script>
+      <script src=/assets/boot-b.js></script>
+      <link href="/assets/root.css">
+    `;
+
+    expect([...extractHtmlAssetUrls(html)].sort()).toEqual([
+      'assets/boot-a.js',
+      'assets/boot-b.js',
+      'assets/root.css',
+      'pwa-install-capture.js',
+    ]);
+  });
+});
+
+describe('resolveOfflineRouteIds', () => {
+  it('returns each declared route plus every parent, once', () => {
+    const manifest = {
+      routes: {
+        root: { module: '/assets/root.js' },
+        layout: { module: '/assets/layout.js', parentId: 'root' },
+        a: { module: '/assets/a.js', parentId: 'layout' },
+        b: { module: '/assets/b.js', parentId: 'layout' },
+      },
+    };
+
+    const { ids, unknownRouteIds } = resolveOfflineRouteIds(manifest, ['a', 'b']);
+
+    expect(ids.sort()).toEqual(['a', 'b', 'layout', 'root']);
+    expect(unknownRouteIds).toEqual([]);
+  });
+
+  it('reports ids the manifest does not have', () => {
+    const manifest = { routes: { a: { module: '/assets/a.js' } } };
+
+    expect(resolveOfflineRouteIds(manifest, ['a', 'gone']).unknownRouteIds).toEqual(['gone']);
   });
 });
 
@@ -133,6 +197,23 @@ describe('resolvePrecachePlan', () => {
     expect(plan.urls).toContain('assets/heavy-III.js');
     expect(plan.urls).toContain('assets/chunk-FFF.js');
     expect(plan.urls).toContain('assets/jsx-runtime-BBB.js');
+  });
+
+  it('includes a stylesheet that only a chunk dependency array names', async () => {
+    const withLazyCss = {
+      ...files,
+      'assets/sale-GGG.js':
+        'const deps = ["assets/lazy-sheet.css"]; import("./zip-fs-wasm-JJJ.js");',
+      'assets/lazy-sheet.css': '',
+    };
+    const plan = await resolvePrecachePlan({
+      routeManifest,
+      offlineRouteIds: ['sales/routes/sale'],
+      staticUrls: [],
+      readChunk: async (url) => withLazyCss[url] ?? null,
+    });
+
+    expect(plan.urls).toContain('assets/lazy-sheet.css');
   });
 
   it('never includes a route that is not declared offline', async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { FORBIDDEN_PRECACHE_PREFIXES, OFFLINE_ROUTE_IDS } from '../precache-patterns.mjs';
+import { resolveOfflineRouteIds } from '../precache-plan.mjs';
 
 // ── Built precache invariants — allowlist model (2026-10-22) ────────────────
 // `verify-sw-precache.mjs` compares the plan against the injection, and both
@@ -64,17 +65,7 @@ function moduleOf(route) {
 
 /** Offline route ids plus every layout above them. */
 function allowedRouteIds(routeManifest) {
-  const allowed = new Set();
-  for (const routeId of OFFLINE_ROUTE_IDS) {
-    const visited = new Set();
-    let currentId = routeId;
-    while (currentId && routeManifest.routes?.[currentId] && !visited.has(currentId)) {
-      visited.add(currentId);
-      allowed.add(currentId);
-      currentId = routeManifest.routes[currentId].parentId;
-    }
-  }
-  return allowed;
+  return new Set(resolveOfflineRouteIds(routeManifest, OFFLINE_ROUTE_IDS).ids);
 }
 
 describe.skipIf(!HAS_BUILD)('built precache invariants', () => {

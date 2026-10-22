@@ -20,7 +20,11 @@ import {
   PRECACHE_STATIC_PATTERNS,
   REQUIRED_PRECACHE_FAMILIES,
 } from './precache-patterns.mjs';
-import { parseRouteManifest, resolvePrecachePlan } from './precache-plan.mjs';
+import {
+  parseRouteManifest,
+  resolveOfflineRouteIds,
+  resolvePrecachePlan,
+} from './precache-plan.mjs';
 import {
   checkForbiddenPrefixes,
   checkRequiredFamilies,
@@ -162,19 +166,11 @@ async function main() {
   // Every route (and every layout above it) the plan declares offline must have
   // its module in the manifest, reported by route id rather than by hash.
   const injectedSet = new Set(injectedUrls);
-  const missingRouteModules = [];
-  for (const routeId of OFFLINE_ROUTE_IDS) {
-    const visited = new Set();
-    let currentId = routeId;
-    while (currentId && routeManifest.routes?.[currentId] && !visited.has(currentId)) {
-      visited.add(currentId);
-      const module = String(routeManifest.routes[currentId].module ?? '').replace(/^\//, '');
-      if (module && !injectedSet.has(module)) {
-        missingRouteModules.push(`${currentId} -> ${module}`);
-      }
-      currentId = routeManifest.routes[currentId].parentId;
-    }
-  }
+  const ancestry = resolveOfflineRouteIds(routeManifest, OFFLINE_ROUTE_IDS);
+  const missingRouteModules = ancestry.ids
+    .map((id) => [id, String(routeManifest.routes[id].module ?? '').replace(/^\//, '')])
+    .filter(([, module]) => module && !injectedSet.has(module))
+    .map(([id, module]) => `${id} -> ${module}`);
 
   const errors = [];
 
@@ -262,13 +258,9 @@ async function main() {
     return;
   }
 
-  const forbiddenChecked = injectedUrls.length;
   console.log(
-    `verify-sw-precache: OK — ${injectedEntries.length} precached entries matching the plan; ` +
-      `${OFFLINE_ROUTE_IDS.length} offline routes with their closure; shell and route manifest ` +
-      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at ` +
-      `their declared counts; none of the ${FORBIDDEN_PRECACHE_PREFIXES.length} forbidden chunk ` +
-      `prefixes among the ${forbiddenChecked} precached URLs.`,
+    `verify-sw-precache: OK — ${injectedEntries.length} precached entries; shell and route manifest ` +
+      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at their declared counts.`,
   );
 }
 

@@ -94,3 +94,19 @@ and 40 offline routes; `vitest run scripts/__tests__` 118/118; Playwright
 `precache-split` 3/3; lowering MAX_FILE_SIZE_BYTES to 1000 makes the verifier
 fail naming the oversized planned assets. The independent recheck could not run
 (provider quota), so verification is recorded as partial, not PASS.
+
+L7: native RDD review (lineage review-e6897f0a2cf87465, 13 files, medium) ended
+`escalated` / `native_stop_required`, no approval and no receipt. Findings:
+risk lens clean; resilience warned that CSS reachable only through a chunk's
+Vite dependency array was not collected (the old glob precached every CSS) and
+that the HTML scanner accepted only double-quoted attributes; readability warned
+about the ancestry walk duplicated in planner, verifier and test; reliability
+raised a CRITICAL about the success stdout of both scripts being rewritten
+unrequested — admission downgraded it (`unverified_location`) and escalated on
+unknown causality, and no repository consumer of those lines exists (the
+`build-sw:` and `verify-sw-precache: OK` prefixes were preserved).
+Corrections applied: `extractCssUrls` feeds the plan from chunk dependency
+arrays, `extractHtmlAssetUrls` accepts double/single/unquoted attributes,
+`resolveOfflineRouteIds` is exported and reused by the verifier and the
+built-invariants test, and both success messages are back to their original
+wording. Observed: gate OK with 189 entries, `vitest` 124/124, E2E 3/3.

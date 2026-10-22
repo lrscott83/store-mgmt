@@ -149,10 +149,7 @@ async function main() {
 
   await rm(SW_BUNDLE, { force: true });
 
-  console.log(
-    `build-sw: injected ${manifestEntries.length} precache entries (${OFFLINE_ROUTE_IDS.length} ` +
-      `offline routes) into ${SW_DEST}`,
-  );
+  console.log(`build-sw: injected manifest into ${SW_DEST}`);
 }
 
 await main();
