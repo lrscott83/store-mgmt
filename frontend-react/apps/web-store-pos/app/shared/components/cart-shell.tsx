@@ -56,6 +56,7 @@ import { convertCartLines } from '~/shared/components/multipayments/cart-line-co
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 
 // Zelle removed from the visual options (user request 2026-09-08) — the enum
 // member stays and historical Zelle data still renders (display maps elsewhere
@@ -629,7 +630,7 @@ export function CartShell() {
       );
       clearCartAfterSuccessfulOrder();
       setIsOpen(false);
-    } catch {
+    } catch (error) {
       // T2.0 verification (toast-notifications-parity, deviation from design ADR-4's literal
       // assumption): Angular's `.subscribe((response) => {...})` registers ONLY a `next`
       // handler (nav-right.component.ts:211-226) — no RxJS error callback — and
@@ -640,6 +641,19 @@ export function CartShell() {
       // design §3.1 (non-negotiable regardless of the T2.0 finding): never surface a raw
       // `err.message`, and no persisted inline banner — both are satisfied by doing nothing
       // user-visible here.
+      //
+      // Diagnóstico: because nothing is shown, this was the only silent place an order
+      // could be lost. Record it (never the raw message in the UI, only in the log).
+      logClientError({
+        level: 'error',
+        message: `[cart] createOrder threw (${
+          error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        })`,
+        context: {
+          storeId: storeId ?? null,
+          orderType: orderType ?? null,
+        },
+      });
     } finally {
       setIsSubmitting(false);
     }

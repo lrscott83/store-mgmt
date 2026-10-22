@@ -15,6 +15,7 @@ import { SessionRejectedError } from '../http/session-rejected-error';
 // Pure role/module predicate over the hydrated profile — `@store-mgmt/domain`
 // enums only, no storage seam — so it is safe as a STATIC import here.
 import { hasMultiMonedasModuleAvailable } from '../auth/authorization-service';
+import { logClientError } from '../diagnostics/client-log';
 
 const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
 
@@ -37,8 +38,16 @@ async function resolveRetiredExchangeRates(user: UserModel | null): Promise<void
       '~/management/channel-rates/lib/migrate-exchange-rates-to-channel-rates'
     );
     migrateExchangeRatesToChannelRates(storeId, false);
-  } catch {
-    // Fire-and-forget: a register failure must never block authentication.
+  } catch (error) {
+    // Fire-and-forget: a register failure must never block authentication, but
+    // it is a real error (a retired register left unmigrated) — diagnose it.
+    logClientError({
+      level: 'error',
+      message: `[auth-store] exchange-rate migration failed (${
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      })`,
+      context: { storeId: user?.selectedStoreId ?? null },
+    });
   }
 }
 

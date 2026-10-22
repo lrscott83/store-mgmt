@@ -26,6 +26,11 @@
 import { StorageKeys, BUSINESS_ENTITY_NAMES } from './storage-keys';
 import { isEncrypted, encryptEntity } from './entity-crypto';
 import { getDekStoreId } from './data-key-store';
+import { logClientError } from '../diagnostics/client-log';
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
 
 /**
  * Runs the eager migration pass for the CURRENT device's DEK store.
@@ -65,11 +70,18 @@ export function runEntityMigration(): void {
       if (raw === null) continue;
       if (isEncrypted(raw)) continue;
       localStorage.setItem(key, encryptEntity(raw));
-    } catch {
+    } catch (error) {
       // Per-key isolation (entity-migration spec): swallow so the loop
       // continues to the next key. The caller also swallows around the
       // whole call, but keeping isolation at the per-key level is what
       // lets the remaining keys still convert when one fails.
+      // Diagnóstico: a quota/storage failure is a REAL error — record it so a
+      // field device can be debugged (this key stays plaintext until retry).
+      logClientError({
+        level: 'error',
+        message: `[entity-migration] failed to encrypt ${entity} (${describeError(error)})`,
+        context: { entity, storageKey: key },
+      });
     }
   }
 }

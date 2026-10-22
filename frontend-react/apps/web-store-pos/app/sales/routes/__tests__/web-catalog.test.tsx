@@ -768,8 +768,8 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1);
     });
 
-    it('marcar quitar NO borra nada todavía: lo aplica el botón de marca', async () => {
-      // La carga del montage trae el logo; la recarga posterior al guardado ya no lo trae: es el
+    it('quitar el logo lo borra al momento, sin esperar al botón de marca', async () => {
+      // La carga del montaje trae el logo; la recarga posterior al borrado ya no lo trae: es el
       // servidor quien dice qué quedó guardado, no la vista.
       catalogMock.getBranding
         .mockResolvedValueOnce(envelope(BRAND_WITH_MEDIA))
@@ -779,35 +779,71 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
 
       fireEvent.click(await screen.findByTestId('brand-logo-remove'));
 
-      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
-      expect(screen.getByTestId('brand-pending-logo-remove')).toHaveTextContent(
-        'El logo se quitará al guardar la marca',
+      // Quitar es UNA petición propia: llega al servidor sin pulsar Guardar marca y no queda
+      // nada pendiente esperando ese botón.
+      await waitFor(() =>
+        expect(catalogMock.updateBranding).toHaveBeenCalledWith({ removeLogo: true }),
       );
+      expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument());
+      expect(screen.queryByTestId('brand-pending-logo-remove')).not.toBeInTheDocument();
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+      await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalledWith('Logo quitado'));
+    });
 
-      fireEvent.click(screen.getByTestId('brand-save'));
+    it('si el borrado del logo falla se avisa y el logo sigue visible', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
+      catalogMock.updateBranding.mockRejectedValue({ response: { status: 500 } });
+      renderPage();
 
-      // El PUT parcial solo lleva `removeLogo`, y nada más.
+      fireEvent.click(await screen.findByTestId('brand-logo-remove'));
+
+      await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
+      // Nada se borró: el logo sigue ahí y no queda ningún cambio pendiente inventado.
+      expect(screen.getByTestId('brand-logo')).toBeInTheDocument();
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('si el borrado responde succeeded=false avisa y el logo sigue visible', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
+      catalogMock.updateBranding.mockResolvedValue({
+        ...envelope(BRAND_WITH_MEDIA),
+        succeeded: false,
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByTestId('brand-logo-remove'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'No se pudo quitar el logo'),
+      );
+      expect(screen.getByTestId('brand-logo')).toBeInTheDocument();
+      expect(showToastSuccessMock).not.toHaveBeenCalled();
+    });
+
+    it('quitar el logo conserva la elección de columnas pendiente', async () => {
+      catalogMock.getBranding
+        .mockResolvedValueOnce(envelope(BRAND_WITH_MEDIA))
+        .mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
+      renderPage();
+
+      // Un ajuste de columnas SIN guardar convive con el borrado: quitarlo no puede destruirlo.
+      fireEvent.change(await screen.findByTestId('brand-mobile-columns-select'), {
+        target: { value: '1' },
+      });
+      fireEvent.click(screen.getByTestId('brand-logo-remove'));
+
       await waitFor(() =>
         expect(catalogMock.updateBranding).toHaveBeenCalledWith({ removeLogo: true }),
       );
       await waitFor(() => expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument());
-      expect(screen.queryByTestId('brand-slot-logo')).toBeInTheDocument();
-    });
+      expect((screen.getByTestId('brand-mobile-columns-select') as HTMLSelectElement).value).toBe('1');
+      expect(screen.getByTestId('brand-save')).not.toBeDisabled();
 
-    it('elegir una imagen cancela el borrado marcado del mismo lado: son excluyentes', async () => {
-      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
-      renderPage();
-
-      fireEvent.click(await screen.findByTestId('brand-logo-remove'));
-      expect(screen.getByTestId('brand-pending-logo-remove')).toBeInTheDocument();
-
-      const file = new File(['x'], 'nuevo.png', { type: 'image/png' });
-      selectFile(await screen.findByTestId('brand-logo-upload'), file);
-
-      expect(screen.queryByTestId('brand-pending-logo-remove')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId('brand-save'));
-
-      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo: file }));
+      await waitFor(() =>
+        expect(catalogMock.updateBranding).toHaveBeenLastCalledWith({ mobileColumns: 1 }),
+      );
     });
 
     it('un archivo que no es imagen no se retiene: avisa y no guarda', async () => {

@@ -141,9 +141,9 @@ function CategoryPanelCard({
 }
 
 /**
- * Un lado de la marca: previsualiza lo guardado, deja elegir un archivo nuevo y marca el borrado.
- * No guarda NADA por su cuenta — el botón de la tarjeta "Marca" aplica el conjunto, igual que hace
- * el guardado por lotes con los productos.
+ * Un lado de la marca: previsualiza lo guardado, deja elegir un archivo nuevo y quita el vigente.
+ * Elegir un archivo NO guarda nada por su cuenta (lo aplica el botón de la tarjeta "Marca");
+ * quitar SÍ: es una petición propia e inmediata.
  *
  * El archivo nuevo NO se previsualiza: el preview es el de la clave guardada, porque el
  * endpoint público solo sirve claves ya persistidas y no hay URL que pintar antes de guardar.
@@ -155,42 +155,36 @@ function CategoryPanelCard({
 function BrandSlot({
   labelId,
   removeLabelId,
-  pendingRemoveLabelId,
   slotTestId,
   testId,
   uploadTestId,
   removeTestId,
   pendingTestId,
-  pendingRemoveTestId,
   storeSlug,
   mediaKey,
   pendingFile,
-  markedForRemoval,
   busy,
   previewClass,
   onSelectFile,
-  onToggleRemove,
+  onRemove,
 }: {
   labelId: string;
   removeLabelId: string;
-  pendingRemoveLabelId: string;
   slotTestId: string;
   testId: string;
   uploadTestId: string;
   removeTestId: string;
   pendingTestId: string;
-  pendingRemoveTestId: string;
   storeSlug: string;
   /** Clave persistida de este lado (null = la tienda no lo tiene). */
   mediaKey: string | null;
   /** Archivo retenido (ya validado, todavía sin subir). */
   pendingFile: File | null;
-  /** true cuando el dueño marcó este lado para borrar: se aplica al guardar. */
-  markedForRemoval: boolean;
   busy: boolean;
   previewClass: string;
   onSelectFile: (file: File | null) => void;
-  onToggleRemove: () => void;
+  /** Quita el archivo YA guardado en el servidor: se aplica al momento, sin botón de marca. */
+  onRemove: () => void;
 }) {
   const intl = useIntl();
 
@@ -208,10 +202,10 @@ function BrandSlot({
               className={`w-16 rounded-md border border-border ${previewClass}`}
               data-testid={testId}
             />
-            {/* Quitar NO borra nada aquí: marca la eliminación y la aplica el botón de marca. */}
+            {/* Quitar SÍ borra: es su propia petición y no espera al botón de marca. */}
             <button
               type="button"
-              onClick={onToggleRemove}
+              onClick={onRemove}
               disabled={busy}
               className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"
               data-testid={removeTestId}
@@ -232,11 +226,6 @@ function BrandSlot({
             <p className="mt-1 text-xs text-primary" data-testid={pendingTestId}>
               {pendingFile.name}
               {` · ${intl.formatMessage({ id: 'WEB_CATALOG.BRAND_PENDING_UPLOAD' })}`}
-            </p>
-          )}
-          {mediaKey && markedForRemoval && (
-            <p className="mt-1 text-xs text-danger" data-testid={pendingRemoveTestId}>
-              {intl.formatMessage({ id: pendingRemoveLabelId })}
             </p>
           )}
         </div>
@@ -561,8 +550,6 @@ export function WebCatalogPage() {
   const [branding, setBranding] = useState<CatalogBranding | null>(null);
   const [brandError, setBrandError] = useState('');
   const [pendingLogo, setPendingLogo] = useState<File | null>(null);
-  /** Logo marcado para borrar, NO borrado todavía: lo aplica el botón de marca. */
-  const [removeLogo, setRemoveLogo] = useState(false);
   /**
    * Elementos por fila en móvil (1 o 2) del borrador. null = sin cargar todavía. Se compara con lo
    * guardado (`branding.mobileColumns`) para saber si hay cambio pendiente.
@@ -935,16 +922,48 @@ export function WebCatalogPage() {
       file,
       (valid) => {
         // Elegir una imagen y quitar la vigente son intenciones opuestas: gana la última.
-        setRemoveLogo(false);
         setPendingLogo(valid);
       },
       setBrandError,
     );
   }
 
+  /**
+   * Quitar el logo es SU PROPIA petición, inmediata: el dueño ve el catálogo sin logo al momento
+   * y no tiene que acordarse de pulsar Guardar marca. El PUT es el mismo parche parcial de la
+   * marca, con solo `removeLogo`.
+   *
+   * La respuesta ES la marca resultante, así que se aplica tal cual: pedirla otra vez con un GET
+   * reescribiría `mobileColumns` y destruiría una elección de columnas sin guardar.
+   */
+  async function handleRemoveLogo() {
+    setBrandError('');
+    setIsSavingBrand(true);
+    try {
+      const result = await catalogHttpService.updateBranding({ removeLogo: true });
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.BRAND_REMOVE_ERROR' }),
+        );
+        return;
+      }
+      // Lo retenido se descarta: acaba de dejar de tener sentido (ya no hay logo que sustituir).
+      setBranding(result.data);
+      setPendingLogo(null);
+      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_LOGO_REMOVED' }));
+    } catch (err) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_REMOVE_ERROR') }),
+      );
+    } finally {
+      setIsSavingBrand(false);
+    }
+  }
+
   const hasBrandChanges =
     pendingLogo !== null ||
-    removeLogo ||
     (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns);
 
   async function handleSaveBrand() {
@@ -952,7 +971,6 @@ export function WebCatalogPage() {
 
     const payload: CatalogBrandingUpdate = {};
     if (pendingLogo) payload.logo = pendingLogo;
-    if (removeLogo) payload.removeLogo = true;
     // Solo viaja si de verdad cambió: un valor igual al guardado reescribiría la fila sin motivo.
     if (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns) {
       payload.mobileColumns = mobileColumns;
@@ -969,7 +987,6 @@ export function WebCatalogPage() {
         return;
       }
       setPendingLogo(null);
-      setRemoveLogo(false);
       setBrandError('');
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVED' }));
       // El servidor manda: se recarga para que la previsualización sea la que quedó guardada
@@ -1207,24 +1224,18 @@ export function WebCatalogPage() {
           <BrandSlot
             labelId="WEB_CATALOG.BRAND_LOGO"
             removeLabelId="WEB_CATALOG.BRAND_REMOVE_LOGO"
-            pendingRemoveLabelId="WEB_CATALOG.BRAND_PENDING_REMOVE_LOGO"
             testId="brand-logo"
             uploadTestId="brand-logo-upload"
             removeTestId="brand-logo-remove"
             pendingTestId="brand-pending-logo"
-            pendingRemoveTestId="brand-pending-logo-remove"
             slotTestId="brand-slot-logo"
             storeSlug={status?.storeSlug ?? ''}
             mediaKey={branding?.logoKey ?? null}
             pendingFile={pendingLogo}
-            markedForRemoval={removeLogo}
             busy={isSavingBrand}
             previewClass="h-16 w-16 object-contain"
             onSelectFile={handleSelectLogo}
-            onToggleRemove={() => {
-              setPendingLogo(null);
-              setRemoveLogo((current) => !current);
-            }}
+            onRemove={() => void handleRemoveLogo()}
           />
 
           {/* Elementos por fila en MÓVIL (decisión del owner, 2026-10-12). Solo afecta a la
