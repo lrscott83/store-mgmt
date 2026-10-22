@@ -65,13 +65,13 @@
 | T6b | Follow-ups del review de T6: idempotencia, persistencia E2E y scoping de los lookups de comisión | S5, S7, S10, S13 | inline | done — `00109bc7` |
 | T6c | Hardening de los tests de T6b: aserciones de éxito/lookup, `TenantId` y código de pedido único con limpieza explícita | S5, S7, S13 | inline | done — `86113489` |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | done — `33a20a8c` |
-| T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | in progress — T8a done, T8b pending |
+| T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | done — T8a/T8b/T8c |
 | T8a | API de comisión por producto: upsert/list/delete, producto de la tienda, tipo % o fijo + moneda | S6 | inline | done — `8d3dd8ae` |
 | T8b | Pantalla del Owner para configurar la comisión de cada producto | S6 | inline | done — `9b00c131` |
 | T8c | Follow-ups del review de T8a: validar enums, tests de delete/query/controller/E2E, `BelongsToStore` y concurrencia del upsert | S6, S13 | inline | done — `ab99f534` |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | done — `227d8b1c` |
 | T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | done — `58c50692` |
-| T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending — suites verdes (192/1507/777 · 5762); falta RDD final y cierre |
+| T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending — Needs your decision: suites verdes (192/1507/777 · 5762); review del acumulado → `lens_context_budget_exceeded` (sin autoridad). Opciones: revisar T9 (1 777 líneas) y T10 (942) como candidatos separados, o cerrar con el RDD por unidad |
 
 ## Decisiones de diseño (no son requisitos nuevos)
 
@@ -204,3 +204,22 @@ Lineage `review-029d2db31288d0ac` · lentes `review-risk` + `review-reliability`
 - **L34 (2026-10-22, T9 cerrada):** portal del gestor. Backend: `GET /api/v1/sales-managers/{orders,commissions,stores}` (gestor-only, datos propios y catálogos del Owner con módulo 21), DTOs, 6 unit tests y 2 E2E nuevos contra PostgreSQL (`SalesManagerPortalE2ETests` y el `POST /sales-managers/orders/{slug}` en `SalesManagerOrderCreationE2ETests`). Frontend: `/gestor` fuera del layout del POS, `resolveUserHomePath` manda al gestor ahí, service con 3 tests. Full suite pendiente de re-correr tras T10. Commit `227d8b1c`.
 - **L35 (2026-10-22, T10 cerrada):** `GET /api/v1/SalesCommissions` (Owner-only) con filtros `status` y `salesManagerId`; DTO con gestor, pedido, producto y estado; 5 unit tests y 1 E2E (`OwnerSalesCommissionsE2ETests`) que lista pendientes, filtra, paga y confirma que el gestor recibe 403. Frontend: `/sales/gestores/commissions` con filtros por estado/gestor y pago completo con confirmación; 4 tests de service. Commit `58c50692`.
 - **L36 (2026-10-22, cobertura E2E cerrada + verificación):** se agregó el E2E faltante del `POST /api/v1/sales-managers/orders/{storeSlug}` (`SalesManagerOrderCreationE2ETests`: atribución server-side, módulo 21, Owner → 403). E2E nuevos del módulo: **9**. Verificación completa: `dotnet test backend/src/SMCA.sln` → Domain **192/192**, Application **1507/1507**, E2E **777/777**; frontend → typecheck OK, ESLint OK, **404 archivos / 5762 passed / 6 skipped**. Hubo un crash intermitente del `testhost` en `ErrorHandlerMiddlewareTests` (test preexistente) en una corrida; la siguiente pasó completa. RDD de T10: `medium`/`under_budget`, sin review. Commits `f48cc216` (guarda de rutas) y docs.
+- **L37 (2026-10-22, intento de RDD final):** el assessment del acumulado (`d0ad31e0..HEAD`) dio **high**/`review_due=true` (120 archivos, 22 725 líneas). Con consentimiento del usuario se lanzó el START del candidato completo, pero el motor nativo lo rechazó con **`lens_context_budget_exceeded`**: la evidencia excede el presupuesto de contexto de las lentes. `mutation_outcome: not_started`, **sin autoridad creada**, nada que abandonar. El RDD por unidad ya quedó aplicado (T1/T2/T3/T6/T8a aprobados; T8b/T8c/T9/T10 `under_budget`). Decisión pendiente: revisar T9 (1 777 líneas) y T10 (942) como candidatos separados —cada uno con su consentimiento— o cerrar T11 con la cobertura por unidad.
+
+## Cierre — cobertura de specs
+
+| Spec | Evidencia |
+| --- | --- |
+| S1 | Módulo 21, precio 20/50 % (neto 10), plan matrices Superior/VIP; migración `20261021185058`, script 38; `GestoresVentasModuleCatalogTests`. |
+| S2 | Rol `GestorVentas = 5` Owner-level; `SalesManager` + `SalesManagerManagementE2ETests`. |
+| S3 | Portal `/gestor` (pedidos, comisiones, catálogos del Owner); `SalesManagerPortalE2ETests` + `resolveUserHomePath`. |
+| S4 | Alta autenticada con atribución server-side + WhatsApp; `SalesManagerOrderCreationE2ETests`, `storefront-checkout`. |
+| S5 | Comisión en la transición a `Entregado`; `UpdateOrderStatusCommissionTests` + `SalesCommissionPersistenceE2ETests`. |
+| S6 | Config por producto en tabla propia; API T8a + pantalla `/sales/gestores`; `ProductSalesCommissionConfigE2ETests`. |
+| S7 | Cálculo por unidad × cantidad, % o fijo, sin conversión, 2 decimales; tests de T6. |
+| S8 | Una comisión por `OrderItemId` (único), snapshot congelado; entidad + idempotencia. |
+| S9 | Pago completo Owner-only con fecha/quien/nota; `MarkSalesCommissionPaidCommand` + `OwnerSalesCommissionsE2ETests`. |
+| S10 | Gate del módulo 21 en la generación; sin módulo no se inserta nada; T6. |
+| S11 | Snapshot de `OrderItem` (base, % descuento, descuento fijo, moneda); T1/T1b + `OrderItemPriceSnapshotE2ETests`. |
+| S12 | ReSeller intacto; suites completas verdes; solo 3 E2E existentes de matriz de planes actualizados con autorización explícita (T2c). |
+| S13 | 9 E2E nuevos, tests de aplicación/dominio y frontend nuevos; ningún E2E existente debilitado. |
