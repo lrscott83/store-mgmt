@@ -32,11 +32,17 @@ interface RouteEntry {
 // `clientLoader` y su único contenido es el Markdown generado desde `docs/legal/*.md`
 // (`generate:legal`) más un renderizador sin estado: no tocan ningún seam
 // `encryptEntity`/`decryptEntity`, así que §3 sigue en pie.
+// §3 RE-VERIFIED 2026-10-22 (portal del gestor de ventas): `gestor/routes/dashboard.tsx` es la
+// vista del gestor en `/gestor`. Vive fuera de `app-layout` porque el gestor NO tiene tienda ni
+// POS (no hay sidebar ni datos offline que pintar), pero NO salta la puerta: exporta
+// `clientLoader = authLoader`, que es el que ejecuta `bootstrapDeviceDekForRoute` y
+// `unlockGate`. Solo consume HTTP. §3 sigue en pie.
 const FROZEN_OUTSIDE_APP_LAYOUT = [
   'auth/routes/login.tsx',
   'auth/routes/provision.tsx',
   'auth/routes/register.tsx',
   'catalog/routes/public-catalog.tsx',
+  'gestor/routes/dashboard.tsx',
   'help/routes/tutorial.tsx',
   'home/routes/landing-deep.tsx',
   'legal/routes/privacy-policy.tsx',
@@ -62,7 +68,7 @@ function collectLeafFilesOutsideAppLayout(
 }
 
 describe('routes.ts — the set of route files outside app-layout is frozen (device-wrapped-dek design §3)', () => {
-  it('equals the exact 10-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
+  it('equals the exact 11-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
     const outside = collectLeafFilesOutsideAppLayout(routes as RouteEntry[], false).sort();
     expect(outside).toEqual(FROZEN_OUTSIDE_APP_LAYOUT);
   });
