@@ -32,6 +32,8 @@ namespace Infrastructure.Persistence.Repositories
         {
             IQueryable<OrderSalesCommission> query = _commissions
                 .Include(x => x.OrderItem)
+                .Include(x => x.Order)
+                    .ThenInclude(o => o.Store)
                 .Where(x => x.SalesManagerId == salesManagerId);
 
             if (status.HasValue)
@@ -46,6 +48,8 @@ namespace Infrastructure.Persistence.Repositories
         {
             IQueryable<OrderSalesCommission> query = _commissions
                 .Include(x => x.OrderItem)
+                .Include(x => x.Order)
+                    .ThenInclude(o => o.Store)
                 .Where(x => x.OwnerId == ownerId);
 
             if (status.HasValue)

@@ -50,6 +50,13 @@ describe('resolveUserHomePath', () => {
     hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(false));
   });
 
+  it('sends a sales manager to /gestor (no product lookup)', async () => {
+    await expect(
+      resolveUserHomePath(makeUser({ isGestorVentas: true, selectedStoreId: '' })),
+    ).resolves.toBe('/gestor');
+    expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
+  });
+
   it('sends a reseller to /admin/owners (no product lookup)', async () => {
     await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe(
       '/admin/owners',

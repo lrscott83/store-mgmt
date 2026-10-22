@@ -273,6 +273,28 @@ const messages: Record<string, string> = {
   'GESTORES.INVALID_VALUE': 'Escribe un monto válido mayor o igual a 0.',
   'GESTORES.SAVE_ERROR': 'No se pudo guardar la comisión. Revisa tu conexión e inténtalo de nuevo.',
 
+  // Vista del gestor de ventas (módulo 21, T9).
+  'GESTOR.TITLE': 'Mis pedidos y comisiones',
+  'GESTOR.SUBTITLE': 'Hola, {name}. Aquí ves tus pedidos, lo que has ganado y los catálogos de las tiendas.',
+  'GESTOR.LOGOUT': 'Salir',
+  'GESTOR.LOAD_ERROR': 'No se pudieron cargar tus pedidos y comisiones.',
+  'GESTOR.CATALOGS': 'Catálogos de las tiendas',
+  'GESTOR.CATALOGS_EMPTY': 'Tu Owner todavía no tiene catálogos publicados disponibles.',
+  'GESTOR.ORDERS': 'Mis pedidos',
+  'GESTOR.ORDERS_EMPTY': 'Todavía no tienes pedidos.',
+  'GESTOR.COMMISSIONS': 'Mis comisiones',
+  'GESTOR.COMMISSIONS_EMPTY': 'Todavía no tienes comisiones. Se generan cuando el pedido se entrega.',
+  'GESTOR.CODE': 'Pedido',
+  'GESTOR.STORE': 'Tienda',
+  'GESTOR.DATE': 'Fecha',
+  'GESTOR.STATUS': 'Estado',
+  'GESTOR.TOTAL': 'Total',
+  'GESTOR.PRODUCT': 'Producto',
+  'GESTOR.AMOUNT': 'Comisión',
+  'GESTOR.PAID': 'Pagada',
+  'GESTOR.PENDING': 'Pendiente',
+  'GESTOR.PAID_AT': 'Pagada el {date}',
+
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
   'MENU.PRODUCT_COUNT': 'Conteo de productos',

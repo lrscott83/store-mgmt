@@ -35,6 +35,10 @@ export default [
   // cliente final, y el backend lo sirve de forma anónima (PublicCatalogController).
   route('catalog/:storeSlug', 'catalog/routes/public-catalog.tsx'),
 
+  // Vista del GESTOR de ventas (módulo 21, T9): SIN layout del POS — el gestor no tiene tienda.
+  // `authLoader` es el único guard; el backend autoriza cada GET por el rol Owner-level.
+  route('gestor', 'gestor/routes/dashboard.tsx'),
+
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
     // Sales â€” Products

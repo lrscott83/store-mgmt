@@ -157,6 +157,12 @@ export enum SalesCommissionType {
   Fixed = 2,
 }
 
+/** Estado del pago de una comisión (espejo de C# SalesCommissionStatus). */
+export enum SalesCommissionStatus {
+  Pending = 0,
+  Paid = 1,
+}
+
 export enum Currency {
   CUP = 0,
   USD = 1,

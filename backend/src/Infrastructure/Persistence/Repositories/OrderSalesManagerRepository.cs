@@ -23,6 +23,8 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<IReadOnlyList<OrderSalesManager>> GetBySalesManagerIdAsync(Guid salesManagerId)
             => await _attributions
+                .Include(x => x.Order)
+                    .ThenInclude(o => o.Store)
                 .Where(x => x.SalesManagerId == salesManagerId)
                 .ToListAsync();
     }
