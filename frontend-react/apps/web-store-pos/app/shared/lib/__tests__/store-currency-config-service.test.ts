@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Currency } from '@store-mgmt/domain';
 import {
   DEFAULT_STORE_CURRENCY_CONFIG,
@@ -134,11 +134,18 @@ describe('StoreCurrencyConfigService — storeless session (SuperAdmin)', () => 
     expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
   });
 
-  it('treats an absent store id as storeless too (legacy profile parity)', () => {
-    localStorage.setItem(storageKey('undefined'), 'not-json');
-    const service = new StoreCurrencyConfigService(undefined as unknown as string);
-    expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
-    service.setConfig({ buyCurrency: Currency.USD, sellCurrency: Currency.EUR });
-    expect(localStorage.getItem(storageKey('undefined'))).toBe('not-json');
+  it('treats an absent store id as storeless and writes no key at all', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      const service = new StoreCurrencyConfigService(undefined as unknown as string);
+
+      expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
+      service.setConfig({ buyCurrency: Currency.USD, sellCurrency: Currency.EUR });
+
+      expect(setItem).not.toHaveBeenCalled();
+      expect(localStorage.length).toBe(0);
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });
