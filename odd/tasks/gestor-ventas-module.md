@@ -124,6 +124,16 @@ Se trasladan a las tareas que los consumen:
 - **R3-SCHEMA-MIGRATION-UNPROVED (WARNING):** resuelto por T3-B (migración generada, aplicada a `smca_test`) + E2E de round-trip 1/1 + suite completa 771/771.
 - **Sugerencias (T6/T7/T8):** bordes 0/100 y cantidad/precio negativos, `paidAt` por defecto, longitud de nota, precisión de `Value` frente a `Amount`, validación de enums y no acoplar el E2E a los defaults del seed.
 
+## Bloqueo RDD — T5c
+
+El review de T5c encontró **R3-001 (CRITICAL)**: el modo gestor se activaba en cualquier catálogo y, si el endpoint del gestor fallaba (tienda de otro Owner o sin módulo 21), el checkout mostraba `CHECKOUT.FAILED` y perdía el pedido. Corrección acotada en `3b2c9b4d`: fallback al alta pública (pedido sin atribución) cuando el endpoint del gestor falla; test nuevo 8/8.
+
+La validación nativa quedó **bloqueada**, no aprobada:
+
+- `review-validator` devolvió `opencode_review_transport_relay_refused` (`role_capture_failed`).
+- El STATUS posterior devolvió `operation_timeout` (`context deadline exceeded`), `retry_safe: false`, `next_action: stop`.
+- La review queda en `correction_required`, sin acknowledgement ni PASS. No se inventa un veredicto.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -148,3 +158,4 @@ Se trasladan a las tareas que los consumen:
 - **L20 (2026-10-21, T5a cerrada):** tabla propia `OrderSalesManager` (`OrderId` único) para atribuir el pedido al gestor; entidad, configuración EF con filtro por tenant, repositorio y DI. Migración `20261021231114_Add-OrderSalesManager-Attribution` aplicada a `smca_test`; script `40-...sql`. E2E de persistencia actualizado con la atribución (1/1). Los tests de auth de T4 que faltaban en el commit quedaron en `3b4c3dc6`. Commit `c0434d6a`. T5b (alta del pedido + endpoint) y T5c (frontend/WhatsApp) pendientes.
 - **L21 (2026-10-21, T5b cerrada):** el alta pública acepta una atribución `SalesManagerUserId` marcada `[JsonIgnore]` (solo la pone el servidor). El handler verifica que el gestor esté activo, que pertenezca al Owner de la tienda y que la tienda tenga el módulo 21; crea `OrderSalesManager` en la MISMA transacción. Nuevo endpoint `POST /api/v1/sales-managers/orders/{storeSlug}` (`[Authorize]` + `IsGestorVentas`, slug por ruta, atribución server-side). Tests de aplicación: atribución correcta y gestor de otro Owner → 403. Suite completa: Domain 192/192, Application 1477/1477, E2E 772/772. Commit `7e82938f`.
 - **L22 (2026-10-21, T5c cerrada):** frontend del gestor. `UserModel.isGestorVentas` (opcional) y `catalogHttpService.createSalesManagerOrder` → `POST /v1/sales-managers/orders/{slug}`. `StorefrontCheckout` gana `salesManagerMode`: alta síncrona contra el endpoint del gestor y **siempre** resumen por WhatsApp, aunque `gestionPedidosEnabled` sea false. `public-catalog.tsx` detecta `user.isGestorVentas` y activa el modo. Tests nuevos del endpoint y del checkout (23/23 focalizados); `pnpm typecheck` 5/5; `pnpm lint` 4/4. Suite frontend completa: 5,749 passed / 1 failed / 6 skipped; el único fallo (`store-routes.test.tsx`) pasa 21/21 aislado — flake de carga, no del cambio. Commit `ed30c49b`. El home/vista del gestor queda para T9.
+- **L23 (2026-10-22, T5c + corrección RDD):** review de T5c con R3-001 CRITICAL; corregido en `3b2c9b4d` con fallback al alta pública y test 8/8. El validador objetivo falló por transporte (`role_capture_failed`) y el STATUS posterior dio `operation_timeout`; review en `correction_required`, sin aprobación. Ver "Bloqueo RDD — T5c".
