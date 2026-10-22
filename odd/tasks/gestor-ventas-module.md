@@ -105,8 +105,8 @@ Lineage `review-9e0f51a8e8e97b9c` · lentes `review-risk` + `review-reliability`
 | Hallazgo | Severidad | Fase | Estado |
 | --- | --- | --- | --- |
 | R1-INACTIVE-MANAGER-RESOLUTION | WARNING | T4 | ✅ Resuelto en `ee5d834b` |
-| R1-TENANT-FILTER-BYPASS-ORDERITEM | WARNING | T6 | ⏳ Pendiente |
-| R1-COMMISSION-AMOUNT-UNVERIFIED | WARNING | T6 | ⏳ Pendiente |
+| R1-TENANT-FILTER-BYPASS-ORDERITEM | WARNING | T6 | ✅ Mitigado: el lookup corre tras `GetByIdWithItemsAsync(storeId, id)`, con el OrderItem ya acotado |
+| R1-COMMISSION-AMOUNT-UNVERIFIED | WARNING | T6 | ✅ El `Amount` se calcula desde Type/Value/UnitPrice/Quantity; no hay monto de cliente |
 | R1-MARKPAID-PAYER-UNBOUND | SUGGESTION | T7 | ⏳ Pendiente |
 | R1-ROLLBACK-DELETES-USERROLE | WARNING | — | Documentado (rollback esperado) |
 | R3-REPO-FILTERS-UNTESTED | WARNING | T4/T7 | 🟡 Parcial: T4 cubre auth/list; estados de comisión en T7 |
