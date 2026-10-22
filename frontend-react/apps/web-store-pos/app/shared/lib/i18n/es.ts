@@ -34,7 +34,7 @@ const messages: Record<string, string> = {
   'GENERAL.INSERT': 'Adicionar',
   'GENERAL.ERROR': 'Error',
   'GENERAL.SUCCESS': 'Éxito',
-  // client-error-log: Diagnostics view (/diagnostics, SuperAdmin/OwnerAdmin only)
+  // client-error-log: Diagnostics view (/diagnostics — public route)
   'DIAGNOSTICS.TITLE': 'Diagnóstico',
   'DIAGNOSTICS.DEVICE_INFO': 'Información del dispositivo',
   'DIAGNOSTICS.APP_VERSION': 'Versión de la app',
@@ -42,6 +42,7 @@ const messages: Record<string, string> = {
   'DIAGNOSTICS.USER_AGENT': 'Navegador',
   'DIAGNOSTICS.SHARE': 'Compartir',
   'DIAGNOSTICS.DOWNLOAD': 'Descargar',
+  'DIAGNOSTICS.SEND_WHATSAPP': 'Enviar por WhatsApp',
   'DIAGNOSTICS.COPY': 'Copiar',
   'DIAGNOSTICS.COPIED': 'Registro copiado al portapapeles',
   'DIAGNOSTICS.CLEAR': 'Limpiar',

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { adminLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
   getClientLogs,
@@ -12,7 +11,11 @@ import {
 import { confirmDialog, showBlockingSuccess } from '~/shared/lib/blocking-alert';
 import { GlobalConfig } from '~/shared/lib/config/global-config';
 
-export const clientLoader = adminLoader;
+// PUBLIC route (no clientLoader): a device that cannot sign in must still be
+// able to open /diagnostics and send its log. routes.ts mounts it under
+// public-app-layout, which has no authLoader.
+const WHATSAPP_NUMBER = '5352432968';
+const WHATSAPP_CHAT_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
   error: 'text-red-600 dark:text-red-400',
@@ -101,6 +104,16 @@ export function DiagnosticsPage() {
     downloadJson(exportClientLogs(selectedStoreId ?? undefined), buildExportFileName());
   }
 
+  /**
+   * WhatsApp cannot attach a file through a URL, so the full artifact leaves as
+   * the downloaded JSON (never truncated into the URL) and the chat with the
+   * owner's number opens in a new tab for the user to attach it.
+   */
+  function handleSendWhatsApp(): void {
+    downloadJson(exportClientLogs(selectedStoreId ?? undefined), buildExportFileName());
+    window.open(WHATSAPP_CHAT_URL, '_blank', 'noopener');
+  }
+
   function downloadJson(json: string, fileName: string): void {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -165,6 +178,13 @@ export function DiagnosticsPage() {
             {intl.formatMessage({ id: 'DIAGNOSTICS.DOWNLOAD' })}
           </button>
         )}
+        <button
+          type="button"
+          onClick={handleSendWhatsApp}
+          data-testid="diagnostics-whatsapp"
+        >
+          {intl.formatMessage({ id: 'DIAGNOSTICS.SEND_WHATSAPP' })}
+        </button>
         <button type="button" onClick={() => void handleCopy()}>
           {intl.formatMessage({ id: 'DIAGNOSTICS.COPY' })}
         </button>

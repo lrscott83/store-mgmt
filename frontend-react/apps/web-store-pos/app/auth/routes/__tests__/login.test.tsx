@@ -267,6 +267,16 @@ describe('LoginPage (AUTH-01)', () => {
     expect(screen.getByRole('link', { name: /crear cuenta/i })).toBeInTheDocument();
   });
 
+  it('links to the diagnostics viewer without a session', () => {
+    renderLogin();
+    // DIAGNOSTICS.TITLE = "Diagnóstico" — a device that cannot sign in must still
+    // be able to open /diagnostics and send its log.
+    expect(screen.getByRole('link', { name: /diagnóstico/i })).toHaveAttribute(
+      'href',
+      '/diagnostics',
+    );
+  });
+
   // PARITY-BUCKET-C: login.component.html:84-87 — showPassword toggle (visibility/
   // visibility_off mat-icon suffix). Default hidden, flips type + icon on click.
   it('password field defaults to hidden and toggles to visible on click (parity)', () => {

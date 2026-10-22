@@ -167,6 +167,9 @@ export function flushUsage(userId: string): void {
       // always-loading LoadingInterceptor.
       {
         skipLoading: true,
+        // Failing to sync usage telemetry is NOT an error (best-effort
+        // background sync): keep it out of the diagnostic buffer.
+        skipDiagnostics: true,
         // Per-request bearer override: api-client.ts only sets Authorization
         // when none is already present, so the roster JWT wins over the
         // session token here — and only for this request.

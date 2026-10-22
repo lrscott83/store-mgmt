@@ -32,11 +32,18 @@ interface RouteEntry {
 // `clientLoader` y su único contenido es el Markdown generado desde `docs/legal/*.md`
 // (`generate:legal`) más un renderizador sin estado: no tocan ningún seam
 // `encryptEntity`/`decryptEntity`, así que §3 sigue en pie.
+// §3 RE-VERIFIED 2026-10-22 (diagnóstico público): `diagnostics/routes/diagnostics.tsx`
+// sale de `app-layout` para poder abrirse sin sesión (el dueño debe poder enviar el
+// registro de un dispositivo que no logra iniciar sesión). Vive bajo
+// `public-app-layout` (mismo chrome, sin authLoader), no tiene `clientLoader` propio y
+// solo lee/escribe el buffer en localStorage (`client-log.ts`): no toca ningún seam
+// `encryptEntity`/`decryptEntity`, así que §3 sigue en pie.
 const FROZEN_OUTSIDE_APP_LAYOUT = [
   'auth/routes/login.tsx',
   'auth/routes/provision.tsx',
   'auth/routes/register.tsx',
   'catalog/routes/public-catalog.tsx',
+  'diagnostics/routes/diagnostics.tsx',
   'help/routes/tutorial.tsx',
   'home/routes/landing-deep.tsx',
   'legal/routes/privacy-policy.tsx',
@@ -62,7 +69,7 @@ function collectLeafFilesOutsideAppLayout(
 }
 
 describe('routes.ts — the set of route files outside app-layout is frozen (device-wrapped-dek design §3)', () => {
-  it('equals the exact 10-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
+  it('equals the exact 11-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
     const outside = collectLeafFilesOutsideAppLayout(routes as RouteEntry[], false).sort();
     expect(outside).toEqual(FROZEN_OUTSIDE_APP_LAYOUT);
   });

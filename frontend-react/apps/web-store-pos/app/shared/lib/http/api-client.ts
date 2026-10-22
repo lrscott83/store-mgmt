@@ -16,6 +16,12 @@ const API_TIMEOUT = 30000;
 declare module 'axios' {
   export interface AxiosRequestConfig {
     skipLoading?: boolean;
+    /**
+     * Opt-out of the diagnostic ring buffer. A failed background/optional
+     * request that is NOT an error (e.g. the best-effort store-usage telemetry
+     * sync) must not be recorded as one.
+     */
+    skipDiagnostics?: boolean;
   }
 }
 
@@ -118,15 +124,19 @@ apiClient.interceptors.response.use(
 
     if (axios.isAxiosError(error)) {
       // client-error-log: every HTTP failure lands in the diagnostic ring buffer
-      // (method + URL + status only — NEVER headers, bodies or tokens).
+      // (method + URL + status only — NEVER headers, bodies or tokens) unless the
+      // caller marked it as expected background behaviour (skipDiagnostics:
+      // store-usage telemetry failing is not an error).
       const requestConfig = error.config ?? error.response?.config;
-      logClientError({
-        level: 'error',
-        message: `${requestConfig?.method?.toUpperCase() ?? 'HTTP'} ${
-          requestConfig?.url ?? '(unknown url)'
-        } → ${error.response ? error.response.status : 'network-failure'}`,
-        context: { isNetworkError: !error.response },
-      });
+      if (!requestConfig?.skipDiagnostics) {
+        logClientError({
+          level: 'error',
+          message: `${requestConfig?.method?.toUpperCase() ?? 'HTTP'} ${
+            requestConfig?.url ?? '(unknown url)'
+          } → ${error.response ? error.response.status : 'network-failure'}`,
+          context: { isNetworkError: !error.response },
+        });
+      }
 
       // Angular error-interceptor.service.ts:52-59: `err.status === 0 ||
       // err.name === 'TimeoutError' || err.message?.includes('Network')` never

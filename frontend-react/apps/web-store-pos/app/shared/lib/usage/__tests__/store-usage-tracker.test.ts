@@ -160,7 +160,7 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true },
+      { skipLoading: true, skipDiagnostics: true },
     );
   });
 
@@ -180,7 +180,7 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true },
+      { skipLoading: true, skipDiagnostics: true },
     );
   });
 
@@ -304,6 +304,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
       { activeDays: [{ day: today(), saved: false }] },
       expect.objectContaining({
         skipLoading: true,
+        skipDiagnostics: true,
         headers: { Authorization: 'Bearer roster-jwt-abc' },
       }),
     );
@@ -339,7 +340,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true },
+      { skipLoading: true, skipDiagnostics: true },
     );
   });
 
@@ -373,7 +374,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true },
+      { skipLoading: true, skipDiagnostics: true },
     );
   });
 });
@@ -696,7 +697,7 @@ describe('flushUsage — USAGE-10: flushes unsaved days on demand (readiness flu
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: '2026-09-13', saved: false }] },
-      { skipLoading: true },
+      { skipLoading: true, skipDiagnostics: true },
     );
     await vi.waitFor(() => {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);

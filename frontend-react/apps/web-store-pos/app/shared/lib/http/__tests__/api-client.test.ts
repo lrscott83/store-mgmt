@@ -463,6 +463,27 @@ describe('api-client (AUTH-06)', () => {
         }),
       );
     });
+    it('does NOT log when the request opts out with skipDiagnostics (expected background failure)', async () => {
+      const { apiClient } = await import('../api-client');
+      const rejected = getResponseInterceptor(apiClient);
+
+      // Store-usage telemetry is best-effort: a failed sync is not an error.
+      const networkError = new axios.AxiosError(
+        'Network Error',
+        'ERR_NETWORK',
+        undefined,
+        undefined,
+        undefined,
+      );
+      networkError.config = {
+        method: 'post',
+        url: '/v1/usages/store-daily-usage',
+        skipDiagnostics: true,
+      } as InternalAxiosRequestConfig;
+
+      await expect(rejected(networkError)).rejects.toBeDefined();
+      expect(logClientErrorMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('Response interceptor — 500 blocking error dialog (Angular error-interceptor.service.ts:77-85 parity)', () => {

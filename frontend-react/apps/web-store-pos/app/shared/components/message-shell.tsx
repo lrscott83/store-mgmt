@@ -17,6 +17,7 @@ import {
   resolveMessagesHubUrl,
 } from '~/shared/lib/messages/messages-realtime-service';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import type {
   ConversationDto,
   MessageDto,
@@ -232,8 +233,16 @@ export function MessageShell() {
   const readPending = useCallback((): QueuedMessage[] => {
     try {
       return offlineService.getQueue();
-    } catch {
-      // A locked or damaged queue must never break the header; retried on reconnect.
+    } catch (error) {
+      // A locked or damaged queue must never break the header; retried on reconnect —
+      // but a damaged queue is a REAL error (outgoing messages may be stuck), so it
+      // must leave a trace in the diagnostic buffer.
+      logClientError({
+        level: 'error',
+        message: `[messages] reading the pending queue failed (${
+          error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        })`,
+      });
       return [];
     }
   }, [offlineService]);
