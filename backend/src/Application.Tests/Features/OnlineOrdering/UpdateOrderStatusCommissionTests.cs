@@ -249,9 +249,11 @@ public class UpdateOrderStatusCommissionTests
             .Setup(x => x.GetByOrderItemIdAsync(item.Id))
             .ReturnsAsync(existing);
 
-        await Handler().Handle(
+        var result = await Handler().Handle(
             new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado), CancellationToken.None);
 
+        result.Succeeded.Should().BeTrue();
+        _orderSalesCommissionRepository.Verify(x => x.GetByOrderItemIdAsync(item.Id), Times.Once);
         _added.Should().BeEmpty();
         _orderSalesCommissionRepository.Verify(
             x => x.AddAsync(It.IsAny<OrderSalesCommission>()), Times.Never);

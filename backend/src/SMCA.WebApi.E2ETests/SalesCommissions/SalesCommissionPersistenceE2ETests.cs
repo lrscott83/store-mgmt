@@ -200,10 +200,11 @@ public sealed class SalesCommissionPersistenceE2ETests
                     modulePercentDiscountPrice: 50,
                     tenantId: fixture.TenantId));
 
+                string code = "E2ECOM" + Guid.NewGuid().ToString("N")[..8];
                 Order order = Order.CreateOnline(
                     fixture.StoreId,
                     fixture.TenantId,
-                    "E2ECOM2",
+                    code,
                     OrderDeliveryType.Pickup,
                     "Cliente Comisión",
                     fixture.Phone,
@@ -271,6 +272,7 @@ public sealed class SalesCommissionPersistenceE2ETests
                 commission.Status.Should().Be(SalesCommissionStatus.Pending);
                 commission.StoreId.Should().Be(fixture.StoreId);
                 commission.OwnerId.Should().Be(fixture.OwnerId);
+                commission.TenantId.Should().Be(fixture.TenantId);
             }
         }
         finally
@@ -289,6 +291,10 @@ public sealed class SalesCommissionPersistenceE2ETests
                     await db.Set<SalesManager>().IgnoreQueryFilters()
                         .Where(x => x.Id == managerId).ExecuteDeleteAsync();
                 }
+                await db.Set<OrderItem>().IgnoreQueryFilters()
+                    .Where(x => x.OrderId == orderId).ExecuteDeleteAsync();
+                await db.Set<Order>().IgnoreQueryFilters()
+                    .Where(x => x.Id == orderId).ExecuteDeleteAsync();
                 await db.Set<StoreModule>().IgnoreQueryFilters()
                     .Where(x => x.StoreId == fixture.StoreId
                         && x.ModuleId == (int)ModuleType.GestoresVentas)
