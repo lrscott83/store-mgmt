@@ -68,6 +68,7 @@
 | T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | in progress — T8a done, T8b pending |
 | T8a | API de comisión por producto: upsert/list/delete, producto de la tienda, tipo % o fijo + moneda | S6 | inline | done — `8d3dd8ae` |
 | T8b | Pantalla del Owner para configurar la comisión de cada producto | S6 | inline | pending |
+| T8c | Follow-ups del review de T8a: validar enums, tests de delete/query/controller/E2E, `BelongsToStore` y concurrencia del upsert | S6, S13 | inline | pending |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
 | T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | pending |
 | T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending |
@@ -154,6 +155,17 @@ Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability`
 - **R3-002 (WARNING) → T6c:** el E2E lee con `IgnoreQueryFilters` y no asserta `TenantId`; la nota de L26 que daba R3-003 por cubierto con `StoreId` no está respaldada.
 - **R3-003 (SUGGESTION) → T6c:** el E2E usa el código fijo `E2ECOM2` y delega la limpieza de `Order`/`OrderItem`; usar un código único y borrar explícitamente.
 
+## Follow-ups del review RDD de T8a
+
+Lineage `review-029d2db31288d0ac` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 8 advisory:
+
+- **R1-001 (WARNING) → T8c:** el PUT no valida que `Type`/`Currency` sean miembros definidos del enum; un valor numérico fuera de rango se persiste y salta el tope de %.
+- **R3-001 (WARNING) → T8c:** el test de update no afirma `Succeeded` ni la persistencia real (NoTracking); un fallo de `UpdateAsync` pasaría verde.
+- **R3-002/R3-003/R3-004 (WARNING) → T8c:** delete, query y controller no tienen tests (403/404/400, empty state, gate de módulo y mapeo HTTP).
+- **R3-005 (WARNING) → T8c:** `BelongsToStoreAsync` es la frontera cross-store y no tiene test.
+- **R3-006 (SUGGESTION) → T8c:** bordes 0/100/negativo y moneda con porcentaje sin pinear.
+- **R3-007 (SUGGESTION) → T8c:** upsert read-then-insert concurrente puede chocar con el índice único y salir 500.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -186,3 +198,4 @@ Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability`
 - **L28 (2026-10-22, T6c cerrada):** hardening de los tests de T6b. El test de idempotencia ahora afirma `Succeeded` y que se consultó `GetByOrderItemIdAsync`; el E2E asserta `TenantId`, usa un código de pedido único y borra explícitamente `OrderItem`/`Order`. Suite completa: Domain 192/192, Application 1483/1483, E2E 773/773. Commit `86113489`.
 - **L29 (2026-10-22, T7 cerrada):** `MarkSalesCommissionPaidCommand` + `POST /api/v1/SalesCommissions/{id}/pay`. El handler exige OwnerAdmin, resuelve el Owner autenticado, exige que la comisión sea suya (404 si es de otro), paga completo con `MarkPaid(owner.UserId, UtcNow, note)` y devuelve 409 si ya estaba pagada; nota >500 → 400. 5 tests de aplicación + el E2E de entrega ahora paga por el endpoint real. Suite completa: Domain 192/192, Application 1488/1488, E2E 773/773. Commit `33a20a8c`.
 - **L30 (2026-10-22, T8a cerrada):** API Owner-only `GET/PUT/DELETE /api/v1/ProductSalesCommissions` con `[HasPermission(GestoresVentasAdmin)]`. Upsert por producto (crea o actualiza, sin duplicar), `BelongsToStoreAsync` impide configurar un producto de otra tienda, valida % ≤100 y valor ≥0, y guarda en `ProductSalesCommission` (tabla propia). 5 tests de aplicación. Suite completa: Domain 192/192, Application 1493/1493, E2E 773/773. Commit `8d3dd8ae`. T8b (pantalla del Owner) pendiente.
+- **L31 (2026-10-22, RDD de T8a):** el assessment inicial dio `medium`/`under_budget`; por instrucción explícita del usuario se forzó el review. Lentes risk+reliability; **approved**, autoridad quemada (`review-029d2db31288d0ac`). 0 bloqueantes; 8 advisory (validación de enums, tests de delete/query/controller/E2E, `BelongsToStore` y concurrencia) quedan como T8c.
