@@ -13,6 +13,9 @@ namespace Infrastructure.Persistence.Repositories
             _products = dbContext.Set<Product>();
         }
 
+        public async Task<bool> BelongsToStoreAsync(Guid storeId, Guid productId)
+            => await _products.AnyAsync(p => p.Id == productId && p.Category.StoreId == storeId);
+
         public async Task<IEnumerable<Product>> GetAvailableToSaleProductsByCategoryIdAsync(Guid categoryId)
         {
             return await _products
