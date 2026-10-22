@@ -5,7 +5,11 @@ using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Common.Extensions;
+using Domain.Entities.OrderItems;
+using Domain.Entities.OrderSalesCommissions;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
+using Domain.Entities.ProductSalesCommissions;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -56,17 +60,29 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
         private readonly IHttpContextService _httpContextService;
         private readonly IOrderRepository _orderRepository;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IStoreModuleRepository _storeModuleRepository;
+        private readonly IOrderSalesManagerRepository _orderSalesManagerRepository;
+        private readonly IProductSalesCommissionRepository _productSalesCommissionRepository;
+        private readonly IOrderSalesCommissionRepository _orderSalesCommissionRepository;
 
         public UpdateOrderStatusCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
             IOrderRepository orderRepository,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            IStoreModuleRepository storeModuleRepository,
+            IOrderSalesManagerRepository orderSalesManagerRepository,
+            IProductSalesCommissionRepository productSalesCommissionRepository,
+            IOrderSalesCommissionRepository orderSalesCommissionRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _orderRepository = orderRepository;
             _localizer = localizer;
+            _storeModuleRepository = storeModuleRepository;
+            _orderSalesManagerRepository = orderSalesManagerRepository;
+            _productSalesCommissionRepository = productSalesCommissionRepository;
+            _orderSalesCommissionRepository = orderSalesCommissionRepository;
         }
 
         public async Task<ResponseResult<bool>> Handle(
@@ -109,6 +125,12 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
                 throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
             }
 
+            // T6: la comisión nace en la MISMA transacción que la entrega. `Entregado` es
+            // terminal, así que no hay una segunda entrega que duplique; el índice único de
+            // `OrderItemId` es la garantía de fondo.
+            if (request.Status == OrderStatus.Entregado)
+                await GenerateCommissionsAsync(order);
+
             // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
             // sin marcar NO escribiría nada — sin error y sin aviso. El `Update` explícito del
             // repositorio es lo que adjunta la entidad como Modified.
@@ -116,6 +138,62 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
+        }
+
+        /// <summary>
+        /// Genera una comisión por cada `OrderItem` de un pedido ENTREGADO, atribuido a un gestor y
+        /// de una tienda con el módulo 21 activo. La configuración se lee EN ESTE MOMENTO (la
+        /// vigente al entregar). Sin configuración no hay fila y la línea vale 0; no se inventa un
+        /// tipo ni se convierte moneda.
+        ///
+        /// Porcentaje: se redondea la comisión UNITARIA y se multiplica por la cantidad. Fijo: es
+        /// por unidad (3 unidades = 3 veces el fijo). El resultado se redondea a 2 decimales.
+        /// </summary>
+        private async Task GenerateCommissionsAsync(Order order)
+        {
+            IReadOnlyCollection<int> activeModuleIds =
+                await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(order.StoreId);
+            if (!activeModuleIds.Contains((int)ModuleType.GestoresVentas))
+                return;
+
+            OrderSalesManager? attribution = await _orderSalesManagerRepository.GetByOrderIdAsync(order.Id);
+            if (attribution is null)
+                return;
+
+            foreach (OrderItem item in order.OrderItems)
+            {
+                OrderSalesCommission? existing =
+                    await _orderSalesCommissionRepository.GetByOrderItemIdAsync(item.Id);
+                if (existing is not null)
+                    continue;
+
+                ProductSalesCommission? config =
+                    await _productSalesCommissionRepository.GetByProductIdAsync(item.ProductId);
+                if (config is null)
+                    continue;
+
+                decimal unitCommission = config.Type == SalesCommissionType.Percentage
+                    ? Math.Round(item.Price * config.Value / 100m, 2, MidpointRounding.AwayFromZero)
+                    : Math.Round(config.Value, 2, MidpointRounding.AwayFromZero);
+                decimal amount = Math.Round(
+                    unitCommission * item.Quantity, 2, MidpointRounding.AwayFromZero);
+
+                OrderSalesCommission commission = OrderSalesCommission.Create(
+                    order.Id,
+                    item.Id,
+                    attribution.SalesManagerId,
+                    attribution.OwnerId,
+                    order.StoreId,
+                    config.Type,
+                    config.Value,
+                    item.Price,
+                    item.Quantity,
+                    amount,
+                    config.Currency,
+                    order.TenantId);
+
+                await _orderSalesCommissionRepository.AddAsync(commission);
+            }
         }
     }
 }
