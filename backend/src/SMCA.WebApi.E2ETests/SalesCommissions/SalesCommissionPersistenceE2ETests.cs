@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Json;
 using Application.Abstractions.HttpContext;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderStatus;
 using Application.UnitOfWorks;
@@ -183,6 +185,7 @@ public sealed class SalesCommissionPersistenceE2ETests
         Guid orderId = Guid.Empty;
         Guid orderItemId = Guid.Empty;
         Guid managerId = Guid.Empty;
+        Guid commissionId = Guid.Empty;
 
         try
         {
@@ -273,6 +276,33 @@ public sealed class SalesCommissionPersistenceE2ETests
                 commission.StoreId.Should().Be(fixture.StoreId);
                 commission.OwnerId.Should().Be(fixture.OwnerId);
                 commission.TenantId.Should().Be(fixture.TenantId);
+                commissionId = commission.Id;
+            }
+
+            // T7: el mismo Owner la marca pagada por el endpoint real.
+            using (var scope = _f.Services.CreateScope())
+            {
+                var ownerClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+                var payResponse = await ownerClient.PostAsJsonAsync(
+                    $"/api/v1/SalesCommissions/{commissionId}/pay",
+                    new { Note = "pago E2E" });
+
+                payResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+                var payBody = await payResponse.Content
+                    .ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+                payBody!.Succeeded.Should().BeTrue();
+            }
+
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                OrderSalesCommission paid = await db.Set<OrderSalesCommission>()
+                    .IgnoreQueryFilters()
+                    .SingleAsync(x => x.Id == commissionId);
+
+                paid.Status.Should().Be(SalesCommissionStatus.Paid);
+                paid.PaidByUserId.Should().Be(fixture.UserId);
+                paid.PaymentNote.Should().Be("pago E2E");
             }
         }
         finally
