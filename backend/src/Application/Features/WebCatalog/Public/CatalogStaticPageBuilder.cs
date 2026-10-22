@@ -16,7 +16,19 @@ namespace Application.Features.WebCatalog.Public
         string SiteName,
         string Locale = "es_ES",
         string? ImageUrl = null,
-        CatalogStaticPageLocation? Location = null);
+        CatalogStaticPageLocation? Location = null,
+        IReadOnlyList<CatalogStaticPageItem>? Items = null);
+
+    /// <summary>
+    /// Un producto publicado tal como entra en el JSON-LD <c>ItemList</c> de la página generada.
+    /// <c>Price</c> es el precio EFECTIVO que muestra el catálogo (<c>Product.FinalPrice</c>), no el
+    /// de lista: el markup tiene que coincidir con lo que ve el visitante.
+    /// </summary>
+    public sealed record CatalogStaticPageItem(
+        string Name,
+        decimal Price,
+        string Currency,
+        string? ImageUrl = null);
 
     /// <summary>
     /// public-catalog-static-pages (T8): ubicación pública de la tienda tal como entra en el JSON-LD
@@ -61,23 +73,89 @@ namespace Application.Features.WebCatalog.Public
             head = RemoveMetaByName(head, "description");
 
             var tags = new StringBuilder();
-            tags.Append("<title>").Append(Text(meta.Title)).Append("</title>");
+            // Trim: `Store.Name` puede venir con espacios a los extremos y hoy salían tal cual en
+            // <title> y og:site_name ("Pacas Gamez " en producción).
+            var title = meta.Title.Trim();
+            var siteName = (meta.SiteName ?? string.Empty).Trim();
+            tags.Append("<title>").Append(Text(title)).Append("</title>");
             if (HasText(meta.Description))
                 tags.Append("<meta name=\"description\" content=\"").Append(Attr(meta.Description!)).Append("\" />");
             tags.Append("<link rel=\"canonical\" href=\"").Append(Attr(meta.CanonicalUrl)).Append("\" />");
             tags.Append("<meta property=\"og:type\" content=\"website\" />");
-            tags.Append("<meta property=\"og:title\" content=\"").Append(Attr(meta.Title)).Append("\" />");
+            tags.Append("<meta property=\"og:title\" content=\"").Append(Attr(title)).Append("\" />");
             if (HasText(meta.Description))
                 tags.Append("<meta property=\"og:description\" content=\"").Append(Attr(meta.Description!)).Append("\" />");
             tags.Append("<meta property=\"og:url\" content=\"").Append(Attr(meta.CanonicalUrl)).Append("\" />");
             if (HasText(meta.ImageUrl))
                 tags.Append("<meta property=\"og:image\" content=\"").Append(Attr(meta.ImageUrl!)).Append("\" />");
-            tags.Append("<meta property=\"og:site_name\" content=\"").Append(Attr(meta.SiteName)).Append("\" />");
+            tags.Append("<meta property=\"og:site_name\" content=\"").Append(Attr(siteName)).Append("\" />");
             tags.Append("<meta property=\"og:locale\" content=\"").Append(Attr(meta.Locale)).Append("\" />");
-            tags.Append("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
+
+            // `summary_large_image` sin `twitter:image` es una tarjeta rota (pasaba en los catálogos
+            // sin logo ni banner). Sin imagen se declara `summary`, que es válido sin imagen.
+            if (HasText(meta.ImageUrl))
+            {
+                tags.Append("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
+                tags.Append("<meta name=\"twitter:image\" content=\"").Append(Attr(meta.ImageUrl!)).Append("\" />");
+            }
+            else
+            {
+                tags.Append("<meta name=\"twitter:card\" content=\"summary\" />");
+            }
+
             tags.Append("<script type=\"application/ld+json\">").Append(JsonLd(meta)).Append("</script>");
 
+            // ItemList (S1): el producto y su precio legibles sin ejecutar JS. Va en un bloque propio
+            // —no dentro del LocalBusiness— porque son dos entidades schema.org distintas.
+            var items = meta.Items?.Where(item => HasText(item.Name)).ToList();
+            if (items is { Count: > 0 })
+                tags.Append("<script type=\"application/ld+json\">").Append(ItemListJsonLd(items)).Append("</script>");
+
             return head + tags + tail;
+        }
+
+        /// <summary>
+        /// JSON-LD <c>ItemList</c> con los productos publicados. El precio es el EFECTIVO
+        /// (<c>FinalPrice</c>), el mismo que muestra la página; <c>InStock</c> es correcto porque el
+        /// universo publicado filtra <c>IsActive &amp;&amp; AvailableToSale</c>. Se serializa con
+        /// System.Text.Json, que escapa <c>&lt;</c> y <c>&gt;</c>: un nombre con <c>&lt;/script&gt;</c>
+        /// no puede cerrar el bloque.
+        /// </summary>
+        private static string ItemListJsonLd(IReadOnlyList<CatalogStaticPageItem> items)
+        {
+            var list = new Dictionary<string, object?>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "ItemList",
+                ["itemListElement"] = items.Select((item, index) => new Dictionary<string, object?>
+                {
+                    ["@type"] = "ListItem",
+                    ["position"] = index + 1,
+                    ["item"] = ProductJsonLd(item),
+                }).ToArray(),
+            };
+
+            return JsonSerializer.Serialize(list);
+        }
+
+        private static Dictionary<string, object?> ProductJsonLd(CatalogStaticPageItem item)
+        {
+            var product = new Dictionary<string, object?>
+            {
+                ["@type"] = "Product",
+                ["name"] = item.Name.Trim(),
+                ["offers"] = new Dictionary<string, object?>
+                {
+                    ["@type"] = "Offer",
+                    ["price"] = item.Price,
+                    ["priceCurrency"] = item.Currency,
+                    ["availability"] = "https://schema.org/InStock",
+                },
+            };
+            if (HasText(item.ImageUrl))
+                product["image"] = item.ImageUrl;
+
+            return product;
         }
 
         /// <summary>
@@ -91,7 +169,7 @@ namespace Application.Features.WebCatalog.Public
             {
                 ["@context"] = "https://schema.org",
                 ["@type"] = "LocalBusiness",
-                ["name"] = meta.Title,
+                ["name"] = meta.Title.Trim(),
                 ["url"] = meta.CanonicalUrl,
             };
             if (HasText(meta.Description))
