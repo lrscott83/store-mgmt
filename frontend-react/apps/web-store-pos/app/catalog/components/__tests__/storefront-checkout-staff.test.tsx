@@ -93,6 +93,25 @@ describe('StorefrontCheckout en modo gestor de ventas', () => {
     serviceMock.createSalesManagerOrder.mockResolvedValue(envelope(CREATED));
   });
 
+  it('si el endpoint del gestor falla, degrada al alta pública sin perder el pedido', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const onCreated = vi.fn();
+    serviceMock.createSalesManagerOrder.mockRejectedValue(new Error('403'));
+    serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED));
+
+    renderCheckout({
+      salesManagerMode: true,
+      config: { ...CONFIG, gestionPedidosEnabled: false },
+      onCreated,
+    });
+
+    submitValidOrder();
+
+    await waitFor(() => expect(serviceMock.createPublicOrder).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED));
+    openSpy.mockRestore();
+  });
+
   it('usa el endpoint del gestor y envía el resumen por WhatsApp aunque no haya Gestión de Pedidos', async () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const onCreated = vi.fn();

@@ -207,9 +207,16 @@ export function StorefrontCheckout({
     let created: PublicOrderCreated | null = null;
     if (createsOrderSynchronously) {
       try {
-        const result = salesManagerMode
+        let result = salesManagerMode
           ? await catalogHttpService.createSalesManagerOrder(storeSlug, orderPayload)
           : await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
+
+        // El endpoint del gestor verifica Owner y módulo 21 en el servidor. Un catálogo de otra
+        // tienda (o sin el módulo) no puede atribuirse: se degrada al alta pública, que es el
+        // flujo de cualquier cliente, en vez de perder el pedido con CHECKOUT.FAILED.
+        if (salesManagerMode && !result.succeeded) {
+          result = await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
+        }
 
         if (!result.succeeded) {
           setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
@@ -218,8 +225,23 @@ export function StorefrontCheckout({
 
         created = result.data;
       } catch {
-        setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
-        return;
+        if (salesManagerMode) {
+          try {
+            const fallback = await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
+            if (fallback.succeeded) {
+              created = fallback.data;
+            } else {
+              setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
+              return;
+            }
+          } catch {
+            setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
+            return;
+          }
+        } else {
+          setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
+          return;
+        }
       } finally {
         submittingRef.current = false;
         setSubmitting(false);
