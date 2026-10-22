@@ -63,6 +63,7 @@
 | T5c | Frontend: catálogo del gestor + envío por WhatsApp al Owner | S3, S4 | inline | done — `ed30c49b` |
 | T6 | Generación de comisión al pasar a `Entregado`: hook transaccional, idempotente, gate del módulo, configuración al momento de entrega, snapshot, fijo por unidad, % por unidad, sin conversión | S5, S7, S10 | inline | done — `2ee92cd3` |
 | T6b | Follow-ups del review de T6: idempotencia, persistencia E2E y scoping de los lookups de comisión | S5, S7, S10, S13 | inline | done — `00109bc7` |
+| T6c | Hardening de los tests de T6b: aserciones de éxito/lookup, `TenantId` y código de pedido único con limpieza explícita | S5, S7, S13 | inline | pending |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | pending |
 | T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
@@ -143,6 +144,14 @@ Lineage `review-95df7427600683a0` · lentes `review-risk` + `review-reliability`
 - **R3-002 (WARNING) → T6b:** toda la cobertura es de handler con mocks; falta una prueba E2E/integración que persista una comisión real al pasar a `Entregado` y demuestre la transacción única.
 - **R3-003 (SUGGESTION) → T6b:** el scoping store/tenant de los lookups de comisión es código leído, no evidencia; falta un test que lo fije.
 
+## Follow-ups del review RDD de T6b
+
+Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 3 advisory:
+
+- **R3-001 (WARNING) → T6c:** el test de idempotencia solo afirma que no se añadió nada; no afirma `Succeeded` ni que se consultó `GetByOrderItemIdAsync`, así que también pasaría si un gate anterior cortocircuitara.
+- **R3-002 (WARNING) → T6c:** el E2E lee con `IgnoreQueryFilters` y no asserta `TenantId`; la nota de L26 que daba R3-003 por cubierto con `StoreId` no está respaldada.
+- **R3-003 (SUGGESTION) → T6c:** el E2E usa el código fijo `E2ECOM2` y delega la limpieza de `Order`/`OrderItem`; usar un código único y borrar explícitamente.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -171,3 +180,4 @@ Lineage `review-95df7427600683a0` · lentes `review-risk` + `review-reliability`
 - **L24 (2026-10-22, T6 cerrada):** `UpdateOrderStatusCommandHandler` genera la comisión al pasar a `Entregado`, en la misma transacción. Gate: módulo 21 activo + `OrderSalesManager` con atribución; lee `ProductSalesCommission` vigente por `ProductId`; omite líneas sin configuración. Porcentaje: redondeo unitario a 2 decimales × cantidad; fijo: por unidad. Moneda configurada, sin conversión; `Status = Pending`; `OrderItemId` único + comprobación de idempotencia. 5 tests nuevos (porcentaje+fijo, módulo inactivo, sin atribución, línea sin config, redondeo). Suite completa: Domain 192/192, Application 1482/1482, E2E 772/772. Commit `2ee92cd3`.
 - **L25 (2026-10-22, RDD de T6):** assessment inicial `medium`/`under_budget`; por pedido explícito del usuario se forzó el review. Lentes `review-risk` + `review-reliability`; **approved**, autoridad quemada (`review-95df7427600683a0`). 0 bloqueantes; R3-001 (idempotencia sin test), R3-002 (persistencia E2E ausente) y R3-003 (scoping de lookups sin test) quedan como T6b advisory.
 - **L26 (2026-10-22, T6b cerrada):** test de idempotencia (una comisión existente para el `OrderItem` no se duplica) y E2E de entrega real que persiste la comisión en PostgreSQL (tenant fijado en el scope del handler). Con esto se cubren R3-001 y R3-002; R3-003 queda cubierto por el `StoreId` asertado en el E2E. Suite completa: Domain 192/192, Application 1483/1483, E2E 773/773. Commit `00109bc7`.
+- **L27 (2026-10-22, RDD de T6b):** review forzado; lentes risk+reliability; **approved**, autoridad quemada (`review-2cebe4668ec94c8b`). 0 bloqueantes; R3-001/R3-002 (WARNING) y R3-003 (SUGGESTION) son hardening de los tests y quedan como T6c advisory.
