@@ -1,25 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRECACHE_GLOB_IGNORES } from '../precache-patterns.mjs';
+import { FORBIDDEN_PRECACHE_PREFIXES, OFFLINE_ROUTE_IDS } from '../precache-patterns.mjs';
 
-// -- Built precache invariants - 2026-10-22 online-only precache exclusions ----
-// `verify-sw-precache.mjs` compares on-disk against injected, and both sides
-// apply the SAME ignore list, so a chunk that is both ignored and precached is
-// invisible to it. These assertions read the real build output instead: they
-// only run when `build/client` exists (CI builds before testing; a fresh clone
-// skips them), and they pin the two rules the owner asked for:
-//   1. nothing matched by an ignore pattern is precached,
-//   2. the heavy libraries the offline POS needs stay precached.
+// ── Built precache invariants — allowlist model (2026-10-22) ────────────────
+// `verify-sw-precache.mjs` compares the plan against the injection, and both
+// sides share the planner, so a planner bug where the allowlist silently grows
+// would be invisible to it. These assertions read the real build output
+// instead: they only run when `build/client` exists (CI builds before testing; a
+// fresh clone skips them).
+//
+// Pinned rules, straight from the owner's requirement:
+//   1. no online-only chunk reaches the precache,
+//   2. every offline route's module IS precached,
+//   3. a route outside the offline set plus its ancestors is NOT precached,
+//   4. the heavy libraries the offline POS needs stay precached.
 
 const CLIENT_DIR = join(process.cwd(), 'build/client');
 const SW_PATH = join(CLIENT_DIR, 'service-worker.js');
 const HAS_BUILD = existsSync(SW_PATH);
-
-const ignoreMatchers = PRECACHE_GLOB_IGNORES.map(
-  (pattern) =>
-    new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '[^/]*')}$`),
-);
 
 function readInjectedUrls() {
   const source = readFileSync(SW_PATH, 'utf8');
@@ -59,10 +58,29 @@ function readRouteManifest() {
   return JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
 }
 
+function moduleOf(route) {
+  return String(route?.module ?? '').replace(/^\//, '');
+}
+
+/** Offline route ids plus every layout above them. */
+function allowedRouteIds(routeManifest) {
+  const allowed = new Set();
+  for (const routeId of OFFLINE_ROUTE_IDS) {
+    const visited = new Set();
+    let currentId = routeId;
+    while (currentId && routeManifest.routes?.[currentId] && !visited.has(currentId)) {
+      visited.add(currentId);
+      allowed.add(currentId);
+      currentId = routeManifest.routes[currentId].parentId;
+    }
+  }
+  return allowed;
+}
+
 describe.skipIf(!HAS_BUILD)('built precache invariants', () => {
-  it('precaches no URL matched by an ignore pattern', () => {
+  it('precaches no online-only chunk', () => {
     const leaked = readInjectedUrls().filter((url) =>
-      ignoreMatchers.some((matcher) => matcher.test(url)),
+      FORBIDDEN_PRECACHE_PREFIXES.some((prefix) => url.startsWith(prefix)),
     );
 
     expect(leaked).toEqual([]);
@@ -86,14 +104,27 @@ describe.skipIf(!HAS_BUILD)('built precache invariants', () => {
     }
   });
 
-  it('precaches the module chunk of every route the ignore list does not cover', () => {
+  it('precaches the module of every offline route and of each layout above it', () => {
+    const routeManifest = readRouteManifest();
     const urls = new Set(readInjectedUrls());
-    const missing = Object.entries(readRouteManifest().routes)
-      .map(([id, route]) => [id, String(route.module ?? '').replace(/^\//, '')])
-      .filter(([, module]) => module && !ignoreMatchers.some((matcher) => matcher.test(module)))
-      .filter(([, module]) => !urls.has(module))
+    const missing = [...allowedRouteIds(routeManifest)]
+      .map((id) => [id, moduleOf(routeManifest.routes[id])])
+      .filter(([, module]) => module && !urls.has(module))
       .map(([id, module]) => `${id} -> ${module}`);
 
     expect(missing).toEqual([]);
+  });
+
+  it('precaches no route module outside the offline set', () => {
+    const routeManifest = readRouteManifest();
+    const allowed = allowedRouteIds(routeManifest);
+    const urls = new Set(readInjectedUrls());
+    const leaked = Object.entries(routeManifest.routes)
+      .filter(([id]) => !allowed.has(id))
+      .map(([id, route]) => [id, moduleOf(route)])
+      .filter(([, module]) => module && urls.has(module))
+      .map(([id, module]) => `${id} -> ${module}`);
+
+    expect(leaked).toEqual([]);
   });
 });

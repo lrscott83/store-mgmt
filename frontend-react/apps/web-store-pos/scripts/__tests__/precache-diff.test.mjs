@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { computePrecacheDiff, checkIgnoredPatterns } from '../precache-diff.mjs';
+import {
+  checkForbiddenPrefixes,
+  checkRequiredFamilies,
+  computePrecacheDiff,
+} from '../precache-diff.mjs';
 
 // ── computePrecacheDiff — pwa-precache-build spec ────────────────────────────
-// Pure comparison logic extracted from verify-sw-precache.mjs (verify-report
-// SUGGESTION #3, pwa-offline-shell): given the on-disk URLs matching the
-// shared precache patterns and the URLs actually injected into the built
-// service-worker.js, decides what is missing and whether the shell / route
-// manifest invariants hold. No filesystem, no workbox-build — safe to run
-// under Vitest with no real build present.
+// Pure comparison logic: given the planned precache URLs (precache-plan.mjs) and
+// the URLs actually injected into the built service-worker.js, decides what is
+// missing, what leaked in, and whether the shell / route manifest invariants
+// hold. No filesystem, no workbox-build — safe to run under Vitest with no real
+// build present.
 
 describe('computePrecacheDiff', () => {
-  it('reports failure for the actual Phase 2.2 RED scenario (10 known-missing paths)', () => {
-    // Exact scenario captured in apply-progress.md's "Regression Evidence":
-    // the pre-fix build's injected manifest was missing these 10 paths.
+  it('reports failure for the historical 10 known-missing paths', () => {
     const missingPaths = [
       'index.html',
       'assets/manifest-4cde2a13.js',
@@ -35,7 +36,7 @@ describe('computePrecacheDiff', () => {
     expect(result.routeManifestCount).toBe(0);
   });
 
-  it('reports success when the manifest is complete', () => {
+  it('reports success when the manifest matches the plan', () => {
     const urls = [
       'index.html',
       'assets/manifest-7c3d2092.js',
@@ -48,17 +49,14 @@ describe('computePrecacheDiff', () => {
 
     expect(result.ok).toBe(true);
     expect(result.missing).toEqual([]);
+    expect(result.extra).toEqual([]);
     expect(result.shellCount).toBe(1);
     expect(result.routeManifestCount).toBe(1);
   });
 
-  it('does not fail when service-worker.js is absent from both lists (the ignore-list case)', () => {
-    // `PRECACHE_GLOB_IGNORES` (precache-patterns.mjs) excludes
-    // `service-worker.js` from the disk-side glob (getManifest), and
-    // injectManifest excludes its own swDest from the injected manifest
-    // internally (design.md Correction 1). So by the time onDiskUrls reaches
-    // this function, `service-worker.js` is present in NEITHER list — it
-    // must never be reported as "missing", or every build would fail.
+  it('does not fail when service-worker.js is absent from both lists', () => {
+    // The planner never enumerates `**/*.js`, so the worker is never a
+    // candidate; by the time this runs it is in NEITHER list.
     const onDiskUrls = ['index.html', 'assets/manifest-abc123.js'];
     const injectedUrls = ['index.html', 'assets/manifest-abc123.js'];
 
@@ -66,6 +64,17 @@ describe('computePrecacheDiff', () => {
 
     expect(result.missing).not.toContain('service-worker.js');
     expect(result.ok).toBe(true);
+  });
+
+  it('fails when the manifest injects an asset nobody planned', () => {
+    const planned = ['index.html', 'assets/manifest-abc123.js'];
+    const injected = [...planned, 'assets/web-catalog-DzleFifX.js'];
+
+    const result = computePrecacheDiff(planned, injected);
+
+    expect(result.ok).toBe(false);
+    expect(result.extra).toEqual(['assets/web-catalog-DzleFifX.js']);
+    expect(result.missing).toEqual([]);
   });
 
   it('fails when there are zero index.html entries in the manifest', () => {
@@ -89,43 +98,66 @@ describe('computePrecacheDiff', () => {
   });
 });
 
-// -- checkIgnoredPatterns - 2026-10-22 online-only precache exclusions ---------
-// The ignore list is what keeps online-only views and SuperAdmin routes out of
-// the install. Vite names chunks after the module file, so an ignore pattern
-// whose route module disappears stops matching anything: the chunk it was
-// written for quietly lands back in the precache and every device downloads it
-// again, with a green build. That zero-match case is exactly what this flag
-// surfaces. It cannot see a chunk renamed to a name the pattern never matched.
+// ── checkForbiddenPrefixes — allowlist teeth ─────────────────────────────────
+// Vite names a chunk after its route module, so the prefix survives every
+// content hash. `computePrecacheDiff` cannot catch an online-only chunk that the
+// PLAN itself started including (both sides would agree); this can.
 
-describe('checkIgnoredPatterns', () => {
-  it('passes when every ignore pattern still matches build output', () => {
-    const counts = { 'assets/ordering-*.js': 7, 'assets/web-catalog-*.js': 1 };
+describe('checkForbiddenPrefixes', () => {
+  const prefixes = ['assets/web-catalog-', 'assets/user-list-', 'assets/ordering-'];
 
-    const result = checkIgnoredPatterns(
-      ['assets/ordering-*.js', 'assets/web-catalog-*.js'],
-      counts,
+  it('passes when no forbidden prefix is precached', () => {
+    const result = checkForbiddenPrefixes(
+      ['index.html', 'assets/sale-DJTd-HKs.js', 'assets/today-orders-BM1WGCY-.js'],
+      prefixes,
     );
 
     expect(result.ok).toBe(true);
-    expect(result.stale).toEqual([]);
+    expect(result.leaked).toEqual([]);
   });
 
-  it('flags the pattern whose exclusion silently died', () => {
-    const counts = { 'assets/ordering-*.js': 0, 'assets/web-catalog-*.js': 1 };
-
-    const result = checkIgnoredPatterns(
-      ['assets/ordering-*.js', 'assets/web-catalog-*.js'],
-      counts,
+  it('flags every leaked online-only chunk, sorted', () => {
+    const result = checkForbiddenPrefixes(
+      ['assets/user-list-BA4L9ZTW.js', 'assets/sale-DJTd-HKs.js', 'assets/web-catalog-DzleFifX.js'],
+      prefixes,
     );
 
     expect(result.ok).toBe(false);
-    expect(result.stale).toEqual([{ pattern: 'assets/ordering-*.js' }]);
+    expect(result.leaked).toEqual([
+      'assets/user-list-BA4L9ZTW.js',
+      'assets/web-catalog-DzleFifX.js',
+    ]);
   });
 
-  it('treats a pattern missing from the counts as stale, not as passing', () => {
-    const result = checkIgnoredPatterns(['assets/store-list-*.js'], {});
+  it('does not match a prefix in the middle of a URL', () => {
+    const result = checkForbiddenPrefixes(['assets/my-web-catalog-thing.js'], prefixes);
 
-    expect(result.ok).toBe(false);
-    expect(result.stale).toEqual([{ pattern: 'assets/store-list-*.js' }]);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('checkRequiredFamilies', () => {
+  it('passes when every declared family is at its count', () => {
+    const urls = [
+      'index.html',
+      'assets/manifest-abc.js',
+      'manifest.webmanifest',
+      'favicon.png',
+      ...Array.from({ length: 6 }, (_, i) => `images/help/${i}.png`),
+      ...Array.from({ length: 5 }, (_, i) => `fonts/inter/${i}.woff2`),
+      ...Array.from({ length: 8 }, (_, i) => `icons/${i}.png`),
+    ];
+
+    expect(checkRequiredFamilies(urls).ok).toBe(true);
+  });
+
+  it('flags a family that lost an asset', () => {
+    const urls = ['index.html', 'assets/manifest-abc.js', 'manifest.webmanifest', 'favicon.png'];
+
+    const { shortfalls } = checkRequiredFamilies(urls);
+
+    expect(shortfalls).toContainEqual({ family: 'images/**/*.png', expected: 6, actual: 0 });
+    expect(shortfalls).toContainEqual({ family: 'fonts/**/*.woff2', expected: 5, actual: 0 });
+    expect(shortfalls).toContainEqual({ family: 'icons/*.png', expected: 8, actual: 0 });
   });
 });

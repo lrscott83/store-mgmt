@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 // PRECACHE SPLIT — verifica que el precache del PWA incluya solo lo que
-// Owner/StoreUser necesitan offline, y excluya las páginas de SuperAdmin.
+// funciona sin red (ventas, inventario, gastos, reportes, sync, shell) y
+// excluya las vistas que exigen la API (SuperAdmin, management, perfil,
+// catálogo web y pedidos online), porque `/api/*` es passthrough.
 //
 // CÓMO CORRER (desde frontend-react/):
 //   pnpm --filter @store-mgmt/web-store-pos build
@@ -53,8 +55,8 @@ function precachedUrls(keys: string[]): string[] {
   return keys.map((u) => new URL(u).pathname);
 }
 
-test.describe('precache split — Owner/StoreUser precacheado, SuperAdmin excluido', () => {
-  test('los chunks de rutas Owner/StoreUser están precacheados', async ({ page }) => {
+test.describe('precache split — solo lo que funciona sin red está precacheado', () => {
+  test('los chunks de rutas offline están precacheados', async ({ page }) => {
     await page.goto('/login');
     await waitForControlledServiceWorker(page);
 
@@ -92,19 +94,8 @@ test.describe('precache split — Owner/StoreUser precacheado, SuperAdmin exclui
     expect(urls.some((u) => /\/assets\/export-[^/]+\.js$/.test(u))).toBe(true);
     expect(urls.some((u) => /\/assets\/import-[^/]+\.js$/.test(u))).toBe(true);
 
-    // Management
-    expect(urls.some((u) => /\/assets\/my-stores-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/edit-store-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/update-store-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/store-plan-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/user-list-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/user-create-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/user-edit-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/configurations-[^/]+\.js$/.test(u))).toBe(true);
-
-    // Catálogo Web
-    expect(urls.some((u) => /\/assets\/public-catalog-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/web-catalog-[^/]+\.js$/.test(u))).toBe(true);
+    // Tasas de cambio: management/channel-rates queda offline a pedido del owner
+    expect(urls.some((u) => /\/assets\/channel-rates-[^/]+\.js$/.test(u))).toBe(true);
   });
 
   test('las librerías pesadas (PDF, scanner, gráficos) están precacheadas', async ({ page }) => {
@@ -127,11 +118,26 @@ test.describe('precache split — Owner/StoreUser precacheado, SuperAdmin exclui
     expect(urls.some((u) => /\/assets\/chart-core-[^/]+\.js$/.test(u))).toBe(true);
   });
 
-  test('los chunks de rutas SuperAdmin NO están precacheados', async ({ page }) => {
+  test('los chunks de rutas online-only NO están precacheados', async ({ page }) => {
     await page.goto('/login');
     await waitForControlledServiceWorker(page);
 
     const urls = precachedUrls(await precachedKeys(page));
+
+    // Management (requiere la API para listar tiendas, usuarios y configuración;
+    // channel-rates es la excepción y sí va precacheada, ver el test anterior)
+    expect(urls.some((u) => /\/assets\/my-stores-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/edit-store-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/update-store-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/store-plan-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/user-list-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/user-create-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/user-edit-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/configurations-[^/]+\.js$/.test(u))).toBe(false);
+
+    // Catálogo Web (exige la API para cargar productos y plantillas)
+    expect(urls.some((u) => /\/assets\/public-catalog-[^/]+\.js$/.test(u))).toBe(false);
+    expect(urls.some((u) => /\/assets\/web-catalog-[^/]+\.js$/.test(u))).toBe(false);
 
     // Admin stores
     expect(urls.some((u) => /\/assets\/store-list-[^/]+\.js$/.test(u))).toBe(false);

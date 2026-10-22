@@ -1,81 +1,149 @@
-// Single source of truth for BOTH the injector (build-sw.mjs, via
-// workbox-build's `injectManifest`) and the verifier (verify-sw-precache.mjs,
-// via workbox-build's `getManifest`). See design.md D-shared-module and the
-// pwa-precache-build spec ("Manifest covers every file matching precache
-// patterns").
-export const PRECACHE_GLOB_PATTERNS = [
-  '**/*.{js,css,html,woff2,webmanifest}', // shell + route chunks + 5 woff2 + manifest.webmanifest
-  'icons/*.png', // 8 PWA install icons
-  'images/**/*.png', // 6 /help/tutorial screenshots
-  'favicon.png',
+// Single source of truth for BOTH the injector (build-sw.mjs) and the verifier
+// (verify-sw-precache.mjs). See the pwa-precache-build spec.
+//
+// ALLOWLIST MODEL: the precache is not "every file matching a glob". It is
+// exactly the import closure of the routes that must render offline, plus the
+// static shell families. A route that is not listed in OFFLINE_ROUTE_IDS is
+// never downloaded on install; visiting it online loads its chunk at runtime
+// like any other code-split route, and `/api/*` is `passthrough` in
+// `sw-strategy.ts`, so a precached online-only view could never render offline
+// anyway.
+//
+// Owner decision 2026-10-22: only what works without the network is precached.
+
+// Route ids as emitted in `build/client/assets/manifest-<hash>.js` (they match
+// `app/routes.ts`). Every ancestor (`parentId` chain) is added automatically by
+// the planner, so layouts are listed once, explicitly, for clarity.
+export const OFFLINE_ROUTE_IDS = [
+  // Shell and public entry
+  'root',
+  'home/routes/landing-deep',
+  'shared/routes/$', // catch-all 404 must render offline
+
+  // Authentication (sign in and first-run provisioning work from the roster)
+  'auth/components/auth-layout',
+  'auth/routes/login',
+  'auth/routes/provision',
+
+  // POS shell
+  'app-layout',
+
+  // Sales
+  'sales/routes/products',
+  'sales/routes/sale',
+  'sales/routes/cash-closing',
+  'sales/routes/wholesale',
+  'sales/routes/today-orders',
+  'sales/routes/orders',
+  'sales/routes/today-stats',
+  'sales/routes/today-credits',
+  'sales/routes/credits',
+
+  // Inventory
+  'inventory/routes/available',
+  'inventory/routes/count',
+  'inventory/routes/today-entries',
+  'inventory/routes/entries',
+  'inventory/routes/today-quantities',
+  'inventory/routes/today-sales-profit',
+  'inventory/routes/egress',
+  'inventory/routes/warehouses',
+  'inventory/routes/warehouse-movements',
+  'inventory/routes/recipes',
+  'inventory/routes/elaborations',
+
+  // Expenses and reports
+  'expenses/routes/today-expenses',
+  'expenses/routes/expenses-history',
+  'reports/routes/today-report',
+
+  // Statistics (local aggregations over the offline repositories)
+  'statistics/routes/dashboard',
+  'statistics/routes/cuadre-por-fechas',
+
+  // Sync
+  'sync/routes/export',
+  'sync/routes/import',
+
+  // Management: only the exchange-rate screen (owner requirement 2026-10-22).
+  // Read its rates offline even though the rest of management stays online-only.
+  'management-channel-rates',
+
+  // Public layout + pages that are pure content
+  'public-app-layout',
+  'diagnostics/routes/diagnostics', // local log viewer: its whole purpose is devices without a session
+  'help/routes/tutorial',
+  'legal/routes/privacy-policy',
+  'legal/routes/terms-conditions',
+
+  // NOT listed on purpose (they read the API on load):
+  //   auth/routes/register
+  //   catalog/routes/public-catalog, sales/routes/web-catalog
+  //   sales/routes/ordering-{orders,settings,drivers,history,sales}
+  //   management-* (my-stores, stores, users, configurations) — except
+  //                management-channel-rates, which is listed above
+  //   admin/* (stores, modules, dashboard, catalog-stats, messages, features,
+  //            resellers, owners)
+  //   profile/* (edit-profile, change-password)
+  //   shared/routes/health (API probe, no UI)
 ];
 
-export const PRECACHE_GLOB_IGNORES = [
-  'assets/server-build-*', // React Router server-build leftover, unreferenced by index.html
-  // injectManifest pushes swSrc/swDest into its OWN globIgnores internally, so
-  // build/client/service-worker.js is never in its own manifest. getManifest()
-  // (used by the verifier) applies NO such automatic ignore — without this
-  // entry the verifier reports service-worker.js as missing and fails EVERY
-  // build (pwa-precache-build spec, "The service worker never precaches
-  // itself").
-  'service-worker.js',
-  // SuperAdmin-only routes: loaded on-demand online, NOT precached.
-  // Owner/StoreUser devices never navigate to these routes; precaching them
-  // wastes cache space on every device.
-  'assets/store-list-*.js', // admin/stores
-  'assets/owner-list-*.js', // admin/owners
-  'assets/owner-create-*.js', // admin/owners/create
-  'assets/owner-edit-*.js', // admin/owners/edit
-  'assets/reseller-list-*.js', // admin/resellers
-  'assets/reseller-create-*.js', // admin/resellers/create
-  'assets/reseller-edit-*.js', // admin/resellers/edit
-  'assets/features-*.js', // admin/features
-  'assets/collections-*.js', // management/stores/collections (SuperAdmin + ReSeller)
-  'assets/reseller-commissions-*.js', // management/stores/commissions (SuperAdmin + ReSeller)
+// Static families that are not route-scoped. CSS is deliberately absent: the
+// route manifest names each route's stylesheet, so the planner takes exactly the
+// CSS of the precached routes. That also keeps the 76 KB
+// `assets/server-build-*.css` SSR leftover out — nothing references it.
+export const PRECACHE_STATIC_PATTERNS = [
+  '*.html', // index.html (the shell) + landing.html
+  'manifest.webmanifest',
+  'favicon.png',
+  'icons/*.png', // 8 PWA install icons
+  'images/**/*.png', // 6 /help/tutorial screenshots
+  'fonts/**/*.woff2', // 5 Inter faces
+];
 
-  // Online-only views (owner request 2026-10-22). Every one of them reads the
-  // API and `/api/*` is `passthrough` in `sw-strategy.ts`, so their bytes can
-  // never render offline — precaching them only grows the install. A device
-  // that visits them online still receives them from the service worker's
-  // runtime cache-first write; they are just not downloaded on install.
-  'assets/web-catalog-*.js', // sales/web-catalog
-  'assets/ordering-*.js', // sales/online-orders{,/settings,/drivers,/history,/sales} + its http service and labels
-  'assets/catalog-stats-*.js', // admin/catalog-stats
-
-  // Same SuperAdmin-only treatment, reachable exclusively from the admin
-  // routes above (verified by walking the built chunk import graph):
-  'assets/module-catalog-*.js', // admin/modules
-  'assets/owner-error-message-*.js',
-  'assets/reseller-http-service-*.js',
-  'assets/store-card-list-*.js', // admin/stores card grid
-  // `assets/owner-http-service-*.js` stays precached on purpose:
-  // `messages-*.js` is NOT excluded (basename collision, see below) and
-  // statically imports it, so dropping it would leave a kept route with a
-  // dangling import.
-
-  // DELIBERATELY NOT IGNORED — Vite names chunks after the module file, so two
-  // different routes can share a basename and a wildcard would take out a chunk
-  // the offline POS needs:
-  //   `assets/dashboard-*.js`   also matches stats/dashboard (POS, recharts)
-  //   `assets/messages-*.js`    also matches messages-http-service (kept layout)
-  //   `assets/public-catalog-*.js`, `catalog-http-service-*` and `template-ids-*`
-  //     -> the owner opens /catalog/<slug> from /sales/web-catalog
-  //   `api-error-message-*`, `format-currency-*`, `use-unsaved-changes-prompt-*`
-  //     -> generic names a POS chunk can start to reuse at any time.
-  // Those leftovers cost ~12 KB of the install, and the gate below fails if one
-  // of the patterns above ever stops matching.
+// Chunk name prefixes that must never reach the manifest. Vite names a chunk
+// after the route module file, so the prefix survives every content hash while
+// the hash does not. This is the gate's independent side: it catches a planner
+// regression that would silently re-inflate every install, which a
+// plan-versus-injected comparison cannot see (both sides would agree).
+export const FORBIDDEN_PRECACHE_PREFIXES = [
+  'assets/register-',
+  'assets/web-catalog-',
+  'assets/ordering-',
+  'assets/public-catalog-',
+  'assets/catalog-stats-',
+  'assets/store-list-',
+  'assets/owner-list-',
+  'assets/owner-create-',
+  'assets/owner-edit-',
+  'assets/reseller-list-',
+  'assets/reseller-create-',
+  'assets/reseller-edit-',
+  'assets/reseller-commissions-',
+  'assets/collections-',
+  'assets/features-',
+  'assets/module-catalog-',
+  'assets/user-list-',
+  'assets/user-create-',
+  'assets/user-edit-',
+  'assets/configurations-',
+  'assets/my-stores-',
+  'assets/edit-store-',
+  'assets/update-store-',
+  'assets/store-plan-',
+  'assets/edit-profile-',
+  'assets/change-password-',
 ];
 
 // Parity with today's vite.config.ts maximumFileSizeToCacheInBytes.
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 // The asset families the offline shell cannot work without, at the counts the
-// glob comments above already claim in prose. `computePrecacheDiff` compares
-// on-disk → manifest and so is blind to a family that vanished from the BUILD
-// OUTPUT: a deleted woff2 is not on disk, therefore not "missing from the
-// manifest", therefore green — while offline fonts break. These counts close
-// that hole and make task 8.2 of the pwa-offline-shell change a build gate
-// instead of a human squinting at Cache Storage.
+// patterns above already claim in prose. `computePrecacheDiff` compares the
+// planned set against the injected manifest and so is blind to a family that
+// vanished from the BUILD OUTPUT: a deleted woff2 is not on disk, therefore not
+// "missing from the manifest", therefore green — while offline fonts break.
+// These counts close that hole.
 //
 // Route chunks and CSS are deliberately absent: their count moves with every
 // code split, so pinning them would fail on unrelated work. Adding a tutorial

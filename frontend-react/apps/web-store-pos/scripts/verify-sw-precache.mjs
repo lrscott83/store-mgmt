@@ -1,26 +1,30 @@
 #!/usr/bin/env node
 // Build-gating verifier (pwa-precache-build spec: "Verification step is a
-// mandatory build gate"). Computes the set of on-disk files in `build/client`
-// that match the shared precache patterns (the same patterns build-sw.mjs
-// injects with), extracts the manifest actually baked into the built
-// `service-worker.js`, and fails loudly if anything on disk that should be
-// precached is missing from the injected manifest — or if the app shell
-// (`index.html`) / hashed route-manifest chunk (`assets/manifest-*.js`) is
-// not present exactly once, or if an ignore pattern stopped matching build
-// output (its exclusion silently died).
+// mandatory build gate"). Resolves the expected precache plan from build/client
+// (precache-plan.mjs), extracts the manifest actually baked into the built
+// `service-worker.js`, and fails loudly when:
+//   - the injected manifest and the plan disagree in either direction,
+//   - an offline route id no longer exists in the route manifest,
+//   - a route the plan needs has no module entry in the manifest,
+//   - the shell (`index.html`) or the hashed route-manifest chunk is not
+//     present exactly once,
+//   - a required asset family is off its declared count,
+//   - a chunk matching a forbidden prefix reached the manifest.
 import { getManifest } from 'workbox-build';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import {
-  PRECACHE_GLOB_PATTERNS,
-  PRECACHE_GLOB_IGNORES,
+  FORBIDDEN_PRECACHE_PREFIXES,
   MAX_FILE_SIZE_BYTES,
+  OFFLINE_ROUTE_IDS,
+  PRECACHE_STATIC_PATTERNS,
   REQUIRED_PRECACHE_FAMILIES,
 } from './precache-patterns.mjs';
+import { parseRouteManifest, resolvePrecachePlan } from './precache-plan.mjs';
 import {
-  computePrecacheDiff,
+  checkForbiddenPrefixes,
   checkRequiredFamilies,
-  checkIgnoredPatterns,
+  computePrecacheDiff,
 } from './precache-diff.mjs';
 
 const BUILD_CLIENT_DIR = resolve(process.cwd(), 'build/client');
@@ -76,6 +80,35 @@ function extractInjectedManifest(swSource) {
   );
 }
 
+async function findRouteManifest() {
+  const entries = await readdir(join(BUILD_CLIENT_DIR, 'assets'));
+  const file = entries.find((name) => /^manifest-.*\.js$/.test(name));
+  if (!file) {
+    throw new Error(
+      'verify-sw-precache: no assets/manifest-<hash>.js route manifest in build/client',
+    );
+  }
+  return { absolutePath: join(BUILD_CLIENT_DIR, 'assets', file), url: `assets/${file}` };
+}
+
+async function resolvePlan(routeManifest, routeManifestUrl) {
+  // No size filter here on purpose: an oversized planned asset must surface as a
+  // gate failure, not silently disappear from the planned set.
+  const { manifestEntries: staticEntries } = await getManifest({
+    globDirectory: BUILD_CLIENT_DIR,
+    globPatterns: PRECACHE_STATIC_PATTERNS,
+    maximumFileSizeToCacheInBytes: Number.MAX_SAFE_INTEGER,
+  });
+
+  return resolvePrecachePlan({
+    routeManifest,
+    offlineRouteIds: OFFLINE_ROUTE_IDS,
+    staticUrls: staticEntries.map((entry) => entry.url),
+    routeManifestUrl,
+    readChunk: (url) => readFile(resolve(BUILD_CLIENT_DIR, url), 'utf8').catch(() => null),
+  });
+}
+
 async function main() {
   let swSource;
   try {
@@ -90,21 +123,103 @@ async function main() {
   const injectedEntries = extractInjectedManifest(swSource);
   const injectedUrls = injectedEntries.map((entry) => entry.url);
 
-  const { manifestEntries } = await getManifest({
-    globDirectory: BUILD_CLIENT_DIR,
-    globPatterns: PRECACHE_GLOB_PATTERNS,
-    globIgnores: PRECACHE_GLOB_IGNORES,
-    maximumFileSizeToCacheInBytes: MAX_FILE_SIZE_BYTES,
-  });
-  const onDiskUrls = manifestEntries.map((entry) => entry.url);
+  let routeManifest;
+  let routeManifestUrl;
+  try {
+    const routeManifestFile = await findRouteManifest();
+    routeManifestUrl = routeManifestFile.url;
+    routeManifest = parseRouteManifest(await readFile(routeManifestFile.absolutePath, 'utf8'));
+  } catch (error) {
+    console.error('verify-sw-precache: FAILED\n');
+    console.error(`- ${error instanceof Error ? error.message : error}`);
+    process.exitCode = 1;
+    return;
+  }
 
-  const { missing, shellCount, routeManifestCount } = computePrecacheDiff(onDiskUrls, injectedUrls);
+  const plan = await resolvePlan(routeManifest, routeManifestUrl);
+  // The plan is the unfiltered truth. Do NOT re-glob it through getManifest with
+  // maximumFileSizeToCacheInBytes: that drops an oversized planned asset from
+  // BOTH sides of the diff and the gate goes green while the install lost a
+  // chunk. Size and presence are checked explicitly right below.
+  const plannedUrls = plan.urls;
+
+  const oversized = [];
+  const missingOnDisk = [];
+  for (const url of plannedUrls) {
+    try {
+      const { size } = await stat(resolve(BUILD_CLIENT_DIR, url));
+      if (size > MAX_FILE_SIZE_BYTES) oversized.push(`${url} (${size} bytes)`);
+    } catch {
+      missingOnDisk.push(url);
+    }
+  }
+
+  const { missing, extra, shellCount, routeManifestCount } = computePrecacheDiff(
+    plannedUrls,
+    injectedUrls,
+  );
+
+  // Every route (and every layout above it) the plan declares offline must have
+  // its module in the manifest, reported by route id rather than by hash.
+  const injectedSet = new Set(injectedUrls);
+  const missingRouteModules = [];
+  for (const routeId of OFFLINE_ROUTE_IDS) {
+    const visited = new Set();
+    let currentId = routeId;
+    while (currentId && routeManifest.routes?.[currentId] && !visited.has(currentId)) {
+      visited.add(currentId);
+      const module = String(routeManifest.routes[currentId].module ?? '').replace(/^\//, '');
+      if (module && !injectedSet.has(module)) {
+        missingRouteModules.push(`${currentId} -> ${module}`);
+      }
+      currentId = routeManifest.routes[currentId].parentId;
+    }
+  }
 
   const errors = [];
+
+  if (plan.unknownRouteIds.length > 0) {
+    errors.push(
+      'OFFLINE_ROUTE_IDS names route id(s) that are absent from the built route manifest ' +
+        '(renamed or removed route module):\n' +
+        plan.unknownRouteIds.map((id) => `  - ${id}`).join('\n'),
+    );
+  }
+  if (plan.missingChunks.length > 0) {
+    errors.push(
+      'the precache plan references chunk(s) that are not in build/client:\n' +
+        plan.missingChunks.map((url) => `  - ${url}`).join('\n'),
+    );
+  }
+  if (missingOnDisk.length > 0) {
+    errors.push(
+      'planned asset(s) are missing from build/client:\n' +
+        missingOnDisk.map((url) => `  - ${url}`).join('\n'),
+    );
+  }
+  if (oversized.length > 0) {
+    errors.push(
+      `planned asset(s) exceed maximumFileSizeToCacheInBytes (${MAX_FILE_SIZE_BYTES}):\n` +
+        oversized.map((entry) => `  - ${entry}`).join('\n'),
+    );
+  }
   if (missing.length > 0) {
     errors.push(
-      `${missing.length} on-disk asset(s) matching the shared precache patterns are missing ` +
-        `from the injected manifest:\n  - ${missing.join('\n  - ')}`,
+      `${missing.length} planned asset(s) are missing from the injected manifest:\n` +
+        missing.map((url) => `  - ${url}`).join('\n'),
+    );
+  }
+  if (extra.length > 0) {
+    errors.push(
+      `${extra.length} injected asset(s) are not part of the offline plan (the install is ` +
+        'downloading something nobody declared):\n' +
+        extra.map((url) => `  - ${url}`).join('\n'),
+    );
+  }
+  if (missingRouteModules.length > 0) {
+    errors.push(
+      'offline route(s) have no module entry in the precache manifest:\n' +
+        missingRouteModules.map((entry) => `  - ${entry}`).join('\n'),
     );
   }
   if (shellCount !== 1) {
@@ -129,27 +244,12 @@ async function main() {
     );
   }
 
-  // Every ignore pattern must still match real build output. A route module
-  // renamed or split differently makes its pattern dead: the chunk it was
-  // supposed to keep out silently lands back in the precache and every
-  // installed device downloads it again, with nothing failing.
-  const ignoreMatches = await Promise.all(
-    PRECACHE_GLOB_IGNORES.map(async (pattern) => {
-      const { manifestEntries } = await getManifest({
-        globDirectory: BUILD_CLIENT_DIR,
-        globPatterns: [pattern],
-        globIgnores: [],
-        maximumFileSizeToCacheInBytes: Number.MAX_SAFE_INTEGER,
-      });
-      return [pattern, manifestEntries.length];
-    }),
-  );
-  const { stale } = checkIgnoredPatterns(PRECACHE_GLOB_IGNORES, Object.fromEntries(ignoreMatches));
-  if (stale.length > 0) {
+  const { leaked } = checkForbiddenPrefixes(injectedUrls, FORBIDDEN_PRECACHE_PREFIXES);
+  if (leaked.length > 0) {
     errors.push(
-      'precache ignore pattern(s) no longer match any build output, so the exclusion ' +
-        'they were written for is gone (see PRECACHE_GLOB_IGNORES in precache-patterns.mjs):\n' +
-        stale.map((s) => `  - ${s.pattern}`).join('\n'),
+      'online-only chunk(s) reached the precache manifest (see FORBIDDEN_PRECACHE_PREFIXES ' +
+        'in precache-patterns.mjs):\n' +
+        leaked.map((url) => `  - ${url}`).join('\n'),
     );
   }
 
@@ -162,10 +262,13 @@ async function main() {
     return;
   }
 
+  const forbiddenChecked = injectedUrls.length;
   console.log(
-    `verify-sw-precache: OK — ${injectedEntries.length} precached entries; shell and route manifest ` +
-      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at their declared counts; ` +
-      `all ${PRECACHE_GLOB_IGNORES.length} ignore patterns still match build output.`,
+    `verify-sw-precache: OK — ${injectedEntries.length} precached entries matching the plan; ` +
+      `${OFFLINE_ROUTE_IDS.length} offline routes with their closure; shell and route manifest ` +
+      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at ` +
+      `their declared counts; none of the ${FORBIDDEN_PRECACHE_PREFIXES.length} forbidden chunk ` +
+      `prefixes among the ${forbiddenChecked} precached URLs.`,
   );
 }
 

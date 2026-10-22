@@ -21,20 +21,23 @@ per-route HTML.
 
 - GIVEN the browser is offline and the service worker previously activated
   with a complete precache
-- WHEN the user navigates directly to any application route (e.g. `/`,
-  `/login`, `/sales/new`, `/inventory/available`, `/admin/dashboard`,
-  `/management/users`, `/profile/edit`, `/help/tutorial`)
+- WHEN the user navigates directly to a route whose chunks are precached (e.g.
+  `/`, `/login`, `/sales/new`, `/inventory/available`, `/management/channel-rates`,
+  `/diagnostics`, `/help/tutorial`)
 - THEN the navigation request is served from the precached `index.html`
 - AND client-side routing then renders the requested route
 - AND no browser network-error page is shown
 
-#### Scenario: Views with API dependencies still render their shell offline
+#### Scenario: Routes outside the offline set are not precached
 
-- GIVEN `/admin/*`, `/management/*`, or `/profile/*` routes make API calls
-  the app cannot fulfill offline
-- WHEN the user navigates to one of these routes while offline
-- THEN the route's shell/UI still renders (served from precache)
-- AND only the in-app API calls are expected to fail, not the navigation itself
+- GIVEN `/admin/*`, `/management/*`, `/profile/*` and the web catalog read the
+  API on load, and `/api/*` is `passthrough`
+- WHEN the service worker is installed
+- THEN their route chunks are NOT downloaded (only the closure of
+  `OFFLINE_ROUTE_IDS` is precached)
+- AND a navigation to one of them while offline is still answered with the
+  precached `index.html`, so no browser network-error page is shown, but the
+  route itself cannot render because its chunk is not cached
 
 ### Requirement: Static asset requests are served cache-first with defined miss behavior
 
@@ -152,9 +155,11 @@ via this documented manual walkthrough, run once per change that touches
    `/help/tutorial` (verify all six images render), `/sales/new`,
    `/inventory/available`. Each MUST render the app shell and route content,
    not a browser network-error page.
-7. Directly load `/admin/dashboard`, `/management/users`, `/profile/edit`.
-   Each MUST render its shell/UI; in-app API calls on these routes MAY show
-   an error state — that is expected, not a failure of this requirement.
+7. Directly load `/admin/dashboard`, `/management/users`, `/profile/edit` and
+   `/catalog/<slug>`. They are NOT part of the offline set: confirm in
+   DevTools → Application → Cache Storage that none of their chunks is
+   precached. Loading them offline may show the app's route error state; that
+   is expected and is not a failure of this requirement.
 8. Inspect DevTools → Application → Cache Storage: confirm exactly one
    current-version cache exists.
 9. Go back online, trigger a new build with a changed file, reload, and
