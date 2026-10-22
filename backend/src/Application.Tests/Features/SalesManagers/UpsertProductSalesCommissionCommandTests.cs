@@ -77,11 +77,12 @@ public class UpsertProductSalesCommissionCommandTests
             .Setup(x => x.GetByProductIdAsync(_productId))
             .ReturnsAsync(existing);
 
-        await Handler().Handle(
+        var result = await Handler().Handle(
             new UpsertProductSalesCommissionCommand(
                 _productId, SalesCommissionType.Fixed, 7m, Currency.USD),
             CancellationToken.None);
 
+        result.Succeeded.Should().BeTrue();
         existing.Type.Should().Be(SalesCommissionType.Fixed);
         existing.Value.Should().Be(7m);
         existing.Currency.Should().Be(Currency.USD);
@@ -115,6 +116,56 @@ public class UpsertProductSalesCommissionCommandTests
             CancellationToken.None);
 
         (await act.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Accepts_zero_fixed_and_hundred_percentage_boundaries()
+    {
+        _commissionRepository
+            .Setup(x => x.GetByProductIdAsync(_productId))
+            .ReturnsAsync((ProductSalesCommission?)null);
+
+        var zero = await Handler().Handle(
+            new UpsertProductSalesCommissionCommand(
+                _productId, SalesCommissionType.Fixed, 0m, Currency.CUP),
+            CancellationToken.None);
+        var hundred = await Handler().Handle(
+            new UpsertProductSalesCommissionCommand(
+                _productId, SalesCommissionType.Percentage, 100m, Currency.CUP),
+            CancellationToken.None);
+
+        zero.Succeeded.Should().BeTrue();
+        hundred.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Rejects_a_negative_value()
+    {
+        Func<Task> act = () => Handler().Handle(
+            new UpsertProductSalesCommissionCommand(
+                _productId, SalesCommissionType.Fixed, -0.01m, Currency.CUP),
+            CancellationToken.None);
+
+        (await act.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Rejects_an_undefined_commission_type_or_currency()
+    {
+        Func<Task> badType = () => Handler().Handle(
+            new UpsertProductSalesCommissionCommand(
+                _productId, (SalesCommissionType)99, 5m, Currency.CUP),
+            CancellationToken.None);
+        Func<Task> badCurrency = () => Handler().Handle(
+            new UpsertProductSalesCommissionCommand(
+                _productId, SalesCommissionType.Fixed, 5m, (Currency)99),
+            CancellationToken.None);
+
+        (await badType.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await badCurrency.Should().ThrowAsync<ApiException>())
             .Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 

@@ -7,6 +7,7 @@ using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.ProductSalesCommissions;
 using Domain.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 
 namespace Application.Features.SalesManagers.Commands.UpsertProductSalesCommission
@@ -56,6 +57,13 @@ namespace Application.Features.SalesManagers.Commands.UpsertProductSalesCommissi
             if (storeId == Guid.Empty || tenantId == Guid.Empty)
                 throw new ApiException("Tienda no seleccionada.", HttpStatusCode.BadRequest);
 
+            // System.Text.Json acepta números fuera del rango de un enum; sin esta puerta un
+            // `Type`/`Currency` indefinido se persistiría y saltaría el tope del porcentaje.
+            if (!Enum.IsDefined(typeof(SalesCommissionType), request.Type))
+                throw new ApiException("Tipo de comisión inválido.", HttpStatusCode.BadRequest);
+            if (!Enum.IsDefined(typeof(Currency), request.Currency))
+                throw new ApiException("Moneda inválida.", HttpStatusCode.BadRequest);
+
             if (request.Value < 0)
                 throw new ApiException("La comisión no puede ser negativa.", HttpStatusCode.BadRequest);
             if (request.Type == SalesCommissionType.Percentage && request.Value > 100)
@@ -86,8 +94,18 @@ namespace Application.Features.SalesManagers.Commands.UpsertProductSalesCommissi
                 await _commissionRepository.UpdateAsync(existing);
             }
 
-            return ResponseResult.Success(
-                await _unitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            try
+            {
+                return ResponseResult.Success(
+                    await _unitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            }
+            catch (DbUpdateException)
+            {
+                // Dos PUT concurrentes pueden pasar el read-then-insert y chocar con el índice
+                // único de ProductId. Es un conflicto recuperable, no un 500.
+                throw new ApiException(
+                    "No se pudo guardar la configuración; reintenta.", HttpStatusCode.Conflict);
+            }
         }
     }
 }
