@@ -65,7 +65,9 @@
 | T6b | Follow-ups del review de T6: idempotencia, persistencia E2E y scoping de los lookups de comisión | S5, S7, S10, S13 | inline | done — `00109bc7` |
 | T6c | Hardening de los tests de T6b: aserciones de éxito/lookup, `TenantId` y código de pedido único con limpieza explícita | S5, S7, S13 | inline | done — `86113489` |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | done — `33a20a8c` |
-| T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
+| T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | in progress — T8a done, T8b pending |
+| T8a | API de comisión por producto: upsert/list/delete, producto de la tienda, tipo % o fijo + moneda | S6 | inline | done — `8d3dd8ae` |
+| T8b | Pantalla del Owner para configurar la comisión de cada producto | S6 | inline | pending |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
 | T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | pending |
 | T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending |
@@ -183,3 +185,4 @@ Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability`
 - **L27 (2026-10-22, RDD de T6b):** review forzado; lentes risk+reliability; **approved**, autoridad quemada (`review-2cebe4668ec94c8b`). 0 bloqueantes; R3-001/R3-002 (WARNING) y R3-003 (SUGGESTION) son hardening de los tests y quedan como T6c advisory.
 - **L28 (2026-10-22, T6c cerrada):** hardening de los tests de T6b. El test de idempotencia ahora afirma `Succeeded` y que se consultó `GetByOrderItemIdAsync`; el E2E asserta `TenantId`, usa un código de pedido único y borra explícitamente `OrderItem`/`Order`. Suite completa: Domain 192/192, Application 1483/1483, E2E 773/773. Commit `86113489`.
 - **L29 (2026-10-22, T7 cerrada):** `MarkSalesCommissionPaidCommand` + `POST /api/v1/SalesCommissions/{id}/pay`. El handler exige OwnerAdmin, resuelve el Owner autenticado, exige que la comisión sea suya (404 si es de otro), paga completo con `MarkPaid(owner.UserId, UtcNow, note)` y devuelve 409 si ya estaba pagada; nota >500 → 400. 5 tests de aplicación + el E2E de entrega ahora paga por el endpoint real. Suite completa: Domain 192/192, Application 1488/1488, E2E 773/773. Commit `33a20a8c`.
+- **L30 (2026-10-22, T8a cerrada):** API Owner-only `GET/PUT/DELETE /api/v1/ProductSalesCommissions` con `[HasPermission(GestoresVentasAdmin)]`. Upsert por producto (crea o actualiza, sin duplicar), `BelongsToStoreAsync` impide configurar un producto de otra tienda, valida % ≤100 y valor ≥0, y guarda en `ProductSalesCommission` (tabla propia). 5 tests de aplicación. Suite completa: Domain 192/192, Application 1493/1493, E2E 773/773. Commit `8d3dd8ae`. T8b (pantalla del Owner) pendiente.
