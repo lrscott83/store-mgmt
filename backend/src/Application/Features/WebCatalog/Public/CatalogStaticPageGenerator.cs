@@ -23,17 +23,20 @@ namespace Application.Features.WebCatalog.Public
     {
         private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _settingsRepository;
+        private readonly IProductRepository _productRepository;
         private readonly ICatalogStaticPageWriter _writer;
         private readonly CatalogStaticPageOptions _options;
 
         public CatalogStaticPageGenerator(
             IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository settingsRepository,
+            IProductRepository productRepository,
             ICatalogStaticPageWriter writer,
             IOptions<CatalogStaticPageOptions> options)
         {
             _storeRepository = storeRepository;
             _settingsRepository = settingsRepository;
+            _productRepository = productRepository;
             _writer = writer;
             _options = options.Value;
         }
@@ -57,19 +60,42 @@ namespace Application.Features.WebCatalog.Public
 
             var settings = await _settingsRepository.GetPublicByStoreIdAsync(storeId);
 
-            // Preferencia de imagen: logo, si no banner, si no nada.
-            var imageKey = string.IsNullOrWhiteSpace(settings?.LogoKey) ? settings?.BannerKey : settings!.LogoKey;
-
             var slug = store.CatalogSlug;
+
+            // Preferencia de imagen: logo, si no banner, si no la imagen de marca por defecto (S5).
+            var imageKey = string.IsNullOrWhiteSpace(settings?.LogoKey) ? settings?.BannerKey : settings!.LogoKey;
+            var imageUrl = string.IsNullOrWhiteSpace(imageKey)
+                ? baseUrl + NormalizePath(_options.DefaultImagePath)
+                : baseUrl + CatalogPublicUrls.Media(slug, imageKey);
+
+            // ItemList (S1): la MISMA consulta que sirve /api/v1/public/catalog/<slug>/products, así
+            // el markup no puede discrepar de lo que ve el visitante: mismo filtro de publicado,
+            // mismo orden (categoría, producto) y mismo precio efectivo.
+            var products = await _productRepository.GetPublishedPageAsync(
+                storeId,
+                categorySlug: null,
+                search: null,
+                skip: 0,
+                take: _options.EffectiveItemListSize,
+                cancellationToken);
+
+            var items = products
+                .Select(product => new CatalogStaticPageItem(
+                    Name: product.Name,
+                    Price: product.FinalPrice,
+                    Currency: product.Currency.ToString(),
+                    ImageUrl: string.IsNullOrWhiteSpace(product.Image)
+                        ? null
+                        : baseUrl + CatalogPublicUrls.Media(slug, product.Image!)))
+                .ToList();
+
             var meta = new CatalogStaticPageMeta(
                 Title: store.Name,
                 Description: store.Description,
                 CanonicalUrl: baseUrl + CatalogPublicUrls.Catalog(slug),
                 SiteName: store.Name,
                 Locale: "es_ES",
-                ImageUrl: string.IsNullOrWhiteSpace(imageKey)
-                    ? null
-                    : baseUrl + CatalogPublicUrls.Media(slug, imageKey),
+                ImageUrl: imageUrl,
                 Location: new CatalogStaticPageLocation(
                     Phone: store.PublicPhone,
                     StreetAddress: store.Address,
@@ -77,10 +103,14 @@ namespace Application.Features.WebCatalog.Public
                     Province: store.AddressProvince,
                     Latitude: store.Latitude,
                     Longitude: store.Longitude,
-                    OpeningHours: OpeningHoursSerializer.Parse(store.OpeningHoursJson)));
+                    OpeningHours: OpeningHoursSerializer.Parse(store.OpeningHoursJson)),
+                Items: items);
 
             await _writer.WriteAsync(slug, meta, cancellationToken);
             return true;
         }
+
+        private static string NormalizePath(string? path)
+            => string.IsNullOrWhiteSpace(path) ? "/og-image.png" : "/" + path.Trim().TrimStart('/');
     }
 }
