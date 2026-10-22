@@ -1,5 +1,12 @@
+using Application.Abstractions.HttpContext;
+using Application.Features.OnlineOrdering.Commands.UpdateOrderStatus;
+using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Entities.OrderItems;
+using Domain.Entities.StoreModules;
+using Domain.Interfaces.Repositories;
+using Microsoft.Extensions.Localization;
+using Resources;
 using Domain.Entities.OrderSalesCommissions;
 using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
@@ -162,5 +169,155 @@ public sealed class SalesCommissionPersistenceE2ETests
 
             await PublicOrderingSeed.CleanupAsync(_f, fixture);
         }
+    }
+
+    /// <summary>
+    /// R3-002: la comisión no solo se construye en memoria; al entregar se persiste de verdad en
+    /// PostgreSQL, en la misma transacción que el cambio de estado. Se ejecuta el handler real con
+    /// los repositorios reales del fixture.
+    /// </summary>
+    [Fact]
+    public async Task Delivered_order_persists_the_commission_in_postgres()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        Guid orderId = Guid.Empty;
+        Guid orderItemId = Guid.Empty;
+        Guid managerId = Guid.Empty;
+
+        try
+        {
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                db.Set<StoreModule>().Add(StoreModule.Create(
+                    fixture.StoreId,
+                    (int)ModuleType.GestoresVentas,
+                    price: 10,
+                    modulePriceIncluded: false,
+                    modulePrice: 20,
+                    moduleDiscountPrice: 0,
+                    modulePercentDiscountPrice: 50,
+                    tenantId: fixture.TenantId));
+
+                Order order = Order.CreateOnline(
+                    fixture.StoreId,
+                    fixture.TenantId,
+                    "E2ECOM2",
+                    OrderDeliveryType.Pickup,
+                    "Cliente Comisión",
+                    fixture.Phone,
+                    total: 200m,
+                    currency: Currency.CUP,
+                    [new OrderLine(fixture.ProductId, fixture.ProductName, 2, 100m, Currency.CUP, 100m, 0, 0)]);
+                order.ChangeStatus(OrderStatus.Preparado);
+                db.Set<Order>().Add(order);
+
+                var manager = SalesManager.Create(fixture.UserId, fixture.OwnerId, fixture.TenantId);
+                managerId = manager.Id;
+                db.Set<SalesManager>().Add(manager);
+
+                db.Set<OrderSalesManager>().Add(OrderSalesManager.Create(
+                    order.Id, manager.Id, fixture.OwnerId, fixture.StoreId, fixture.TenantId));
+
+                db.Set<ProductSalesCommission>().Add(ProductSalesCommission.Create(
+                    fixture.StoreId,
+                    fixture.ProductId,
+                    SalesCommissionType.Fixed,
+                    5m,
+                    Currency.CUP,
+                    fixture.TenantId));
+
+                await db.SaveChangesAsync();
+
+                orderId = order.Id;
+                orderItemId = order.OrderItems.Single().Id;
+            }
+
+            using (var scope = _f.Services.CreateScope())
+            {
+                var sp = scope.ServiceProvider;
+                // El handler corre en una petición con tenant; el test directo debe fijarlo para
+                // que `GetByIdWithItemsAsync` y la configuración por producto no salgan vacíos.
+                sp.GetRequiredService<ApplicationDbContext>()
+                    .SetTenantContext(fixture.TenantId, isSuperAdmin: false);
+
+                var handler = new UpdateOrderStatusCommandHandler(
+                    sp.GetRequiredService<IApplicationUnitOfWork>(),
+                    new StubHttpContextService(fixture.StoreId),
+                    sp.GetRequiredService<IOrderRepository>(),
+                    sp.GetRequiredService<IStringLocalizer<I18n>>(),
+                    sp.GetRequiredService<IStoreModuleRepository>(),
+                    sp.GetRequiredService<IOrderSalesManagerRepository>(),
+                    sp.GetRequiredService<IProductSalesCommissionRepository>(),
+                    sp.GetRequiredService<IOrderSalesCommissionRepository>());
+
+                var result = await handler.Handle(
+                    new UpdateOrderStatusCommand(orderId, OrderStatus.Entregado),
+                    CancellationToken.None);
+
+                result.Succeeded.Should().BeTrue();
+            }
+
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                OrderSalesCommission commission = await db.Set<OrderSalesCommission>()
+                    .IgnoreQueryFilters()
+                    .SingleAsync(x => x.OrderItemId == orderItemId);
+
+                commission.Amount.Should().Be(10m, "5 fijo por unidad × 2 unidades");
+                commission.Currency.Should().Be(Currency.CUP);
+                commission.Status.Should().Be(SalesCommissionStatus.Pending);
+                commission.StoreId.Should().Be(fixture.StoreId);
+                commission.OwnerId.Should().Be(fixture.OwnerId);
+            }
+        }
+        finally
+        {
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.Set<OrderSalesCommission>().IgnoreQueryFilters()
+                    .Where(x => x.OrderId == orderId).ExecuteDeleteAsync();
+                await db.Set<OrderSalesManager>().IgnoreQueryFilters()
+                    .Where(x => x.OrderId == orderId).ExecuteDeleteAsync();
+                await db.Set<ProductSalesCommission>().IgnoreQueryFilters()
+                    .Where(x => x.ProductId == fixture.ProductId).ExecuteDeleteAsync();
+                if (managerId != Guid.Empty)
+                {
+                    await db.Set<SalesManager>().IgnoreQueryFilters()
+                        .Where(x => x.Id == managerId).ExecuteDeleteAsync();
+                }
+                await db.Set<StoreModule>().IgnoreQueryFilters()
+                    .Where(x => x.StoreId == fixture.StoreId
+                        && x.ModuleId == (int)ModuleType.GestoresVentas)
+                    .ExecuteDeleteAsync();
+            }
+
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    private sealed class StubHttpContextService : IHttpContextService
+    {
+        private readonly string _storeId;
+
+        public StubHttpContextService(Guid storeId) => _storeId = storeId.ToString();
+
+        public string AccessToken => string.Empty;
+        public string UserExternalId => string.Empty;
+        public string IPAddress => "127.0.0.1";
+        public string GfDevice => string.Empty;
+        public string GfDeviceId => string.Empty;
+        public string GfSessionId => string.Empty;
+        public bool IsSuperAdmin => false;
+        public bool IsOwnerAdmin => true;
+        public bool IsReSeller => false;
+        public bool IsGestorVentas => false;
+        public bool IsSuperAdminOrOwnerAdmin => IsSuperAdmin || IsOwnerAdmin;
+        public string TenantId => string.Empty;
+        public string StoreId => _storeId;
+        public Task SignOutAsync() => Task.CompletedTask;
     }
 }

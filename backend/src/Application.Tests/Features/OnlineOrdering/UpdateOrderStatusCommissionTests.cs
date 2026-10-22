@@ -212,4 +212,48 @@ public class UpdateOrderStatusCommissionTests
         _added.Should().ContainSingle();
         _added[0].Amount.Should().Be(3.75m, "9.99 × 12.5% = 1.24875 → 1.25 por unidad × 3");
     }
+
+    /// <summary>
+    /// R3-001: si la comisión de una línea ya existe, la generación no la duplica. Es la rama que
+    /// el índice único de `OrderItemId` respalda en la base.
+    /// </summary>
+    [Fact]
+    public async Task Existing_commission_for_an_item_is_not_duplicated()
+    {
+        Guid productId = Guid.NewGuid();
+        Order order = OrderWithItems((productId, 2, 100m));
+        OrderSalesManager attribution = AttributionFor(order);
+        Setup(order, moduleActive: true, attribution);
+
+        _productSalesCommissionRepository
+            .Setup(x => x.GetByProductIdAsync(productId))
+            .ReturnsAsync(ProductSalesCommission.Create(
+                _storeId, productId, SalesCommissionType.Fixed, 5m, Currency.CUP, _tenantId));
+
+        OrderItem item = order.OrderItems.Single();
+        var existing = OrderSalesCommission.Create(
+            order.Id,
+            item.Id,
+            attribution.SalesManagerId,
+            attribution.OwnerId,
+            _storeId,
+            SalesCommissionType.Fixed,
+            5m,
+            item.Price,
+            item.Quantity,
+            10m,
+            Currency.CUP,
+            _tenantId);
+
+        _orderSalesCommissionRepository
+            .Setup(x => x.GetByOrderItemIdAsync(item.Id))
+            .ReturnsAsync(existing);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado), CancellationToken.None);
+
+        _added.Should().BeEmpty();
+        _orderSalesCommissionRepository.Verify(
+            x => x.AddAsync(It.IsAny<OrderSalesCommission>()), Times.Never);
+    }
 }
