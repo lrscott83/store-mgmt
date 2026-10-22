@@ -6,6 +6,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
+import { clearDek } from '~/shared/lib/storage/data-key-store';
 
 function getAuthState() {
   return useAuthStore.getState();
@@ -65,7 +66,13 @@ function isStorelessSession(user: UserModel): boolean {
 }
 
 async function bootstrapDeviceDekForRoute(user: UserModel): Promise<void> {
-  if (isStorelessSession(user)) return;
+  if (isStorelessSession(user)) {
+    // Drop any key left in memory by a previous session on this tab. Skipping
+    // the bootstrap alone is not enough: a SuperAdmin login performed without
+    // a full reload can inherit the DEK through this same module.
+    clearDek();
+    return;
+  }
   const { bootstrapDeviceDek } = await import('~/shared/lib/storage/dek-bootstrap');
   await bootstrapDeviceDek();
 }

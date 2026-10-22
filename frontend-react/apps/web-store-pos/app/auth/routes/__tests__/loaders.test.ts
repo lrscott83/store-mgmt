@@ -423,6 +423,23 @@ describe('Route Loaders (AUTH-04)', () => {
       expect(getDek()).toBeNull();
     });
 
+    it('authLoader — drops a DEK already in memory from a previous session', async () => {
+      setDek(new Uint8Array(32).fill(0x99), 'foreign-store');
+      setAuthState(
+        makeUser({
+          login: 'admin',
+          isSuperAdmin: true,
+          isOwnerAdmin: false,
+          selectedStoreId: '00000000-0000-0000-0000-000000000000',
+        }),
+      );
+
+      const result = await authLoader();
+
+      expect(result).toBeNull();
+      expect(getDek()).toBeNull();
+    });
+
     it('guestOnlyLoader — routes the storeless SuperAdmin home without a foreign DEK', async () => {
       const OTHER_STORE_DEK = new Uint8Array(32).fill(0x67);
       const key = await establishDeviceWrap(OTHER_STORE_DEK, 's1');

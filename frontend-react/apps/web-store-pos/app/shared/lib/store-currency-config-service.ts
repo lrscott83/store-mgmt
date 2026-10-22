@@ -41,7 +41,9 @@ export const DEFAULT_STORE_CURRENCY_CONFIG: StoreCurrencyConfig = {
 const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
 
 function isStoreless(storeId: string): boolean {
-  return storeId === '' || storeId === EMPTY_GUID;
+  // Matches the route/login predicate: any falsy store id ('' / null /
+  // undefined from a legacy profile) has no store data to read or write.
+  return !storeId || storeId === EMPTY_GUID;
 }
 
 /** Coerces a stored value to a valid Currency; anything else falls back to CUP. */

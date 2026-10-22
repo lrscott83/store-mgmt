@@ -462,4 +462,23 @@ describe('StorePaymentMethodsConfigService — storeless session (SuperAdmin)', 
       ...DEFAULT_ENABLED_CHANNEL_KEYS,
     ]);
   });
+
+  it('backup read/write seams are inert for a storeless session', () => {
+    const key = storageKey(EMPTY_GUID);
+    setDek(new Uint8Array(32).fill(0x11), 'store-a');
+    const ciphertext = encryptEntity(
+      JSON.stringify({ enabledChannels: DEFAULT_ENABLED_CHANNEL_KEYS }),
+    );
+    localStorage.setItem(key, ciphertext);
+    setDek(new Uint8Array(32).fill(0x22), 'store-b');
+    const service = new StorePaymentMethodsConfigService(EMPTY_GUID);
+
+    // The read seam must NOT touch the foreign-key ciphertext.
+    expect(() => service.getStorageStorePaymentMethods(EMPTY_GUID)).not.toThrow();
+    expect(service.getStorageStorePaymentMethods(EMPTY_GUID)).toBeNull();
+
+    // The backup write seam must not persist anything.
+    service.setConfigFromBackup({ enabledChannels: ['1|2'] }, EMPTY_GUID);
+    expect(localStorage.getItem(key)).toBe(ciphertext);
+  });
 });

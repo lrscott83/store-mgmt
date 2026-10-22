@@ -133,4 +133,12 @@ describe('StoreCurrencyConfigService — storeless session (SuperAdmin)', () => 
     const service = new StoreCurrencyConfigService('');
     expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
   });
+
+  it('treats an absent store id as storeless too (legacy profile parity)', () => {
+    localStorage.setItem(storageKey('undefined'), 'not-json');
+    const service = new StoreCurrencyConfigService(undefined as unknown as string);
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
+    service.setConfig({ buyCurrency: Currency.USD, sellCurrency: Currency.EUR });
+    expect(localStorage.getItem(storageKey('undefined'))).toBe('not-json');
+  });
 });
