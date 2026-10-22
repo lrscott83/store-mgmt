@@ -42,4 +42,29 @@ namespace Application.Dtos.SalesManagers
         Guid StoreId,
         string StoreName,
         string CatalogSlug);
+
+    /// <summary>
+    /// Vista del OWNER sobre una comisión de cualquiera de sus gestores. Incluye a quién se le
+    /// debe y el pedido/línea que la originó; el pago completo se registra con T7.
+    /// </summary>
+    public sealed record OwnerSalesCommissionDto(
+        Guid Id,
+        Guid SalesManagerId,
+        string SalesManagerName,
+        string SalesManagerLogin,
+        Guid OrderId,
+        string? OrderCode,
+        DateTime OrderDate,
+        Guid StoreId,
+        string StoreName,
+        string ProductName,
+        int Quantity,
+        SalesCommissionType Type,
+        decimal Value,
+        decimal UnitPrice,
+        decimal Amount,
+        Currency Currency,
+        SalesCommissionStatus Status,
+        DateTimeOffset? PaidAt,
+        string? PaymentNote);
 }

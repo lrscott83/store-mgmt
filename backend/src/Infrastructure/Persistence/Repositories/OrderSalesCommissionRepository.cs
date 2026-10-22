@@ -50,6 +50,8 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(x => x.OrderItem)
                 .Include(x => x.Order)
                     .ThenInclude(o => o.Store)
+                .Include(x => x.SalesManager)
+                    .ThenInclude(s => s.User)
                 .Where(x => x.OwnerId == ownerId);
 
             if (status.HasValue)

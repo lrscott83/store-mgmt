@@ -242,6 +242,7 @@ const messages: Record<string, string> = {
   'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.GESTORES_COMMISSIONS': 'Comisiones por producto',
+  'MENU.GESTORES_COMMISSIONS_LIST': 'Comisiones',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
   // cierre-efectivo: ítem justo debajo de "Vender" (S5).
@@ -294,6 +295,32 @@ const messages: Record<string, string> = {
   'GESTOR.PAID': 'Pagada',
   'GESTOR.PENDING': 'Pendiente',
   'GESTOR.PAID_AT': 'Pagada el {date}',
+
+  // Comisiones de los gestores (T10).
+  'OWNER_COMMISSIONS.TITLE': 'Comisiones de los gestores',
+  'OWNER_COMMISSIONS.SUBTITLE':
+    'Lo que debes a cada gestor. Filtra por estado o por gestor y marca el pago completo cuando le pagues; no hay pagos parciales.',
+  'OWNER_COMMISSIONS.STATUS_FILTER': 'Estado',
+  'OWNER_COMMISSIONS.MANAGER_FILTER': 'Gestor',
+  'OWNER_COMMISSIONS.ALL': 'Todas',
+  'OWNER_COMMISSIONS.ALL_MANAGERS': 'Todos los gestores',
+  'OWNER_COMMISSIONS.PENDING': 'Pendiente',
+  'OWNER_COMMISSIONS.PAID': 'Pagada',
+  'OWNER_COMMISSIONS.EMPTY': 'No hay comisiones con ese filtro.',
+  'OWNER_COMMISSIONS.LOAD_ERROR': 'No se pudieron cargar las comisiones.',
+  'OWNER_COMMISSIONS.DATE': 'Fecha',
+  'OWNER_COMMISSIONS.MANAGER': 'Gestor',
+  'OWNER_COMMISSIONS.ORDER': 'Pedido',
+  'OWNER_COMMISSIONS.PRODUCT': 'Producto',
+  'OWNER_COMMISSIONS.STORE': 'Tienda',
+  'OWNER_COMMISSIONS.STATUS': 'Estado',
+  'OWNER_COMMISSIONS.AMOUNT': 'Comisión',
+  'OWNER_COMMISSIONS.PAY': 'Marcar pagada',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TITLE': 'Registrar el pago',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TEXT':
+    '¿Registrar el pago completo de {amount} a {manager}? Esta acción no se puede deshacer.',
+  'OWNER_COMMISSIONS.PAID_OK': 'Pago registrado.',
+  'OWNER_COMMISSIONS.PAY_ERROR': 'No se pudo registrar el pago. Revisa tu conexión e inténtalo de nuevo.',
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
