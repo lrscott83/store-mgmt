@@ -69,6 +69,19 @@ export const DEFAULT_STORE_PAYMENT_METHODS_CONFIG: StorePaymentMethodsConfig = {
 };
 
 /**
+ * Storeless session sentinel (SuperAdmin / ReSeller): `selectedStoreId` is the
+ * empty GUID (or `''` in legacy payloads). There is no store whose data this
+ * user could own, so the per-store entity layer must never read or write here —
+ * a device shared with an owner still holds a foreign store's DEK in memory, and
+ * decrypting the empty-GUID ciphertext with it fails as "damaged".
+ */
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+function isStoreless(storeId: string): boolean {
+  return storeId === '' || storeId === EMPTY_GUID;
+}
+
+/**
  * Resolves the enabled channel keys of a stored config, applying the compat
  * rule: `enabledChannels` wins when present; otherwise the equivalent channels
  * of the legacy `enabledMethods` are derived; otherwise the default (all on).
@@ -162,6 +175,15 @@ export class StorePaymentMethodsConfigService {
   constructor(private readonly storeId: string) {}
 
   getConfig(storeId: string = this.storeId): StorePaymentMethodsConfig {
+    // Storeless session: never touch per-store storage (see `isStoreless`).
+    // Deep-clone the default so a consumer mutating the returned
+    // `enabledChannels` array cannot corrupt the module-level default.
+    if (isStoreless(storeId)) {
+      return {
+        enabledChannels: [...(DEFAULT_STORE_PAYMENT_METHODS_CONFIG.enabledChannels ?? [])],
+      };
+    }
+
     const revision = useDataRevisionStore.getState().revision;
     if (
       !this.config ||
@@ -268,6 +290,7 @@ export class StorePaymentMethodsConfigService {
   getStorageStorePaymentMethods(
     storeId: string = this.storeId,
   ): StorePaymentMethodsConfig | null {
+    if (isStoreless(storeId)) return null;
     return this.readConfigFromLocalStorage(storeId);
   }
 
@@ -283,6 +306,7 @@ export class StorePaymentMethodsConfigService {
     config: StorePaymentMethodsConfig,
     storeId: string = this.storeId,
   ): void {
+    if (isStoreless(storeId)) return;
     this.setConfigLocalStorage(storeId, config);
     this.config = config;
     this.lastConfigKey = this.getCurrentStorageKey(storeId);
@@ -304,6 +328,7 @@ export class StorePaymentMethodsConfigService {
   }
 
   private persistChannels(storeId: string, channelKeys: readonly string[]): void {
+    if (isStoreless(storeId)) return;
     const ordered = ALL_CHANNEL_KEYS.filter((key) => channelKeys.includes(key));
     const next: StorePaymentMethodsConfig = { enabledChannels: ordered };
     this.config = next;

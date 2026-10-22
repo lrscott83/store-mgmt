@@ -660,4 +660,50 @@ describe('useAuthStore', () => {
       expect(result).toBe(fakeUser);
     });
   });
+
+  describe('login — storeless session (SuperAdmin)', () => {
+    const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+    it('drops the DEK a previous store session left in memory', async () => {
+      setDek(new Uint8Array(32).fill(0x11), 'previous-store');
+      const storelessUser = makeUser({
+        id: 'admin-1',
+        login: 'admin',
+        isSuperAdmin: true,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: EMPTY_GUID,
+      });
+      // The suite replaces this action in another test; pin it explicitly so
+      // the login delegates to a deterministic profile, then restore it so the
+      // case is order-independent.
+      const previousGetUserByToken = useAuthStore.getState().getUserByToken;
+      useAuthStore.setState({
+        getUserByToken: vi.fn().mockResolvedValue(storelessUser),
+      });
+      const loginSpy = vi.spyOn(authHttpService, 'login').mockResolvedValue({
+        succeeded: true,
+        data: {
+          authToken: 'admin-token',
+          expiresIn: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+        message: null,
+        actionCode: null,
+        errors: [],
+      } as never);
+
+      try {
+        const user = await useAuthStore.getState().login('admin', 'pw');
+
+        expect(user.selectedStoreId).toBe(EMPTY_GUID);
+        // A storeless session must not hold another store's key: that is what
+        // made the empty-GUID config decrypt with a foreign DEK and get reported
+        // as damaged data (logout loop).
+        expect(getDek()).toBeNull();
+      } finally {
+        useAuthStore.setState({ getUserByToken: previousGetUserByToken });
+        loginSpy.mockRestore();
+      }
+    });
+  });
 });

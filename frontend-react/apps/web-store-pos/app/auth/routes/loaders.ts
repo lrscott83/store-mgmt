@@ -44,7 +44,28 @@ async function unlockGate(user: UserModel): Promise<Response | null> {
 // already-authenticated `/login` visitor (seam 2) reach the 16 sync
 // `encryptEntity`/`decryptEntity` call sites — see design §3's grep-verified
 // proof. Dynamic import for the same D1/D4 reason as `unlockGate` above.
-async function bootstrapDeviceDekForRoute(): Promise<void> {
+//
+// storeless-session fix (2026-10-21): a user with NO store (SuperAdmin /
+// ReSeller — `selectedStoreId` '' or EMPTY_GUID) must never recover a store DEK.
+// `bootstrapDeviceDek` is device-level: on a browser an owner used earlier it
+// installs THAT store's key in memory, and the storeless session then decrypts
+// the empty-GUID ciphertext with a foreign key. GCM fails, the app calls it
+// "damaged data" and signs the session out on every login. Skipping the
+// bootstrap leaves the DEK null, which is the correct state for a session that
+// owns no store data.
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+function isStorelessSession(user: UserModel): boolean {
+  // Matches `auth-store.login`'s predicate exactly: any falsy store id
+  // ('' / null / undefined from a legacy profile) is storeless, plus the
+  // backend's explicit EMPTY_GUID. The login path clears the in-memory DEK for
+  // the same inputs, so the two guards can never disagree and revive the
+  // foreign-DEK loop after a reload.
+  return !user.selectedStoreId || user.selectedStoreId === EMPTY_GUID;
+}
+
+async function bootstrapDeviceDekForRoute(user: UserModel): Promise<void> {
+  if (isStorelessSession(user)) return;
   const { bootstrapDeviceDek } = await import('~/shared/lib/storage/dek-bootstrap');
   await bootstrapDeviceDek();
 }
@@ -55,8 +76,9 @@ export async function authLoader(): Promise<Response | null> {
     return denyAccess();
   }
   // MUST precede `unlockGate` — a working device-key wrap recovers the DEK
-  // silently here, before `needsUnlock` ever sees a null DEK.
-  await bootstrapDeviceDekForRoute();
+  // silently here, before `needsUnlock` ever sees a null DEK. Storeless
+  // sessions skip it on purpose (see `bootstrapDeviceDekForRoute`).
+  await bootstrapDeviceDekForRoute(user);
   return unlockGate(user);
 }
 
@@ -70,7 +92,7 @@ export async function guestOnlyLoader(): Promise<Response | null> {
     // MUST precede both `needsUnlock` and `resolveUserHomePath` below —
     // the latter reaches business-entity storage seams that throw
     // MissingDataKeyError while locked (design §3 seam 2).
-    await bootstrapDeviceDekForRoute();
+    await bootstrapDeviceDekForRoute(user);
     // design §5 + valid-session fix (2026-09-06): a locked-but-provisioned
     // visitor whose device HOLDS unreadable ciphertext must see the unlock
     // form (return null), NOT get bounced home — resolveUserHomePath reads

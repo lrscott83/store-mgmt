@@ -383,6 +383,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // is the empty GUID) has no wrap, no roster entry, and no device table —
       // attempting resolution would always hit the F5 dead end and throw
       // DekUnwrapError, blocking login for a user who doesn't need data encryption.
+      //
+      // storeless-session fix (2026-10-21): also DROP any key left in memory by a
+      // previous session on this tab. A storeless session must not read or write
+      // per-store entities: it would decrypt the empty-GUID ciphertext with the
+      // previous owner's DEK, fail the GCM tag, and get signed out as "damaged".
       if (user.selectedStoreId && user.selectedStoreId !== EMPTY_GUID) {
         const { resolveDekForLogin, provisionStoreDekWraps } = await import('../offline/dek-provisioning');
         await resolveDekForLogin({
@@ -402,6 +407,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (authData.storeDekWraps && authData.storeDekWraps.length > 0) {
           await provisionStoreDekWraps({ password, wraps: authData.storeDekWraps });
         }
+      } else {
+        clearDek();
       }
 
       // Task 4: a login that RESOLVED a key is the one event meaning "this

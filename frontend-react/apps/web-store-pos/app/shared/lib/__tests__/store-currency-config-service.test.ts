@@ -6,8 +6,11 @@ import {
 } from '../store-currency-config-service';
 import type { StoreCurrencyConfig } from '../store-currency-config-service';
 import { StorageKeys, BUSINESS_ENTITY_NAMES } from '~/shared/lib/storage/storage-keys';
+import { clearDek, setDek } from '~/shared/lib/storage/data-key-store';
+import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 
 const S1 = 's1';
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
 
 function storageKey(storeId: string): string {
   return StorageKeys.entityKey('storeCurrencyConfig', storeId);
@@ -15,6 +18,7 @@ function storageKey(storeId: string): string {
 
 beforeEach(() => {
   localStorage.clear();
+  clearDek();
 });
 
 describe('StoreCurrencyConfigService — default / auto-init', () => {
@@ -94,5 +98,39 @@ describe('StoreCurrencyConfigService — validation', () => {
 describe('storeCurrencyConfig storage registration', () => {
   it('is registered as a business entity so wipe/migration/recovery see it', () => {
     expect(BUSINESS_ENTITY_NAMES).toContain('storeCurrencyConfig');
+  });
+});
+
+describe('StoreCurrencyConfigService — storeless session (SuperAdmin)', () => {
+  it('returns the CUP defaults without reading a foreign-key ciphertext', () => {
+    const key = storageKey(EMPTY_GUID);
+    // Ciphertext written under one store's DEK; the session now holds another.
+    setDek(new Uint8Array(32).fill(0x11), 'store-a');
+    const ciphertext = encryptEntity(
+      JSON.stringify({ buyCurrency: Currency.USD, sellCurrency: Currency.USD }),
+    );
+    localStorage.setItem(key, ciphertext);
+    setDek(new Uint8Array(32).fill(0x22), 'store-b');
+
+    const service = new StoreCurrencyConfigService(EMPTY_GUID);
+
+    expect(() => service.getConfig()).not.toThrow();
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
+    // The unreadable bytes are left untouched: no data was deleted or rewritten.
+    expect(localStorage.getItem(key)).toBe(ciphertext);
+  });
+
+  it('never persists a config for a storeless session', () => {
+    const service = new StoreCurrencyConfigService(EMPTY_GUID);
+    service.setConfig({ buyCurrency: Currency.USD, sellCurrency: Currency.EUR });
+
+    expect(localStorage.getItem(storageKey(EMPTY_GUID))).toBeNull();
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
+  });
+
+  it('treats the empty store id as storeless too', () => {
+    localStorage.setItem(storageKey(''), 'not-json');
+    const service = new StoreCurrencyConfigService('');
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
   });
 });
