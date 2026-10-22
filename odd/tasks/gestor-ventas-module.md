@@ -62,6 +62,7 @@
 | T5b | Alta del pedido con atribución + endpoint gestor-only + verificación Owner-tienda | S3, S4 | inline | done — `7e82938f` |
 | T5c | Frontend: catálogo del gestor + envío por WhatsApp al Owner | S3, S4 | inline | done — `ed30c49b` |
 | T6 | Generación de comisión al pasar a `Entregado`: hook transaccional, idempotente, gate del módulo, configuración al momento de entrega, snapshot, fijo por unidad, % por unidad, sin conversión | S5, S7, S10 | inline | done — `2ee92cd3` |
+| T6b | Follow-ups del review de T6: idempotencia, persistencia E2E y scoping de los lookups de comisión | S5, S7, S10, S13 | inline | pending |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | pending |
 | T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
@@ -134,6 +135,14 @@ La validación nativa quedó **bloqueada**, no aprobada:
 - El STATUS posterior devolvió `operation_timeout` (`context deadline exceeded`), `retry_safe: false`, `next_action: stop`.
 - La review queda en `correction_required`, sin acknowledgement ni PASS. No se inventa un veredicto.
 
+## Follow-ups del review RDD de T6
+
+Lineage `review-95df7427600683a0` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 3 hallazgos advisory:
+
+- **R3-001 (WARNING) → T6b:** ningún test ejerce la rama de idempotencia (`existing is not null`); el mock devuelve null en todos los casos. Falta un test con una comisión ya existente que demuestre que no se duplica.
+- **R3-002 (WARNING) → T6b:** toda la cobertura es de handler con mocks; falta una prueba E2E/integración que persista una comisión real al pasar a `Entregado` y demuestre la transacción única.
+- **R3-003 (SUGGESTION) → T6b:** el scoping store/tenant de los lookups de comisión es código leído, no evidencia; falta un test que lo fije.
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -160,3 +169,4 @@ La validación nativa quedó **bloqueada**, no aprobada:
 - **L22 (2026-10-21, T5c cerrada):** frontend del gestor. `UserModel.isGestorVentas` (opcional) y `catalogHttpService.createSalesManagerOrder` → `POST /v1/sales-managers/orders/{slug}`. `StorefrontCheckout` gana `salesManagerMode`: alta síncrona contra el endpoint del gestor y **siempre** resumen por WhatsApp, aunque `gestionPedidosEnabled` sea false. `public-catalog.tsx` detecta `user.isGestorVentas` y activa el modo. Tests nuevos del endpoint y del checkout (23/23 focalizados); `pnpm typecheck` 5/5; `pnpm lint` 4/4. Suite frontend completa: 5,749 passed / 1 failed / 6 skipped; el único fallo (`store-routes.test.tsx`) pasa 21/21 aislado — flake de carga, no del cambio. Commit `ed30c49b`. El home/vista del gestor queda para T9.
 - **L23 (2026-10-22, T5c + corrección RDD):** review de T5c con R3-001 CRITICAL; corregido en `3b2c9b4d` con fallback al alta pública y test 8/8. El validador objetivo falló por transporte (`role_capture_failed`) y el STATUS posterior dio `operation_timeout`; review en `correction_required`, sin aprobación. Ver "Bloqueo RDD — T5c".
 - **L24 (2026-10-22, T6 cerrada):** `UpdateOrderStatusCommandHandler` genera la comisión al pasar a `Entregado`, en la misma transacción. Gate: módulo 21 activo + `OrderSalesManager` con atribución; lee `ProductSalesCommission` vigente por `ProductId`; omite líneas sin configuración. Porcentaje: redondeo unitario a 2 decimales × cantidad; fijo: por unidad. Moneda configurada, sin conversión; `Status = Pending`; `OrderItemId` único + comprobación de idempotencia. 5 tests nuevos (porcentaje+fijo, módulo inactivo, sin atribución, línea sin config, redondeo). Suite completa: Domain 192/192, Application 1482/1482, E2E 772/772. Commit `2ee92cd3`.
+- **L25 (2026-10-22, RDD de T6):** assessment inicial `medium`/`under_budget`; por pedido explícito del usuario se forzó el review. Lentes `review-risk` + `review-reliability`; **approved**, autoridad quemada (`review-95df7427600683a0`). 0 bloqueantes; R3-001 (idempotencia sin test), R3-002 (persistencia E2E ausente) y R3-003 (scoping de lookups sin test) quedan como T6b advisory.
