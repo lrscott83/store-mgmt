@@ -63,7 +63,7 @@
 | T5c | Frontend: catálogo del gestor + envío por WhatsApp al Owner | S3, S4 | inline | done — `ed30c49b` |
 | T6 | Generación de comisión al pasar a `Entregado`: hook transaccional, idempotente, gate del módulo, configuración al momento de entrega, snapshot, fijo por unidad, % por unidad, sin conversión | S5, S7, S10 | inline | done — `2ee92cd3` |
 | T6b | Follow-ups del review de T6: idempotencia, persistencia E2E y scoping de los lookups de comisión | S5, S7, S10, S13 | inline | done — `00109bc7` |
-| T6c | Hardening de los tests de T6b: aserciones de éxito/lookup, `TenantId` y código de pedido único con limpieza explícita | S5, S7, S13 | inline | pending |
+| T6c | Hardening de los tests de T6b: aserciones de éxito/lookup, `TenantId` y código de pedido único con limpieza explícita | S5, S7, S13 | inline | done — `86113489` |
 | T7 | Pago de comisión por el Owner: acción completa, auditoría (fecha/quién/nota) | S9 | inline | pending |
 | T8 | Configuración de comisión por producto (API + pantalla del Owner) | S6 | inline | pending |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | pending |
@@ -181,3 +181,4 @@ Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability`
 - **L25 (2026-10-22, RDD de T6):** assessment inicial `medium`/`under_budget`; por pedido explícito del usuario se forzó el review. Lentes `review-risk` + `review-reliability`; **approved**, autoridad quemada (`review-95df7427600683a0`). 0 bloqueantes; R3-001 (idempotencia sin test), R3-002 (persistencia E2E ausente) y R3-003 (scoping de lookups sin test) quedan como T6b advisory.
 - **L26 (2026-10-22, T6b cerrada):** test de idempotencia (una comisión existente para el `OrderItem` no se duplica) y E2E de entrega real que persiste la comisión en PostgreSQL (tenant fijado en el scope del handler). Con esto se cubren R3-001 y R3-002; R3-003 queda cubierto por el `StoreId` asertado en el E2E. Suite completa: Domain 192/192, Application 1483/1483, E2E 773/773. Commit `00109bc7`.
 - **L27 (2026-10-22, RDD de T6b):** review forzado; lentes risk+reliability; **approved**, autoridad quemada (`review-2cebe4668ec94c8b`). 0 bloqueantes; R3-001/R3-002 (WARNING) y R3-003 (SUGGESTION) son hardening de los tests y quedan como T6c advisory.
+- **L28 (2026-10-22, T6c cerrada):** hardening de los tests de T6b. El test de idempotencia ahora afirma `Succeeded` y que se consultó `GetByOrderItemIdAsync`; el E2E asserta `TenantId`, usa un código de pedido único y borra explícitamente `OrderItem`/`Order`. Suite completa: Domain 192/192, Application 1483/1483, E2E 773/773. Commit `86113489`.
