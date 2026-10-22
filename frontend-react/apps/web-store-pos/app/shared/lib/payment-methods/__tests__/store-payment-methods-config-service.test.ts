@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Currency, PAYMENT_CHANNELS, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
 import {
   ALL_CHANNEL_KEYS,
@@ -483,23 +483,31 @@ describe('StorePaymentMethodsConfigService — storeless session (SuperAdmin)', 
   });
 
   it('treats absent and null store ids as storeless across every seam', () => {
-    for (const rawStoreId of [undefined, null]) {
-      const storeId = rawStoreId as unknown as string;
-      const service = new StorePaymentMethodsConfigService(storeId);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      for (const rawStoreId of [undefined, null]) {
+        const storeId = rawStoreId as unknown as string;
+        const service = new StorePaymentMethodsConfigService(storeId);
 
-      expect(service.getConfig(storeId)).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
-      expect(service.getEnabledChannels(storeId)).toEqual([...DEFAULT_ENABLED_CHANNEL_KEYS]);
-      expect(service.getStorageStorePaymentMethods(storeId)).toBeNull();
-      service.setChannelEnabled(storeId, SalePaymentMethod.Zelle, Currency.USD, false);
-      service.setConfigFromBackup({ enabledChannels: ['1|2'] }, storeId);
-    }
+        expect(service.getConfig(storeId)).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
+        expect(service.getEnabledChannels(storeId)).toEqual([...DEFAULT_ENABLED_CHANNEL_KEYS]);
+        expect(service.getStorageStorePaymentMethods(storeId)).toBeNull();
+        service.setChannelEnabled(storeId, SalePaymentMethod.Zelle, Currency.USD, false);
+        service.setConfigFromBackup({ enabledChannels: ['1|2'] }, storeId);
 
-    // No per-store key was created for either representation.
-    const paymentKeys: string[] = [];
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('lizoft.store-storePaymentMethods-')) paymentKeys.push(key);
+        // Per-iteration scan: a write that a later representation removes
+        // cannot hide here.
+        const paymentKeys: string[] = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('lizoft.store-storePaymentMethods-')) paymentKeys.push(key);
+        }
+        expect(paymentKeys).toEqual([]);
+      }
+
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
     }
-    expect(paymentKeys).toEqual([]);
   });
 });

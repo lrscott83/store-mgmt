@@ -134,18 +134,24 @@ describe('StoreCurrencyConfigService — storeless session (SuperAdmin)', () => 
     expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
   });
 
-  it('treats an absent store id as storeless and writes no key at all', () => {
+  it('treats an absent store id as storeless and leaves an existing key untouched', () => {
+    const legacyKey = storageKey('undefined');
+    localStorage.setItem(legacyKey, 'legacy-bytes');
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
     try {
       const service = new StoreCurrencyConfigService(undefined as unknown as string);
 
       expect(service.getConfig()).toEqual(DEFAULT_STORE_CURRENCY_CONFIG);
       service.setConfig({ buyCurrency: Currency.USD, sellCurrency: Currency.EUR });
 
+      // No write and no deletion: an existing legacy entry survives untouched.
       expect(setItem).not.toHaveBeenCalled();
-      expect(localStorage.length).toBe(0);
+      expect(removeItem).not.toHaveBeenCalled();
+      expect(localStorage.getItem(legacyKey)).toBe('legacy-bytes');
     } finally {
       setItem.mockRestore();
+      removeItem.mockRestore();
     }
   });
 });
