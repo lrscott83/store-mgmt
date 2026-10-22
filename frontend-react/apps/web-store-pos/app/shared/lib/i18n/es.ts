@@ -217,6 +217,7 @@ const messages: Record<string, string> = {
   'MENU.ADMIN': 'ADMINISTRACIÓN',
   'MENU.SALES': 'VENTA',
   'MENU.WEB_CATALOG_GROUP': 'CATÁLOGO WEB',
+  'MENU.GESTORES_VENTAS': 'GESTORES DE VENTAS',
   'MENU.INVENTORY': 'INVENTARIO',
   'MENU.EXPENSES': 'GASTOS',
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
@@ -240,6 +241,7 @@ const messages: Record<string, string> = {
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
+  'MENU.GESTORES_COMMISSIONS': 'Comisiones por producto',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
   // cierre-efectivo: ítem justo debajo de "Vender" (S5).
@@ -250,6 +252,26 @@ const messages: Record<string, string> = {
   'MENU.TODAY_STATS': 'Cuadre del día',
   'MENU.CREDITS_HISTORY': 'Créditos',
   'MENU.ORDERS_HISTORY': 'Ventas',
+
+  // Gestores de ventas (módulo 21, feature 125): configuración de comisión del Owner.
+  'GESTORES.TITLE': 'Comisiones por producto',
+  'GESTORES.SUBTITLE':
+    'Define cuánto gana el gestor por unidad vendida de cada producto: un porcentaje sobre el precio o un monto fijo, y en qué moneda se le paga. Un producto sin comisión no genera ganancia para el gestor.',
+  'GESTORES.LOAD_ERROR': 'No se pudieron cargar los productos y las comisiones.',
+  'GESTORES.EMPTY': 'Todavía no hay productos para configurar.',
+  'GESTORES.TYPE': 'Comisión',
+  'GESTORES.NONE': 'Sin comisión',
+  'GESTORES.PERCENTAGE': 'Porcentaje',
+  'GESTORES.FIXED': 'Monto fijo',
+  'GESTORES.PERCENT_VALUE': '% por unidad',
+  'GESTORES.FIXED_VALUE': 'Monto por unidad',
+  'GESTORES.CURRENCY': 'Moneda',
+  'GESTORES.SAVE': 'Guardar',
+  'GESTORES.REMOVE': 'Quitar',
+  'GESTORES.SAVED': 'Comisión guardada.',
+  'GESTORES.REMOVED': 'Comisión eliminada.',
+  'GESTORES.INVALID_VALUE': 'Escribe un monto válido mayor o igual a 0.',
+  'GESTORES.SAVE_ERROR': 'No se pudo guardar la comisión. Revisa tu conexión e inténtalo de nuevo.',
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',

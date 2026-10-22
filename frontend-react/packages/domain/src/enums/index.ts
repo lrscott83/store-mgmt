@@ -151,6 +151,12 @@ export enum ExpenseType {
  * — la serialización es el número, así que este orden queda CONGELADO desde
  * el día 1: reordenar/insertar valores rompería datos históricos.
  */
+/** Tipo de comisión de un producto para los gestores de ventas (espejo de C# SalesCommissionType). */
+export enum SalesCommissionType {
+  Percentage = 1,
+  Fixed = 2,
+}
+
 export enum Currency {
   CUP = 0,
   USD = 1,

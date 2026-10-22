@@ -312,6 +312,25 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    // Gestores de ventas (módulo 21, feature 125): grupo propio, solo para el dueño. El gestor
+    // NO ve este menú; su vista vive fuera del layout de caja (T9).
+    groupLabel: 'MENU.GESTORES_VENTAS',
+    moduleId: EModules.GestoresVentas,
+    items: [
+      {
+        label: 'MENU.GESTORES_COMMISSIONS',
+        path: '/sales/gestores',
+        featureIds: [EFeatures.GestoresVentas],
+        moduleId: EModules.GestoresVentas,
+        rolesOnly: (user) => user.isOwnerAdmin,
+        isNew: true,
+        helpContent:
+          'Comisiones de gestores. Define cuánto gana el gestor de ventas por cada producto: un porcentaje sobre el precio o un monto fijo por unidad, y en qué moneda se le paga. Sin configuración, ese producto no genera comisión.' +
+          BETA_NOTICE,
+      },
+    ],
+  },
+  {
     groupLabel: 'MENU.INVENTORY',
     moduleId: EModules.Inventory,
     items: [
