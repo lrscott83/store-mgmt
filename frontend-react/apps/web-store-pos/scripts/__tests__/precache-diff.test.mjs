@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePrecacheDiff } from '../precache-diff.mjs';
+import { computePrecacheDiff, checkIgnoredPatterns } from '../precache-diff.mjs';
 
 // ── computePrecacheDiff — pwa-precache-build spec ────────────────────────────
 // Pure comparison logic extracted from verify-sw-precache.mjs (verify-report
@@ -86,5 +86,46 @@ describe('computePrecacheDiff', () => {
 
     expect(result.ok).toBe(false);
     expect(result.routeManifestCount).toBe(2);
+  });
+});
+
+// -- checkIgnoredPatterns - 2026-10-22 online-only precache exclusions ---------
+// The ignore list is what keeps online-only views and SuperAdmin routes out of
+// the install. Vite names chunks after the module file, so an ignore pattern
+// whose route module disappears stops matching anything: the chunk it was
+// written for quietly lands back in the precache and every device downloads it
+// again, with a green build. That zero-match case is exactly what this flag
+// surfaces. It cannot see a chunk renamed to a name the pattern never matched.
+
+describe('checkIgnoredPatterns', () => {
+  it('passes when every ignore pattern still matches build output', () => {
+    const counts = { 'assets/ordering-*.js': 7, 'assets/web-catalog-*.js': 1 };
+
+    const result = checkIgnoredPatterns(
+      ['assets/ordering-*.js', 'assets/web-catalog-*.js'],
+      counts,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.stale).toEqual([]);
+  });
+
+  it('flags the pattern whose exclusion silently died', () => {
+    const counts = { 'assets/ordering-*.js': 0, 'assets/web-catalog-*.js': 1 };
+
+    const result = checkIgnoredPatterns(
+      ['assets/ordering-*.js', 'assets/web-catalog-*.js'],
+      counts,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.stale).toEqual([{ pattern: 'assets/ordering-*.js' }]);
+  });
+
+  it('treats a pattern missing from the counts as stale, not as passing', () => {
+    const result = checkIgnoredPatterns(['assets/store-list-*.js'], {});
+
+    expect(result.ok).toBe(false);
+    expect(result.stale).toEqual([{ pattern: 'assets/store-list-*.js' }]);
   });
 });

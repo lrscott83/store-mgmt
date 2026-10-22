@@ -35,7 +35,7 @@ export function checkRequiredFamilies(injectedUrls) {
     if (!matcher) {
       throw new Error(
         `checkRequiredFamilies: no matcher declared for required family "${family}" — ` +
-          'add one to FAMILY_MATCHERS in precache-diff.mjs'
+          'add one to FAMILY_MATCHERS in precache-diff.mjs',
       );
     }
     const actual = injectedUrls.filter(matcher).length;
@@ -52,9 +52,27 @@ export function computePrecacheDiff(onDiskUrls, injectedUrls) {
   const missing = onDiskUrls.filter((url) => !injectedSet.has(url)).sort();
 
   const shellCount = injectedUrls.filter((url) => url === 'index.html').length;
-  const routeManifestCount = injectedUrls.filter((url) => /^assets\/manifest-.*\.js$/.test(url)).length;
+  const routeManifestCount = injectedUrls.filter((url) =>
+    /^assets\/manifest-.*\.js$/.test(url),
+  ).length;
 
   const ok = missing.length === 0 && shellCount === 1 && routeManifestCount === 1;
 
   return { missing, shellCount, routeManifestCount, ok };
+}
+
+/**
+ * The exclusion list is data, and data drifts silently: rename a route module
+ * and `assets/ordering-*.js` stops matching anything, the chunk quietly lands
+ * back in the precache, and every installed device pays for it again — with a
+ * green build. `countsByPattern` is how many files the build produced for each
+ * ignore pattern; zero means the entry is dead and the exclusion it was
+ * supposed to enforce is gone.
+ */
+export function checkIgnoredPatterns(ignorePatterns, countsByPattern) {
+  const stale = ignorePatterns
+    .filter((pattern) => (countsByPattern[pattern] ?? 0) === 0)
+    .map((pattern) => ({ pattern }));
+
+  return { stale, ok: stale.length === 0 };
 }

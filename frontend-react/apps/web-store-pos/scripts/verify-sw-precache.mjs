@@ -6,7 +6,8 @@
 // `service-worker.js`, and fails loudly if anything on disk that should be
 // precached is missing from the injected manifest — or if the app shell
 // (`index.html`) / hashed route-manifest chunk (`assets/manifest-*.js`) is
-// not present exactly once.
+// not present exactly once, or if an ignore pattern stopped matching build
+// output (its exclusion silently died).
 import { getManifest } from 'workbox-build';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -16,7 +17,11 @@ import {
   MAX_FILE_SIZE_BYTES,
   REQUIRED_PRECACHE_FAMILIES,
 } from './precache-patterns.mjs';
-import { computePrecacheDiff, checkRequiredFamilies } from './precache-diff.mjs';
+import {
+  computePrecacheDiff,
+  checkRequiredFamilies,
+  checkIgnoredPatterns,
+} from './precache-diff.mjs';
 
 const BUILD_CLIENT_DIR = resolve(process.cwd(), 'build/client');
 const SW_PATH = resolve(BUILD_CLIENT_DIR, 'service-worker.js');
@@ -67,7 +72,7 @@ function extractInjectedManifest(swSource) {
   }
 
   throw new Error(
-    `verify-sw-precache: found a manifest start marker but never found a balanced closing bracket in ${SW_PATH}`
+    `verify-sw-precache: found a manifest start marker but never found a balanced closing bracket in ${SW_PATH}`,
   );
 }
 
@@ -99,15 +104,17 @@ async function main() {
   if (missing.length > 0) {
     errors.push(
       `${missing.length} on-disk asset(s) matching the shared precache patterns are missing ` +
-        `from the injected manifest:\n  - ${missing.join('\n  - ')}`
+        `from the injected manifest:\n  - ${missing.join('\n  - ')}`,
     );
   }
   if (shellCount !== 1) {
-    errors.push(`expected exactly one "index.html" entry in the precache manifest, found ${shellCount}`);
+    errors.push(
+      `expected exactly one "index.html" entry in the precache manifest, found ${shellCount}`,
+    );
   }
   if (routeManifestCount !== 1) {
     errors.push(
-      `expected exactly one "assets/manifest-*.js" entry in the precache manifest, found ${routeManifestCount}`
+      `expected exactly one "assets/manifest-*.js" entry in the precache manifest, found ${routeManifestCount}`,
     );
   }
 
@@ -118,7 +125,31 @@ async function main() {
         '(see REQUIRED_PRECACHE_FAMILIES in precache-patterns.mjs):\n' +
         shortfalls
           .map((s) => `  - ${s.family}: expected ${s.expected}, found ${s.actual}`)
-          .join('\n')
+          .join('\n'),
+    );
+  }
+
+  // Every ignore pattern must still match real build output. A route module
+  // renamed or split differently makes its pattern dead: the chunk it was
+  // supposed to keep out silently lands back in the precache and every
+  // installed device downloads it again, with nothing failing.
+  const ignoreMatches = await Promise.all(
+    PRECACHE_GLOB_IGNORES.map(async (pattern) => {
+      const { manifestEntries } = await getManifest({
+        globDirectory: BUILD_CLIENT_DIR,
+        globPatterns: [pattern],
+        globIgnores: [],
+        maximumFileSizeToCacheInBytes: Number.MAX_SAFE_INTEGER,
+      });
+      return [pattern, manifestEntries.length];
+    }),
+  );
+  const { stale } = checkIgnoredPatterns(PRECACHE_GLOB_IGNORES, Object.fromEntries(ignoreMatches));
+  if (stale.length > 0) {
+    errors.push(
+      'precache ignore pattern(s) no longer match any build output, so the exclusion ' +
+        'they were written for is gone (see PRECACHE_GLOB_IGNORES in precache-patterns.mjs):\n' +
+        stale.map((s) => `  - ${s.pattern}`).join('\n'),
     );
   }
 
@@ -133,7 +164,8 @@ async function main() {
 
   console.log(
     `verify-sw-precache: OK — ${injectedEntries.length} precached entries; shell and route manifest ` +
-      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at their declared counts.`
+      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at their declared counts; ` +
+      `all ${PRECACHE_GLOB_IGNORES.length} ignore patterns still match build output.`,
   );
 }
 

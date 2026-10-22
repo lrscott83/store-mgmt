@@ -32,6 +32,38 @@ export const PRECACHE_GLOB_IGNORES = [
   'assets/features-*.js', // admin/features
   'assets/collections-*.js', // management/stores/collections (SuperAdmin + ReSeller)
   'assets/reseller-commissions-*.js', // management/stores/commissions (SuperAdmin + ReSeller)
+
+  // Online-only views (owner request 2026-10-22). Every one of them reads the
+  // API and `/api/*` is `passthrough` in `sw-strategy.ts`, so their bytes can
+  // never render offline — precaching them only grows the install. A device
+  // that visits them online still receives them from the service worker's
+  // runtime cache-first write; they are just not downloaded on install.
+  'assets/web-catalog-*.js', // sales/web-catalog
+  'assets/ordering-*.js', // sales/online-orders{,/settings,/drivers,/history,/sales} + its http service and labels
+  'assets/catalog-stats-*.js', // admin/catalog-stats
+
+  // Same SuperAdmin-only treatment, reachable exclusively from the admin
+  // routes above (verified by walking the built chunk import graph):
+  'assets/module-catalog-*.js', // admin/modules
+  'assets/owner-error-message-*.js',
+  'assets/reseller-http-service-*.js',
+  'assets/store-card-list-*.js', // admin/stores card grid
+  // `assets/owner-http-service-*.js` stays precached on purpose:
+  // `messages-*.js` is NOT excluded (basename collision, see below) and
+  // statically imports it, so dropping it would leave a kept route with a
+  // dangling import.
+
+  // DELIBERATELY NOT IGNORED — Vite names chunks after the module file, so two
+  // different routes can share a basename and a wildcard would take out a chunk
+  // the offline POS needs:
+  //   `assets/dashboard-*.js`   also matches stats/dashboard (POS, recharts)
+  //   `assets/messages-*.js`    also matches messages-http-service (kept layout)
+  //   `assets/public-catalog-*.js`, `catalog-http-service-*` and `template-ids-*`
+  //     -> the owner opens /catalog/<slug> from /sales/web-catalog
+  //   `api-error-message-*`, `format-currency-*`, `use-unsaved-changes-prompt-*`
+  //     -> generic names a POS chunk can start to reuse at any time.
+  // Those leftovers cost ~12 KB of the install, and the gate below fails if one
+  // of the patterns above ever stops matching.
 ];
 
 // Parity with today's vite.config.ts maximumFileSizeToCacheInBytes.
