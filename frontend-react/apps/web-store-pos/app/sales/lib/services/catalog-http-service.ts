@@ -702,6 +702,22 @@ export const catalogHttpService = {
   },
 
   /**
+   * Alta del pedido del GESTOR de ventas (T5b/T5c). Mismo payload que el público; el backend
+   * pone la atribución desde el token, nunca desde el cuerpo. El slug va en la ruta y el
+   * servidor verifica que la tienda pertenezca al Owner del gestor y tenga el módulo 21.
+   */
+  async createSalesManagerOrder(
+    storeSlug: string,
+    payload: CreatePublicOrderRequest,
+  ): Promise<BaseResponseModel<PublicOrderCreated>> {
+    const response = await apiClient.post<BaseResponseModel<PublicOrderCreated>>(
+      `/v1/sales-managers/orders/${encodeURIComponent(storeSlug)}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
    * Persiste el pedido SIN esperar la respuesta (modo sin "Gestión de Pedidos", 20).
    *
    * El storefront abre `wa.me` en el mismo gesto: el pedido viaja por WhatsApp y la fila se

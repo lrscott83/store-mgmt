@@ -121,6 +121,9 @@ export function PublicCatalogPage() {
    * Se calcula sobre `catalog.storeId` —el id real detrás del slug— y no sobre el slug.
    */
   const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
+  // El gestor de ventas es Owner-level: no es staff de la tienda, pero su pedido se atribuye
+  // en el servidor y SIEMPRE se envía por WhatsApp al Owner.
+  const salesManagerMode = user?.isGestorVentas === true;
 
   // Una sola regla para las cuatro llamadas: el staff de esta tienda no genera visitas de
   // cliente. Centralizarla evita que un cambio futuro se aplique a tres call-sites y se olvide
@@ -462,6 +465,7 @@ export function PublicCatalogPage() {
           config={orderingConfig}
           lines={cartLines}
           staffMode={staffMode}
+          salesManagerMode={salesManagerMode}
           onCreated={(order) => {
             clearCart(storeSlug);
             setCheckoutOpen(false);

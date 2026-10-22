@@ -10,7 +10,10 @@ import type {
 } from '~/sales/lib/services/catalog-http-service';
 import { PublicOrderDeliveryType } from '~/sales/lib/services/catalog-http-service';
 
-const serviceMock = vi.hoisted(() => ({ createPublicOrder: vi.fn() }));
+const serviceMock = vi.hoisted(() => ({
+  createPublicOrder: vi.fn(),
+  createSalesManagerOrder: vi.fn(),
+}));
 
 vi.mock('~/sales/lib/services/catalog-http-service', async () => {
   const actual = await vi.importActual<
@@ -82,6 +85,36 @@ function submitValidOrder() {
   fireEvent.change(screen.getByTestId('checkout-phone'), { target: { value: '5351234567' } });
   fireEvent.click(screen.getByTestId('checkout-submit'));
 }
+
+describe('StorefrontCheckout en modo gestor de ventas', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED));
+    serviceMock.createSalesManagerOrder.mockResolvedValue(envelope(CREATED));
+  });
+
+  it('usa el endpoint del gestor y envía el resumen por WhatsApp aunque no haya Gestión de Pedidos', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const onCreated = vi.fn();
+
+    renderCheckout({
+      salesManagerMode: true,
+      config: { ...CONFIG, gestionPedidosEnabled: false },
+      onCreated,
+    });
+
+    submitValidOrder();
+
+    await waitFor(() => expect(serviceMock.createSalesManagerOrder).toHaveBeenCalledTimes(1));
+    expect(serviceMock.createPublicOrder).not.toHaveBeenCalled();
+    const [slug] = serviceMock.createSalesManagerOrder.mock.calls[0] as [string, unknown];
+    expect(slug).toBe('mi-tienda');
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED));
+    await waitFor(() => expect(openSpy).toHaveBeenCalled());
+    openSpy.mockRestore();
+  });
+});
 
 describe('StorefrontCheckout en modo staff (sin WhatsApp)', () => {
   beforeEach(() => {

@@ -74,6 +74,12 @@ interface StorefrontCheckoutProps {
    * única constancia inmediata. La etiqueta del botón lo anuncia.
    */
   readonly staffMode?: boolean;
+  /**
+   * Quien registra es un GESTOR de ventas autenticado (rol 5, Owner-level). Usa el endpoint
+   * `sales-managers/orders`, que atribuye el pedido al gestor en el servidor, y SIEMPRE envía
+   * el resumen por WhatsApp al Owner (el gestor no atiende el pedido en un panel propio).
+   */
+  readonly salesManagerMode?: boolean;
 }
 
 /**
@@ -94,6 +100,7 @@ export function StorefrontCheckout({
   onCreated,
   onSentWithoutOrder,
   staffMode = false,
+  salesManagerMode = false,
 }: StorefrontCheckoutProps) {
   const intl = useIntl();
   const [customerName, setCustomerName] = useState('');
@@ -135,14 +142,14 @@ export function StorefrontCheckout({
    * se persiste en SEGUNDO PLANO: el pedido y el handoff por WhatsApp salen en el mismo gesto y el
    * cliente no espera a la base. Las vistas de gestión siguen ocultas hasta que se active el 20.
    */
-  const createsOrderSynchronously = config.gestionPedidosEnabled;
+  const createsOrderSynchronously = salesManagerMode || config.gestionPedidosEnabled;
 
   /**
    * ¿Sale el resumen por WhatsApp? Con gestión, el cliente anónimo siempre y el STAFF no: su
    * pedido queda en el panel y mandarlo también al chat lo duplicaría. SIN gestión, siempre
    * (también para staff): no hay panel donde verlo y el chat es la única constancia inmediata.
    */
-  const sendsByWhatsapp = createsOrderSynchronously ? !staffMode : true;
+  const sendsByWhatsapp = salesManagerMode ? true : createsOrderSynchronously ? !staffMode : true;
 
   // Un aviso del pedido ANTERIOR no puede quedar flotando mientras se hace el siguiente: abrir
   // el checkout es empezar un pedido nuevo.
@@ -200,7 +207,9 @@ export function StorefrontCheckout({
     let created: PublicOrderCreated | null = null;
     if (createsOrderSynchronously) {
       try {
-        const result = await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
+        const result = salesManagerMode
+          ? await catalogHttpService.createSalesManagerOrder(storeSlug, orderPayload)
+          : await catalogHttpService.createPublicOrder(storeSlug, orderPayload);
 
         if (!result.succeeded) {
           setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));

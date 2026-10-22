@@ -79,6 +79,26 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/v1/catalog/sync', { snapshot: null });
   });
 
+  it('createSalesManagerOrder postea al endpoint del gestor con el slug en la ruta', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.post).mockResolvedValue(okEnvelope({ id: 'o1' }) as never);
+
+    const { catalogHttpService } = await import('../catalog-http-service');
+    const payload = {
+      customerName: 'Ana',
+      customerPhone: '5351234567',
+      deliveryType: 1,
+      items: [{ productId: 'p1', quantity: 2 }],
+    };
+
+    await catalogHttpService.createSalesManagerOrder('mi tienda', payload as never);
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/sales-managers/orders/mi%20tienda',
+      payload,
+    );
+  });
+
   it('HTTP-4: saveProductFields envía SOLO los campos del catálogo al endpoint dedicado', async () => {
     const { apiClient } = await import('~/shared/lib/http/api-client');
     vi.mocked(apiClient.put).mockResolvedValue(okEnvelope(true) as never);
