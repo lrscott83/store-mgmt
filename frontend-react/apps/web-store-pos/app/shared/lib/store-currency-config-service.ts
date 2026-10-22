@@ -31,6 +31,21 @@ export const DEFAULT_STORE_CURRENCY_CONFIG: StoreCurrencyConfig = {
   sellCurrency: Currency.CUP,
 };
 
+/**
+ * Storeless session sentinel (SuperAdmin / ReSeller): `selectedStoreId` is the
+ * empty GUID (or `''` in legacy payloads). There is no store whose data this
+ * user could own, so the per-store entity layer must never read or write here —
+ * a device shared with an owner still holds a foreign store's DEK in memory, and
+ * decrypting the empty-GUID ciphertext with it fails as "damaged".
+ */
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+function isStoreless(storeId: string): boolean {
+  // Matches the route/login predicate: any falsy store id ('' / null /
+  // undefined from a legacy profile) has no store data to read or write.
+  return !storeId || storeId === EMPTY_GUID;
+}
+
 /** Coerces a stored value to a valid Currency; anything else falls back to CUP. */
 function toValidCurrency(value: unknown): Currency {
   const numeric = Number(value);
@@ -58,6 +73,11 @@ export class StoreCurrencyConfigService {
 
   /** Reads the store config, auto-initialising the default on an absent key. */
   getConfig(): StoreCurrencyConfig {
+    // Storeless session: never touch per-store storage. A device shared with an
+    // owner still carries that store's DEK, so reading the empty-GUID ciphertext
+    // here would decrypt with a foreign key and be reported as damaged data.
+    if (isStoreless(this.storeId)) return { ...DEFAULT_STORE_CURRENCY_CONFIG };
+
     let stored: StoreCurrencyConfig | null;
     try {
       stored = this.readConfigFromLocalStorage();
@@ -81,6 +101,9 @@ export class StoreCurrencyConfigService {
 
   /** Merges a patch into the current config, validates it, and persists. */
   setConfig(patch: Partial<StoreCurrencyConfig>): void {
+    // Storeless session: nothing to persist — there is no store this config
+    // belongs to.
+    if (isStoreless(this.storeId)) return;
     this.setConfigLocalStorage(normalizeConfig({ ...this.getConfig(), ...patch }));
   }
 

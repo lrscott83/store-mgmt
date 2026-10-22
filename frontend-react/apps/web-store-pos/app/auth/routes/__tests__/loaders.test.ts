@@ -364,7 +364,7 @@ describe('Route Loaders (AUTH-04)', () => {
       vi.mocked(getDeviceKey).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve(key), 10)),
       );
-      setAuthState(makeUser({ login: ORDERING_LOGIN }));
+      setAuthState(makeUser({ login: ORDERING_LOGIN, selectedStoreId: 's1' }));
 
       await authLoader();
 
@@ -393,13 +393,88 @@ describe('Route Loaders (AUTH-04)', () => {
         } as unknown as ReturnType<typeof productServiceFactory.createProductService>;
       });
 
-      setAuthState(makeUser({ login: ORDERING_LOGIN }));
+      setAuthState(makeUser({ login: ORDERING_LOGIN, selectedStoreId: 's1' }));
       await guestOnlyLoader();
 
       expect(dekWhenProductServiceCalled).not.toBeNull();
       expect(Array.from(dekWhenProductServiceCalled!)).toEqual(Array.from(dek));
 
       spy.mockRestore();
+    });
+
+    it('authLoader — a storeless SuperAdmin never recovers another store’s DEK and proceeds to home', async () => {
+      const OTHER_STORE_DEK = new Uint8Array(32).fill(0x66);
+      const key = await establishDeviceWrap(OTHER_STORE_DEK, 's1');
+      vi.mocked(getDeviceKey).mockResolvedValue(key);
+      setAuthState(
+        makeUser({
+          login: 'admin',
+          isSuperAdmin: true,
+          isOwnerAdmin: false,
+          selectedStoreId: '00000000-0000-0000-0000-000000000000',
+        }),
+      );
+
+      const result = await authLoader();
+
+      // Behavioral boundary, not just the internal key state: the loader lets
+      // the authenticated session proceed (null), never a redirect.
+      expect(result).toBeNull();
+      expect(getDek()).toBeNull();
+    });
+
+    it('authLoader — drops a DEK already in memory from a previous session', async () => {
+      setDek(new Uint8Array(32).fill(0x99), 'foreign-store');
+      setAuthState(
+        makeUser({
+          login: 'admin',
+          isSuperAdmin: true,
+          isOwnerAdmin: false,
+          selectedStoreId: '00000000-0000-0000-0000-000000000000',
+        }),
+      );
+
+      const result = await authLoader();
+
+      expect(result).toBeNull();
+      expect(getDek()).toBeNull();
+    });
+
+    it('guestOnlyLoader — routes the storeless SuperAdmin home without a foreign DEK', async () => {
+      const OTHER_STORE_DEK = new Uint8Array(32).fill(0x67);
+      const key = await establishDeviceWrap(OTHER_STORE_DEK, 's1');
+      vi.mocked(getDeviceKey).mockResolvedValue(key);
+      setAuthState(
+        makeUser({
+          login: 'admin',
+          isSuperAdmin: true,
+          isOwnerAdmin: false,
+          selectedStoreId: '00000000-0000-0000-0000-000000000000',
+        }),
+      );
+
+      const result = await guestOnlyLoader();
+
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/admin/owners');
+      expect(getDek()).toBeNull();
+    });
+
+    it('authLoader — treats an absent store id as storeless, same as login()', async () => {
+      const OTHER_STORE_DEK = new Uint8Array(32).fill(0x68);
+      const key = await establishDeviceWrap(OTHER_STORE_DEK, 's1');
+      vi.mocked(getDeviceKey).mockResolvedValue(key);
+      setAuthState(
+        makeUser({
+          login: 'legacy@test.com',
+          selectedStoreId: undefined as unknown as string,
+        }),
+      );
+
+      const result = await authLoader();
+
+      expect(result).toBeNull();
+      expect(getDek()).toBeNull();
     });
   });
 

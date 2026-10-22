@@ -43,39 +43,59 @@ The generated precache manifest MUST contain exactly one entry for
 - WHEN the build-gating verification step runs
 - THEN the build process exits non-zero and no artifact is published
 
-### Requirement: Manifest covers every file matching precache patterns
+### Requirement: Manifest contains exactly the offline route closure
 
-Every file under `build/client` matching the shared precache glob patterns
-(scripts, styles, HTML, fonts, icons, webmanifest, images, favicon) MUST
-appear in the injected manifest. Patterns and ignores MUST be defined in one
-shared module consumed by both the injector and the verifier.
+The precache manifest MUST contain exactly the URLs resolved from the built
+route manifest: for every route id in `OFFLINE_ROUTE_IDS`
+(`scripts/precache-patterns.mjs`) its module, its `imports`, its `css` and the
+same for each ancestor in the `parentId` chain, plus the entry module/imports,
+plus the transitive import graph walked on disk (static and dynamic imports),
+plus the declared static families (`*.html`, `manifest.webmanifest`,
+`favicon.png`, `icons/*.png`, `images/**/*.png`, `fonts/**/*.woff2`), plus the
+local assets the precached HTML documents reference (root-level
+`pwa-install-capture.js`, the landing page's externalized `bootstrap-*.js`), and
+the hashed route-manifest chunk. A route that is not in that list MUST NOT be
+precached. The route list, the static patterns and the forbidden chunk prefixes
+MUST live in one shared module consumed by both the injector and the verifier
+(the verifier additionally reads the forbidden prefixes).
 
-#### Scenario: On-disk asset absent from manifest fails the build
+#### Scenario: Planned asset absent from the manifest fails the build
 
-- GIVEN a file on disk matches the shared precache patterns
-- WHEN that file has no corresponding entry in the injected manifest
-- THEN the build-gating verification step fails and reports the missing file path
+- GIVEN an asset the plan resolved from the route manifest or the static
+  families
+- WHEN that asset has no corresponding entry in the injected manifest
+- THEN the build-gating verification step fails and reports the missing path
 
-#### Scenario: Non-matching file is not required
+#### Scenario: Unplanned asset in the manifest fails the build
 
-- GIVEN a file on disk does NOT match any shared precache pattern (e.g. a
-  source map)
+- GIVEN an entry in the injected manifest that the plan did not resolve
+- WHEN the verification step runs
+- THEN the build fails and reports the extra URL, because the install is
+  downloading something nobody declared
+
+#### Scenario: Online-only chunk reaching the manifest fails the build
+
+- GIVEN a chunk whose name matches `FORBIDDEN_PRECACHE_PREFIXES` (web catalog,
+  online orders, management, profile, admin)
+- WHEN it appears in the injected manifest
+- THEN the build fails: a plan-versus-injection comparison cannot catch this on
+  its own, because both sides would agree
+
+#### Scenario: Offline route id that no longer exists fails the build
+
+- GIVEN a route module renamed or removed while its id stays in
+  `OFFLINE_ROUTE_IDS`
+- WHEN the plan is resolved
+- THEN the build fails naming the unknown route id, instead of silently
+  precaching a smaller set
+
+#### Scenario: File outside the closure is not required
+
+- GIVEN a file on disk that neither the route closure nor the static families
+  reference (a source map, the SSR `server-build-*` leftovers, an online-only
+  route chunk)
 - WHEN the verification step runs
 - THEN its absence from the manifest does NOT fail the build
-
-#### Scenario: The service worker never precaches itself
-
-- GIVEN the built service worker (`build/client/service-worker.js`), which sits
-  at the glob root and therefore matches the script pattern
-- WHEN the verification step runs
-- THEN its absence from the manifest does NOT fail the build, because the
-  shared ignore list excludes it
-
-Note: `injectManifest` adds `swSrc`/`swDest` to its own ignores internally, so
-the worker is never in its own manifest. `getManifest()` — used by the
-verifier — applies no such automatic ignore. Without an explicit entry in the
-shared ignore list, the verifier reports `service-worker.js` as missing and
-fails EVERY build.
 
 ### Requirement: Exactly one injection point in the worker bundle
 

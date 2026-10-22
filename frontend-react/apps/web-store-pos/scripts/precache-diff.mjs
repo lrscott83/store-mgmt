@@ -1,11 +1,8 @@
-// Pure comparison logic for the precache build gate. Given the on-disk URLs
-// matching the shared precache patterns (workbox-build's `getManifest()`, run
-// with `PRECACHE_GLOB_IGNORES`) and the URLs actually injected into the built
+// Pure comparison logic for the precache build gate. Given the planned URLs
+// (precache-plan.mjs) and the URLs actually injected into the built
 // `service-worker.js`, decides what is missing and whether the shell / route
-// manifest invariants hold. No I/O — extracted from verify-sw-precache.mjs
-// (verify-report SUGGESTION #3, pwa-offline-shell) purely so this logic has
-// Vitest coverage; the script itself is unchanged in behavior, output, and
-// exit code.
+// manifest / allowlist invariants hold. No I/O — so this logic has Vitest
+// coverage without a real build.
 import { REQUIRED_PRECACHE_FAMILIES } from './precache-patterns.mjs';
 
 // How each declared family is recognised in a manifest URL. Kept next to the
@@ -35,7 +32,7 @@ export function checkRequiredFamilies(injectedUrls) {
     if (!matcher) {
       throw new Error(
         `checkRequiredFamilies: no matcher declared for required family "${family}" — ` +
-          'add one to FAMILY_MATCHERS in precache-diff.mjs'
+          'add one to FAMILY_MATCHERS in precache-diff.mjs',
       );
     }
     const actual = injectedUrls.filter(matcher).length;
@@ -47,14 +44,39 @@ export function checkRequiredFamilies(injectedUrls) {
   return { shortfalls, ok: shortfalls.length === 0 };
 }
 
-export function computePrecacheDiff(onDiskUrls, injectedUrls) {
+/**
+ * Compares the planned set against the injected manifest in both directions.
+ * `extra` is the allowlist's teeth: a URL nobody planned is a chunk the install
+ * downloaded without a decision. `missing` is the shell losing something.
+ */
+export function computePrecacheDiff(plannedUrls, injectedUrls) {
+  const plannedSet = new Set(plannedUrls);
   const injectedSet = new Set(injectedUrls);
-  const missing = onDiskUrls.filter((url) => !injectedSet.has(url)).sort();
+  const missing = plannedUrls.filter((url) => !injectedSet.has(url)).sort();
+  const extra = injectedUrls.filter((url) => !plannedSet.has(url)).sort();
 
   const shellCount = injectedUrls.filter((url) => url === 'index.html').length;
-  const routeManifestCount = injectedUrls.filter((url) => /^assets\/manifest-.*\.js$/.test(url)).length;
+  const routeManifestCount = injectedUrls.filter((url) =>
+    /^assets\/manifest-.*\.js$/.test(url),
+  ).length;
 
-  const ok = missing.length === 0 && shellCount === 1 && routeManifestCount === 1;
+  const ok =
+    missing.length === 0 && extra.length === 0 && shellCount === 1 && routeManifestCount === 1;
 
-  return { missing, shellCount, routeManifestCount, ok };
+  return { missing, extra, shellCount, routeManifestCount, ok };
+}
+
+/**
+ * Chunk names follow the route module file name, so a prefix survives every
+ * content hash. This is the gate's independent check: `computePrecacheDiff`
+ * compares the plan against the injection, and both sides agree when the PLAN
+ * itself regresses. A forbidden prefix in the manifest means an online-only
+ * view is being downloaded on install again.
+ */
+export function checkForbiddenPrefixes(injectedUrls, prefixes) {
+  const leaked = injectedUrls
+    .filter((url) => prefixes.some((prefix) => url.startsWith(prefix)))
+    .sort();
+
+  return { leaked, ok: leaked.length === 0 };
 }

@@ -19,7 +19,8 @@ public class CatalogStaticPageBuilderTests
         string title = "Mercado 25 y 28",
         string? description = "Mira el catálogo de Mercado 25 y 28 y haz tu pedido por WhatsApp.",
         string? image = "https://pos.playground.sceiba.net/media/logo.webp",
-        CatalogStaticPageLocation? location = null)
+        CatalogStaticPageLocation? location = null,
+        IReadOnlyList<CatalogStaticPageItem>? items = null)
         => new(
             Title: title,
             Description: description,
@@ -27,7 +28,8 @@ public class CatalogStaticPageBuilderTests
             SiteName: "Mercado 25 y 28",
             Locale: "es_ES",
             ImageUrl: image,
-            Location: location);
+            Location: location,
+            Items: items);
 
     private static CatalogStaticPageLocation Location(
         string? phone = "+53 5555 1234",
@@ -213,6 +215,112 @@ public class CatalogStaticPageBuilderTests
         ld.GetProperty("name").GetString().Should().Be(hostile);
         ld.GetProperty("description").GetString().Should().Be(hostile);
         ld.GetProperty("telephone").GetString().Should().Be(hostile);
+    }
+
+    [Fact]
+    public void Build_emits_item_list_json_ld_with_the_effective_price()
+    {
+        var html = CatalogStaticPageBuilder.Build(Shell, Meta(items: new[]
+        {
+            new CatalogStaticPageItem(
+                "Mujer y hombres primavera #1 y #2", 250.00m, "USD",
+                "https://pos.playground.sceiba.net/api/v1/public/catalog/mercado-25-y-28/media/p1.webp"),
+            new CatalogStaticPageItem("Camisa", 199.99m, "CUP"),
+        }));
+
+        var blocks = JsonLdBlocks(html);
+        blocks.Should().HaveCount(2, "LocalBusiness + ItemList");
+
+        var list = blocks[1];
+        list.GetProperty("@type").GetString().Should().Be("ItemList");
+        var elements = list.GetProperty("itemListElement");
+        elements.GetArrayLength().Should().Be(2);
+
+        var first = elements[0];
+        first.GetProperty("@type").GetString().Should().Be("ListItem");
+        first.GetProperty("position").GetInt32().Should().Be(1);
+
+        var product = first.GetProperty("item");
+        product.GetProperty("@type").GetString().Should().Be("Product");
+        product.GetProperty("name").GetString().Should().Be("Mujer y hombres primavera #1 y #2");
+        product.GetProperty("image").GetString().Should().Contain("/media/p1.webp");
+
+        var offer = product.GetProperty("offers");
+        offer.GetProperty("price").GetDecimal().Should().Be(250.00m);
+        offer.GetProperty("priceCurrency").GetString().Should().Be("USD");
+        offer.GetProperty("availability").GetString().Should().Be("https://schema.org/InStock");
+
+        // Sin imagen, la clave no se emite.
+        elements[1].GetProperty("item").TryGetProperty("image", out _).Should().BeFalse();
+        elements[1].GetProperty("item").GetProperty("offers").GetProperty("priceCurrency")
+            .GetString().Should().Be("CUP");
+    }
+
+    [Fact]
+    public void Build_omits_the_item_list_when_there_are_no_items()
+    {
+        var html = CatalogStaticPageBuilder.Build(Shell, Meta(items: Array.Empty<CatalogStaticPageItem>()));
+
+        CountOccurrences(html, "application/ld+json").Should().Be(1);
+        html.Should().NotContain("ItemList");
+    }
+
+    [Fact]
+    public void Build_trims_surrounding_spaces_from_title_and_site_name()
+    {
+        var html = CatalogStaticPageBuilder.Build(Shell, Meta(title: "  Pacas Gamez  "));
+
+        html.Should().Contain("<title>Pacas Gamez</title>");
+        html.Should().Contain("property=\"og:site_name\" content=\"Mercado 25 y 28\"");
+        html.Should().NotContain("<title>  Pacas Gamez  </title>");
+    }
+
+    [Fact]
+    public void Build_emits_twitter_image_and_falls_back_to_summary_without_image()
+    {
+        var withImage = CatalogStaticPageBuilder.Build(Shell, Meta());
+        withImage.Should().Contain("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
+        withImage.Should().Contain(
+            "<meta name=\"twitter:image\" content=\"https://pos.playground.sceiba.net/media/logo.webp\" />");
+
+        var withoutImage = CatalogStaticPageBuilder.Build(Shell, Meta(image: null));
+        withoutImage.Should().Contain("<meta name=\"twitter:card\" content=\"summary\" />");
+        withoutImage.Should().NotContain("twitter:image");
+        withoutImage.Should().NotContain("summary_large_image");
+    }
+
+    [Fact]
+    public void Build_cannot_be_closed_by_a_hostile_product_name()
+    {
+        const string hostile = "</script><script>alert(1)</script>";
+
+        var html = CatalogStaticPageBuilder.Build(
+            Shell,
+            Meta(items: new[] { new CatalogStaticPageItem(hostile, 10m, "USD") }));
+
+        html.Should().NotContain("</script><script>alert(1)</script>");
+        CountOccurrences(html, "application/ld+json").Should().Be(2);
+
+        var list = JsonLdBlocks(html)[1];
+        list.GetProperty("itemListElement")[0].GetProperty("item").GetProperty("name")
+            .GetString().Should().Be(hostile);
+    }
+
+    private static IReadOnlyList<JsonElement> JsonLdBlocks(string html)
+    {
+        const string open = "<script type=\"application/ld+json\">";
+        var blocks = new List<JsonElement>();
+        var at = html.IndexOf(open, StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            var end = html.IndexOf("</script>", at, StringComparison.Ordinal);
+            end.Should().BeGreaterThan(at);
+            var json = html.Substring(at + open.Length, end - at - open.Length);
+            using var document = JsonDocument.Parse(json);
+            blocks.Add(document.RootElement.Clone());
+            at = html.IndexOf(open, end, StringComparison.Ordinal);
+        }
+        return blocks;
     }
 
     private static JsonElement JsonLd(string html)

@@ -207,8 +207,16 @@ function announceDamagedData(): void {
 async function runRecovery(bundle: RecoveryBundle): Promise<void> {
   try {
     await offerRecoveryAfterDamage(bundle);
-  } catch {
-    // See the doc comment above.
+  } catch (error) {
+    // See the doc comment above: the user already left the session, so there is
+    // no surface to report through — but the diagnostic buffer still can.
+    logClientError({
+      level: 'error',
+      message: `[decryption-recovery] offering the recovery file failed (${
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      })`,
+      context: { storeId: bundle.meta.storeId ?? null },
+    });
   }
 }
 

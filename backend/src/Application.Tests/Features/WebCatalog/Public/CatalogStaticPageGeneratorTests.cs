@@ -1,5 +1,7 @@
 using Application.Features.WebCatalog.Public;
 using Application.Services.Stores;
+using Domain.Common.Enums;
+using Domain.Entities.Products;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -19,6 +21,7 @@ public sealed class CatalogStaticPageGeneratorTests
 
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
+    private readonly Mock<IProductRepository> _productRepository = new();
     private readonly Mock<ICatalogStaticPageWriter> _writer = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -31,14 +34,22 @@ public sealed class CatalogStaticPageGeneratorTests
             .Setup(w => w.WriteAsync(It.IsAny<string>(), It.IsAny<CatalogStaticPageMeta>(), It.IsAny<CancellationToken>()))
             .Callback<string, CatalogStaticPageMeta, CancellationToken>((slug, meta, _) => _written.Add((slug, meta)))
             .Returns(Task.CompletedTask);
+
+        // Default: catálogo sin productos publicados. Los tests que necesitan productos lo overridean.
+        _productRepository
+            .Setup(r => r.GetPublishedPageAsync(
+                It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Product>());
     }
 
-    private CatalogStaticPageGenerator CreateGenerator(string? baseUrl = BaseUrl)
+    private CatalogStaticPageGenerator CreateGenerator(string? baseUrl = BaseUrl, int itemListSize = 12)
         => new(
             _storeRepository.Object,
             _settingsRepository.Object,
+            _productRepository.Object,
             _writer.Object,
-            Options.Create(new CatalogStaticPageOptions { PublicBaseUrl = baseUrl }));
+            Options.Create(new CatalogStaticPageOptions { PublicBaseUrl = baseUrl, ItemListSize = itemListSize }));
 
     private Store ArrangeStore(string name = "Mercado 25 y 28", string? description = "Tu mercado de barrio", string? slug = "mercado-25-y-28")
     {
@@ -88,14 +99,76 @@ public sealed class CatalogStaticPageGeneratorTests
     }
 
     [Fact]
-    public async Task Generate_omits_the_image_when_the_store_has_no_branding()
+    public async Task Generate_falls_back_to_the_default_brand_image_when_the_store_has_no_branding()
     {
         ArrangeStore();
         _settingsRepository.Setup(r => r.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
 
         await CreateGenerator().GenerateAsync(_storeId);
 
-        _written[0].Meta.ImageUrl.Should().BeNull();
+        // S5: sin logo ni banner, `og:image` sale con la imagen de marca por defecto en vez de
+        // quedarse sin miniatura al compartir.
+        _written[0].Meta.ImageUrl.Should().Be($"{BaseUrl}/og-image.png");
+    }
+
+    [Fact]
+    public async Task Generate_maps_the_published_products_into_the_item_list()
+    {
+        ArrangeStore();
+        ArrangeBranding();
+        var image = Product.Create("Mujer y hombres primavera #1 y #2", Guid.NewGuid(), 250m, 1, true, true, "B-1", _tenantId, image: "p1.webp");
+        image.Currency = Currency.USD;
+        var plain = Product.Create("Camisa", Guid.NewGuid(), 199.99m, 2, true, true, "B-2", _tenantId);
+
+        IList<Product> page = new List<Product> { image, plain };
+        _productRepository
+            .Setup(r => r.GetPublishedPageAsync(_storeId, null, null, 0, 12, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(page);
+
+        await CreateGenerator().GenerateAsync(_storeId);
+
+        var items = _written[0].Meta.Items;
+        items.Should().HaveCount(2);
+        items![0].Name.Should().Be("Mujer y hombres primavera #1 y #2");
+        items[0].Price.Should().Be(250m);
+        items[0].Currency.Should().Be("USD");
+        items[0].ImageUrl.Should()
+            .Be($"{BaseUrl}/api/v1/public/catalog/mercado-25-y-28/media/p1.webp");
+
+        // Producto sin imagen: no se inventa una URL.
+        items[1].ImageUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Generate_asks_the_repository_for_the_configured_item_list_size()
+    {
+        ArrangeStore();
+        ArrangeBranding();
+        _productRepository
+            .Setup(r => r.GetPublishedPageAsync(_storeId, null, null, 0, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Product>());
+
+        await CreateGenerator(itemListSize: 5).GenerateAsync(_storeId);
+
+        _productRepository.Verify(
+            r => r.GetPublishedPageAsync(_storeId, null, null, 0, 5, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Generate_clamps_the_item_list_size_to_the_public_query_cap()
+    {
+        ArrangeStore();
+        ArrangeBranding();
+        _productRepository
+            .Setup(r => r.GetPublishedPageAsync(_storeId, null, null, 0, 60, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Product>());
+
+        await CreateGenerator(itemListSize: 500).GenerateAsync(_storeId);
+
+        _productRepository.Verify(
+            r => r.GetPublishedPageAsync(_storeId, null, null, 0, 60, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

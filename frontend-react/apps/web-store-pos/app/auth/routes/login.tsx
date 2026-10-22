@@ -406,6 +406,15 @@ export default function LoginPage() {
       </div>
 
       <OfflineAccessPanel />
+
+      <div className="mt-4 text-center">
+        <Link
+          to="/diagnostics"
+          className="text-xs text-gray-500 underline hover:text-gray-700"
+        >
+          {intl.formatMessage({ id: 'DIAGNOSTICS.TITLE' })}
+        </Link>
+      </div>
     </div>
   );
 }

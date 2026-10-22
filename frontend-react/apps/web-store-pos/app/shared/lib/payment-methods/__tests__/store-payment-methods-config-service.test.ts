@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Currency, PAYMENT_CHANNELS, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
 import {
   ALL_CHANNEL_KEYS,
@@ -13,9 +13,12 @@ import {
 import type { StorePaymentMethodsConfig } from '../store-payment-methods-config-service';
 import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { clearDek, setDek } from '~/shared/lib/storage/data-key-store';
+import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 
 const S1 = 's1';
 const S2 = 's2';
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
 
 function storageKey(storeId: string): string {
   return StorageKeys.entityKey('storePaymentMethods', storeId);
@@ -23,6 +26,7 @@ function storageKey(storeId: string): string {
 
 beforeEach(() => {
   localStorage.clear();
+  clearDek();
 });
 
 describe('StorePaymentMethodsConfigService — default / auto-init', () => {
@@ -418,5 +422,92 @@ describe('applyStorePaymentMethodsConfig (compositor)', () => {
       'Transferencia (CUP)',
     );
     expect(salePaymentMethodLabel(SalePaymentMethod.Zelle, Currency.CUP)).toBe('Zelle');
+  });
+});
+
+describe('StorePaymentMethodsConfigService — storeless session (SuperAdmin)', () => {
+  it('returns the defaults without reading a foreign-key ciphertext', () => {
+    const key = storageKey(EMPTY_GUID);
+    setDek(new Uint8Array(32).fill(0x11), 'store-a');
+    const ciphertext = encryptEntity(
+      JSON.stringify({ enabledChannels: DEFAULT_ENABLED_CHANNEL_KEYS }),
+    );
+    localStorage.setItem(key, ciphertext);
+    setDek(new Uint8Array(32).fill(0x22), 'store-b');
+
+    const service = new StorePaymentMethodsConfigService(EMPTY_GUID);
+
+    expect(() => service.getEnabledChannels(EMPTY_GUID)).not.toThrow();
+    expect(service.getEnabledChannels(EMPTY_GUID)).toEqual([...DEFAULT_ENABLED_CHANNEL_KEYS]);
+    expect(localStorage.getItem(key)).toBe(ciphertext);
+  });
+
+  it('never persists channel changes for a storeless session', () => {
+    const service = new StorePaymentMethodsConfigService(EMPTY_GUID);
+    service.setChannelEnabled(EMPTY_GUID, SalePaymentMethod.Zelle, Currency.USD, false);
+
+    expect(localStorage.getItem(storageKey(EMPTY_GUID))).toBeNull();
+    expect(service.getEnabledChannels(EMPTY_GUID)).toEqual([...DEFAULT_ENABLED_CHANNEL_KEYS]);
+  });
+
+  it('hands out a fresh channel array, so mutating it cannot poison the default', () => {
+    const service = new StorePaymentMethodsConfigService(EMPTY_GUID);
+    const first = service.getConfig(EMPTY_GUID).enabledChannels ?? [];
+    first.push('bogus|0');
+
+    expect(DEFAULT_STORE_PAYMENT_METHODS_CONFIG.enabledChannels ?? []).toEqual([
+      ...DEFAULT_ENABLED_CHANNEL_KEYS,
+    ]);
+    expect(service.getConfig(EMPTY_GUID).enabledChannels ?? []).toEqual([
+      ...DEFAULT_ENABLED_CHANNEL_KEYS,
+    ]);
+  });
+
+  it('backup read/write seams are inert for a storeless session', () => {
+    const key = storageKey(EMPTY_GUID);
+    setDek(new Uint8Array(32).fill(0x11), 'store-a');
+    const ciphertext = encryptEntity(
+      JSON.stringify({ enabledChannels: DEFAULT_ENABLED_CHANNEL_KEYS }),
+    );
+    localStorage.setItem(key, ciphertext);
+    setDek(new Uint8Array(32).fill(0x22), 'store-b');
+    const service = new StorePaymentMethodsConfigService(EMPTY_GUID);
+
+    // The read seam must NOT touch the foreign-key ciphertext.
+    expect(() => service.getStorageStorePaymentMethods(EMPTY_GUID)).not.toThrow();
+    expect(service.getStorageStorePaymentMethods(EMPTY_GUID)).toBeNull();
+
+    // The backup write seam must not persist anything.
+    service.setConfigFromBackup({ enabledChannels: ['1|2'] }, EMPTY_GUID);
+    expect(localStorage.getItem(key)).toBe(ciphertext);
+  });
+
+  it('treats absent and null store ids as storeless across every seam', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      for (const rawStoreId of [undefined, null]) {
+        const storeId = rawStoreId as unknown as string;
+        const service = new StorePaymentMethodsConfigService(storeId);
+
+        expect(service.getConfig(storeId)).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
+        expect(service.getEnabledChannels(storeId)).toEqual([...DEFAULT_ENABLED_CHANNEL_KEYS]);
+        expect(service.getStorageStorePaymentMethods(storeId)).toBeNull();
+        service.setChannelEnabled(storeId, SalePaymentMethod.Zelle, Currency.USD, false);
+        service.setConfigFromBackup({ enabledChannels: ['1|2'] }, storeId);
+
+        // Per-iteration scan: a write that a later representation removes
+        // cannot hide here.
+        const paymentKeys: string[] = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('lizoft.store-storePaymentMethods-')) paymentKeys.push(key);
+        }
+        expect(paymentKeys).toEqual([]);
+      }
+
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });

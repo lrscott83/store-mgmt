@@ -129,6 +129,13 @@ describe('DiagnosticsPage — filters', () => {
   });
 });
 
+describe('DiagnosticsPage — public access', () => {
+  it('exports no guarded clientLoader so the page renders without a session', async () => {
+    const mod = await import('../diagnostics');
+    expect('clientLoader' in mod).toBe(false);
+  });
+});
+
 describe('DiagnosticsPage — share / download / copy / clear', () => {
   it('downloads the export when navigator.share is NOT available (desktop fallback)', async () => {
     logClientError({ level: 'error', message: 'to be exported' });
@@ -143,6 +150,24 @@ describe('DiagnosticsPage — share / download / copy / clear', () => {
 
     await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
     expect(revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it('sends the whole diagnostic to the owner WhatsApp number (download + open chat)', async () => {
+    logClientError({ level: 'error', message: 'whatsapp entry' });
+
+    const createObjectURL = vi.fn(() => 'blob:mock');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(window.URL, 'createObjectURL', { value: createObjectURL, configurable: true });
+    Object.defineProperty(window.URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true });
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: esMessages['DIAGNOSTICS.SEND_WHATSAPP'] }));
+
+    // The full artifact leaves as a file (never truncated into a URL) and the
+    // chat with the fixed owner number opens so it can be attached.
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+    expect(openSpy).toHaveBeenCalledWith('https://wa.me/5352432968', '_blank', 'noopener');
   });
 
   it('uses navigator.share with the export file when available (installed PWA)', async () => {

@@ -35,6 +35,26 @@ namespace Application.Features.WebCatalog.Public
         /// <summary>Intervalo efectivo del sincronizador, ya acotado al mínimo.</summary>
         public TimeSpan SynchronizationInterval => TimeSpan.FromSeconds(Math.Max(5, SynchronizationIntervalSeconds));
 
+        /// <summary>Tope duro de <see cref="ItemListSize"/>: el mismo <c>MaxPageSize</c> de la query pública.</summary>
+        public const int MaxItemListSize = 60;
+
+        /// <summary>
+        /// Productos que entran en el JSON-LD <c>ItemList</c>. El default 12 NO es arbitrario: es el
+        /// <c>PAGE_SIZE</c> del catálogo público (<c>public-catalog.tsx</c>), la primera página que ve
+        /// el visitante, así el markup describe exactamente lo que la página muestra. Se acota a
+        /// 1..<see cref="MaxItemListSize"/> para que una configuración errónea no genere un HTML enorme.
+        /// </summary>
+        public int ItemListSize { get; set; } = 12;
+
+        /// <summary>Valor efectivo de <see cref="ItemListSize"/>, acotado.</summary>
+        public int EffectiveItemListSize => Math.Clamp(ItemListSize, 1, MaxItemListSize);
+
+        /// <summary>
+        /// Ruta de la imagen de marca usada como <c>og:image</c> cuando el catálogo no tiene logo ni
+        /// banner, relativa a <see cref="PublicBaseUrl"/>. Evita compartir el catálogo sin miniatura.
+        /// </summary>
+        public string DefaultImagePath { get; set; } = "/og-image.png";
+
         /// <summary>
         /// La pre-generación está CONFIGURADA en este entorno. Distingue "apagada" de "rota": sin
         /// <see cref="ShellPath"/> ni <see cref="OutputRoot"/> la feature no aplica (dev, tests, un

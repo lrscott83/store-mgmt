@@ -10,6 +10,11 @@ import { StorageKeys } from '../storage-keys';
 import { importRoster, clearRoster } from '../../offline/roster-store';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
+const logClientErrorMock = vi.fn();
+vi.mock('../../diagnostics/client-log', () => ({
+  logClientError: (...args: unknown[]) => logClientErrorMock(...args),
+}));
+
 const STORE_A = 's1';
 const STORE_B = 's2';
 const DEK = new Uint8Array(32).fill(0x09);
@@ -201,5 +206,45 @@ describe('runEntityMigration — local-DEK device with no roster (device-wrapped
     expect(after).not.toBeNull();
     expect(isEncrypted(after!)).toBe(true);
     expect(decryptEntity(after)).toBe(productsRaw);
+  });
+});
+
+// Diagnóstico: a per-key storage failure is a REAL error (quota/corrupt storage),
+// not an expected degradation. It must leave a trace instead of vanishing.
+describe('runEntityMigration - silent per-key failure is diagnosed', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    clearRoster();
+    logClientErrorMock.mockClear();
+  });
+
+  it('logs one error with entity + key context and keeps migrating the remaining keys', () => {
+    setDek(DEK, STORE_A);
+    const [failingKey, healthyKey] = ENTITY_KEYS;
+    localStorage.setItem(failingKey, 'plain-failing');
+    localStorage.setItem(healthyKey, 'plain-healthy');
+
+    const realSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (key === failingKey) throw new DOMException('quota', 'QuotaExceededError');
+      realSetItem.call(this, key, value);
+    });
+
+    runEntityMigration();
+
+    expect(logClientErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'error',
+        message: expect.stringContaining('[entity-migration]'),
+        context: expect.objectContaining({ entity: 'products', storageKey: failingKey }),
+      }),
+    );
+    // Isolation still holds: the next key was converted.
+    expect(isEncrypted(localStorage.getItem(healthyKey) ?? '')).toBe(true);
   });
 });

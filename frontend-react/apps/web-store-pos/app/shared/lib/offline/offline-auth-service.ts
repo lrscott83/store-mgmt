@@ -9,6 +9,7 @@ import { OFFLINE_SESSION_TOKEN } from './offline-session';
 import { unwrapDek } from './dek-unwrap';
 import { setDek } from '../storage/data-key-store';
 import { runEntityMigration } from '../storage/entity-migration';
+import { logClientError } from '../diagnostics/client-log';
 
 export class NoRosterError extends Error {
   readonly name = 'NoRosterError';
@@ -147,8 +148,17 @@ export async function authenticateOffline(login: string, password: string): Prom
     // log in".
     try {
       runEntityMigration();
-    } catch {
-      // intentionally swallowed — see comment above.
+    } catch (error) {
+      // intentionally swallowed for login — see comment above — but it is a
+      // REAL error (per-key failures are already isolated and logged):
+      // record it so it does not disappear.
+      logClientError({
+        level: 'error',
+        message: `[offline-auth] entity migration failed (${
+          error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        })`,
+        context: { storeId: bundle.storeId },
+      });
     }
   }
 

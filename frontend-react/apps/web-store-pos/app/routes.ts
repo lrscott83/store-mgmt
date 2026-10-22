@@ -179,10 +179,6 @@ export default [
     // Profile â€” User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
-
-    // Diagnostics — client-error-log ring buffer viewer (client-error-log plan).
-    // adminLoader = SuperAdmin or OwnerAdmin only; the menu item gates the same set.
-    route('diagnostics', 'diagnostics/routes/diagnostics.tsx'),
   ]),
 
   // Help â€” Tutorial (PUBLIC â€” mirrors Angular's app-routing.module.ts:89-97,
@@ -190,6 +186,11 @@ export default [
   // guard). Same chrome as app-layout, but reached via a layout module that
   // does NOT re-export authLoader as its clientLoader.
   layout('shared/components/public-app-layout.tsx', { id: 'public-app-layout' }, [
+    // Diagnostics - client-error-log ring buffer viewer. PUBLIC on purpose
+    // (2026-10-22): the owner must be able to open it and send the log from a
+    // device that cannot sign in. Same chrome as app-layout, no authLoader. The
+    // menu item still gates it to SuperAdmin/OwnerAdmin for discoverability.
+    route('diagnostics', 'diagnostics/routes/diagnostics.tsx'),
     route('help/tutorial', 'help/routes/tutorial.tsx'),
     // Páginas legales (PÚBLICAS): el footer las enlaza también desde el layout de
     // invitado y el register las abre en otra pestaña, así que NO pueden pasar por
