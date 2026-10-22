@@ -5,7 +5,9 @@ using Application.UnitOfWorks;
 using System.Text.Json;
 using Domain.Common.Enums;
 using Domain.Entities.OrderItems;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
+using Domain.Entities.SalesManagers;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.StoreCatalogSettings;
@@ -62,6 +64,8 @@ public class CreateOnlineOrderCommandHandlerTests
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStoreModuleRepository> _moduleRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
+    private readonly Mock<ISalesManagerRepository> _salesManagerRepository = new();
+    private readonly Mock<IOrderSalesManagerRepository> _orderSalesManagerRepository = new();
 
     private readonly string _slug = "tienda-ana";
     private Guid _storeId;
@@ -101,7 +105,9 @@ public class CreateOnlineOrderCommandHandlerTests
         _orderRepository.Object,
         _settingsRepository.Object,
         _moduleRepository.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _salesManagerRepository.Object,
+        _orderSalesManagerRepository.Object);
 
     /// <summary>
     /// La tienda NO tiene activo "Pedidos WhatsApp" (19): no hay carrito ni pedidos nuevos, así que
@@ -1058,6 +1064,68 @@ public class CreateOnlineOrderCommandHandlerTests
 
         _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
         _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// T5b: cuando el endpoint gestor-only marca `SalesManagerUserId`, el pedido se atribuye en
+    /// la MISMA transacción (tabla propia `OrderSalesManager`). El público no lo marca y no crea
+    /// atribución.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldAttributeTheOrderToTheGestor_WhenSalesManagerUserIdIsSet()
+    {
+        Store store = PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestoresVentas]);
+
+        var manager = SalesManager.Create(Guid.NewGuid(), store.OwnerId, _tenantId);
+        _salesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(manager.UserId, false))
+            .ReturnsAsync(manager);
+        _orderSalesManagerRepository
+            .Setup(x => x.AddAsync(It.IsAny<OrderSalesManager>()))
+            .ReturnsAsync((OrderSalesManager attribution) => attribution);
+
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+        command.SalesManagerUserId = manager.UserId;
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        _orderSalesManagerRepository.Verify(
+            x => x.AddAsync(It.Is<OrderSalesManager>(a =>
+                a.SalesManagerId == manager.Id
+                && a.OwnerId == store.OwnerId
+                && a.StoreId == store.Id)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldRejectAGestorFromAnotherOwner()
+    {
+        Store store = PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestoresVentas]);
+
+        var foreignManager = SalesManager.Create(Guid.NewGuid(), Guid.NewGuid(), _tenantId);
+        _salesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(foreignManager.UserId, false))
+            .ReturnsAsync(foreignManager);
+
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 1);
+        command.SalesManagerUserId = foreignManager.UserId;
+
+        Func<Task> act = () => Handler().Handle(command, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
     }
 
     /// <summary>

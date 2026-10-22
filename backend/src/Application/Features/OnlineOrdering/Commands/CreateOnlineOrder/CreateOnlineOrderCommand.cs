@@ -4,14 +4,17 @@ using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
 using Domain.Entities.Products;
+using Domain.Entities.SalesManagers;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
+using System.Text.Json.Serialization;
 
 namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 {
@@ -72,6 +75,14 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
         /// <summary>Las líneas del carrito. El precio de cada una lo pone el catálogo.</summary>
         public List<CreateOnlineOrderLineRequest> Items { get; set; } = [];
+
+        /// <summary>
+        /// Gestor al que se atribuye el pedido. Lo pone SIEMPRE el servidor (el endpoint
+        /// gestor-only), nunca el cuerpo: `[JsonIgnore]` evita que un cliente público pueda
+        /// atribuirse un pedido. Null = pedido público normal, sin atribución.
+        /// </summary>
+        [JsonIgnore]
+        public Guid? SalesManagerUserId { get; set; }
     }
 
     /// <summary>Una línea del carrito: QUÉ producto y CUÁNTO. Nunca a qué precio.</summary>
@@ -132,6 +143,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ISalesManagerRepository _salesManagerRepository;
+        private readonly IOrderSalesManagerRepository _orderSalesManagerRepository;
 
         public CreateOnlineOrderCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -140,7 +153,9 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             IOrderRepository orderRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             IStoreModuleRepository storeModuleRepository,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            ISalesManagerRepository salesManagerRepository,
+            IOrderSalesManagerRepository orderSalesManagerRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeRepository = storeRepository;
@@ -149,6 +164,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _storeModuleRepository = storeModuleRepository;
             _localizer = localizer;
+            _salesManagerRepository = salesManagerRepository;
+            _orderSalesManagerRepository = orderSalesManagerRepository;
         }
 
         public async Task<ResponseResult<OnlineOrderCreatedDto>> Handle(CreateOnlineOrderCommand request,
@@ -171,7 +188,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             Guid tenantId = store.TenantId;
 
             StoreCatalogSettings settings = await LoadEnabledSettingsAsync(storeId);
-            await EnsurePedidosWhatsAppAsync(storeId);
+            IReadOnlyCollection<int> activeModuleIds = await EnsurePedidosWhatsAppAsync(storeId);
+            await EnsureGestoresModuleAsync(storeId, activeModuleIds, request.SalesManagerUserId);
             OrderDeliveryType deliveryType = ResolveDeliveryType(request.DeliveryType, settings);
             ValidateDeliveryAddress(deliveryType, request.DeliveryAddress);
 
@@ -245,6 +263,23 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             // error y sin aviso. Por eso el alta es explícita.
             await _orderRepository.AddAsync(order);
 
+            if (request.SalesManagerUserId is { } salesManagerUserId)
+            {
+                SalesManager? salesManager = await _salesManagerRepository.GetByUserIdAsync(salesManagerUserId);
+                if (salesManager is null || !salesManager.IsActive || salesManager.OwnerId != store.OwnerId)
+                    throw new ApiException(
+                        "El gestor no pertenece al Owner de esta tienda.",
+                        HttpStatusCode.Forbidden);
+
+                OrderSalesManager attribution = OrderSalesManager.Create(
+                    order.Id,
+                    salesManager.Id,
+                    salesManager.OwnerId,
+                    store.Id,
+                    tenantId);
+                await _orderSalesManagerRepository.AddAsync(attribution);
+            }
+
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
             return ResponseResult.Success(new OnlineOrderCreatedDto(
@@ -308,13 +343,36 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         /// Se comprueba DESPUÉS de la configuración y ANTES de cualquier escritura: una tienda sin
         /// el módulo recibe 400 sin que se llegue a crear el <c>Order</c>.
         /// </summary>
-        private async Task EnsurePedidosWhatsAppAsync(Guid storeId)
+        private async Task<IReadOnlyCollection<int>> EnsurePedidosWhatsAppAsync(Guid storeId)
         {
             IReadOnlyCollection<int> activeModuleIds =
                 await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(storeId);
 
             if (!activeModuleIds.Contains((int)ModuleType.PedidosWhatsApp))
                 throw new ApiException(_localizer["OnlineOrdersModuleNotEnabled", storeId], HttpStatusCode.BadRequest);
+
+            return activeModuleIds;
+        }
+
+        /// <summary>
+        /// Un pedido atribuido a un gestor solo se acepta si la tienda tiene el módulo 21 activo:
+        /// sin el módulo no se escribe comisión (S10) y tampoco tiene sentido atribuir el pedido.
+        /// El pedido público normal no pasa por esta puerta.
+        /// </summary>
+        private static Task EnsureGestoresModuleAsync(
+            Guid storeId,
+            IReadOnlyCollection<int> activeModuleIds,
+            Guid? salesManagerUserId)
+        {
+            if (salesManagerUserId is not null
+                && !activeModuleIds.Contains((int)ModuleType.GestoresVentas))
+            {
+                throw new ApiException(
+                    "El módulo de gestores de ventas no está activo en esta tienda.",
+                    HttpStatusCode.BadRequest);
+            }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
