@@ -21,8 +21,16 @@ tarjeta de importación **solo** aparece en modo admin (con `storeId`); el dueñ
 importación de `/sales/products`.
 
 S2. Columnas aceptadas (encabezados, sin distinguir mayúsculas): `categoria`/`category`,
-`nombre`/`name`, `precio`/`price`, `moneda`/`currency` o `precio_moneda`/`price_currency`. Se
-reutiliza `parseCsvProducts` (quote-aware, RFC4180). Sin moneda o con moneda desconocida = `CUP`.
+`nombre`/`name`/`producto`/`product`, `precio`/`price`/`precio_venta`/`sale_price`,
+`moneda`/`currency`/`moneda_venta`/`sale_currency` (o `precio_moneda`/`price_currency`). Se
+reutiliza `parseCsvProducts` (quote-aware, RFC4180) **con `allowCurrencyNames: true`**, que es lo
+único que habilita la moneda por código (`USD`) en la columna `moneda`; el import del POS del dueño
+conserva el modo estricto (solo el número del enum, no numérico → `undefined` → CUP). Sin moneda o
+con moneda desconocida = `CUP`.
+
+S2b. El import es por lotes con tope de filas y deduplicado por (categoría + producto): si el
+archivo repite un par, se procesa UNA vez y gana la última aparición; `rowsProcessed` cuenta filas
+efectivas.
 
 S3. Upsert por (categoría + producto), comparando nombres **sin distinguir mayúsculas**. Crea
 categorías y productos faltantes; en los existentes actualiza **solo** `Price` y `Currency`.
@@ -57,6 +65,7 @@ existentes. Se añaden tests nuevos.
 | D4 | Productos reales | Aviso explícito en la UI | El catálogo publica `Product`/`ProductCategory`; no hay copia aparte. |
 | D5 | Slugs | Se generan en el import si faltan | Sin slug la categoría no se publica (filtro del catálogo público). |
 | D6 | Entrega | Rama stacked sobre la del catálogo admin | La vista y los endpoints dependen de esa rama aún sin fusionar. |
+| D7 | Moneda por código | Opt-in (`allowCurrencyNames`) en el parser compartido | El import del POS del dueño es un contrato existente: aceptar códigos en `moneda` cambiaría la moneda de un CSV suyo sin pedirlo. |
 
 ## Tareas
 
@@ -134,6 +143,23 @@ L6 (2026-10-23, RDD — receipt-driven development):
 - Falso positivo comprobado: R3-3 (la regeneración no es best-effort) — `CatalogStaticPageRegenerator`
   captura toda excepción y nunca lanza (`CatalogStaticPageRegenerator.cs:43-59`).
 - Pendiente: el commit de la vista store-scoped (`697dd1d6`, item 2 seguridad) sigue sin RDD.
+
+L7 (2026-10-23, correcciones tras la revisión RDD):
+- R1/R3-5: la moneda por código del parser quedó **opt-in** (`allowCurrencyNames`); el import del
+  POS del dueño vuelve a resolver un valor no numérico a `undefined` (CUP). Tests del parser
+  cubren ambos modos y la suite del POS sigue verde.
+- R3-2: filas duplicadas en un mismo archivo se deduplican por (categoría + producto) antes de
+  escribir; gana la última y el resumen cuenta filas efectivas.
+- R3-1: `rows: null`/vacío se rechaza con 400 y mensaje propio (`CatalogCsvEmpty`), sin 500 ni
+  "fila 0".
+- R3-4: la recarga posterior al import ya no está en el `try`: un fallo de recarga no reporta el
+  import como fallido.
+- R2-7: la tarjeta muestra el `description` del backend (la fila rechazada) en vez de un texto fijo.
+- R3-7 + bug real atrapado por el test nuevo: una categoría existente SIN productos no estaba en
+  el diccionario agrupado y el handler lanzaba `KeyNotFoundException`; ahora se crea la lista.
+- R2-1: la doc del DTO y `ResolveCurrency` ya no prometen un fallback a CUP que el handler rechaza.
+- Tests nuevos: E2E de lista vacía, moneda fuera del enum, filas duplicadas y backfill de slug en
+  categoría existente (8/8 verdes); Vitest de los archivos tocados 122/122.
 
 L5 (2026-10-22, evidencia):
 - `dotnet build src/SMCA.sln`: Build succeeded.

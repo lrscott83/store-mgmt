@@ -700,6 +700,12 @@
   <data name="CatalogCsvInvalidRow" xml:space="preserve">
     <value>CSV row {0} is invalid: check the category, the product and the price.</value>
   </data>
+  <data name="CatalogCsvEmpty" xml:space="preserve">
+    <value>The CSV has no rows to import.</value>
+  </data>
+  <data name="CatalogCsvTooManyRows" xml:space="preserve">
+    <value>The CSV exceeds the maximum of {0} rows per import.</value>
+  </data>
   <data name="ApiRequestInvalid" xml:space="preserve">
     <value>The request is not valid</value>
   </data>

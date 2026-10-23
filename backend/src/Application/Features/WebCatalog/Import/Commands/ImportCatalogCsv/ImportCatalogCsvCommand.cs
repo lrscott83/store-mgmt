@@ -77,6 +77,17 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
             // CSV en una hoja de cálculo (sin contar el encabezado, que se explica en la UI).
             ValidateRows(request.Rows);
 
+            // Un mismo (categoría, producto) repetido en el archivo se procesa UNA vez y gana la
+            // última aparición. Sin esto, la segunda pasada encontraría el producto que la primera
+            // acaba de Añadir en esta misma unidad de trabajo, lo marcaría Update y el resumen
+            // contaría como actualizado algo que en realidad se creó.
+            IReadOnlyList<CatalogCsvRowDto> rows = request.Rows
+                .GroupBy(row => (
+                    row.CategoryName.Trim().ToUpperInvariant(),
+                    row.ProductName.Trim().ToUpperInvariant()))
+                .Select(group => group.Last())
+                .ToList();
+
             Store store = await _storeRepository.GetStoreByIdAsync(storeId)
                 ?? throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
 
@@ -109,7 +120,7 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
             int maxCategoryOrder = categories.Count == 0 ? 0 : categories.Max(category => category.Order);
             int categoriesCreated = 0, productsCreated = 0, productsUpdated = 0;
 
-            foreach (CatalogCsvRowDto row in request.Rows)
+            foreach (CatalogCsvRowDto row in rows)
             {
                 string categoryName = row.CategoryName.Trim();
                 string productName = row.ProductName.Trim();
@@ -139,7 +150,14 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
                     await _productCategoryRepository.UpdateAsync(category);
                 }
 
-                List<Product> categoryProducts = productsByCategory[category.Id];
+                // Una categoría existente puede no tener NINGÚN producto: entonces no aparece en el
+                // diccionario agrupado y hay que crearla aquí, no asumir la clave.
+                if (!productsByCategory.TryGetValue(category.Id, out List<Product>? categoryProducts))
+                {
+                    categoryProducts = new List<Product>();
+                    productsByCategory[category.Id] = categoryProducts;
+                }
+
                 Product? existing = categoryProducts.FirstOrDefault(product =>
                     string.Equals(product.Name.Trim(), productName, StringComparison.OrdinalIgnoreCase));
 
@@ -177,22 +195,48 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
             await _catalogPageRegenerator.RegenerateAsync(storeId, cancellationToken);
 
             return ResponseResult.Success(new CatalogCsvImportSummaryDto(
-                categoriesCreated, productsCreated, productsUpdated, request.Rows.Count));
+                categoriesCreated, productsCreated, productsUpdated, rows.Count));
         }
 
-        private void ValidateRows(IReadOnlyList<CatalogCsvRowDto> rows)
+        /// <summary>
+        /// Tope de filas por import: el endpoint es de SuperAdmin y todo o nada, así que una subida
+        /// enorme acabaría en una sola transacción y una sola respuesta. El límite es de sanidad,
+        /// no de negocio: cincuenta mil productos en un archivo es un error de quien lo preparó.
+        /// </summary>
+        public const int MaxRowsPerImport = 50_000;
+
+        private void ValidateRows(IReadOnlyList<CatalogCsvRowDto>? rows)
         {
-            if (rows.Count == 0)
+            // Un cuerpo sin `rows` (o con `rows: null`) deserializa a null: sin este guard el
+            // handler lanzaría NullReferenceException y el cliente vería un 500 en vez del 400 que
+            // documenta el contrato. Se usa un mensaje propio para no hablar de una "fila 0".
+            if (rows is null || rows.Count == 0)
             {
                 throw new ValidationException
                 {
-                    Errors = [new Error("Rows", _localizer["CatalogCsvInvalidRow", 0])]
+                    Errors = [new Error("Rows", _localizer["CatalogCsvEmpty"])]
+                };
+            }
+
+            if (rows.Count > MaxRowsPerImport)
+            {
+                throw new ValidationException
+                {
+                    Errors = [new Error("Rows", _localizer["CatalogCsvTooManyRows", MaxRowsPerImport])]
                 };
             }
 
             for (int index = 0; index < rows.Count; index++)
             {
-                CatalogCsvRowDto row = rows[index];
+                CatalogCsvRowDto? row = rows[index];
+                if (row is null)
+                {
+                    throw new ValidationException
+                    {
+                        Errors = [new Error($"Rows[{index + 1}]", _localizer["CatalogCsvInvalidRow", index + 1])]
+                    };
+                }
+
                 bool invalid = string.IsNullOrWhiteSpace(row.CategoryName)
                     || string.IsNullOrWhiteSpace(row.ProductName)
                     || row.Price < 0
@@ -208,7 +252,7 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
             }
         }
 
-        private static Currency ResolveCurrency(Currency? currency)
-            => currency.HasValue && Enum.IsDefined(currency.Value) ? currency.Value : Currency.CUP;
+        // ValidateRows ya rechazó un valor fuera del enum: aquí solo queda el default del dominio.
+        private static Currency ResolveCurrency(Currency? currency) => currency ?? Currency.CUP;
     }
 }

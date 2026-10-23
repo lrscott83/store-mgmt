@@ -179,18 +179,23 @@ function parseOptionalCurrency(raw: string): Currency | undefined {
 }
 
 /**
- * Moneda por NOMBRE (`USD`) o por el número del enum (`1`) — nunca un error.
+ * Moneda de la columna `moneda`: por el número del enum SIEMPRE, y por NOMBRE solo cuando el
+ * llamador lo autoriza (`allowNames`).
  *
- * El número se resuelve PRIMERO con `parseOptionalCurrency`: `parseCurrencyByName` mira
+ * El número se resuelve primero con `parseOptionalCurrency`: `parseCurrencyByName` mira
  * `Currency[raw]`, y en un enum numérico TypeScript eso devuelve el NOMBRE del miembro (mapeo
- * inverso: `Currency['1'] === 'USD'`), no el valor. Sin este orden, un CSV con `moneda=1`
- * devolvería la cadena `'USD'` en vez del número que el resto del dominio espera.
+ * inverso: `Currency['1'] === 'USD'`), no el valor.
+ *
+ * Por defecto NO se aceptan nombres: la columna `moneda` es parte del contrato del import del POS
+ * del dueño, donde un valor no numérico siempre cayó a CUP. Aceptar códigos ahí cambiaría la
+ * moneda de un CSV existente sin que nadie lo pidiera; el import de catálogo del SuperAdmin pide
+ * el modo por nombre explícitamente.
  */
-function parseCurrencyCell(raw: string): Currency | undefined {
+function parseCurrencyCell(raw: string, allowNames: boolean): Currency | undefined {
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
   if (!isNaN(Number(trimmed))) return parseOptionalCurrency(trimmed);
-  return parseCurrencyByName(trimmed);
+  return allowNames ? parseCurrencyByName(trimmed) : undefined;
 }
 
 /**
@@ -214,7 +219,18 @@ export function parseCurrencyByName(raw: string): Currency | undefined {
   return undefined;
 }
 
-export function parseCsvProducts(csvText: string): CsvParseResult {
+/** Opciones del parser. Sin opciones, el contrato es el del import del POS del dueño. */
+export interface CsvParseOptions {
+  /**
+   * `true` = la columna `moneda`/`currency` acepta también el CÓDIGO (`USD`) además del número del
+   * enum. Lo pide el import de catálogo del SuperAdmin (su columna se documenta como moneda de
+   * venta). Por defecto `false`: un valor no numérico sigue resolviendo a `undefined` (CUP), que es
+   * lo que un CSV existente del POS ya hacía.
+   */
+  allowCurrencyNames?: boolean;
+}
+
+export function parseCsvProducts(csvText: string, options: CsvParseOptions = {}): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
 
@@ -293,7 +309,10 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
     // Acepta NOMBRE (`USD`) o el número del enum (`1`). El import de catálogo del SuperAdmin
     // (2026-10-22) documenta la columna como moneda de venta, y escribirla por código es lo
     // natural; los CSV numéricos existentes siguen funcionando igual.
-    const currency = parseCurrencyCell(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
+    const currency = parseCurrencyCell(
+      currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '',
+      options.allowCurrencyNames === true,
+    );
 
     // --- MultiMonedas CSV (2026-09-22): monedas por NOMBRE, case-insensitive ---
     const priceCurrency = parseCurrencyByName(

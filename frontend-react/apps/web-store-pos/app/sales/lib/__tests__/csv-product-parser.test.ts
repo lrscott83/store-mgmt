@@ -378,12 +378,19 @@ describe('parseCsvProducts', () => {
       expect(result.products[0].currency).toBeUndefined();
     });
 
-    it('resuelve la moneda por NOMBRE ("USD") en la columna moneda (import de catálogo, 2026-10-22)', () => {
-      // Antes esta celda se ignoraba (solo se aceptaba el número del enum). El import de catálogo
-      // del SuperAdmin documenta `moneda_venta` como código, así que `moneda` también lo acepta:
-      // el cambio es ADITIVO — los CSV numéricos siguen resolviendo igual (caso anterior).
+    it('sin opciones, una celda no numérica ("USD") sigue resolviendo undefined — contrato del POS', () => {
+      // Este es el contrato del import del dueño y NO se toca: la moneda por código existe solo
+      // para el import de catálogo del SuperAdmin, que la pide explícitamente.
       const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
       const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('con allowCurrencyNames, la columna moneda resuelve el código ("USD")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
+      const result = parseCsvProducts(csv, { allowCurrencyNames: true });
       expect(result.products).toHaveLength(1);
       expect(result.errors).toHaveLength(0);
       expect(result.products[0].currency).toBe(Currency.USD);
@@ -522,7 +529,8 @@ describe('parseCsvProducts — alias del import de catálogo (SuperAdmin)', () =
       'Postres,Flan,3,CUP',
     ].join('\n');
 
-    const result = parseCsvProducts(csv);
+    // El import de catálogo pide la moneda por código: `allowCurrencyNames`.
+    const result = parseCsvProducts(csv, { allowCurrencyNames: true });
 
     expect(result.errors).toHaveLength(0);
     expect(result.products).toHaveLength(2);
@@ -540,12 +548,14 @@ describe('parseCsvProducts — alias del import de catálogo (SuperAdmin)', () =
     });
   });
 
-  it('la columna moneda acepta el código y el número del enum', () => {
+  it('la columna moneda acepta el código y el número del enum con allowCurrencyNames', () => {
     const byName = parseCsvProducts(
       ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,USD'].join('\n'),
+      { allowCurrencyNames: true },
     );
     const byNumber = parseCsvProducts(
       ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,1'].join('\n'),
+      { allowCurrencyNames: true },
     );
 
     expect(byName.products[0].currency).toBe(Currency.USD);
@@ -555,6 +565,7 @@ describe('parseCsvProducts — alias del import de catálogo (SuperAdmin)', () =
   it('una moneda desconocida no descarta la fila: queda sin moneda (CUP por defecto)', () => {
     const result = parseCsvProducts(
       ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,XXX'].join('\n'),
+      { allowCurrencyNames: true },
     );
 
     expect(result.errors).toHaveLength(0);

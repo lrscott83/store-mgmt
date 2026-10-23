@@ -52,7 +52,9 @@ export function CatalogCsvImportCard({ storeId, onImported }: CatalogCsvImportCa
     setError('');
     setSummary(null);
     try {
-      const parsed = parseCsvProducts(await file.text());
+      // `allowCurrencyNames`: este CSV documenta la moneda por código (`USD`). El import del POS
+      // del dueño conserva el modo estricto (solo número del enum), que es su contrato previo.
+      const parsed = parseCsvProducts(await file.text(), { allowCurrencyNames: true });
       setRows(parsed.products);
       setParseErrors(parsed.errors);
     } catch {
@@ -74,24 +76,40 @@ export function CatalogCsvImportCard({ storeId, onImported }: CatalogCsvImportCa
 
     setIsImporting(true);
     setError('');
+
+    let result: Awaited<ReturnType<typeof importCatalogCsv>>;
     try {
-      const result = await importCatalogCsv(storeId, payload);
-      if (!result.succeeded) {
-        setError(intl.formatMessage({ id: 'WEB_CATALOG.IMPORT.FAILED' }));
-        return;
-      }
-      setSummary(result.data);
-      setRows([]);
-      setParseErrors([]);
-      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.IMPORT.DONE' }));
-      await onImported();
+      result = await importCatalogCsv(storeId, payload);
     } catch (err) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
         intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.IMPORT.FAILED') }),
       );
+      return;
     } finally {
       setIsImporting(false);
+    }
+
+    if (!result.succeeded) {
+      // El backend rechaza el import completo con el número de fila; ese detalle es lo único que
+      // le dice al operador qué corregir, así que se muestra tal cual en vez de un texto genérico.
+      setError(
+        result.errors[0]?.description || intl.formatMessage({ id: 'WEB_CATALOG.IMPORT.FAILED' }),
+      );
+      return;
+    }
+
+    setSummary(result.data);
+    setRows([]);
+    setParseErrors([]);
+    showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.IMPORT.DONE' }));
+
+    // La recarga es SEPARADA del import a propósito: si falla, el import YA se hizo y no puede
+    // reportarse como fallo. La siguiente navegación o recarga manual vuelve a leer del servidor.
+    try {
+      await onImported();
+    } catch {
+      // Silencio deliberado: el resumen ya muestra lo importado.
     }
   }
 

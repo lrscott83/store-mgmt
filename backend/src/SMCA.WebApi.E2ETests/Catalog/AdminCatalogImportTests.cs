@@ -131,6 +131,107 @@ public sealed class AdminCatalogImportTests
     }
 
     [Fact]
+    public async Task An_empty_rows_list_is_rejected_with_400()
+    {
+        var login = AdminLogin();
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var response = await ImportAsync(DbTestHelpers.AuthedClient(_f, saId, login), store.StoreId, []);
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    [Fact]
+    public async Task A_currency_outside_the_enum_is_rejected_with_400()
+    {
+        var login = AdminLogin();
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var response = await ImportAsync(DbTestHelpers.AuthedClient(_f, saId, login), store.StoreId,
+                [new CsvRow("Bebidas", "Café", 2.50m, 99)]);
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    [Fact]
+    public async Task Duplicate_rows_in_one_file_are_processed_once_with_the_last_value()
+    {
+        var login = AdminLogin();
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, saId, login);
+
+            var response = await ImportAsync(client, store.StoreId, [
+                new CsvRow("Bebidas", "Café", 2.50m, null),
+                new CsvRow("bebidas", "café", 5.00m, 1),
+            ]);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var summary = await response.Content.ReadFromJsonAsync<ApiResponse<ImportSummaryDto>>(ApiResponse.Json);
+            // Una sola fila efectiva: se crea UNA vez (no se "actualiza" lo que se acaba de crear) y
+            // gana el último valor del archivo.
+            summary!.Data.Should().Be(new ImportSummaryDto(1, 1, 0, 1));
+
+            var products = await client.GetFromJsonAsync<ApiResponse<List<AdminProductDto>>>(
+                $"/api/v1/stores/{store.StoreId}/catalog/products", ApiResponse.Json);
+            products!.Data!.Should().ContainSingle();
+            products.Data![0].Price.Should().Be(5.00m);
+            products.Data[0].Currency.Should().Be("USD");
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    [Fact]
+    public async Task An_existing_category_without_a_slug_is_published_after_the_import()
+    {
+        var login = AdminLogin();
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            // Categoría preexistente SIN slug (nunca sincronizada): el import debe rellenarlo o el
+            // catálogo público la filtra fuera y lo importado quedaría invisible.
+            await WebCatalogSeed.AddCategoryAsync(_f, store, "Bebidas");
+
+            var response = await ImportAsync(DbTestHelpers.AuthedClient(_f, saId, login), store.StoreId,
+                [new CsvRow("Bebidas", "Café", 2.50m, null)]);
+            response.EnsureSuccessStatusCode();
+
+            var publicCatalog = await _f.CreateClient().GetFromJsonAsync<ApiResponse<PublicCatalogDto>>(
+                $"/api/v1/public/catalog/{store.Slug}", ApiResponse.Json);
+            publicCatalog!.Data!.Categories.Should().ContainSingle()
+                .Which.Name.Should().Be("Bebidas");
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    [Fact]
     public async Task OwnerAdmin_cannot_import_returns_403()
     {
         var store = await WebCatalogSeed.SeedOwnerAsync(_f);

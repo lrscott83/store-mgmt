@@ -98,4 +98,39 @@ describe('CatalogCsvImportCard — import CSV del catálogo (SuperAdmin)', () =>
     await waitFor(() => expect(screen.getByTestId('catalog-csv-import-error')).toBeInTheDocument());
     expect(onImported).not.toHaveBeenCalled();
   });
+
+  it('muestra el detalle del backend (la fila rechazada), no un texto genérico', async () => {
+    const detail = 'La fila 2 del CSV no es válida: revisa la categoría, el producto y el precio.';
+    importMock.mockResolvedValue({
+      succeeded: false,
+      data: null,
+      errors: [{ code: 'Rows[2]', description: detail }],
+    });
+    renderCard();
+
+    selectCsv(CSV);
+    await waitFor(() =>
+      expect(screen.getByTestId('catalog-csv-import-valid-rows')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('catalog-csv-import-button'));
+
+    expect(await screen.findByText(detail)).toBeInTheDocument();
+  });
+
+  it('si falla la RECARGA posterior, el import NO se reporta como fallido', async () => {
+    const onImported = vi.fn().mockRejectedValue(new Error('reload failed'));
+    renderCard(onImported);
+
+    selectCsv(CSV);
+    await waitFor(() =>
+      expect(screen.getByTestId('catalog-csv-import-valid-rows')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('catalog-csv-import-button'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('catalog-csv-import-summary')).toBeInTheDocument(),
+    );
+    expect(onImported).toHaveBeenCalled();
+    expect(screen.queryByTestId('catalog-csv-import-error')).not.toBeInTheDocument();
+  });
 });
