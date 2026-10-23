@@ -47,11 +47,14 @@ namespace Application.Features.SalesManagers.Queries.GetMySalesManagerOrders
                 await _orderSalesManagerRepository.GetBySalesManagerIdAsync(manager.Id);
 
             List<SalesManagerOrderDto> orders = attributions
+                // Una fila cuyo pedido ya no es visible (soft-deleted/filtrado) no puede
+                // proyectarse: se omite en vez de tumbar el listado con un 500.
+                .Where(a => a.Order is not null)
                 .Select(a => new SalesManagerOrderDto(
                     a.Order.Id,
                     a.Order.Code,
                     a.Order.StoreId,
-                    a.Order.Store.Name,
+                    a.Order.Store?.Name ?? string.Empty,
                     a.Order.Status,
                     a.Order.Date,
                     a.Order.Total,

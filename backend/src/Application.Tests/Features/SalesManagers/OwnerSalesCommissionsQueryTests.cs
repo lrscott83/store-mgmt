@@ -125,8 +125,11 @@ public class OwnerSalesCommissionsQueryTests
             new GetOwnerSalesCommissionsQuery(SalesCommissionStatus.Paid, _manager.Id),
             CancellationToken.None);
 
-        // El estado lo filtra el repositorio; el gestor, el handler.
-        result.Data.Should().ContainSingle(c => c.Id == paid.Id && c.Status == SalesCommissionStatus.Paid);
+        // El estado lo filtra el repositorio; el gestor, el handler. Se afirma el conjunto
+        // COMPLETO: con ContainSingle(predicado) una fila ajena colada seguiría pasando verde.
+        result.Data.Should().HaveCount(1);
+        result.Data![0].Id.Should().Be(paid.Id);
+        result.Data[0].Status.Should().Be(SalesCommissionStatus.Paid);
     }
 
     [Fact]
@@ -145,6 +148,35 @@ public class OwnerSalesCommissionsQueryTests
         result.Data!.Select(c => c.Status).Should().ContainInOrder(
             SalesCommissionStatus.Pending,
             SalesCommissionStatus.Paid);
+    }
+
+    [Fact]
+    public async Task An_inactive_owner_is_forbidden()
+    {
+        _owner.IsActive = false;
+
+        Func<Task> act = () => Handler().Handle(
+            new GetOwnerSalesCommissionsQuery(null, null), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_commission_without_a_visible_order_is_skipped_without_a_500()
+    {
+        OrderSalesCommission orphan = Commission();
+        orphan.Order = null!;
+
+        _commissionRepository
+            .Setup(x => x.GetByOwnerIdAsync(_owner.Id, null))
+            .ReturnsAsync(new[] { orphan });
+
+        var result = await Handler().Handle(
+            new GetOwnerSalesCommissionsQuery(null, null), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().BeEmpty();
     }
 
     [Fact]

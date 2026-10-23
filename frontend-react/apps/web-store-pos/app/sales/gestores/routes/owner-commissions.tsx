@@ -19,7 +19,11 @@ import {
   type SalesManagerOption,
 } from '../lib/owner-commissions-http-service';
 
-/** Módulo 21 + feature 125: el backend exige OwnerAdmin y el módulo activo. */
+/**
+ * Guard de UI: módulo 21 + feature 125 para el menú/loader. El backend exige OwnerAdmin y NO
+ * gatea este listado por el módulo a propósito (S10): al desactivarlo, las comisiones pendientes
+ * siguen siendo pagables y el Owner tiene que poder verlas.
+ */
 export const clientLoader = featureLoader([EFeatures.GestoresVentas]);
 
 const INPUT_CLASSES =

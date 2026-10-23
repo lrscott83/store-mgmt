@@ -47,13 +47,16 @@ namespace Application.Features.SalesManagers.Queries.GetMySalesManagerCommission
                 await _orderSalesCommissionRepository.GetBySalesManagerIdAsync(manager.Id);
 
             List<SalesManagerCommissionDto> result = commissions
+                // Igual que en los pedidos: una comisión cuya orden/línea ya no es visible se
+                // omite en lugar de lanzar NullReferenceException en la proyección.
+                .Where(c => c.Order is not null && c.OrderItem is not null)
                 .Select(c => new SalesManagerCommissionDto(
                     c.Id,
                     c.OrderId,
                     c.Order.Code,
                     c.Order.Date,
                     c.StoreId,
-                    c.Order.Store.Name,
+                    c.Order.Store?.Name ?? string.Empty,
                     c.OrderItem.Name,
                     c.Quantity,
                     c.Type,

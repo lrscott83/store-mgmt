@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Link, useNavigate } from 'react-router';
 import { Currency, SalesCommissionStatus } from '@store-mgmt/domain';
-import { authLoader } from '~/auth/routes/loaders';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
-import { InfoBox } from '~/shared/components/ui/info-box';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { statusLabel } from '~/sales/lib/ordering-labels';
+import { gestorLoader } from './loader';
 import {
   gestorHttpService,
   type GestorCatalog,
@@ -20,9 +19,9 @@ import {
 /**
  * T9 — vista del GESTOR de ventas (S3). Vive FUERA del layout del POS: el gestor no tiene tienda
  * ni datos offline, solo sus pedidos, sus comisiones y los catálogos web de las tiendas de su
- * Owner. `authLoader` basta como guard (un usuario sin tienda no exige DEK).
+ * Owner. `gestorLoader` exige sesión y el rol `GestorVentas`.
  */
-export const clientLoader = authLoader;
+export const clientLoader = gestorLoader;
 
 export default function GestorDashboardPage() {
   const intl = useIntl();
@@ -34,26 +33,43 @@ export default function GestorDashboardPage() {
   const [commissions, setCommissions] = useState<GestorCommission[]>([]);
   const [stores, setStores] = useState<GestorCatalog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(false);
+  // Un fallo parcial no puede vaciar las otras dos secciones (R3-ALL-OR-NOTHING-LOAD).
+  const [ordersError, setOrdersError] = useState(false);
+  const [commissionsError, setCommissionsError] = useState(false);
+  const [storesError, setStoresError] = useState(false);
 
   useEffect(() => {
     let active = true;
     setIsLoading(true);
-    setError(false);
+    setOrdersError(false);
+    setCommissionsError(false);
+    setStoresError(false);
 
-    Promise.all([
+    Promise.allSettled([
       gestorHttpService.getOrders(),
       gestorHttpService.getCommissions(),
       gestorHttpService.getStores(),
     ])
       .then(([ordersResult, commissionsResult, storesResult]) => {
         if (!active) return;
-        setOrders(ordersResult.data ?? []);
-        setCommissions(commissionsResult.data ?? []);
-        setStores(storesResult.data ?? []);
-      })
-      .catch(() => {
-        if (active) setError(true);
+
+        if (ordersResult.status === 'fulfilled') {
+          setOrders(ordersResult.value.data ?? []);
+        } else {
+          setOrdersError(true);
+        }
+
+        if (commissionsResult.status === 'fulfilled') {
+          setCommissions(commissionsResult.value.data ?? []);
+        } else {
+          setCommissionsError(true);
+        }
+
+        if (storesResult.status === 'fulfilled') {
+          setStores(storesResult.value.data ?? []);
+        } else {
+          setStoresError(true);
+        }
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -89,16 +105,14 @@ export default function GestorDashboardPage() {
 
       {isLoading && <Spinner label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />}
 
-      {!isLoading && error && (
-        <InfoBox variant="danger" className="text-center">
-          <span data-testid="gestor-error">{intl.formatMessage({ id: 'GESTOR.LOAD_ERROR' })}</span>
-        </InfoBox>
-      )}
-
-      {!isLoading && !error && (
+      {!isLoading && (
         <>
           <Card padding="tight" title={intl.formatMessage({ id: 'GESTOR.CATALOGS' })}>
-            {stores.length === 0 ? (
+            {storesError ? (
+              <p className="text-sm text-danger" data-testid="gestor-stores-error">
+                {intl.formatMessage({ id: 'GESTOR.SECTION_ERROR' })}
+              </p>
+            ) : stores.length === 0 ? (
               <p className="text-sm text-text-muted">
                 {intl.formatMessage({ id: 'GESTOR.CATALOGS_EMPTY' })}
               </p>
@@ -119,7 +133,11 @@ export default function GestorDashboardPage() {
           </Card>
 
           <Card padding="tight" title={intl.formatMessage({ id: 'GESTOR.ORDERS' })}>
-            {orders.length === 0 ? (
+            {ordersError ? (
+              <p className="text-sm text-danger" data-testid="gestor-orders-error">
+                {intl.formatMessage({ id: 'GESTOR.SECTION_ERROR' })}
+              </p>
+            ) : orders.length === 0 ? (
               <p className="text-sm text-text-muted">
                 {intl.formatMessage({ id: 'GESTOR.ORDERS_EMPTY' })}
               </p>
@@ -154,7 +172,11 @@ export default function GestorDashboardPage() {
           </Card>
 
           <Card padding="tight" title={intl.formatMessage({ id: 'GESTOR.COMMISSIONS' })}>
-            {commissions.length === 0 ? (
+            {commissionsError ? (
+              <p className="text-sm text-danger" data-testid="gestor-commissions-error">
+                {intl.formatMessage({ id: 'GESTOR.SECTION_ERROR' })}
+              </p>
+            ) : commissions.length === 0 ? (
               <p className="text-sm text-text-muted">
                 {intl.formatMessage({ id: 'GESTOR.COMMISSIONS_EMPTY' })}
               </p>

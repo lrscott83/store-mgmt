@@ -167,6 +167,13 @@ public sealed class OwnerSalesCommissionsE2ETests
                         && x.ModuleId == (int)ModuleType.GestoresVentas)
                     .ExecuteDeleteAsync();
 
+                // R3-5: el test crea su propio Order/OrderItem; los borra él mismo en vez de
+                // depender del alcance del helper compartido.
+                await db.Set<Domain.Entities.OrderItems.OrderItem>().IgnoreQueryFilters()
+                    .Where(i => i.Order.StoreId == fixture.StoreId).ExecuteDeleteAsync();
+                await db.Set<Order>().IgnoreQueryFilters()
+                    .Where(o => o.StoreId == fixture.StoreId).ExecuteDeleteAsync();
+
                 if (managerId != Guid.Empty)
                 {
                     await db.Set<SalesManager>().IgnoreQueryFilters()

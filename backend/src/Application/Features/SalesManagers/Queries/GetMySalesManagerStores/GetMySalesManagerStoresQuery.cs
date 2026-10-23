@@ -55,19 +55,23 @@ namespace Application.Features.SalesManagers.Queries.GetMySalesManagerStores
                 .GetActiveStoresWithCatalogByOwnerIdAsync(manager.OwnerId))
                 .ToList();
 
-            var result = new List<SalesManagerCatalogDto>();
-            foreach (Store store in stores)
-            {
-                IReadOnlyCollection<int> moduleIds =
-                    await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(store.Id);
-                if (!moduleIds.Contains((int)ModuleType.GestoresVentas))
-                    continue;
+            if (stores.Count == 0)
+                return ResponseResult.Success(new List<SalesManagerCatalogDto>());
 
-                result.Add(new SalesManagerCatalogDto(
+            // Una sola consulta para todas las tiendas: el gating por tienda en un bucle era N+1.
+            IReadOnlyCollection<Guid> withModule =
+                await _storeModuleRepository.GetStoreIdsWithActiveModuleAsync(
+                    stores.Select(s => s.Id),
+                    (int)ModuleType.GestoresVentas,
+                    cancellationToken);
+
+            List<SalesManagerCatalogDto> result = stores
+                .Where(store => withModule.Contains(store.Id))
+                .Select(store => new SalesManagerCatalogDto(
                     store.Id,
                     store.Name,
-                    store.CatalogSlug!));
-            }
+                    store.CatalogSlug!))
+                .ToList();
 
             return ResponseResult.Success(result);
         }

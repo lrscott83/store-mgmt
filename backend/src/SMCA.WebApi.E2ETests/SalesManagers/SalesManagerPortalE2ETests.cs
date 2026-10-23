@@ -39,8 +39,11 @@ public sealed class SalesManagerPortalE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         Guid gestorUserId = Guid.Empty;
         Guid managerId = Guid.Empty;
+        Guid managerId2 = Guid.Empty;
+        Guid emptySlugStoreId = Guid.Empty;
         string login = $"gestor-portal-{Guid.NewGuid():N}@test.com";
         string orderCode = $"P{Guid.NewGuid():N}"[..10];
+        string otherOrderCode = $"X{Guid.NewGuid():N}"[..10];
         string catalogSlug = $"gestor-{Guid.NewGuid():N}";
 
         try
@@ -112,7 +115,8 @@ public sealed class SalesManagerPortalE2ETests
                 db.Set<OrderSalesManager>().Add(OrderSalesManager.Create(
                     order.Id, managerId, fixture.OwnerId, fixture.StoreId, fixture.TenantId));
 
-                Domain.Entities.OrderItems.OrderItem item = order.OrderItems.Single();                db.Set<OrderSalesCommission>().Add(OrderSalesCommission.Create(
+                Domain.Entities.OrderItems.OrderItem item = order.OrderItems.Single();
+                db.Set<OrderSalesCommission>().Add(OrderSalesCommission.Create(
                     order.Id,
                     item.Id,
                     managerId,
@@ -125,6 +129,65 @@ public sealed class SalesManagerPortalE2ETests
                     10m,
                     Currency.CUP,
                     fixture.TenantId));
+
+                // AISLAMIENTO: un segundo gestor con su propio pedido y comisión. El portal del
+                // primero no debe devolver nada de esto.
+                SalesManager otherManager = SalesManager.Create(
+                    fixture.UserId, fixture.OwnerId, fixture.TenantId);
+                db.Set<SalesManager>().Add(otherManager);
+                managerId2 = otherManager.Id;
+
+                Order otherOrder = Order.CreateOnline(
+                    fixture.StoreId,
+                    fixture.TenantId,
+                    otherOrderCode,
+                    OrderDeliveryType.Pickup,
+                    "Cliente ajeno",
+                    "5350000000",
+                    20m,
+                    Currency.CUP,
+                    new[]
+                    {
+                        new OrderLine(fixture.ProductId, fixture.ProductName, 1, 20m, Currency.CUP),
+                    });
+                otherOrder.Status = OrderStatus.Entregado;
+                db.Set<Order>().Add(otherOrder);
+                db.Set<OrderSalesManager>().Add(OrderSalesManager.Create(
+                    otherOrder.Id, managerId2, fixture.OwnerId, fixture.StoreId, fixture.TenantId));
+                db.Set<OrderSalesCommission>().Add(OrderSalesCommission.Create(
+                    otherOrder.Id,
+                    otherOrder.OrderItems.Single().Id,
+                    managerId2,
+                    fixture.OwnerId,
+                    fixture.StoreId,
+                    SalesCommissionType.Fixed,
+                    1m,
+                    20m,
+                    1,
+                    1m,
+                    Currency.CUP,
+                    fixture.TenantId));
+
+                // SUGGESTION R3-EMPTY-CATALOG-SLUG: una tienda con slug vacío y módulo activo no
+                // debe ofrecerse como catálogo.
+                Store emptySlugStore = Store.Create(
+                    $"Sin slug {Guid.NewGuid():N}",
+                    fixture.OwnerId,
+                    true,
+                    fixture.TenantId,
+                    storePlanId: (int)StorePlanType.Superior);
+                emptySlugStore.CatalogSlug = string.Empty;
+                db.Set<Store>().Add(emptySlugStore);
+                emptySlugStoreId = emptySlugStore.Id;
+                db.Set<StoreModule>().Add(StoreModule.Create(
+                    emptySlugStore.Id,
+                    (int)ModuleType.GestoresVentas,
+                    price: 10,
+                    modulePriceIncluded: false,
+                    modulePrice: 20,
+                    moduleDiscountPrice: 0,
+                    modulePercentDiscountPrice: 50,
+                    tenantId: fixture.TenantId));
 
                 await db.SaveChangesAsync();
             }
@@ -184,10 +247,25 @@ public sealed class SalesManagerPortalE2ETests
                         && x.ModuleId == (int)ModuleType.GestoresVentas)
                     .ExecuteDeleteAsync();
 
+                if (emptySlugStoreId != Guid.Empty)
+                {
+                    await db.Set<StoreModule>().IgnoreQueryFilters()
+                        .Where(x => x.StoreId == emptySlugStoreId)
+                        .ExecuteDeleteAsync();
+                    await db.Set<Store>().IgnoreQueryFilters()
+                        .Where(s => s.Id == emptySlugStoreId)
+                        .ExecuteDeleteAsync();
+                }
+
                 if (managerId != Guid.Empty)
                 {
                     await db.Set<SalesManager>().IgnoreQueryFilters()
                         .Where(m => m.Id == managerId).ExecuteDeleteAsync();
+                }
+                if (managerId2 != Guid.Empty)
+                {
+                    await db.Set<SalesManager>().IgnoreQueryFilters()
+                        .Where(m => m.Id == managerId2).ExecuteDeleteAsync();
                 }
                 if (gestorUserId != Guid.Empty)
                 {

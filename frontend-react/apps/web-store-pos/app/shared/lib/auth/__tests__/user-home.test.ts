@@ -57,6 +57,19 @@ describe('resolveUserHomePath', () => {
     expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
   });
 
+  it('gestor wins over a platform role (combined-role precedence is pinned)', async () => {
+    await expect(
+      resolveUserHomePath(
+        makeUser({ isGestorVentas: true, isSuperAdmin: true, selectedStoreId: '' }),
+      ),
+    ).resolves.toBe('/gestor');
+    await expect(
+      resolveUserHomePath(
+        makeUser({ isGestorVentas: true, isReSeller: true, selectedStoreId: '' }),
+      ),
+    ).resolves.toBe('/gestor');
+  });
+
   it('sends a reseller to /admin/owners (no product lookup)', async () => {
     await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe(
       '/admin/owners',

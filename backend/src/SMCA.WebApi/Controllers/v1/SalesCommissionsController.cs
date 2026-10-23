@@ -17,6 +17,12 @@ namespace SMCA.WebApi.Controllers.v1
     [Authorize]
     public class SalesCommissionsController : BaseApiController
     {
+        /// <summary>
+        /// Listado de cobros del Owner. NO se gatea por el módulo 21 a propósito (S10): al
+        /// desactivar el módulo, las comisiones ya generadas y pendientes siguen siendo pagables,
+        /// así que el Owner tiene que poder verlas para pagarlas. La frontera real es OwnerAdmin +
+        /// Owner activo (la valida el handler), no la feature.
+        /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ResponseResult<List<OwnerSalesCommissionDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

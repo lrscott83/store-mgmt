@@ -36,7 +36,8 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<IReadOnlyList<Store>> GetActiveStoresWithCatalogByOwnerIdAsync(Guid ownerId)
             => await _stores
-                .Where(s => s.OwnerId == ownerId && s.IsActive && s.CatalogSlug != null)
+                .Where(s => s.OwnerId == ownerId && s.IsActive
+                    && !string.IsNullOrWhiteSpace(s.CatalogSlug))
                 .OrderBy(s => s.Name)
                 .ToListAsync();
 

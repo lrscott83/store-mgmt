@@ -279,6 +279,7 @@ const messages: Record<string, string> = {
   'GESTOR.SUBTITLE': 'Hola, {name}. Aquí ves tus pedidos, lo que has ganado y los catálogos de las tiendas.',
   'GESTOR.LOGOUT': 'Salir',
   'GESTOR.LOAD_ERROR': 'No se pudieron cargar tus pedidos y comisiones.',
+  'GESTOR.SECTION_ERROR': 'No se pudo cargar esta sección. Recarga la página o inténtalo de nuevo.',
   'GESTOR.CATALOGS': 'Catálogos de las tiendas',
   'GESTOR.CATALOGS_EMPTY': 'Tu Owner todavía no tiene catálogos publicados disponibles.',
   'GESTOR.ORDERS': 'Mis pedidos',

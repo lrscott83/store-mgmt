@@ -59,16 +59,19 @@ namespace Application.Features.SalesManagers.Queries.GetOwnerSalesCommissions
                 : commissions;
 
             List<OwnerSalesCommissionDto> result = filtered
+                // Las filas con navegaciones ausentes (p. ej. un usuario/orden soft-deleted) se
+                // omiten: es preferible perder una fila a tumbar todo el cobro con un 500.
+                .Where(c => c.Order is not null && c.OrderItem is not null)
                 .Select(c => new OwnerSalesCommissionDto(
                     c.Id,
                     c.SalesManagerId,
-                    c.SalesManager.User.FullName,
-                    c.SalesManager.User.Login,
+                    c.SalesManager?.User?.FullName ?? string.Empty,
+                    c.SalesManager?.User?.Login ?? string.Empty,
                     c.OrderId,
                     c.Order.Code,
                     c.Order.Date,
                     c.StoreId,
-                    c.Order.Store.Name,
+                    c.Order.Store?.Name ?? string.Empty,
                     c.OrderItem.Name,
                     c.Quantity,
                     c.Type,

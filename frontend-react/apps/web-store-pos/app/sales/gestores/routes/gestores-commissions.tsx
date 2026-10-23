@@ -11,6 +11,7 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { createProductCategoryService } from '~/sales/lib/services/product-category-service.factory';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
+import { parseCommissionValue } from '../lib/commission-value';
 import {
   salesCommissionHttpService,
   type ProductSalesCommissionDto,
@@ -126,8 +127,8 @@ export default function GestoresCommissionsPage() {
 
     setSavingId(product.id);
     try {
-      const value = Number(draft.value.replace(',', '.'));
-      if (!Number.isFinite(value) || value < 0) {
+      const value = parseCommissionValue(draft.value);
+      if (value === null) {
         showBlockingError(
           intl.formatMessage({ id: 'GESTORES.TITLE' }),
           intl.formatMessage({ id: 'GESTORES.INVALID_VALUE' }),
@@ -143,7 +144,14 @@ export default function GestoresCommissionsPage() {
         currency,
       });
       if (!result.succeeded) {
-        throw new Error('upsert rejected');
+        // Un rechazo del backend (p. ej. % > 100) NO es un problema de conexión: se muestra el
+        // mensaje real del servidor.
+        showBlockingError(
+          intl.formatMessage({ id: 'GESTORES.TITLE' }),
+          result.errors?.[0]?.description
+            ?? intl.formatMessage({ id: 'GESTORES.SAVE_ERROR' }),
+        );
+        return;
       }
 
       setConfigs((prev) => ({
@@ -168,7 +176,12 @@ export default function GestoresCommissionsPage() {
     try {
       const result = await salesCommissionHttpService.remove(product.id);
       if (!result.succeeded) {
-        throw new Error('delete rejected');
+        showBlockingError(
+          intl.formatMessage({ id: 'GESTORES.TITLE' }),
+          result.errors?.[0]?.description
+            ?? intl.formatMessage({ id: 'GESTORES.SAVE_ERROR' }),
+        );
+        return;
       }
       setConfigs((prev) => {
         const next = { ...prev };

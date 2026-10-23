@@ -176,11 +176,11 @@ public class SalesManagerPortalQueryTests
             .Setup(x => x.GetActiveStoresWithCatalogByOwnerIdAsync(_ownerId))
             .ReturnsAsync(new[] { withModule, withoutModule });
         _storeModuleRepository
-            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(withModule.Id))
-            .ReturnsAsync(new[] { (int)ModuleType.GestoresVentas });
-        _storeModuleRepository
-            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(withoutModule.Id))
-            .ReturnsAsync(new[] { (int)ModuleType.Sales });
+            .Setup(x => x.GetStoreIdsWithActiveModuleAsync(
+                It.IsAny<IEnumerable<Guid>>(),
+                (int)ModuleType.GestoresVentas,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { withModule.Id });
 
         var result = await StoresHandler().Handle(
             new GetMySalesManagerStoresQuery(), CancellationToken.None);
@@ -188,6 +188,82 @@ public class SalesManagerPortalQueryTests
         result.Data.Should().ContainSingle();
         result.Data![0].StoreId.Should().Be(withModule.Id);
         result.Data[0].CatalogSlug.Should().Be("tienda-owner");
+        // El gating se resuelve en UNA consulta para toda la lista (sin N+1).
+        _storeModuleRepository.Verify(
+            x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Orders_use_the_manager_resolved_from_the_token_and_never_another()
+    {
+        var otherManager = SalesManager.Create(Guid.NewGuid(), _ownerId, _tenantId);
+        Order otherOrder = Order.Create(
+            _store.Id, OrderType.WhatsApp, "Otro", 10m, 1, _orderDate.AddDays(-1), _tenantId);
+        otherOrder.Code = "PED-999";
+        otherOrder.Store = _store;
+        OrderSalesManager otherAttribution = OrderSalesManager.Create(
+            otherOrder.Id, otherManager.Id, _ownerId, _store.Id, _tenantId);
+        otherAttribution.Order = otherOrder;
+        OrderSalesManager mine = OrderSalesManager.Create(
+            _order.Id, _manager.Id, _ownerId, _store.Id, _tenantId);
+        mine.Order = _order;
+
+        _orderSalesManagerRepository
+            .Setup(x => x.GetBySalesManagerIdAsync(_manager.Id))
+            .ReturnsAsync(new[] { mine });
+        _orderSalesManagerRepository
+            .Setup(x => x.GetBySalesManagerIdAsync(otherManager.Id))
+            .ReturnsAsync(new[] { otherAttribution });
+
+        var result = await OrdersHandler().Handle(
+            new GetMySalesManagerOrdersQuery(), CancellationToken.None);
+
+        result.Data.Should().ContainSingle();
+        result.Data![0].Code.Should().Be("PED-001");
+        _orderSalesManagerRepository.Verify(
+            x => x.GetBySalesManagerIdAsync(_manager.Id), Times.Once);
+        _orderSalesManagerRepository.Verify(
+            x => x.GetBySalesManagerIdAsync(otherManager.Id), Times.Never);
+    }
+
+    [Fact]
+    public async Task Rows_whose_order_or_item_is_not_visible_are_skipped_without_a_500()
+    {
+        OrderSalesManager orphan = OrderSalesManager.Create(
+            Guid.NewGuid(), _manager.Id, _ownerId, _store.Id, _tenantId);
+        orphan.Order = null!;
+        _orderSalesManagerRepository
+            .Setup(x => x.GetBySalesManagerIdAsync(_manager.Id))
+            .ReturnsAsync(new[] { orphan });
+
+        OrderItem item = OrderItem.Create(
+            _order.Id, Guid.NewGuid(), "Camisa", 1, 10m, 1, _tenantId);
+        OrderSalesCommission orphanCommission = OrderSalesCommission.Create(
+            _order.Id,
+            item.Id,
+            _manager.Id,
+            _ownerId,
+            _store.Id,
+            SalesCommissionType.Fixed,
+            1m,
+            10m,
+            1,
+            1m,
+            Currency.CUP,
+            _tenantId);
+        orphanCommission.Order = null!;
+        orphanCommission.OrderItem = item;
+        _commissionRepository
+            .Setup(x => x.GetBySalesManagerIdAsync(_manager.Id, null))
+            .ReturnsAsync(new[] { orphanCommission });
+
+        var orders = await OrdersHandler().Handle(
+            new GetMySalesManagerOrdersQuery(), CancellationToken.None);
+        var commissions = await CommissionsHandler().Handle(
+            new GetMySalesManagerCommissionsQuery(), CancellationToken.None);
+
+        orders.Data.Should().BeEmpty();
+        commissions.Data.Should().BeEmpty();
     }
 
     [Fact]

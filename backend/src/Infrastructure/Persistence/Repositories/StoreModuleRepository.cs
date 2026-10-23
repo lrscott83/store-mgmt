@@ -70,6 +70,23 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IReadOnlyCollection<Guid>> GetStoreIdsWithActiveModuleAsync(
+            IEnumerable<Guid> storeIds,
+            int moduleId,
+            CancellationToken cancellationToken = default)
+        {
+            List<Guid> ids = storeIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return Array.Empty<Guid>();
+
+            return await _storeModules
+                .IgnoreQueryFilters()
+                .Where(sm => ids.Contains(sm.StoreId) && sm.ModuleId == moduleId && sm.IsActive)
+                .Select(sm => sm.StoreId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Cascada del catálogo global: las filas ACTIVAS de esos módulos en TODAS las tiendas
         /// (sin filtro de tenant). Devuelve entidades SIN trackear — el llamador las re-adjunta
