@@ -1016,4 +1016,33 @@ describe('AdminStoreListPage — change plan popup (owner my-stores parity)', ()
     expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
   });
+
+  it('opens the per-store web catalog configuration from the gear menu (SuperAdmin)', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's1', name: 'Store One', isActive: true })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByTestId('store-web-catalog-action-s1'));
+
+    // La vista store-scoped vive en su propia ruta: la tienda viaja en el path, no en la sesión.
+    expect(mockNavigate).toHaveBeenCalledWith('/admin/stores/s1/web-catalog');
+  });
 });

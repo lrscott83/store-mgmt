@@ -151,6 +151,9 @@ export default [
 
     // Admin â€” Stores
     route('admin/stores', 'admin/stores/routes/store-list.tsx'),
+    // Catálogo web de UNA tienda (SuperAdmin, 2026-10-22): misma vista del dueño, store-scoped,
+    // sin cambiar la tienda seleccionada del SuperAdmin.
+    route('admin/stores/:storeId/web-catalog', 'admin/stores/routes/store-web-catalog.tsx'),
 
     // Admin â€” Global module catalog pricing (SuperAdmin only, superAdminLoader in the
     // route module; the menu item gates the same role). Distinct from the per-STORE module

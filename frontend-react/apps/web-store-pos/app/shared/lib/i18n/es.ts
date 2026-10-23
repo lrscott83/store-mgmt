@@ -1577,6 +1577,11 @@ const messages: Record<string, string> = {
   'STORES.CATALOG_SLUG.HINT':
     'La dirección pública de la tienda. Se normaliza al escribir: minúsculas, sin tildes y con guiones en vez de espacios. Cambiarla cambia la URL que usan los clientes.',
   'STORES.CATALOG_SLUG.PREVIEW': 'URL pública',
+  // Configuración COMPLETA del catálogo web de una tienda desde /admin/stores (SuperAdmin,
+  // 2026-10-22): la misma vista del dueño, pero store-scoped. No exige el módulo 18 — la
+  // publicación sí lo exige.
+  'STORES.WEB_CATALOG.MENU_LABEL': 'Configurar catálogo web',
+  'STORES.WEB_CATALOG.BACK': 'Volver a tiendas',
   'STORES.CATALOG_SLUG.REQUIRED': 'El enlace del catálogo no puede quedar vacío',
   'STORES.CATALOG_SLUG.IN_USE': 'Ese enlace ya está en uso por otra tienda',
   'STORES.CATALOG_SLUG.SAVE_ERROR': 'No se pudo guardar el catálogo. Intente de nuevo.',
