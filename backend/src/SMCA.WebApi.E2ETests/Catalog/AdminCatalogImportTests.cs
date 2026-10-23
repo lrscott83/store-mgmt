@@ -260,4 +260,44 @@ public sealed class AdminCatalogImportTests
             await WebCatalogSeed.CleanupAsync(_f, store);
         }
     }
+
+    /// <summary>
+    /// Integración importar → CRUD → público: lo importado se puede editar con los MISMOS endpoints
+    /// del SuperAdmin y el catálogo público ve el cambio. Cierra el circuito de las dos features.
+    /// </summary>
+    [Fact]
+    public async Task Imported_products_can_be_edited_through_the_admin_crud_and_the_public_catalog_sees_it()
+    {
+        var login = AdminLogin();
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var sa = DbTestHelpers.AuthedClient(_f, saId, login);
+            (await ImportAsync(sa, store.StoreId, [new CsvRow("Bebidas", "Café", 2.50m, 1)]))
+                .EnsureSuccessStatusCode();
+
+            var products = await sa.GetFromJsonAsync<ApiResponse<List<AdminProductDto>>>(
+                $"/api/v1/stores/{store.StoreId}/catalog/products", ApiResponse.Json);
+            var imported = products!.Data!.Single();
+
+            (await sa.PutAsJsonAsync(
+                $"/api/v1/stores/{store.StoreId}/catalog/products/{imported.Id}",
+                new { description = "Café de altura" })).EnsureSuccessStatusCode();
+
+            var publicProduct = await _f.CreateClient().GetFromJsonAsync<ApiResponse<PublicProductDto>>(
+                $"/api/v1/public/catalog/{store.Slug}/products/{imported.Id}", ApiResponse.Json);
+
+            publicProduct!.Succeeded.Should().BeTrue();
+            publicProduct.Data!.Name.Should().Be("Café");
+            publicProduct.Data.Description.Should().Be("Café de altura");
+            publicProduct.Data.Price.Should().Be(2.50m);
+            publicProduct.Data.Currency.Should().Be("USD");
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
 }
