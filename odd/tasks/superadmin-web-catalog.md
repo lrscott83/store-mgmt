@@ -129,6 +129,21 @@ L4 (2026-10-22, análisis, evidencia):
   gateados con `[HasPermission(SuperAdmin)]` (`StoresController.cs:368-386`), con acción por tienda
   en `/admin/stores` (`store-list.tsx:420`).
 
+L9 (2026-10-23, split de historia y RDD commit por commit):
+- `697dd1d6` se partió en seis commits coherentes (backend/scope, probes, cliente HTTP, extracción
+  de la vista, ruta+UI admin, docs), con árbol IDÉNTICO verificado contra `backup/pre-split-697dd1d6`.
+  La rama del CSV se re-apoyó encima del nuevo tip.
+- RDD: `bef12044` (backend store-scoped, escalado item 2) → **high → revisado → approved**,
+  lineage `review-16724fd6b7afea87`, acknowledgement ejecutado. El refuter tumbó el único BLOCKER
+  (era falta de cobertura de escrituras en ese candidato, no un defecto).
+- Resto de commits (assess con `gentle-ai review assess`): `bf9a8d2b` cliente HTTP →
+  medium/under_budget; `44ef3fa4` extracción de la vista → medium/under_budget; `0c446da3` ruta/UI
+  admin → medium/under_budget; `a5b6b3c4` probes → medium/under_budget; `e751555e` tests CRUD →
+  medium/under_budget; `e55e7fa0` docs → passive. Ninguno tiene review debido por el motor.
+- E2E de CRUD del SuperAdmin: `AdminWebCatalogCrudTests` 4/4 (campos de producto, imágenes de
+  producto con reordenado y borrado, marca con logo+columnas, showcase con alta/reordenado/borrado),
+  más los 5 probes de alcance y los 4 de lectura. Total del catálogo admin: 13 E2E verdes.
+
 L8 (2026-10-23, verificación independiente y RDD):
 - Verificación independiente (`gentle-ai-verify`) sobre `697dd1d6`: **PASS**, sin bloqueantes.
   Invariantes comprobados con probes propios además de los comandos: el filtro es el único writer
