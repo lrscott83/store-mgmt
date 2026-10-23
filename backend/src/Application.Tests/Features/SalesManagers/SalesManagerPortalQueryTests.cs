@@ -177,7 +177,9 @@ public class SalesManagerPortalQueryTests
             .ReturnsAsync(new[] { withModule, withoutModule });
         _storeModuleRepository
             .Setup(x => x.GetStoreIdsWithActiveModuleAsync(
-                It.IsAny<IEnumerable<Guid>>(),
+                It.Is<IEnumerable<Guid>>(ids =>
+                    ids.OrderBy(id => id).SequenceEqual(
+                        new[] { withModule.Id, withoutModule.Id }.OrderBy(id => id))),
                 (int)ModuleType.GestoresVentas,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { withModule.Id });

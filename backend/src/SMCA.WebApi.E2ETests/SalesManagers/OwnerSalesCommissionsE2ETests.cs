@@ -38,6 +38,7 @@ public sealed class OwnerSalesCommissionsE2ETests
         Guid gestorUserId = Guid.Empty;
         Guid managerId = Guid.Empty;
         Guid commissionId = Guid.Empty;
+        Guid createdOrderId = Guid.Empty;
         string login = $"gestor-owner-list-{Guid.NewGuid():N}@test.com";
         string orderCode = $"O{Guid.NewGuid():N}"[..10];
 
@@ -93,6 +94,7 @@ public sealed class OwnerSalesCommissionsE2ETests
                     });
                 order.Status = OrderStatus.Entregado;
                 db.Set<Order>().Add(order);
+                createdOrderId = order.Id;
                 db.Set<OrderSalesManager>().Add(OrderSalesManager.Create(
                     order.Id, managerId, fixture.OwnerId, fixture.StoreId, fixture.TenantId));
 
@@ -167,12 +169,15 @@ public sealed class OwnerSalesCommissionsE2ETests
                         && x.ModuleId == (int)ModuleType.GestoresVentas)
                     .ExecuteDeleteAsync();
 
-                // R3-5: el test crea su propio Order/OrderItem; los borra él mismo en vez de
-                // depender del alcance del helper compartido.
-                await db.Set<Domain.Entities.OrderItems.OrderItem>().IgnoreQueryFilters()
-                    .Where(i => i.Order.StoreId == fixture.StoreId).ExecuteDeleteAsync();
-                await db.Set<Order>().IgnoreQueryFilters()
-                    .Where(o => o.StoreId == fixture.StoreId).ExecuteDeleteAsync();
+                // R3-5/R1: se borra SOLO el pedido que creó este test, no todos los de la tienda
+                // compartida (el seed deja pedidos que otros tests pueden leer).
+                if (createdOrderId != Guid.Empty)
+                {
+                    await db.Set<Domain.Entities.OrderItems.OrderItem>().IgnoreQueryFilters()
+                        .Where(i => i.OrderId == createdOrderId).ExecuteDeleteAsync();
+                    await db.Set<Order>().IgnoreQueryFilters()
+                        .Where(o => o.Id == createdOrderId).ExecuteDeleteAsync();
+                }
 
                 if (managerId != Guid.Empty)
                 {

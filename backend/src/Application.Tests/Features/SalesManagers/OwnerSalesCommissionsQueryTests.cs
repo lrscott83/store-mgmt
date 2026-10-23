@@ -180,6 +180,24 @@ public class OwnerSalesCommissionsQueryTests
     }
 
     [Fact]
+    public async Task A_commission_without_a_visible_manager_keeps_blank_names()
+    {
+        OrderSalesCommission orphan = Commission();
+        orphan.SalesManager = null!;
+
+        _commissionRepository
+            .Setup(x => x.GetByOwnerIdAsync(_owner.Id, null))
+            .ReturnsAsync(new[] { orphan });
+
+        var result = await Handler().Handle(
+            new GetOwnerSalesCommissionsQuery(null, null), CancellationToken.None);
+
+        result.Data.Should().ContainSingle();
+        result.Data![0].SalesManagerName.Should().BeEmpty();
+        result.Data[0].SalesManagerLogin.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_non_owner_is_forbidden()
     {
         _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
