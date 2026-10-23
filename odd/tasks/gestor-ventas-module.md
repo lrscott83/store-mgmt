@@ -72,7 +72,8 @@
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | done — `227d8b1c` |
 | T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | done — `58c50692` |
 | T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | done — suites verdes (192/1507/777 · 5762); RDD T9 `review-e9608c9978d98f1a` y T10 `review-e7bae19e79781785` **approved**, autoridad quemada; 14 advisory como follow-ups |
-| T12 | Follow-ups de T9/T10: guard de rol, aislamiento, null-safety, N+1, slug vacío, validación y tests de UI | S13 | inline | done — `643958ef` |
+| T12 | Follow-ups de T9/T10: guard de rol, aislamiento, null-safety, N+1, slug vacío, validación y tests de UI | S13 | inline | done — `643958ef`; RDD `review-01112fe32079983f` **approved**, autoridad quemada; 8 advisory → T13 |
+| T13 | Follow-ups del review de T12: limpieza E2E, mock del batch, tests de carga parcial, rechazo del backend y manager nulo | S13 | inline | done — `89c28726` |
 
 ## Decisiones de diseño (no son requisitos nuevos)
 
@@ -194,6 +195,19 @@ Lineage `review-e7bae19e79781785` · lentes `review-risk` + `review-reliability`
 - **R3-4 (WARNING):** la proyección desreferencia `SalesManager.User`, `Order.Store`, `Order.Code` y `OrderItem.Name` sin guardas; una fila relacionada ausente/soft-deleted puede dar 500.
 - **R3-5 (SUGGESTION):** el E2E deja `Order`/`OrderItem` al cleanup compartido; borrarlos explícitamente.
 
+## Follow-ups del review RDD de T12
+
+Lineage `review-01112fe32079983f` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 8 advisory (5 WARNING, 3 SUGGESTION):
+
+- **R1-e2e-store-wide-delete (WARNING)** → cerrado en T13 (`89c28726`): el E2E borra solo el `Order`/`OrderItem` que creó, no todos los de la tienda compartida.
+- **R1-owner-page-unreachable-when-module-off (SUGGESTION, pre-existente)** → documentado: el menú oculta la entrada sin la feature; la ruta sigue accesible por URL para OwnerAdmin y el API permite pagar (S10).
+- **R3-BATCH-MOCK-ANY (WARNING)** → cerrado en T13: el mock exige el conjunto exacto de `StoreId` que recibe el batch.
+- **R3-DASHBOARD-PARTIAL-ERROR-TEST (WARNING)** → cerrado en T13: 2 tests de carga parcial (una sección falla, las otras dos siguen visibles).
+- **R3-IGNORE-FILTERS-EQUIVALENCE (SUGGESTION)** → residual documentado; el E2E cubre filas activas y la consulta se acota por los `StoreId` del Owner.
+- **R3-LOGIN-REDIRECT-HYDRATION (WARNING)** → la rama `!user` es inalcanzable después de `authLoader`; queda como defensa y el test la pinea.
+- **R3-NULL-MANAGER-UNTESTED (SUGGESTION)** → cerrado en T13: test de comisión sin `SalesManager` visible (nombres vacíos, sin 500).
+- **R3-SAVE-REJECTION-UNTESTED (WARNING)** → cerrado en T13: 2 tests de la pantalla de configuración (mensaje del backend y vacío ≠ 0).
+
 ## Log
 
 - **L1 (2026-10-21, solicitud original):** "necesito que busques el plan para los gestores de ventas y revises si todo esta cubierto para su implementacion. La idea es poder tener un modulo para eso y que cuando este activo se configure para quien pueda entrar los gestores de ventas autenticados y que hagan pedidos y luego cuando el pedido sea pagado entonces se le ponga una comision a los gestores de ventas y que se pueda saber si se pagaron esas comisiones o no. Si tienes alguna duda me preguntas para que no asumas nada de nada."
@@ -236,6 +250,7 @@ Lineage `review-e7bae19e79781785` · lentes `review-risk` + `review-reliability`
 - **L38 (2026-10-22, RDD de T9):** T9 revisado como candidato aislado (`df5f474a..227d8b1c`, 25 archivos / 1 778 líneas, `high`). Lentes risk+reliability; **approved**, autoridad quemada (`review-e9608c9978d98f1a`). Risk: 0 hallazgos; reliability: 8 advisory (5 WARNING, 3 SUGGESTION) registrados arriba.
 - **L39 (2026-10-22, RDD de T10):** T10 revisado como candidato aislado (`227d8b1c..HEAD`, 14 archivos / 967 líneas, `medium`). Lentes risk+reliability; **approved**, autoridad quemada (`review-e7bae19e79781785`). 6 advisory (5 WARNING, 1 SUGGESTION) registrados arriba. El review del acumulado de L37 quedó sustituido por estos dos cortes; T11 cerrada.
 - **L40 (2026-10-22, T12 cerrada):** se atendieron los 14 advisory de T9/T10. Backend: `gestorLoader` con rol, guard de navegación nula en las tres proyecciones, batch de módulos por tienda (sin N+1), filtro de slug vacío y excepción documentada de S10 en el GET de cobros. Tests: aislamiento con un segundo gestor (unit + E2E), owner inactivo, filas sin orden, filtro por gestor con `HaveCount`, limpieza explícita de `Order`/`OrderItem`. Frontend: guard de rol con 4 tests, precedencia combinada pineada, `parseCommissionValue` con 4 tests, mensajes de error del backend, carga por sección con `allSettled` y 4 tests de componente de la pantalla del Owner. Suite completa: Domain **192/192**, Application **1511/1511**, E2E **777/777**; frontend **407 archivos / 5775 passed / 6 skipped**. Commit `643958ef`.
+- **L41 (2026-10-23, RDD de T12 + T13):** T12 revisado (`c73b4a17..HEAD`, 24 archivos / 651 líneas, `high`); **approved**, autoridad quemada (`review-01112fe32079983f`). 8 advisory: 5 WARNING y 3 SUGGESTION. T13 (`89c28726`) cerró 6: limpieza E2E acotada al pedido propio, mock del batch con los ids exactos, 2 tests de carga parcial del dashboard, test de manager nulo y 2 tests del rechazo del backend en la configuración. Quedan 2 documentados: la entrada del menú cuando el módulo está apagado (pre-existente; la ruta y el API siguen disponibles) y la equivalencia de `IgnoreQueryFilters` (cubierta por E2E de filas activas). Verificación final: Domain **192/192**, Application **1512/1512**, E2E **777/777**; frontend **409 archivos / 5779 passed / 6 skipped**.
 
 ## Cierre — cobertura de specs
 
