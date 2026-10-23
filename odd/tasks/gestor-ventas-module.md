@@ -71,7 +71,7 @@
 | T8c | Follow-ups del review de T8a: validar enums, tests de delete/query/controller/E2E, `BelongsToStore` y concurrencia del upsert | S6, S13 | inline | done — `ab99f534` |
 | T9 | Vista del gestor: sus pedidos y comisiones + acceso a los catálogos de todas las tiendas de su Owner | S3 | inline | done — `227d8b1c` |
 | T10 | Vista del Owner: comisiones pendientes/pagadas por gestor y por pedido | S7, S9 | inline | done — `58c50692` |
-| T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | pending — Needs your decision: suites verdes (192/1507/777 · 5762); review del acumulado → `lens_context_budget_exceeded` (sin autoridad). Opciones: revisar T9 (1 777 líneas) y T10 (942) como candidatos separados, o cerrar con el RDD por unidad |
+| T11 | Pruebas nuevas + regresión + RDD/verificación + cierre | S12, S13 | inline | done — suites verdes (192/1507/777 · 5762); RDD T9 `review-e9608c9978d98f1a` y T10 `review-e7bae19e79781785` **approved**, autoridad quemada; 14 advisory como follow-ups |
 
 ## Decisiones de diseño (no son requisitos nuevos)
 
@@ -156,7 +156,6 @@ Lineage `review-2cebe4668ec94c8b` · lentes `review-risk` + `review-reliability`
 - **R3-003 (SUGGESTION) → T6c:** el E2E usa el código fijo `E2ECOM2` y delega la limpieza de `Order`/`OrderItem`; usar un código único y borrar explícitamente.
 
 ## Follow-ups del review RDD de T8a
-
 Lineage `review-029d2db31288d0ac` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 0 bloqueantes; 8 advisory:
 
 - **R1-001 (WARNING) → T8c:** el PUT no valida que `Type`/`Currency` sean miembros definidos del enum; un valor numérico fuera de rango se persiste y salta el tope de %.
@@ -165,6 +164,30 @@ Lineage `review-029d2db31288d0ac` · lentes `review-risk` + `review-reliability`
 - **R3-005 (WARNING) → T8c:** `BelongsToStoreAsync` es la frontera cross-store y no tiene test.
 - **R3-006 (SUGGESTION) → T8c:** bordes 0/100/negativo y moneda con porcentaje sin pinear.
 - **R3-007 (SUGGESTION) → T8c:** upsert read-then-insert concurrente puede chocar con el índice único y salir 500.
+
+## Follow-ups del review RDD de T9
+
+Lineage `review-e9608c9978d98f1a` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. Risk: 0 hallazgos. Reliability: 8 advisory (5 WARNING, 3 SUGGESTION), ninguno bloqueante:
+
+- **R3-GESTOR-ROUTE-GUARD (WARNING):** `/gestor` solo usa `authLoader`; un autenticado no-gestor ve el error genérico. Añadir guard de rol y un test.
+- **R3-HOME-PRECEDENCE (WARNING):** `isGestorVentas` va antes de `isReSeller`/`isSuperAdmin`; un usuario con ambos roles cambia de home. Probar el caso combinado o reordenar.
+- **R3-ISOLATION-UNPROVED (WARNING):** ningún test pone filas de un segundo gestor junto a las del llamante; el mock devuelve solo las propias.
+- **R3-NULL-ORDER-NAV (WARNING):** las proyecciones desreferencian `Order`/`Store`/`OrderItem`; si el filtro global los oculta, 500.
+- **R3-OWNER-SCREEN-FAILURE-PATH (WARNING, T8b):** valor vacío → 0; el rechazo del backend se reporta como error de conexión.
+- **R3-STORES-N-PLUS-ONE (SUGGESTION):** lookup de módulos por tienda en un bucle secuencial.
+- **R3-EMPTY-CATALOG-SLUG (SUGGESTION):** `CatalogSlug` vacío pasa el filtro `!= null` y genera `/catalog/`.
+- **R3-ALL-OR-NOTHING-LOAD (SUGGESTION):** un `Promise.all` con un error deja las tres secciones vacías.
+
+## Follow-ups del review RDD de T10
+
+Lineage `review-e7bae19e79781785` · lentes `review-risk` + `review-reliability` · **approved**, autoridad quemada. 6 advisory (5 WARNING, 1 SUGGESTION), ninguno bloqueante:
+
+- **R1-entitlement-gate (WARNING):** `GET /SalesCommissions` no verifica el módulo 21/feature; la frontera de tenant sí está intacta.
+- **R3-1 (WARNING):** el test de filtro por gestor usa `ContainSingle(predicate)` y tolera filas extra; quitar el filtro seguiría verde.
+- **R3-2 (WARNING):** el test "inactive or missing owner" solo cubre el owner ausente; la rama `!IsActive` no se ejecuta.
+- **R3-3 (WARNING):** la pantalla del Owner no tiene test de comportamiento (filtros, error, vacío, confirmar/cancelar, pago y recarga).
+- **R3-4 (WARNING):** la proyección desreferencia `SalesManager.User`, `Order.Store`, `Order.Code` y `OrderItem.Name` sin guardas; una fila relacionada ausente/soft-deleted puede dar 500.
+- **R3-5 (SUGGESTION):** el E2E deja `Order`/`OrderItem` al cleanup compartido; borrarlos explícitamente.
 
 ## Log
 
@@ -205,6 +228,8 @@ Lineage `review-029d2db31288d0ac` · lentes `review-risk` + `review-reliability`
 - **L35 (2026-10-22, T10 cerrada):** `GET /api/v1/SalesCommissions` (Owner-only) con filtros `status` y `salesManagerId`; DTO con gestor, pedido, producto y estado; 5 unit tests y 1 E2E (`OwnerSalesCommissionsE2ETests`) que lista pendientes, filtra, paga y confirma que el gestor recibe 403. Frontend: `/sales/gestores/commissions` con filtros por estado/gestor y pago completo con confirmación; 4 tests de service. Commit `58c50692`.
 - **L36 (2026-10-22, cobertura E2E cerrada + verificación):** se agregó el E2E faltante del `POST /api/v1/sales-managers/orders/{storeSlug}` (`SalesManagerOrderCreationE2ETests`: atribución server-side, módulo 21, Owner → 403). E2E nuevos del módulo: **9**. Verificación completa: `dotnet test backend/src/SMCA.sln` → Domain **192/192**, Application **1507/1507**, E2E **777/777**; frontend → typecheck OK, ESLint OK, **404 archivos / 5762 passed / 6 skipped**. Hubo un crash intermitente del `testhost` en `ErrorHandlerMiddlewareTests` (test preexistente) en una corrida; la siguiente pasó completa. RDD de T10: `medium`/`under_budget`, sin review. Commits `f48cc216` (guarda de rutas) y docs.
 - **L37 (2026-10-22, intento de RDD final):** el assessment del acumulado (`d0ad31e0..HEAD`) dio **high**/`review_due=true` (120 archivos, 22 725 líneas). Con consentimiento del usuario se lanzó el START del candidato completo, pero el motor nativo lo rechazó con **`lens_context_budget_exceeded`**: la evidencia excede el presupuesto de contexto de las lentes. `mutation_outcome: not_started`, **sin autoridad creada**, nada que abandonar. El RDD por unidad ya quedó aplicado (T1/T2/T3/T6/T8a aprobados; T8b/T8c/T9/T10 `under_budget`). Decisión pendiente: revisar T9 (1 777 líneas) y T10 (942) como candidatos separados —cada uno con su consentimiento— o cerrar T11 con la cobertura por unidad.
+- **L38 (2026-10-22, RDD de T9):** T9 revisado como candidato aislado (`df5f474a..227d8b1c`, 25 archivos / 1 778 líneas, `high`). Lentes risk+reliability; **approved**, autoridad quemada (`review-e9608c9978d98f1a`). Risk: 0 hallazgos; reliability: 8 advisory (5 WARNING, 3 SUGGESTION) registrados arriba.
+- **L39 (2026-10-22, RDD de T10):** T10 revisado como candidato aislado (`227d8b1c..HEAD`, 14 archivos / 967 líneas, `medium`). Lentes risk+reliability; **approved**, autoridad quemada (`review-e7bae19e79781785`). 6 advisory (5 WARNING, 1 SUGGESTION) registrados arriba. El review del acumulado de L37 quedó sustituido por estos dos cortes; T11 cerrada.
 
 ## Cierre — cobertura de specs
 
