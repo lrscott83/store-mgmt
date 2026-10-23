@@ -7,7 +7,7 @@ import type {
   ProductCategoryView,
   WholesaleConfig,
 } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
@@ -18,7 +18,7 @@ import { PlusIcon, PaperclipIcon, ChevronDownIcon, TrashIcon } from '~/shared/co
 import { showBlockingError, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
-import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { isModuleAvailable, isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
 import { createProductService } from '../lib/services/product-service.factory';
@@ -55,6 +55,16 @@ export function ProductsPage() {
   // MultiMonedas CSV (2026-09-22): el import acepta monedas de precio y costo
   // SOLO con el módulo activo (mismo gate que los selectores del dominio).
   const multiMonedas = hasMultiMonedasAvailable(useAuthStore((s) => s.user));
+  // Mismo gate que la vista Catálogo Web (`ownerModuleLoader(EModules.WebCatalog)`,
+  // web-catalog.tsx:34 / loaders.ts:199-210): GET /v1/catalog/products exige
+  // WebCatalogAdmin, así que sin OwnerAdmin o sin el módulo contratado el botón
+  // solo llevaría a un error. No se inventa un permiso nuevo: se reutiliza la
+  // misma señal de sesión que usa esa vista.
+  const canImportFromWebCatalog = useAuthStore((s) =>
+    s.user && Array.isArray(s.user.storeModuleIds)
+      ? isOwnerAdmin(s.user) && isModuleAvailable(s.user, EModules.WebCatalog)
+      : false,
+  );
   const clearCart = useCartStore((s) => s.clear);
 
   const [categories, setCategories] = useState<ProductCategoryView[]>([]);
@@ -649,18 +659,20 @@ export function ProductsPage() {
             {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
             {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
           </Button>
-          <Button
-            variant="fab"
-            onClick={handleImportWebCatalog}
-            disabled={isImportingWebCatalog}
-            data-testid="import-web-catalog-button"
-          >
-            {intl.formatMessage({
-              id: isImportingWebCatalog
-                ? 'PRODUCTS.WEB_IMPORT.IMPORTING'
-                : 'PRODUCTS.WEB_IMPORT.BUTTON',
-            })}
-          </Button>
+          {canImportFromWebCatalog && (
+            <Button
+              variant="fab"
+              onClick={handleImportWebCatalog}
+              disabled={isImportingWebCatalog}
+              data-testid="import-web-catalog-button"
+            >
+              {intl.formatMessage({
+                id: isImportingWebCatalog
+                  ? 'PRODUCTS.WEB_IMPORT.IMPORTING'
+                  : 'PRODUCTS.WEB_IMPORT.BUTTON',
+              })}
+            </Button>
+          )}
         </div>
 
         {/* Accordion: one panel per category, collapsed by default */}

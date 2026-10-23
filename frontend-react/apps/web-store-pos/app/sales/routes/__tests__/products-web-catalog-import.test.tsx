@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { EModules } from '@store-mgmt/domain';
 import type { BaseResponseModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import type { CatalogProductView } from '~/sales/lib/services/catalog-http-service';
@@ -9,7 +10,8 @@ import type { CatalogImportSummary } from '~/sales/lib/catalog/catalog-import';
 const mockUser = vi.hoisted(() => ({
   selectedStoreId: 's1',
   isOwnerAdmin: true,
-  storeModuleIds: [] as number[],
+  // Literal, not EModules.WebCatalog: vi.hoisted runs before the imports initialize.
+  storeModuleIds: [18] as number[],
 }));
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
@@ -146,7 +148,8 @@ import { ProductsPage } from '../products';
 describe('ProductsPage — importar desde el Catálogo Web', () => {
   beforeEach(() => {
     mockUser.selectedStoreId = 's1';
-    mockUser.storeModuleIds = [];
+    mockUser.isOwnerAdmin = true;
+    mockUser.storeModuleIds = [EModules.WebCatalog];
     catalogHttpSpies.getProducts.mockReset();
     catalogHttpSpies.getProducts.mockResolvedValue(productsResponse());
     catalogImportSpies.importCatalogProducts.mockReset();
@@ -168,6 +171,32 @@ describe('ProductsPage — importar desde el Catálogo Web', () => {
     const button = await screen.findByTestId('import-web-catalog-button');
     expect(button).toHaveTextContent('Importar desde Catálogo Web');
     expect(screen.getByTestId('import-csv-button')).toBeInTheDocument();
+  });
+
+  it('no muestra el botón si el usuario no es OwnerAdmin', async () => {
+    mockUser.isOwnerAdmin = false;
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('import-csv-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('import-web-catalog-button')).toBeNull();
+  });
+
+  it('no muestra el botón si la tienda no tiene contratado el módulo Catálogo Web', async () => {
+    mockUser.storeModuleIds = [];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('import-csv-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('import-web-catalog-button')).toBeNull();
   });
 
   it('confirma antes de importar y no hace nada si el usuario cancela', async () => {
@@ -271,6 +300,25 @@ describe('ProductsPage — importar desde el Catálogo Web', () => {
     await act(async () => {
       resolveProducts(productsResponse());
     });
+    await waitFor(() => expect(button).not.toBeDisabled());
+  });
+
+  it('reports the fetch failure, shows no success toast and releases the button', async () => {
+    catalogHttpSpies.getProducts.mockResolvedValueOnce({
+      data: [], succeeded: false, message: '', actionCode: 500, errors: [],
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    const button = await screen.findByTestId('import-web-catalog-button');
+    fireEvent.click(button);
+
+    await waitFor(() => expect(blockingAlertSpies.showBlockingError).toHaveBeenCalled());
+    expect(toastSpies.showToastSuccess).not.toHaveBeenCalled();
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 });

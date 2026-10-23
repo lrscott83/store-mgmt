@@ -968,7 +968,7 @@ const messages: Record<string, string> = {
   'PRODUCTS.WEB_IMPORT.IMPORTING': 'Importando...',
   'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE': 'Importar desde el Catálogo Web',
   'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE':
-    'Se añadirán al catálogo del POS los productos del catálogo web que todavía no existan. Los que ya existan no se modificarán. ¿Desea continuar?',
+    'Se añadirán al catálogo del POS los productos del catálogo web que todavía no existan. La importación puede reordenar los productos que ya están en la misma categoría. ¿Desea continuar?',
   'PRODUCTS.WEB_IMPORT.SUCCESS':
     'Importación completada: {imported} productos importados y {existing} ya existentes.',
   'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY':
