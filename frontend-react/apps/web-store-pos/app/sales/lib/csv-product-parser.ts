@@ -306,9 +306,9 @@ export function parseCsvProducts(csvText: string, options: CsvParseOptions = {})
     const quantity = parseOptionalQuantity(quantityIdx >= 0 ? (fields[quantityIdx] ?? '') : '');
 
     // --- Optional currency (React-only, currency-in-costs-and-prices plan 2026-09-16) ---
-    // Acepta NOMBRE (`USD`) o el número del enum (`1`). El import de catálogo del SuperAdmin
-    // (2026-10-22) documenta la columna como moneda de venta, y escribirla por código es lo
-    // natural; los CSV numéricos existentes siguen funcionando igual.
+    // Número del enum (`1`) SIEMPRE; NOMBRE (`USD`) solo con `allowCurrencyNames`. El import del
+    // POS del dueño no pasa la opción y conserva su contrato: un valor no numérico sigue siendo
+    // `undefined` (CUP). Solo el import de catálogo del SuperAdmin la activa.
     const currency = parseCurrencyCell(
       currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '',
       options.allowCurrencyNames === true,

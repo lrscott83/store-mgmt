@@ -138,9 +138,21 @@ public sealed class AdminCatalogImportTests
         var store = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            var response = await ImportAsync(DbTestHelpers.AuthedClient(_f, saId, login), store.StoreId, []);
+            var client = DbTestHelpers.AuthedClient(_f, saId, login);
+            var response = await ImportAsync(client, store.StoreId, []);
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            // Discrimina el contrato nuevo: el mensaje es el de "sin filas", no el de "fila 0".
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.Errors.Should().ContainSingle();
+            body.Errors[0].Description.Should().NotBeNullOrWhiteSpace();
+            body.Errors[0].Description.Should().NotContain("fila 0");
+
+            // Un cuerpo sin `rows` (null) también es 400, no el 500 de un NullReferenceException.
+            var nullRows = await client.PostAsJsonAsync(
+                $"/api/v1/stores/{store.StoreId}/catalog/import", new { rows = (object?)null });
+            nullRows.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
         finally
         {

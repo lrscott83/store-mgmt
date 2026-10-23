@@ -81,10 +81,14 @@ namespace Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv
             // última aparición. Sin esto, la segunda pasada encontraría el producto que la primera
             // acaba de Añadir en esta misma unidad de trabajo, lo marcaría Update y el resumen
             // contaría como actualizado algo que en realidad se creó.
+            // La MISMA noción de identidad que el upsert (`OrdinalIgnoreCase` sobre el nombre
+            // recortado): si el dedupe usara otra normalización (ToUpperInvariant), las dos reglas
+            // podrían discrepar con nombres no ASCII y una fila repetida acabaría actualizando lo
+            // que la otra rama consideró nueva.
             IReadOnlyList<CatalogCsvRowDto> rows = request.Rows
-                .GroupBy(row => (
-                    row.CategoryName.Trim().ToUpperInvariant(),
-                    row.ProductName.Trim().ToUpperInvariant()))
+                .GroupBy(
+                    row => $"{row.CategoryName.Trim()}\u0000{row.ProductName.Trim()}",
+                    StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.Last())
                 .ToList();
 
