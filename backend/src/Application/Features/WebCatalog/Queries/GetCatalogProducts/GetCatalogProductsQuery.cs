@@ -48,6 +48,7 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogProducts
                 Id = product.Id,
                 CategoryId = product.CategoryId,
                 CategoryName = product.Category?.Name ?? string.Empty,
+                CategoryOrder = product.Category?.Order ?? 0,
                 Name = product.Name,
                 Price = product.Price,
                 Currency = product.Currency.ToString(),
