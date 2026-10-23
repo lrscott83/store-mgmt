@@ -115,6 +115,26 @@ L4 (2026-10-22, hallazgos de implementación):
   resuelve primero con `parseOptionalCurrency`.
 - La API serializa los enums como CADENA (`"USD"`), no como número; el E2E lo fija.
 
+L6 (2026-10-23, RDD — receipt-driven development):
+- RDD está ON (global). Assess inicial del slice completo (`HEAD~2..HEAD`, 5109 líneas): medium,
+  `under_budget`. Con escalado del item 2 → high / `review_due`.
+- El START del slice completo falló con `lens_context_budget_exceeded` (3 lentes); no se creó
+  autoridad. Se redujo el alcance al commit del import CSV (`HEAD~1..HEAD`, 16 archivos, 1020
+  líneas), 3 lentes (risk, readability, reliability), con consentimiento del owner.
+- Resultado: **approved** (lineage `review-7e17eac5e49b17e2`, target `sha256:65dd27c1…`),
+  acknowledgement ejecutado (`gentle-ai.review-acknowledged/v1`), autoridad quemada.
+- Hallazgos: 16, todos **informational/no bloqueantes**. Reales y a corregir como trabajo
+  posterior: (1) la columna `moneda` compartida ahora acepta códigos y eso cambia el import del
+  POS del dueño (contradice lo que decía S2 de este doc); (2) filas duplicadas en un mismo CSV
+  actualizan una entidad recién añadida y descuadran el resumen; (3) `await onImported()` dentro
+  del try hace que un fallo de recarga se reporte como fallo de importación; (4) `rows: null`
+  produce 500 en vez de 400; (5) la doc del DTO dice "moneda desconocida = CUP" pero el handler
+  devuelve 400; (6) falta cobertura de lista vacía, moneda fuera del enum y backfill de slug en
+  categoría existente.
+- Falso positivo comprobado: R3-3 (la regeneración no es best-effort) — `CatalogStaticPageRegenerator`
+  captura toda excepción y nunca lanza (`CatalogStaticPageRegenerator.cs:43-59`).
+- Pendiente: el commit de la vista store-scoped (`697dd1d6`, item 2 seguridad) sigue sin RDD.
+
 L5 (2026-10-22, evidencia):
 - `dotnet build src/SMCA.sln`: Build succeeded.
 - E2E nuevos `Catalog/AdminCatalogImportTests.cs`: 4/4 verdes (crea categorías/productos y los
