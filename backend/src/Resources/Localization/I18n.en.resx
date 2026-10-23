@@ -697,6 +697,9 @@
   <data name="StoreNotSelected" xml:space="preserve">
     <value>User {0} has no store selected</value>
   </data>
+  <data name="CatalogCsvInvalidRow" xml:space="preserve">
+    <value>CSV row {0} is invalid: check the category, the product and the price.</value>
+  </data>
   <data name="ApiRequestInvalid" xml:space="preserve">
     <value>The request is not valid</value>
   </data>

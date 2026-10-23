@@ -11,6 +11,7 @@ import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CatalogCsvImportCard } from '../components/catalog-csv-import-card';
 import { CatalogLocationCard } from '../components/catalog-location-card';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
@@ -1221,6 +1222,10 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
           </dl>
         </div>
       </Card>
+
+      {/* Import CSV (SuperAdmin, 2026-10-22): solo en modo admin — el dueño tiene su propia
+          importación en /sales/products, con inventario y monedas de costo. */}
+      {storeId && <CatalogCsvImportCard storeId={storeId} onImported={loadData} />}
 
       {/* Marca (F8). Solo el LOGO: el control de banner se retiró el 2026-10-08 (decisión del
           owner) sin tocar el dato ni el backend. Su propio botón y su propio PUT: el guardado

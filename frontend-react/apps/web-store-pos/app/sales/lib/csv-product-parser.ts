@@ -179,6 +179,21 @@ function parseOptionalCurrency(raw: string): Currency | undefined {
 }
 
 /**
+ * Moneda por NOMBRE (`USD`) o por el número del enum (`1`) — nunca un error.
+ *
+ * El número se resuelve PRIMERO con `parseOptionalCurrency`: `parseCurrencyByName` mira
+ * `Currency[raw]`, y en un enum numérico TypeScript eso devuelve el NOMBRE del miembro (mapeo
+ * inverso: `Currency['1'] === 'USD'`), no el valor. Sin este orden, un CSV con `moneda=1`
+ * devolvería la cadena `'USD'` en vez del número que el resto del dominio espera.
+ */
+function parseCurrencyCell(raw: string): Currency | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (!isNaN(Number(trimmed))) return parseOptionalCurrency(trimmed);
+  return parseCurrencyByName(trimmed);
+}
+
+/**
  * MultiMonedas CSV (2026-09-22): columnas de moneda por NOMBRE
  * (`precio_moneda`/`precio_costo`), validadas SIN distinción de mayúsculas:
  * "usd" -> Currency.USD. Acepta el código exacto (usd/Usd/USD) o el nombre
@@ -215,12 +230,15 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
 
   const headers = rows[headerIndex].map((h) => h.trim().toLowerCase());
 
-  const nameIdx = indexOfHeader(headers, 'nombre', 'name');
-  const priceIdx = indexOfHeader(headers, 'precio', 'price');
+  // `producto`/`precio_venta`/`moneda_venta` (2026-10-22): alias naturales del import de catálogo
+  // del SuperAdmin. Son ADITIVOS — las cabeceras del POS siguen resolviendo primero por sus
+  // nombres canónicos, así que un CSV existente no cambia de significado.
+  const nameIdx = indexOfHeader(headers, 'nombre', 'name', 'producto', 'product');
+  const priceIdx = indexOfHeader(headers, 'precio', 'price', 'precio_venta', 'sale_price');
   const categoryIdx = indexOfHeader(headers, 'categoria', 'category');
   const costIdx = indexOfHeader(headers, 'costo', 'cost');
   const quantityIdx = indexOfHeader(headers, 'cantidad', 'quantity');
-  const currencyIdx = indexOfHeader(headers, 'moneda', 'currency');
+  const currencyIdx = indexOfHeader(headers, 'moneda', 'currency', 'moneda_venta', 'sale_currency');
   // MultiMonedas CSV (2026-09-22): las DOS columnas nuevas viven "al lado de
   // cantidad" — `precio_moneda` (moneda del precio) y `precio_costo` (moneda
   // del costo). El alias `moneda` legacy sigue resolviendo `currency` (compat
@@ -272,16 +290,31 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
     const quantity = parseOptionalQuantity(quantityIdx >= 0 ? (fields[quantityIdx] ?? '') : '');
 
     // --- Optional currency (React-only, currency-in-costs-and-prices plan 2026-09-16) ---
-    const currency = parseOptionalCurrency(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
+    // Acepta NOMBRE (`USD`) o el número del enum (`1`). El import de catálogo del SuperAdmin
+    // (2026-10-22) documenta la columna como moneda de venta, y escribirla por código es lo
+    // natural; los CSV numéricos existentes siguen funcionando igual.
+    const currency = parseCurrencyCell(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
 
     // --- MultiMonedas CSV (2026-09-22): monedas por NOMBRE, case-insensitive ---
-    const priceCurrency = parseCurrencyByName(priceCurrencyIdx >= 0 ? (fields[priceCurrencyIdx] ?? '') : '');
-    const costCurrency = parseCurrencyByName(costCurrencyIdx >= 0 ? (fields[costCurrencyIdx] ?? '') : '');
+    const priceCurrency = parseCurrencyByName(
+      priceCurrencyIdx >= 0 ? (fields[priceCurrencyIdx] ?? '') : '',
+    );
+    const costCurrency = parseCurrencyByName(
+      costCurrencyIdx >= 0 ? (fields[costCurrencyIdx] ?? '') : '',
+    );
     // La columna legacy `moneda` alimenta el precio SOLO si la nueva
     // `precio_moneda` no vino — ambas describen el precio.
     const resolvedCurrency = priceCurrency ?? currency;
 
-    products.push({ name, price, category, cost, quantity, currency: resolvedCurrency, costCurrency });
+    products.push({
+      name,
+      price,
+      category,
+      cost,
+      quantity,
+      currency: resolvedCurrency,
+      costCurrency,
+    });
   }
 
   return { products, errors };

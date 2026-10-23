@@ -1582,6 +1582,20 @@ const messages: Record<string, string> = {
   // publicación sí lo exige.
   'STORES.WEB_CATALOG.MENU_LABEL': 'Configurar catálogo web',
   'STORES.WEB_CATALOG.BACK': 'Volver a tiendas',
+  // Import CSV del catálogo desde la vista store-scoped del SuperAdmin (2026-10-22): las columnas
+  // del CSV y su validación por fila reutilizan los mensajes PRODUCTS.CSV.* del import del POS.
+  'WEB_CATALOG.IMPORT.TITLE': 'Importar productos desde CSV',
+  'WEB_CATALOG.IMPORT.SUBTITLE':
+    'Columnas: categoria, producto, precio_venta y moneda_venta (también valen nombre, precio y moneda). Moneda por código: CUP, USD, EUR… Si la categoría y el producto ya existen, se actualizan el precio y la moneda.',
+  'WEB_CATALOG.IMPORT.IMPORT': 'Importar {count} productos',
+  'WEB_CATALOG.IMPORT.IMPORTING': 'Importando…',
+  'WEB_CATALOG.IMPORT.DONE': 'CSV importado',
+  'WEB_CATALOG.IMPORT.FAILED': 'No se pudo importar el CSV',
+  'WEB_CATALOG.IMPORT.SUMMARY':
+    'Categorías creadas: {categories}. Productos creados: {created}. Actualizados: {updated}.',
+  'WEB_CATALOG.IMPORT.ROW_ERROR': 'Fila {row}: {reason}',
+  'WEB_CATALOG.IMPORT.REAL_PRODUCTS_NOTE':
+    'Los productos importados son productos reales de la tienda: también aparecen en el POS y en inventario.',
   'STORES.CATALOG_SLUG.REQUIRED': 'El enlace del catálogo no puede quedar vacío',
   'STORES.CATALOG_SLUG.IN_USE': 'Ese enlace ya está en uso por otra tienda',
   'STORES.CATALOG_SLUG.SAVE_ERROR': 'No se pudo guardar el catálogo. Intente de nuevo.',

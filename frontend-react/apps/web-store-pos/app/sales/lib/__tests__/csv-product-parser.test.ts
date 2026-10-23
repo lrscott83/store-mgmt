@@ -378,8 +378,19 @@ describe('parseCsvProducts', () => {
       expect(result.products[0].currency).toBeUndefined();
     });
 
-    it('never fails a row and resolves undefined for a non-numeric cell ("USD")', () => {
+    it('resuelve la moneda por NOMBRE ("USD") en la columna moneda (import de catálogo, 2026-10-22)', () => {
+      // Antes esta celda se ignoraba (solo se aceptaba el número del enum). El import de catálogo
+      // del SuperAdmin documenta `moneda_venta` como código, así que `moneda` también lo acepta:
+      // el cambio es ADITIVO — los CSV numéricos siguen resolviendo igual (caso anterior).
       const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBe(Currency.USD);
+    });
+
+    it('never fails a row and resolves undefined for an UNKNOWN currency name ("XXX")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,XXX'].join('\n');
       const result = parseCsvProducts(csv);
       expect(result.products).toHaveLength(1);
       expect(result.errors).toHaveLength(0);
@@ -495,5 +506,59 @@ describe('parseCsvProducts — columnas precio_moneda / precio_costo (MultiMoned
     const result = parseCsvProducts(csv);
     expect(result.products[0].currency).toBe(Currency.USD);
     expect(result.products[0].costCurrency).toBe(Currency.CUP);
+  });
+});
+
+/**
+ * Alias del import de catálogo del SuperAdmin (2026-10-22): el CSV del owner usa
+ * `categoria,nombre,precio,moneda`; el del admin puede decir `producto`, `precio_venta` y
+ * `moneda_venta`, y escribir la moneda por CÓDIGO. Todo aditivo: los CSV existentes no cambian.
+ */
+describe('parseCsvProducts — alias del import de catálogo (SuperAdmin)', () => {
+  it('acepta producto, precio_venta y moneda_venta como cabeceras', () => {
+    const csv = [
+      'categoria,producto,precio_venta,moneda_venta',
+      'Bebidas,Café,2.50,USD',
+      'Postres,Flan,3,CUP',
+    ].join('\n');
+
+    const result = parseCsvProducts(csv);
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.products).toHaveLength(2);
+    expect(result.products[0]).toMatchObject({
+      category: 'Bebidas',
+      name: 'Café',
+      price: 2.5,
+      currency: Currency.USD,
+    });
+    expect(result.products[1]).toMatchObject({
+      category: 'Postres',
+      name: 'Flan',
+      price: 3,
+      currency: Currency.CUP,
+    });
+  });
+
+  it('la columna moneda acepta el código y el número del enum', () => {
+    const byName = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,USD'].join('\n'),
+    );
+    const byNumber = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,1'].join('\n'),
+    );
+
+    expect(byName.products[0].currency).toBe(Currency.USD);
+    expect(byNumber.products[0].currency).toBe(Currency.USD);
+  });
+
+  it('una moneda desconocida no descarta la fila: queda sin moneda (CUP por defecto)', () => {
+    const result = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,XXX'].join('\n'),
+    );
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].currency).toBeUndefined();
   });
 });

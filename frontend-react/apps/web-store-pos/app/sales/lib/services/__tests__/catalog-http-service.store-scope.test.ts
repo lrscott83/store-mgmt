@@ -68,6 +68,24 @@ describe('catalogClientForStore — endpoints store-scoped del SuperAdmin', () =
     });
   });
 
+  it('SCOPE-HTTP-4b: el import CSV viaja a /v1/stores/{storeId}/catalog/import', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.post).mockResolvedValue(
+      okEnvelope({
+        categoriesCreated: 1,
+        productsCreated: 1,
+        productsUpdated: 0,
+        rowsProcessed: 1,
+      }) as never,
+    );
+
+    const { importCatalogCsv } = await import('../catalog-http-service');
+    const rows = [{ categoryName: 'Bebidas', productName: 'Café', price: 2.5, currency: 1 }];
+    await importCatalogCsv('store-42', rows);
+
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/store-42/catalog/import', { rows });
+  });
+
   it('SCOPE-HTTP-5: el cliente del dueño sigue usando /v1/catalog (sin cambios)', async () => {
     const { apiClient } = await import('~/shared/lib/http/api-client');
     vi.mocked(apiClient.get).mockResolvedValue(okEnvelope({ storeSlug: 'tienda' }) as never);

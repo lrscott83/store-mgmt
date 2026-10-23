@@ -3,6 +3,7 @@ using Application.Features.WebCatalog.Commands.UpdateProductCatalogFields;
 using Application.Features.WebCatalog.Images.Commands.AddProductImage;
 using Application.Features.WebCatalog.Images.Commands.RemoveProductImage;
 using Application.Features.WebCatalog.Images.Commands.ReorderProductImages;
+using Application.Features.WebCatalog.Import.Commands.ImportCatalogCsv;
 using Application.Features.WebCatalog.Queries.GetCatalogProducts;
 using Application.Features.WebCatalog.Queries.GetCatalogStatus;
 using Application.Features.WebCatalog.Sync.Commands.SyncCatalog;
@@ -94,6 +95,20 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> RemoveProductImageAsync(Guid productId, [FromQuery] string path)
         {
             return Ok(await Sender.Send(new RemoveProductImageCommand(productId, path)));
+        }
+
+        /// <summary>
+        /// Importa productos al catálogo de la tienda desde un CSV ya parseado por el navegador
+        /// (categoría, producto, precio de venta y moneda). Es un UPSERT por categoría + producto:
+        /// crea lo que falta y actualiza precio y moneda de lo existente. Todo o nada.
+        /// </summary>
+        [HttpPost("~/api/v1/stores/{storeId:guid}/catalog/import")]
+        [ProducesResponseType(typeof(ResponseResult<CatalogCsvImportSummaryDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ImportCsvAsync([FromBody] ImportCatalogCsvCommand request)
+        {
+            return Ok(await Sender.Send(request));
         }
 
         /// <summary>Reordena la galería: envía el orden final completo de las imágenes.</summary>

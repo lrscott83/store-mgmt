@@ -661,6 +661,44 @@ export function catalogClientForStore(storeId: string) {
   return createCatalogConfigClient(`/v1/stores/${storeId}/catalog`);
 }
 
+/**
+ * Una fila del CSV de importación del catálogo, ya normalizada por `parseCsvProducts`:
+ * categoría, producto, precio de venta y moneda de venta (número del enum `Currency`;
+ * ausente = CUP). Al backend le llegan estos nombres, no los del CSV.
+ */
+export interface CatalogCsvImportRow {
+  categoryName: string;
+  productName: string;
+  price: number;
+  currency?: number;
+}
+
+/** Resumen del import (espejo de `CatalogCsvImportSummaryDto`). */
+export interface CatalogCsvImportSummary {
+  categoriesCreated: number;
+  productsCreated: number;
+  productsUpdated: number;
+  rowsProcessed: number;
+}
+
+/**
+ * Import CSV de productos al catálogo de UNA tienda (SuperAdmin, store-scoped).
+ *
+ * UPSERT por categoría + producto: crea lo que falta y actualiza SOLO precio y moneda de lo
+ * existente. Es una sola petición — el CSV se parsea en el navegador — y es todo o nada: una fila
+ * inválida hace que el backend rechace el import completo.
+ */
+export async function importCatalogCsv(
+  storeId: string,
+  rows: CatalogCsvImportRow[],
+): Promise<BaseResponseModel<CatalogCsvImportSummary>> {
+  const response = await apiClient.post<BaseResponseModel<CatalogCsvImportSummary>>(
+    `/v1/stores/${storeId}/catalog/import`,
+    { rows },
+  );
+  return response.data;
+}
+
 export const catalogHttpService = {
   ...createCatalogConfigClient(SESSION_CATALOG_PATH),
 

@@ -1321,6 +1321,12 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   //   expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
   // });
   // ────────────────────────────────────────────────────────────────────────────────
+
+  it('no muestra la tarjeta de import CSV del SuperAdmin (el dueño usa /sales/products)', async () => {
+    renderPage();
+    await waitFor(() => expect(catalogMock.getStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId('catalog-csv-import')).not.toBeInTheDocument();
+  });
 });
 
 describe('clientLoader del catálogo (módulo 18 + Owner)', () => {
@@ -1431,6 +1437,12 @@ describe('WebCatalogSettingsView — modo SuperAdmin (store-scoped)', () => {
     await waitFor(() => expect(scoped.getBranding).toHaveBeenCalled());
     expect(catalogMock.getStatus).not.toHaveBeenCalled();
     expect(catalogMock.getBranding).not.toHaveBeenCalled();
+  });
+
+  it('SCOPE-3: muestra la tarjeta de import CSV (solo existe en la vista del SuperAdmin)', async () => {
+    renderAdminView();
+
+    expect(await screen.findByTestId('catalog-csv-import')).toBeInTheDocument();
   });
 
   it('SCOPE-2: sincronizar publica el origen del SERVIDOR, sin snapshot del dispositivo', async () => {
