@@ -23,6 +23,8 @@ import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
+import { catalogHttpService } from '../lib/services/catalog-http-service';
+import { importCatalogProducts } from '../lib/catalog/catalog-import';
 import { ProductRepository } from '../lib/repositories/product-repository';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
@@ -59,6 +61,7 @@ export function ProductsPage() {
   const [productsByCategory, setProductsByCategory] = useState<Record<string, Product[]>>({});
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<Modal | null>(null);
+  const [isImportingWebCatalog, setIsImportingWebCatalog] = useState(false);
 
   const productService = createProductService(storeId);
   const categoryService = createProductCategoryService(storeId);
@@ -451,6 +454,84 @@ export function ProductsPage() {
     void loadData();
   }
 
+  // --- Import from the web catalog (web-catalog-to-pos-import) ---
+  // El servidor publica el catálogo web; aquí se trae al catálogo LOCAL de este dispositivo.
+  // La identidad es el id y solo el id: lo que ya existe no se toca. El importador reporta
+  // exactamente lo que no pudo insertar y esta vista lo muestra sin resumir.
+  async function handleImportWebCatalog() {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    setIsImportingWebCatalog(true);
+    try {
+      const result = await catalogHttpService.getProducts();
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.LOAD_FAILED' }),
+        );
+        return;
+      }
+
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const summary = importCatalogProducts(result.data ?? [], {
+        categoryRepository,
+        productRepository: new ProductRepository(storeId, categoryRepository),
+      });
+
+      const failureLines = [
+        ...summary.failedCategories.map((category) =>
+          category.skippedProductsCount === 1
+            ? intl.formatMessage(
+                { id: 'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED_ONE' },
+                { name: category.name },
+              )
+            : intl.formatMessage(
+                { id: 'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED' },
+                { name: category.name, count: category.skippedProductsCount },
+              ),
+        ),
+        ...summary.failedProducts.map((product) =>
+          intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.PRODUCT_FAILED' }, { name: product.name }),
+        ),
+      ];
+
+      if (failureLines.length > 0) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          [
+            intl.formatMessage(
+              { id: 'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY' },
+              { imported: summary.importedCount, existing: summary.existingCount },
+            ),
+            ...failureLines,
+          ].join('\n'),
+        );
+      } else {
+        showToastSuccess(
+          intl.formatMessage(
+            { id: 'PRODUCTS.WEB_IMPORT.SUCCESS' },
+            { imported: summary.importedCount, existing: summary.existingCount },
+          ),
+        );
+      }
+
+      void loadData();
+    } catch {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.LOAD_FAILED' }),
+      );
+    } finally {
+      setIsImportingWebCatalog(false);
+    }
+  }
+
   // --- Clear all data ---
   // catalog-show-all-and-clear-data §D5/D6/D9, revised by §Finding 1. Wipes the business
   // entities of the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so
@@ -567,6 +648,18 @@ export function ProductsPage() {
             <PaperclipIcon />
             {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
             {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
+          </Button>
+          <Button
+            variant="fab"
+            onClick={handleImportWebCatalog}
+            disabled={isImportingWebCatalog}
+            data-testid="import-web-catalog-button"
+          >
+            {intl.formatMessage({
+              id: isImportingWebCatalog
+                ? 'PRODUCTS.WEB_IMPORT.IMPORTING'
+                : 'PRODUCTS.WEB_IMPORT.BUTTON',
+            })}
           </Button>
         </div>
 

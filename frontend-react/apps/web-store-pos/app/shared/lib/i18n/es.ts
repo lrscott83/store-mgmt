@@ -962,6 +962,23 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.COL_ROW': 'Fila',
   'PRODUCTS.CSV.COL_STATUS': 'Estado',
   'PRODUCTS.CSV.STATUS_VALID': 'Válido',
+  // Importación Catálogo Web → POS (plan web-catalog-to-pos-import): trae al catálogo local los
+  // productos publicados que aún no existan aquí. Los fallos se nombran uno a uno.
+  'PRODUCTS.WEB_IMPORT.BUTTON': 'Importar desde Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.IMPORTING': 'Importando...',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE': 'Importar desde el Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE':
+    'Se añadirán al catálogo del POS los productos del catálogo web que todavía no existan. Los que ya existan no se modificarán. ¿Desea continuar?',
+  'PRODUCTS.WEB_IMPORT.SUCCESS':
+    'Importación completada: {imported} productos importados y {existing} ya existentes.',
+  'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY':
+    'Se importaron {imported} productos y {existing} ya existían. No se pudieron importar:',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED':
+    'La categoría "{name}" no se pudo insertar; sus {count} productos no fueron importados.',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED_ONE':
+    'La categoría "{name}" no se pudo insertar; su producto no fue importado.',
+  'PRODUCTS.WEB_IMPORT.PRODUCT_FAILED': 'El producto "{name}" no se pudo insertar.',
+  'PRODUCTS.WEB_IMPORT.LOAD_FAILED': 'No se pudo leer el catálogo web.',
   'PRODUCTS.CATEGORY.CREATE': 'Crear categoría',
   'PRODUCTS.CATEGORY.EDIT': 'Editar categoría',
   // Angular PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY — header FAB label (also reused, per
