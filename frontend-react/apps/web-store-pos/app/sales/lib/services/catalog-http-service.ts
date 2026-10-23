@@ -460,182 +460,251 @@ export interface PublicOrderStatusItem {
   price: number;
 }
 
+/** Prefijo del cliente del dueño: la tienda sale del claim de la sesión. */
+const SESSION_CATALOG_PATH = '/v1/catalog';
+
+/**
+ * Cliente de configuración del catálogo contra un prefijo dado. Los métodos son los mismos para el
+ * dueño y para el SuperAdmin: lo único que cambia es de dónde sale la tienda — del claim
+ * (`/v1/catalog`) o de la RUTA (`/v1/stores/{storeId}/catalog`). El backend ejecuta exactamente los
+ * mismos comandos/queries en ambos casos.
+ */
+function createCatalogConfigClient(basePath: string) {
+  return {
+    async getStatus(): Promise<BaseResponseModel<CatalogStatus>> {
+      const response = await apiClient.get<BaseResponseModel<CatalogStatus>>(`${basePath}/status`);
+      return response.data;
+    },
+
+    async getProducts(): Promise<BaseResponseModel<CatalogProductView[]>> {
+      const response = await apiClient.get<BaseResponseModel<CatalogProductView[]>>(
+        `${basePath}/products`,
+      );
+      return response.data;
+    },
+
+    /**
+     * Sincroniza el catálogo publicado con el origen (crea lo que falta, actualiza lo existente y
+     * despublica lo que dejó de estar en venta; nunca borra).
+     *
+     * `snapshot` es el catálogo local de esta tienda: sin él el servidor publicaría lo que tenga en
+     * su propia tabla de productos, que para una tienda offline-first está vacía.
+     */
+    async sync(snapshot?: CatalogSnapshot): Promise<BaseResponseModel<CatalogSyncSummary>> {
+      const response = await apiClient.post<BaseResponseModel<CatalogSyncSummary>>(
+        `${basePath}/sync`,
+        {
+          snapshot: snapshot ?? null,
+        },
+      );
+      return response.data;
+    },
+
+    /** Guarda los campos del catálogo de un producto. */
+    async saveProductFields(
+      productId: string,
+      fields: CatalogProductFields,
+    ): Promise<BaseResponseModel<boolean>> {
+      const response = await apiClient.put<BaseResponseModel<boolean>>(
+        `${basePath}/products/${productId}`,
+        fields,
+      );
+      return response.data;
+    },
+
+    /** Sube una imagen a la galería y devuelve su clave. */
+    async uploadImage(productId: string, file: File): Promise<BaseResponseModel<string>> {
+      const formData = new FormData();
+      formData.append('file', file);
+      // `Content-Type: multipart/form-data` EXPLÍCITO: `api-client` fija `application/json` como
+      // cabecera por defecto, y axios convierte un FormData a JSON cuando ve ese tipo — el POST salía
+      // como JSON y el backend lo rechazaba con 415. Declarando multipart, axios deja el FormData
+      // intacto y el adaptador borra la cabecera para que el navegador ponga el boundary real.
+      const response = await apiClient.post<BaseResponseModel<string>>(
+        `${basePath}/products/${productId}/images`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return response.data;
+    },
+
+    /** Quita una imagen de la galería (se borra el archivo, sin vuelta atrás). */
+    async removeImage(productId: string, path: string): Promise<BaseResponseModel<boolean>> {
+      const response = await apiClient.delete<BaseResponseModel<boolean>>(
+        `${basePath}/products/${productId}/images`,
+        { params: { path } },
+      );
+      return response.data;
+    },
+
+    /** Reordena la galería enviando el orden final completo. */
+    async reorderImages(productId: string, paths: string[]): Promise<BaseResponseModel<boolean>> {
+      const response = await apiClient.put<BaseResponseModel<boolean>>(
+        `${basePath}/products/${productId}/images/order`,
+        { paths },
+      );
+      return response.data;
+    },
+
+    /**
+     * Marca de la tienda actual. Una tienda sin fila NO es un 404: el backend devuelve los valores
+     * por defecto (sin logo, sin banner, paleta actual).
+     */
+    async getBranding(): Promise<BaseResponseModel<CatalogBranding>> {
+      const response = await apiClient.get<BaseResponseModel<CatalogBranding>>(
+        `${basePath}/branding`,
+      );
+      return response.data;
+    },
+
+    /**
+     * Sube, cambia o quita el logo y/o el banner (F8). Es un PUT PARCIAL: lo que no se manda no
+     * se toca, así que cambiar el logo no borra el banner.
+     *
+     * Multipart porque los archivos viajan como `IFormFile`. El `Content-Type` EXPLÍCITO es el
+     * mismo requisito documentado en `uploadImage`: `api-client` fija `application/json` y axios
+     * convertiría el FormData a JSON — declarando multipart, axios deja el FormData intacto y el
+     * adaptador borra la cabecera para que el navegador ponga el boundary real.
+     */
+    async updateBranding(
+      payload: CatalogBrandingUpdate,
+    ): Promise<BaseResponseModel<CatalogBranding>> {
+      const formData = new FormData();
+      if (payload.logo) formData.append('logo', payload.logo);
+      if (payload.banner) formData.append('banner', payload.banner);
+      if (payload.removeLogo) formData.append('removeLogo', 'true');
+      if (payload.removeBanner) formData.append('removeBanner', 'true');
+      // Ausente = "no toco el ajuste": el backend lo lee como null.
+      if (payload.mobileColumns !== undefined) {
+        formData.append('mobileColumns', String(payload.mobileColumns));
+      }
+      const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
+        `${basePath}/branding`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return response.data;
+    },
+
+    // --- SHOWCASE: carrusel de cabecera e imágenes del día, los dos conjuntos independientes. ---
+
+    /**
+     * Las imágenes de la tienda actual agrupadas por conjunto. Una tienda sin imágenes devuelve los
+     * dos conjuntos VACÍOS, no un 404: acaba de sincronizar y todavía no subió ninguna.
+     */
+    async getShowcaseImages(): Promise<BaseResponseModel<CatalogShowcaseImages>> {
+      const response = await apiClient.get<BaseResponseModel<CatalogShowcaseImages>>(
+        `${basePath}/showcase`,
+      );
+      return response.data;
+    },
+
+    /**
+     * Sube UNA imagen a UN conjunto. Multipart porque el archivo viaja como `IFormFile`, y el
+     * `Content-Type` EXPLÍCITO es el mismo requisito documentado en `uploadImage`: `api-client` fija
+     * `application/json` como cabecera por defecto y axios convertiría el FormData a JSON — declarando
+     * multipart, axios lo deja intacto y el adaptador borra la cabecera para que el navegador ponga el
+     * boundary real.
+     *
+     * `kind` viaja como NÚMERO (el binder de `[FromForm]` acepta "0"/"1" para el enum), y el pie de
+     * foto solo se manda si el dueño lo escribió: vacío y ausente no son lo mismo para el comando.
+     */
+    async uploadShowcaseImage(
+      payload: CatalogShowcaseImageUpload,
+    ): Promise<BaseResponseModel<CatalogShowcaseImage>> {
+      const formData = new FormData();
+      formData.append('kind', String(payload.kind));
+      formData.append('file', payload.file);
+      if (payload.caption) formData.append('caption', payload.caption);
+      const response = await apiClient.post<BaseResponseModel<CatalogShowcaseImage>>(
+        `${basePath}/showcase`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return response.data;
+    },
+
+    /** Quita una imagen: borra la fila y el archivo (sin vuelta atrás). */
+    async removeShowcaseImage(imageId: string): Promise<BaseResponseModel<boolean>> {
+      const response = await apiClient.delete<BaseResponseModel<boolean>>(
+        `${basePath}/showcase/${imageId}`,
+      );
+      return response.data;
+    },
+
+    /**
+     * Reordena UN conjunto enviando su orden FINAL COMPLETO — no un movimiento: el backend reescribe
+     * el `OrderIndex` de todas las imágenes de ese conjunto y rechaza (400) una lista incompleta,
+     * con repetidos o con ids de otro conjunto.
+     */
+    async reorderShowcaseImages(
+      kind: CatalogShowcaseKind,
+      orderedIds: string[],
+    ): Promise<BaseResponseModel<boolean>> {
+      const response = await apiClient.put<BaseResponseModel<boolean>>(
+        `${basePath}/showcase/order`,
+        {
+          kind,
+          orderedIds,
+        },
+      );
+      return response.data;
+    },
+  };
+}
+
+/**
+ * Cliente store-scoped para el SuperAdmin. La tienda viaja en la RUTA, así que la configuración no
+ * depende de su tienda seleccionada (un SuperAdmin no tiene ninguna) y no toca la sesión ni la DEK.
+ */
+export function catalogClientForStore(storeId: string) {
+  return createCatalogConfigClient(`/v1/stores/${storeId}/catalog`);
+}
+
+/**
+ * Una fila del CSV de importación del catálogo, ya normalizada por `parseCsvProducts`:
+ * categoría, producto, precio de venta y moneda de venta (número del enum `Currency`;
+ * ausente = CUP). Al backend le llegan estos nombres, no los del CSV.
+ */
+export interface CatalogCsvImportRow {
+  categoryName: string;
+  productName: string;
+  price: number;
+  currency?: number;
+}
+
+/** Resumen del import (espejo de `CatalogCsvImportSummaryDto`). */
+export interface CatalogCsvImportSummary {
+  categoriesCreated: number;
+  productsCreated: number;
+  productsUpdated: number;
+  rowsProcessed: number;
+}
+
+/**
+ * Import CSV de productos al catálogo de UNA tienda (SuperAdmin, store-scoped).
+ *
+ * UPSERT por categoría + producto: crea lo que falta y actualiza SOLO precio y moneda de lo
+ * existente. Es una sola petición — el CSV se parsea en el navegador — y es todo o nada: una fila
+ * inválida hace que el backend rechace el import completo.
+ */
+export async function importCatalogCsv(
+  storeId: string,
+  rows: CatalogCsvImportRow[],
+): Promise<BaseResponseModel<CatalogCsvImportSummary>> {
+  const response = await apiClient.post<BaseResponseModel<CatalogCsvImportSummary>>(
+    `/v1/stores/${storeId}/catalog/import`,
+    { rows },
+  );
+  return response.data;
+}
+
 export const catalogHttpService = {
-  async getStatus(): Promise<BaseResponseModel<CatalogStatus>> {
-    const response = await apiClient.get<BaseResponseModel<CatalogStatus>>('/v1/catalog/status');
-    return response.data;
-  },
-
-  async getProducts(): Promise<BaseResponseModel<CatalogProductView[]>> {
-    const response = await apiClient.get<BaseResponseModel<CatalogProductView[]>>(
-      '/v1/catalog/products',
-    );
-    return response.data;
-  },
-
-  /**
-   * Sincroniza el catálogo publicado con el origen (crea lo que falta, actualiza lo existente y
-   * despublica lo que dejó de estar en venta; nunca borra).
-   *
-   * `snapshot` es el catálogo local de esta tienda: sin él el servidor publicaría lo que tenga en
-   * su propia tabla de productos, que para una tienda offline-first está vacía.
-   */
-  async sync(snapshot?: CatalogSnapshot): Promise<BaseResponseModel<CatalogSyncSummary>> {
-    const response = await apiClient.post<BaseResponseModel<CatalogSyncSummary>>('/v1/catalog/sync', {
-      snapshot: snapshot ?? null,
-    });
-    return response.data;
-  },
-
-  /** Guarda los campos del catálogo de un producto. */
-  async saveProductFields(
-    productId: string,
-    fields: CatalogProductFields,
-  ): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.put<BaseResponseModel<boolean>>(
-      `/v1/catalog/products/${productId}`,
-      fields,
-    );
-    return response.data;
-  },
-
-  /** Sube una imagen a la galería y devuelve su clave. */
-  async uploadImage(productId: string, file: File): Promise<BaseResponseModel<string>> {
-    const formData = new FormData();
-    formData.append('file', file);
-    // `Content-Type: multipart/form-data` EXPLÍCITO: `api-client` fija `application/json` como
-    // cabecera por defecto, y axios convierte un FormData a JSON cuando ve ese tipo — el POST salía
-    // como JSON y el backend lo rechazaba con 415. Declarando multipart, axios deja el FormData
-    // intacto y el adaptador borra la cabecera para que el navegador ponga el boundary real.
-    const response = await apiClient.post<BaseResponseModel<string>>(
-      `/v1/catalog/products/${productId}/images`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return response.data;
-  },
-
-  /** Quita una imagen de la galería (se borra el archivo, sin vuelta atrás). */
-  async removeImage(productId: string, path: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.delete<BaseResponseModel<boolean>>(
-      `/v1/catalog/products/${productId}/images`,
-      { params: { path } },
-    );
-    return response.data;
-  },
-
-  /** Reordena la galería enviando el orden final completo. */
-  async reorderImages(productId: string, paths: string[]): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.put<BaseResponseModel<boolean>>(
-      `/v1/catalog/products/${productId}/images/order`,
-      { paths },
-    );
-    return response.data;
-  },
-
-  /**
-   * Marca de la tienda actual. Una tienda sin fila NO es un 404: el backend devuelve los valores
-   * por defecto (sin logo, sin banner, paleta actual).
-   */
-  async getBranding(): Promise<BaseResponseModel<CatalogBranding>> {
-    const response = await apiClient.get<BaseResponseModel<CatalogBranding>>('/v1/catalog/branding');
-    return response.data;
-  },
-
-  /**
-   * Sube, cambia o quita el logo y/o el banner (F8). Es un PUT PARCIAL: lo que no se manda no
-   * se toca, así que cambiar el logo no borra el banner.
-   *
-   * Multipart porque los archivos viajan como `IFormFile`. El `Content-Type` EXPLÍCITO es el
-   * mismo requisito documentado en `uploadImage`: `api-client` fija `application/json` y axios
-   * convertiría el FormData a JSON — declarando multipart, axios deja el FormData intacto y el
-   * adaptador borra la cabecera para que el navegador ponga el boundary real.
-   */
-  async updateBranding(
-    payload: CatalogBrandingUpdate,
-  ): Promise<BaseResponseModel<CatalogBranding>> {
-    const formData = new FormData();
-    if (payload.logo) formData.append('logo', payload.logo);
-    if (payload.banner) formData.append('banner', payload.banner);
-    if (payload.removeLogo) formData.append('removeLogo', 'true');
-    if (payload.removeBanner) formData.append('removeBanner', 'true');
-    // Ausente = "no toco el ajuste": el backend lo lee como null.
-    if (payload.mobileColumns !== undefined) {
-      formData.append('mobileColumns', String(payload.mobileColumns));
-    }
-    const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
-      '/v1/catalog/branding',
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return response.data;
-  },
+  ...createCatalogConfigClient(SESSION_CATALOG_PATH),
 
   /** URL pública (anónima) de una imagen del catálogo publicado. */
   mediaUrl(storeSlug: string, key: string): string {
     return `/api/v1/public/catalog/${storeSlug}/media/${key}`;
-  },
-
-  // --- SHOWCASE: carrusel de cabecera e imágenes del día, los dos conjuntos independientes. ---
-
-  /**
-   * Las imágenes de la tienda actual agrupadas por conjunto. Una tienda sin imágenes devuelve los
-   * dos conjuntos VACÍOS, no un 404: acaba de sincronizar y todavía no subió ninguna.
-   */
-  async getShowcaseImages(): Promise<BaseResponseModel<CatalogShowcaseImages>> {
-    const response = await apiClient.get<BaseResponseModel<CatalogShowcaseImages>>(
-      '/v1/catalog/showcase',
-    );
-    return response.data;
-  },
-
-  /**
-   * Sube UNA imagen a UN conjunto. Multipart porque el archivo viaja como `IFormFile`, y el
-   * `Content-Type` EXPLÍCITO es el mismo requisito documentado en `uploadImage`: `api-client` fija
-   * `application/json` como cabecera por defecto y axios convertiría el FormData a JSON — declarando
-   * multipart, axios lo deja intacto y el adaptador borra la cabecera para que el navegador ponga el
-   * boundary real.
-   *
-   * `kind` viaja como NÚMERO (el binder de `[FromForm]` acepta "0"/"1" para el enum), y el pie de
-   * foto solo se manda si el dueño lo escribió: vacío y ausente no son lo mismo para el comando.
-   */
-  async uploadShowcaseImage(
-    payload: CatalogShowcaseImageUpload,
-  ): Promise<BaseResponseModel<CatalogShowcaseImage>> {
-    const formData = new FormData();
-    formData.append('kind', String(payload.kind));
-    formData.append('file', payload.file);
-    if (payload.caption) formData.append('caption', payload.caption);
-    const response = await apiClient.post<BaseResponseModel<CatalogShowcaseImage>>(
-      '/v1/catalog/showcase',
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return response.data;
-  },
-
-  /** Quita una imagen: borra la fila y el archivo (sin vuelta atrás). */
-  async removeShowcaseImage(imageId: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.delete<BaseResponseModel<boolean>>(
-      `/v1/catalog/showcase/${imageId}`,
-    );
-    return response.data;
-  },
-
-  /**
-   * Reordena UN conjunto enviando su orden FINAL COMPLETO — no un movimiento: el backend reescribe
-   * el `OrderIndex` de todas las imágenes de ese conjunto y rechaza (400) una lista incompleta,
-   * con repetidos o con ids de otro conjunto.
-   */
-  async reorderShowcaseImages(
-    kind: CatalogShowcaseKind,
-    orderedIds: string[],
-  ): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.put<BaseResponseModel<boolean>>('/v1/catalog/showcase/order', {
-      kind,
-      orderedIds,
-    });
-    return response.data;
   },
 
   // --- API pública: sin sesión, la consume el catálogo que ve el cliente final. ---
@@ -676,7 +745,9 @@ export const catalogHttpService = {
    * catálogo, un fallo aquí NO es un 404 de tienda inexistente: la marca es opcional, así que
    * quien la consume trata el error como "sin marca" y sigue pintando la página.
    */
-  async getPublicOrderingConfig(storeSlug: string): Promise<BaseResponseModel<PublicOrderingConfig>> {
+  async getPublicOrderingConfig(
+    storeSlug: string,
+  ): Promise<BaseResponseModel<PublicOrderingConfig>> {
     const response = await apiClient.get<BaseResponseModel<PublicOrderingConfig>>(
       `/v1/public/ordering/${encodeURIComponent(storeSlug)}/config`,
     );
@@ -712,7 +783,10 @@ export const catalogHttpService = {
    * el modo asíncrono elimina. El backend sigue validando el pedido; si lo rechaza, la tienda lo
    * recibe igual por WhatsApp.
    */
-  createPublicOrderInBackground(storeSlug: string, payload: CreatePublicOrderRequest): Promise<void> {
+  createPublicOrderInBackground(
+    storeSlug: string,
+    payload: CreatePublicOrderRequest,
+  ): Promise<void> {
     try {
       return fetch(`${API_URL}/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`, {
         method: 'POST',
@@ -724,7 +798,10 @@ export const catalogHttpService = {
         .catch((err: unknown) => {
           // Best-effort: el pedido ya salió por WhatsApp. Dejamos señal para diagnosticar una
           // caída del endpoint sin bloquear ni asustar al cliente.
-          console.warn('[catalog-http-service] no se pudo persistir el pedido en segundo plano', err);
+          console.warn(
+            '[catalog-http-service] no se pudo persistir el pedido en segundo plano',
+            err,
+          );
         });
     } catch (err) {
       console.warn('[catalog-http-service] no se pudo iniciar el pedido en segundo plano', err);

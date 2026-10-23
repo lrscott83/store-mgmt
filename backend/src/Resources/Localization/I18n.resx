@@ -246,6 +246,15 @@
   <data name="StoreNotSelected" xml:space="preserve">
     <value>El usuario {0} no tiene tienda seleccionada</value>
   </data>
+  <data name="CatalogCsvInvalidRow" xml:space="preserve">
+    <value>La fila {0} del CSV no es válida: revisa la categoría, el producto y el precio.</value>
+  </data>
+  <data name="CatalogCsvEmpty" xml:space="preserve">
+    <value>El CSV no tiene filas para importar.</value>
+  </data>
+  <data name="CatalogCsvTooManyRows" xml:space="preserve">
+    <value>El CSV supera el máximo de {0} filas para importar en una sola operación.</value>
+  </data>
   <data name="ApiRequestInvalid" xml:space="preserve">
     <value>La petición no es válida</value>
   </data>

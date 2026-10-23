@@ -45,11 +45,31 @@ namespace SMCA.WebApi.Services
         public bool IsSuperAdmin => GetClaimValue(StringValueUtils.SuperAdminClaim) == "true";
         public bool IsOwnerAdmin => GetClaimValue(StringValueUtils.AdminClaim) == "true";
         public string TenantId => GetClaimValue(StringValueUtils.TenantIdClaim);
-        public string StoreId => GetClaimValue(StringValueUtils.StoreIdClaim);
+
+        /// <summary>
+        /// Store scope of the request. A SuperAdmin normally has no selected store, so the admin
+        /// store-scoped endpoints publish the route store through
+        /// <see cref="Filters.AdminStoreScopeAttribute"/>; that override wins over the claim, but
+        /// only for a SuperAdmin and only when that filter ran. Every other request keeps the
+        /// claim value untouched.
+        /// </summary>
+        public string StoreId => GetAdminStoreScope() ?? GetClaimValue(StringValueUtils.StoreIdClaim);
 
         public bool IsSuperAdminOrOwnerAdmin => IsSuperAdmin || IsOwnerAdmin;
 
         public bool IsReSeller => GetClaimValue(StringValueUtils.ReSellerClaim) == "true";
+
+        /// <summary>
+        /// The store published by <see cref="Filters.AdminStoreScopeAttribute"/>, or null. Reading it
+        /// requires BOTH the SuperAdmin claim and the opt-in filter: a non-SuperAdmin can never
+        /// borrow another store's context by hitting a store-scoped route.
+        /// </summary>
+        private string? GetAdminStoreScope()
+        {
+            if (!IsSuperAdmin) return null;
+
+            return _httpContextAccessor.HttpContext?.Items[Filters.AdminStoreScopeFilter.StoreIdItemKey] as string;
+        }
 
         private string GetHeaderValue(string headerKey)
         {
