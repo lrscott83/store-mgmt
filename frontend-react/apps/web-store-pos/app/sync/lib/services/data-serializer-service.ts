@@ -141,6 +141,273 @@ export interface V2Meta {
   exportedAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// v3 envelope (multi-store-backup)
+// ---------------------------------------------------------------------------
+//
+// An Owner with several stores exports ALL of them in ONE archive. v3 keeps
+// v2's password-only key derivation (same PBKDF2, same fresh salt) and its
+// plaintext `meta.json` first entry, but the envelope lists every store and
+// each store's data lives under its own `stores/<storeId>/` folder:
+//
+//   meta.json                                  <- plaintext
+//   stores/<storeId>/categories.json           <- encrypted
+//   stores/<storeId>/products.json             <- encrypted
+//   ...
+//
+// v2 and v1 archives are NOT touched by any of this: `import()` still handles
+// them exactly as before, and the multi-store path is only taken when
+// `peekBackupFormatVersion()` reports 3. That is the backward-compatibility
+// contract — an old backup still imports into the one store it describes.
+
+export const V3_MULTI_FORMAT_VERSION = 3;
+
+/** One store listed in a v3 archive's `meta.json`. */
+export interface V3StoreRef {
+  storeId: string;
+  name?: string;
+}
+
+export interface V3Meta {
+  formatVersion: typeof V3_MULTI_FORMAT_VERSION;
+  salt: string;
+  iterations: number;
+  exportedAt: string;
+  stores: V3StoreRef[];
+}
+
+/** One store's data inside a v3 archive, as `entryName -> plaintext JSON`. */
+export interface StoreBackupEntries {
+  storeId: string;
+  name?: string;
+  entries: Map<string, string>;
+}
+
+/**
+ * ZIP entry name of one store's data file in a v3 archive. The store folder
+ * keeps stores from ever sharing an entry name, which is what makes a single
+ * archive able to carry all of them.
+ */
+/** Folder inside the zip that holds every store's files. */
+export const V3_STORES_FOLDER = 'stores/';
+
+export function storeArchiveEntryName(storeId: string, fileName: string): string {
+  return `${V3_STORES_FOLDER}${storeId}/${fileName}`;
+}
+
+/**
+ * Reads ONLY the plaintext `meta.json` envelope (no data entry is decrypted)
+ * and reports its format version. `null` means "no envelope" — a legacy v1
+ * archive, which must keep importing through the single-store path.
+ */
+export async function peekBackupFormatVersion(payload: Uint8Array): Promise<number | null> {
+  const zipReader = new ZipReader(new BlobReader(new Blob([payload])));
+  let entries: Awaited<ReturnType<typeof zipReader.getEntries>>;
+  try {
+    entries = await zipReader.getEntries();
+  } catch {
+    throw new CorruptFileError('ZIP extraction failed');
+  }
+
+  try {
+    const metaEntry = entries.find(
+      (entry): entry is FileEntry => !entry.directory && entry.filename === V2_META_FILENAME,
+    );
+    if (!metaEntry) return null;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await metaEntry.getData(new TextWriter()));
+    } catch {
+      throw new CorruptFileError('Invalid backup envelope');
+    }
+    const version = (parsed as { formatVersion?: unknown } | null)?.formatVersion;
+    return typeof version === 'number' ? version : null;
+  } finally {
+    await zipReader.close();
+  }
+}
+
+/**
+ * Writes a single-store v2 archive. Extracted from `export()` so the same
+ * envelope code serves the store-bound exporter and the multi-store one.
+ */
+export async function writeSingleStoreArchive(
+  storeId: string,
+  contents: Map<string, string>,
+  password: string,
+): Promise<Uint8Array> {
+  // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
+  const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+  const key = await deriveV2Key(password, salt, V2_ITERATIONS);
+  const meta: V2Meta = {
+    formatVersion: V2_FORMAT_VERSION,
+    salt: base64FromBytes(salt),
+    iterations: V2_ITERATIONS,
+    storeId,
+    exportedAt: new Date().toISOString(),
+  };
+
+  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+  await zipWriter.add(V2_META_FILENAME, new TextReader(JSON.stringify(meta)));
+  for (const [fileName, text] of contents) {
+    await zipWriter.add(fileName, new TextReader(text), { rawPassword: key });
+  }
+
+  const blob = await zipWriter.close();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/**
+ * Writes a v3 multi-store archive: one plaintext `meta.json` listing every
+ * store, then each store's entries under `stores/<storeId>/`, all encrypted
+ * with the SAME password-derived key (v2's derivation, reused verbatim).
+ */
+export async function writeMultiStoreArchive(
+  stores: StoreBackupEntries[],
+  password: string,
+): Promise<Uint8Array> {
+  const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+  const key = await deriveV2Key(password, salt, V2_ITERATIONS);
+  const meta: V3Meta = {
+    formatVersion: V3_MULTI_FORMAT_VERSION,
+    salt: base64FromBytes(salt),
+    iterations: V2_ITERATIONS,
+    exportedAt: new Date().toISOString(),
+    stores: stores.map((store) =>
+      store.name ? { storeId: store.storeId, name: store.name } : { storeId: store.storeId },
+    ),
+  };
+
+  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+  await zipWriter.add(V2_META_FILENAME, new TextReader(JSON.stringify(meta)));
+  for (const store of stores) {
+    for (const [fileName, text] of store.entries) {
+      await zipWriter.add(storeArchiveEntryName(store.storeId, fileName), new TextReader(text), {
+        rawPassword: key,
+      });
+    }
+  }
+
+  const blob = await zipWriter.close();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/**
+ * Reads a v3 multi-store archive. Throws CorruptFileError for a missing or
+ * incompatible envelope and WrongPasswordError when the entries do not decrypt
+ * — the SAME error contract the single-store path exposes, so the UI keeps
+ * showing one set of messages. Entries under a store folder the envelope does
+ * not list are ignored rather than decrypted.
+ */
+export async function readMultiStoreArchive(
+  payload: Uint8Array,
+  password: string,
+): Promise<StoreBackupEntries[]> {
+  const zipReader = new ZipReader(new BlobReader(new Blob([payload])));
+  let entries: Awaited<ReturnType<typeof zipReader.getEntries>>;
+  try {
+    entries = await zipReader.getEntries();
+  } catch {
+    throw new CorruptFileError('ZIP extraction failed');
+  }
+
+  try {
+    const metaEntry = entries.find(
+      (entry): entry is FileEntry => !entry.directory && entry.filename === V2_META_FILENAME,
+    );
+    if (!metaEntry) throw new CorruptFileError('Backup has no envelope');
+
+    let meta: V3Meta;
+    try {
+      const parsed = JSON.parse(await metaEntry.getData(new TextWriter())) as Partial<V3Meta>;
+      if (parsed.formatVersion !== V3_MULTI_FORMAT_VERSION) {
+        throw new CorruptFileError('Unsupported backup format version');
+      }
+      if (typeof parsed.salt !== 'string' || typeof parsed.iterations !== 'number') {
+        throw new CorruptFileError('Invalid backup envelope');
+      }
+      if (!Array.isArray(parsed.stores)) {
+        throw new CorruptFileError('Invalid backup envelope');
+      }
+      const stores: V3StoreRef[] = [];
+      for (const ref of parsed.stores) {
+        if (!ref || typeof ref.storeId !== 'string' || ref.storeId === '') {
+          throw new CorruptFileError('Invalid backup envelope');
+        }
+        stores.push({
+          storeId: ref.storeId,
+          ...(typeof ref.name === 'string' ? { name: ref.name } : {}),
+        });
+      }
+      meta = {
+        formatVersion: V3_MULTI_FORMAT_VERSION,
+        salt: parsed.salt,
+        iterations: parsed.iterations,
+        exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : '',
+        stores,
+      };
+    } catch (err) {
+      if (err instanceof CorruptFileError) throw err;
+      throw new CorruptFileError('Invalid backup envelope');
+    }
+
+    let key: Uint8Array;
+    try {
+      key = await deriveV2Key(password, bytesFromBase64(meta.salt), meta.iterations);
+    } catch {
+      throw new CorruptFileError('Invalid backup envelope');
+    }
+
+    const contentsByStore = new Map<string, Map<string, string>>();
+    for (const store of meta.stores) {
+      contentsByStore.set(store.storeId, new Map<string, string>());
+    }
+
+    try {
+      for (const entry of entries) {
+        if (entry.directory || !entry.getData || entry.filename === V2_META_FILENAME) continue;
+        const parsedEntry = parseStoreArchiveEntryName(entry.filename, contentsByStore);
+        if (!parsedEntry) continue;
+        const text = await entry.getData(new TextWriter(), { rawPassword: key });
+        contentsByStore.get(parsedEntry.storeId)!.set(parsedEntry.fileName, text);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Invalid password') {
+        throw new WrongPasswordError();
+      }
+      throw new WrongPasswordError('Decryption failed');
+    }
+
+    return meta.stores.map((store) => ({
+      storeId: store.storeId,
+      ...(store.name ? { name: store.name } : {}),
+      entries: contentsByStore.get(store.storeId)!,
+    }));
+  } finally {
+    await zipReader.close();
+  }
+}
+
+/**
+ * Splits `stores/<storeId>/<fileName>` into its parts, returning null for any
+ * entry that is not inside a store folder listed by the envelope.
+ */
+function parseStoreArchiveEntryName(
+  entryName: string,
+  contentsByStore: Map<string, Map<string, string>>,
+): { storeId: string; fileName: string } | null {
+  if (!entryName.startsWith(V3_STORES_FOLDER)) return null;
+  const rest = entryName.slice(V3_STORES_FOLDER.length);
+  const separator = rest.indexOf('/');
+  if (separator <= 0) return null;
+  const storeId = rest.slice(0, separator);
+  const fileName = rest.slice(separator + 1);
+  if (!fileName) return null;
+  if (!contentsByStore.has(storeId)) return null;
+  return { storeId, fileName };
+}
+
 /**
  * Derives the 32-byte AES key for a v2 backup from the password ALONE
  * (V2-03/V2-04): PBKDF2-HMAC-SHA-256 over the raw UTF-8 password bytes — no
@@ -411,14 +678,12 @@ export class DataSerializerService {
   }
 
   /**
-   * Reads all entities and writes them as a v2 ZIP: an unencrypted
-   * `meta.json` envelope first, then the data entries each
-   * AES-encrypted with the per-export password-only key. zip.js's internal
-   * PBKDF2-SHA-1 @ 1000-iteration KDF still runs over the per-entry key — it
-   * is buried, not replaced (V2-04); the outer Web Crypto KDF dominates the
-   * effective key derivation.
+   * Every entry this store's archive carries, as `entryName -> plaintext
+   * JSON`, in the SAME order `export()` writes them. Split out so the
+   * multi-store backup reuses these exact read seams (raw-JSON passthrough
+   * included) for EVERY store instead of a second copy that could drift.
    */
-  async export(password: string): Promise<Uint8Array> {
+  async collectEntries(): Promise<Map<string, string>> {
     const orders = this.orderReader.getStorageOrders();
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
@@ -472,85 +737,35 @@ export class DataSerializerService {
       this.cashClosingReader?.getStorageCashClosingsJson() ??
       JSON.stringify(emptyCashClosingStore());
 
-    // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
-    const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
-    const key = await deriveV2Key(password, salt, V2_ITERATIONS);
-
-    const meta: V2Meta = {
-      formatVersion: V2_FORMAT_VERSION,
-      salt: base64FromBytes(salt),
-      iterations: V2_ITERATIONS,
-      storeId: this.storeId,
-      exportedAt: new Date().toISOString(),
-    };
-
-    // A writer-level password cannot be cleared per-entry (zip.js option
-    // fallback rule), so the writer is constructed WITHOUT one; each data
-    // entry gets the derived key as its own `rawPassword`, and meta.json is
-    // added with no options at all — plaintext by construction (V2-01).
-    const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
-    await zipWriter.add(V2_META_FILENAME, new TextReader(JSON.stringify(meta)));
-
-    await zipWriter.add(EDataFileName.Categories, new TextReader(categoriesJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Products, new TextReader(productsJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.InventoryEntries, new TextReader(inventoryJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Orders, new TextReader(ordersJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Expenses, new TextReader(expensesJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.SaleCredits, new TextReader(saleCreditsJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Warehouses, new TextReader(warehousesJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(
-      EDataFileName.WarehouseStockLevels,
-      new TextReader(warehouseStockLevelsJson),
-      {
-        rawPassword: key,
-      },
-    );
-    await zipWriter.add(
-      EDataFileName.WarehouseStockMovements,
-      new TextReader(warehouseStockMovementsJson),
-      {
-        rawPassword: key,
-      },
-    );
-    await zipWriter.add(EDataFileName.ChannelRates, new TextReader(channelRatesJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Recipes, new TextReader(recipesJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.Elaborations, new TextReader(elaborationsJson), {
-      rawPassword: key,
-    });
+    const contents = new Map<string, string>();
+    contents.set(EDataFileName.Categories, categoriesJson);
+    contents.set(EDataFileName.Products, productsJson);
+    contents.set(EDataFileName.InventoryEntries, inventoryJson);
+    contents.set(EDataFileName.Orders, ordersJson);
+    contents.set(EDataFileName.Expenses, expensesJson);
+    contents.set(EDataFileName.SaleCredits, saleCreditsJson);
+    contents.set(EDataFileName.Warehouses, warehousesJson);
+    contents.set(EDataFileName.WarehouseStockLevels, warehouseStockLevelsJson);
+    contents.set(EDataFileName.WarehouseStockMovements, warehouseStockMovementsJson);
+    contents.set(EDataFileName.ChannelRates, channelRatesJson);
+    contents.set(EDataFileName.Recipes, recipesJson);
+    contents.set(EDataFileName.Elaborations, elaborationsJson);
     if (storePaymentMethods) {
-      await zipWriter.add(
-        EDataFileName.StorePaymentMethods,
-        new TextReader(JSON.stringify(storePaymentMethods)),
-        { rawPassword: key },
-      );
+      contents.set(EDataFileName.StorePaymentMethods, JSON.stringify(storePaymentMethods));
     }
-    await zipWriter.add(EDataFileName.MessagesQueue, new TextReader(messagesQueueJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.CashClosings, new TextReader(cashClosingsJson), {
-      rawPassword: key,
-    });
+    contents.set(EDataFileName.MessagesQueue, messagesQueueJson);
+    contents.set(EDataFileName.CashClosings, cashClosingsJson);
 
-    const blob = await zipWriter.close();
-    return new Uint8Array(await blob.arrayBuffer());
+    return contents;
+  }
+
+  /**
+   * Reads all entities and writes them as a v2 ZIP: an unencrypted
+   * `meta.json` envelope first, then the data entries each AES-encrypted
+   * with the per-export password-only key (V2-01/V2-03).
+   */
+  async export(password: string): Promise<Uint8Array> {
+    return writeSingleStoreArchive(this.storeId, await this.collectEntries(), password);
   }
 
   /**
@@ -741,7 +956,12 @@ export class DataSerializerService {
     };
   }
 
-  private parseContents(contents: Map<string, string>): ParsedData {
+  /**
+   * Parses one store's entries into `ParsedData`. Public so the multi-store
+   * import can reuse the exact same parse rules (missing entries, `'{}'`
+   * sentinel, absent payment-methods) for EVERY store in an archive.
+   */
+  parseContents(contents: Map<string, string>): ParsedData {
     const categoryEntries = parseJson<[string, ProductCategory][]>(
       contents,
       EDataFileName.Categories,
