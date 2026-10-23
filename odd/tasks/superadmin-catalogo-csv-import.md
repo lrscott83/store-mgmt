@@ -144,6 +144,19 @@ L6 (2026-10-23, RDD — receipt-driven development):
   captura toda excepción y nunca lanza (`CatalogStaticPageRegenerator.cs:43-59`).
 - Pendiente: el commit de la vista store-scoped (`697dd1d6`, item 2 seguridad) sigue sin RDD.
 
+L8 (2026-10-23, rebase y cobertura de integración):
+- La rama se re-apoyó sobre el tip real de `feat/superadmin-web-catalog` tras partir aquel commit
+  (`git rebase --onto e751555e 697dd1d6`), sin conflictos y con el árbol del CSV intacto
+  (verificado: `git diff 9a5dc8f4 HEAD` solo muestra lo que llegó de la base nueva).
+- Test de integración nuevo: importar un CSV, editar el producto importado con el CRUD admin
+  (`PUT .../catalog/products/{id}`) y comprobar que el catálogo público sirve la descripción,
+  precio y moneda editados. `AdminCatalogImportTests` queda 9/9.
+- RDD por commit (assess con `gentle-ai review assess`): `81fa1698` import → medium/under_budget;
+  `df7940e6` correcciones → medium/under_budget; `d2c83bd8` dedupe → medium/under_budget;
+  `0eb29e9b` docs → passive; `8870e218` test integración → medium/under_budget. Los dos primeros
+  conservan además los receipts nativos previos al rebase (mismo contenido, lineage
+  `review-7e17eac5e49b17e2` y `review-4618d98356b313ed`, ambos con acknowledgement).
+
 L7 (2026-10-23, correcciones tras la revisión RDD):
 - R1/R3-5: la moneda por código del parser quedó **opt-in** (`allowCurrencyNames`); el import del
   POS del dueño vuelve a resolver un valor no numérico a `undefined` (CUP). Tests del parser
