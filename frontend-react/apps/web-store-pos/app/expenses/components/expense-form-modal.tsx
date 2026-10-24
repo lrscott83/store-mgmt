@@ -22,6 +22,7 @@ import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { CurrencySelect, hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { FUND_SOURCE_OPTIONS } from '../lib/fund-source-label';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -165,13 +166,7 @@ export interface ExpenseFormInput {
   fundSource: ExpenseFundSource;
 }
 
-/** Origen del gasto, en el orden en que se ofrecen: Externo primero (default). */
-const FUND_SOURCES = [ExpenseFundSource.Externo, ExpenseFundSource.Caja];
-
-const FUND_SOURCE_KEYS: Record<ExpenseFundSource, string> = {
-  [ExpenseFundSource.Externo]: 'EXPENSES.FUND_SOURCE.EXTERNO',
-  [ExpenseFundSource.Caja]: 'EXPENSES.FUND_SOURCE.CAJA',
-};
+/** Origen del gasto — catálogo compartido con el historial (lib/fund-source-label). */
 
 export function ExpenseFormModal({
   isOpen,
@@ -331,17 +326,17 @@ export function ExpenseFormModal({
               {intl.formatMessage({ id: 'EXPENSES.FORM.FUND_SOURCE' })}
             </legend>
             <div className="flex flex-wrap gap-4">
-              {FUND_SOURCES.map((source) => (
-                <label key={source} className="flex items-center gap-1.5 text-sm text-text">
+              {FUND_SOURCE_OPTIONS.map((option) => (
+                <label key={option.value} className="flex items-center gap-1.5 text-sm text-text">
                   <input
                     type="radio"
                     name="expense-fund-source"
-                    value={source}
-                    checked={form.fundSource === source}
-                    onChange={() => setForm((f) => ({ ...f, fundSource: source }))}
+                    value={option.value}
+                    checked={form.fundSource === option.value}
+                    onChange={() => setForm((f) => ({ ...f, fundSource: option.value }))}
                     className="text-primary focus:ring-primary"
                   />
-                  {intl.formatMessage({ id: FUND_SOURCE_KEYS[source] })}
+                  {intl.formatMessage({ id: option.messageId })}
                 </label>
               ))}
             </div>

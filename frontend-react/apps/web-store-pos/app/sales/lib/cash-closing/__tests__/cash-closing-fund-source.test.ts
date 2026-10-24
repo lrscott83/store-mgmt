@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Currency, ExpenseFundSource, SalePaymentMethod } from '@store-mgmt/domain';
+import { Currency, ExpenseFundSource, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import { CashClosingOfflineService, expectedTotalOf } from '../cash-closing-offline-service';
 import { CashClosingStatus } from '../cash-closing-types';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import { toLocalDayKey } from '~/shared/lib/date-utils';
 
 /**
  * expense-fund-source (2026-10-24): el Esperado del cierre resta SOLO los
  * gastos pagados con dinero de la caja. Un gasto `Externo` —o un histórico sin
  * el campo— nunca tocó el cajón y no puede mover el arqueo.
+ *
+ * RDD R3-7: el día es una constante literal, no `new Date()` al cargar el
+ * módulo — así el test no depende de la hora de la pared ni cruza medianoche.
  */
 
 const STORE = 'store-cash-fund-source';
-const DAY = toLocalDayKey(new Date());
+const DAY = '2026-10-24';
 
 function ordersKey(): string {
   return StorageKeys.entityKey('orders', STORE);
@@ -32,7 +34,7 @@ function seedOrder(total: number, paymentMethod = SalePaymentMethod.Efectivo): v
     total,
     currency: Currency.CUP,
     salePaymentMethod: paymentMethod,
-    date: new Date().toISOString(),
+    date: new Date(`${DAY}T12:00:00`),
     orderItems: [],
   });
   localStorage.setItem(ordersKey(), JSON.stringify(list));
@@ -47,10 +49,10 @@ function seedExpense(
   const list = raw ? (JSON.parse(raw) as unknown[]) : [];
   list.push({
     id,
-    type: 1,
+    type: ExpenseType.Salario,
     total,
-    date: new Date().toISOString(),
-    paymentType: 1,
+    date: new Date(`${DAY}T12:00:00`),
+    paymentType: PaymentType.Efectivo,
     isActive: true,
     currency: options.currency ?? Currency.CUP,
     ...(options.fundSource !== undefined ? { fundSource: options.fundSource } : {}),

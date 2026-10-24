@@ -26,6 +26,7 @@ import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
+import { FUND_SOURCE_OPTIONS, fundSourceMessageId } from '../lib/fund-source-label';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
@@ -534,16 +535,7 @@ function FundSourceFilter({
   onChange: (next: ExpenseFundSource | null) => void;
 }) {
   const intl = useIntl();
-  const options: (ExpenseFundSource | null)[] = [
-    null,
-    ExpenseFundSource.Externo,
-    ExpenseFundSource.Caja,
-  ];
-  const labels: Record<string, string> = {
-    all: 'EXPENSES.FILTER.ALL_ORIGINS',
-    [ExpenseFundSource.Externo]: 'EXPENSES.FUND_SOURCE.EXTERNO',
-    [ExpenseFundSource.Caja]: 'EXPENSES.FUND_SOURCE.CAJA',
-  };
+  const options: (ExpenseFundSource | null)[] = [null, ...FUND_SOURCE_OPTIONS.map((o) => o.value)];
   return (
     <fieldset aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.FUND_SOURCE' })}>
       <div className="flex flex-wrap gap-4">
@@ -560,7 +552,8 @@ function FundSourceFilter({
               className="text-primary focus:ring-primary"
             />
             {intl.formatMessage({
-              id: labels[option === null ? 'all' : String(option)],
+              id:
+                option === null ? 'EXPENSES.FILTER.ALL_ORIGINS' : fundSourceMessageId(option),
             })}
           </label>
         ))}

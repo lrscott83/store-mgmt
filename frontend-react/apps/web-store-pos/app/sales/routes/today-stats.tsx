@@ -3,11 +3,10 @@ import { useIntl } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
-  ExpenseFundSource,
   ExpenseType,
   PaymentType,
   SalePaymentMethod,
-  expenseFundSourceOf,
+  isCashDrawerExpense,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { normalizedOrderPaymentMethod, resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
@@ -244,7 +243,7 @@ export function TodayStatsPage() {
   // CAJA descuentan el efectivo. `paymentType === Efectivo` era el proxy viejo y
   // confundía "pagado en efectivo" con "salió de lo recaudado".
   const expensesCashEntries: CurrencyAmount[] = visibleExpenses
-    .filter((e) => expenseFundSourceOf(e) === ExpenseFundSource.Caja)
+    .filter(isCashDrawerExpense)
     .map((e) => ({ amount: e.total, currency: e.currency }));
   const transferEntries: CurrencyAmount[] = visibleOrders
     .filter(

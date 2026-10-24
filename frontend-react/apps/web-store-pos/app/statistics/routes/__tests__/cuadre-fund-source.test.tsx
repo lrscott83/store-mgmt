@@ -6,6 +6,7 @@ import {
   Currency,
   EModules,
   ExpenseFundSource,
+  ExpenseType,
   OrderType,
   PaymentType,
   SalePaymentMethod,
@@ -99,7 +100,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
   return {
     id: `exp-${Math.random().toString(36).slice(2)}`,
-    type: 1,
+    type: ExpenseType.Salario,
     total: 20,
     date: new Date('2026-09-02T10:00:00'),
     paymentType: PaymentType.Efectivo,
@@ -130,13 +131,6 @@ function cashPanel(): HTMLElement {
   return screen.getByRole('button', { name: /Resumen Efectivo/ });
 }
 
-/** Importe exacto del header del panel (primer span con whitespace-nowrap). */
-function panelAmount(panel: HTMLElement): string {
-  return (panel.querySelector('span.whitespace-nowrap')?.textContent ?? '')
-    .replace(/\u00A0/g, ' ')
-    .trim();
-}
-
 describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -157,7 +151,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     generate();
 
     await waitFor(() => expect(cashPanel()).toHaveTextContent('70 CUP'));
-    expect(panelAmount(cashPanel())).toBe('70 CUP');
+    expect(cashPanel()).toHaveTextContent('70 CUP');
   });
 
   it('does NOT subtract an Externo expense paid in cash', async () => {
@@ -174,7 +168,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     renderPage();
     generate();
 
-    await waitFor(() => expect(panelAmount(cashPanel())).toBe('100 CUP'));
+    await waitFor(() => expect(cashPanel()).toHaveTextContent('100 CUP'));
   });
 
   it('does NOT subtract a legacy expense with no fundSource field', async () => {
@@ -184,7 +178,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     renderPage();
     generate();
 
-    await waitFor(() => expect(panelAmount(cashPanel())).toBe('100 CUP'));
+    await waitFor(() => expect(cashPanel()).toHaveTextContent('100 CUP'));
   });
 
   it('keeps the expenses KPI summing both origins', async () => {
@@ -201,6 +195,6 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     const grid = await screen.findByTestId('cuadre-kpi-grid');
     expect(within(grid).getByText('Gastos')).toBeInTheDocument();
     expect(within(grid).getAllByText(/150 CUP/).length).toBeGreaterThan(0);
-    expect(panelAmount(cashPanel())).toBe('70 CUP');
+    expect(cashPanel()).toHaveTextContent('70 CUP');
   });
 });

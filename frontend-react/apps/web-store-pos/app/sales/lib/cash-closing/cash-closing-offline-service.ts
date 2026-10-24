@@ -1,4 +1,4 @@
-import { ExpenseFundSource, expenseFundSourceOf, Result, SalePaymentMethod } from '@store-mgmt/domain';
+import { isCashDrawerExpense, Result, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Currency } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -55,6 +55,12 @@ export function differenceOf(countedTotal: number, expectedTotal: number): numbe
 /** Clave de un registro: un cierre por (día, moneda). */
 export function cashClosingId(dayKey: string, currency: Currency): string {
   return `${dayKey}|${currency}`;
+}
+
+/** Esperado y gastos de caja de un (día, moneda), calculados juntos. */
+export interface ExpectedBreakdown {
+  readonly expectedTotal: number;
+  readonly cashExpensesTotal: number;
 }
 
 /**
@@ -186,7 +192,7 @@ export class CashClosingOfflineService {
     const { start, end } = localDayRange(fromLocalDayKey(dayKey));
     const expenses = new ExpenseOfflineService(storeId).getActiveExpensesBetween(start, end);
     return expenses
-      .filter((expense) => expenseFundSourceOf(expense) === ExpenseFundSource.Caja)
+      .filter(isCashDrawerExpense)
       .map((expense) => ({
         amount: round2(expense.total),
         currency: resolveCurrency(expense.currency),
@@ -205,6 +211,29 @@ export class CashClosingOfflineService {
     return round2(total);
   }
 
+  /**
+   * Esperado + gastos de caja en UNA sola lectura (RDD R2-CLOSING-EXPENSES-RECOMPUTE):
+   * la vista muestra `cashExpensesTotal` y resta `expectedTotal`, así que ambos
+   * deben salir del mismo cálculo — si se pidieran por separado, la línea visible
+   * podría no coincidir con lo restado.
+   */
+  getExpectedBreakdown(
+    dayKey: string,
+    currency: Currency,
+    openingCash: number,
+    storeId: string = this.storeId,
+  ): ExpectedBreakdown {
+    const cashExpensesTotal = this.getCashExpensesTotal(dayKey, currency, storeId);
+    return {
+      expectedTotal: expectedTotalOf(
+        openingCash,
+        this.getCashSalesTotal(dayKey, currency, storeId),
+        cashExpensesTotal,
+      ),
+      cashExpensesTotal,
+    };
+  }
+
   /** Esperado para un (día, moneda) con la apertura indicada (S7). */
   getExpectedTotal(
     dayKey: string,
@@ -212,11 +241,7 @@ export class CashClosingOfflineService {
     openingCash: number,
     storeId: string = this.storeId,
   ): number {
-    return expectedTotalOf(
-      openingCash,
-      this.getCashSalesTotal(dayKey, currency, storeId),
-      this.getCashExpensesTotal(dayKey, currency, storeId),
-    );
+    return this.getExpectedBreakdown(dayKey, currency, openingCash, storeId).expectedTotal;
   }
 
   /**
@@ -236,15 +261,16 @@ export class CashClosingOfflineService {
     const now = new Date().toISOString();
     const denominations = this.normalizeDenominations(draft.denominations);
     const countedTotal = countedTotalOf(denominations);
-    const expectedTotal = this.getExpectedTotal(
+    const expected = this.getExpectedBreakdown(
       draft.dayKey,
       draft.currency,
       draft.openingCash,
       storeId,
     );
+    const expectedTotal = expected.expectedTotal;
     // expense-fund-source (2026-10-24): se congela junto al Esperado para que
     // el cierre cerrado sea auditable (cuánto del Esperado eran gastos de caja).
-    const cashExpensesTotal = this.getCashExpensesTotal(draft.dayKey, draft.currency, storeId);
+    const cashExpensesTotal = expected.cashExpensesTotal;
 
     const record: CashClosing = {
       id,

@@ -166,10 +166,29 @@ describe('ExpenseOfflineService — fundSource (expense-fund-source)', () => {
       expect(persisted().find((e) => e.id === 'imp-2')?.fundSource).toBe(ExpenseFundSource.Caja);
     });
 
-    it('updates an existing expense to Externo when the import carries no field', () => {
+    it('keeps the local classification when the import carries no field', () => {
       const created = svc.create(makeInput({ fundSource: ExpenseFundSource.Caja })).data!;
       svc.updateImportedExpense({ ...created, fundSource: undefined } as Expense);
-      expect(persisted()[0].fundSource).toBe(ExpenseFundSource.Externo);
+      expect(persisted()[0].fundSource).toBe(ExpenseFundSource.Caja);
+    });
+
+    it('never invents Caja for a local record that never had the field', () => {
+      seedRaw([{ id: 'legacy', type: ExpenseType.Alquiler, total: 100, isActive: true }]);
+      svc.getStorageExpenses();
+      svc.updateImportedExpense({
+        id: 'legacy',
+        type: ExpenseType.Alquiler,
+        total: 100,
+        isActive: true,
+      } as Expense);
+      // El merge no trae el campo: la lectura lo resuelve a Externo y el
+      // siguiente write lo materializa así — nunca como Caja.
+      expect(svc.getStorageExpenses().find((e) => e.id === 'legacy')?.fundSource).toBe(
+        ExpenseFundSource.Externo,
+      );
+      expect(persisted().find((e) => e.id === 'legacy')?.fundSource).not.toBe(
+        ExpenseFundSource.Caja,
+      );
     });
 
     it('keeps an explicit Caja source when the import carries one', () => {

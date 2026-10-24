@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import {
@@ -179,7 +179,7 @@ describe('TodayStatsPage — expense fund source (expense-fund-source)', () => {
     expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('70 CUP');
   });
 
-  it('does not read a Caja expense paid by transfer as a cash expense of another method', async () => {
+  it('subtracts a Caja expense from the cash panel even when it was paid by transfer', async () => {
     await renderWith(
       [makeOrder({ id: 'cash-1', total: 100 })],
       [
@@ -192,6 +192,14 @@ describe('TodayStatsPage — expense fund source (expense-fund-source)', () => {
       ],
     );
 
+    // S9: manda el ORIGEN, no el método de pago — el dinero salió del cajón.
     expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('60 CUP');
+  });
+
+  it('pins the cash-panel row label as "Gastos de caja"', async () => {
+    await renderWith([makeOrder({ id: 'cash-1', total: 100 })], []);
+
+    fireEvent.click(screen.getByRole('button', { name: /Resumen Efectivo/ }));
+    expect(await screen.findByText('Gastos de caja')).toBeInTheDocument();
   });
 });

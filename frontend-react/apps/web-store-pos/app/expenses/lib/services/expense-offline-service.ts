@@ -310,8 +310,13 @@ export class ExpenseOfflineService {
       existing.total = importedExpense.total;
       existing.note = importedExpense.note;
       existing.type = importedExpense.type;
-      // expense-fund-source (2026-10-24): ausente en el import → Externo.
-      existing.fundSource = importedExpense.fundSource ?? DEFAULT_EXPENSE_FUND_SOURCE;
+      // expense-fund-source (2026-10-24, RDD R1-001): un import que NO trae el
+      // campo no tiene opinión sobre el origen. Pisar la clasificación local con
+      // el default degradaba silenciosamente un gasto `Caja` local a `Externo` y
+      // lo sacaba del arqueo. Solo un valor explícito del payload la cambia.
+      if (importedExpense.fundSource !== undefined) {
+        existing.fundSource = importedExpense.fundSource;
+      }
       existing.updatedDate = importedExpense.updatedDate;
       existing.updatedByName = importedExpense.updatedByName;
       this.setExpensesLocalStorage(this.expenses!);

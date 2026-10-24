@@ -3,11 +3,10 @@ import { useIntl, type IntlShape } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
-  ExpenseFundSource,
   ExpenseType,
   PaymentType,
   SalePaymentMethod,
-  expenseFundSourceOf,
+  isCashDrawerExpense,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import {
@@ -329,9 +328,7 @@ export function CuadrePorFechasPage() {
       expenses = expenseService.getActiveExpensesBetween(rangeStart, rangeEnd);
       expensesTotal = expenses.reduce((acc, e) => acc + e.total, 0);
       // expense-fund-source (2026-10-24): solo `Caja` descuenta el efectivo.
-      expensesCashTotal = expenses
-        .filter((e) => expenseFundSourceOf(e) === ExpenseFundSource.Caja)
-        .reduce((acc, e) => acc + e.total, 0);
+      expensesCashTotal = expenses.filter(isCashDrawerExpense).reduce((acc, e) => acc + e.total, 0);
     }
 
     let saleCredits: SaleCredit[] = [];
@@ -1019,7 +1016,7 @@ function filterSummaryByCurrency(summary: RangeSummary, currency: Currency): Ran
     salesCashTotal: sum(salesCashEntries),
     salesCardTotal: sum(salesCardEntries),
     expensesCashTotal: expenses
-      .filter((e) => expenseFundSourceOf(e) === ExpenseFundSource.Caja)
+      .filter(isCashDrawerExpense)
       .reduce((acc, e) => acc + e.total, 0),
     paidCreditsCashTotal: paidSaleCredits
       .filter((c) => c.paidType === PaymentType.Efectivo)

@@ -1,12 +1,6 @@
 import type { AuditableBaseModel } from './base';
-import type {
-  Currency,
-  ExpenseFundSource,
-  ExpenseType,
-  PaymentType,
-  SalePaymentMethod,
-} from '../enums';
-import { DEFAULT_EXPENSE_FUND_SOURCE } from '../enums';
+import type { Currency, ExpenseType, PaymentType, SalePaymentMethod } from '../enums';
+import { DEFAULT_EXPENSE_FUND_SOURCE, ExpenseFundSource } from '../enums';
 
 export interface Expense extends AuditableBaseModel {
   id: string;
@@ -39,4 +33,14 @@ export interface Expense extends AuditableBaseModel {
  */
 export function expenseFundSourceOf(expense: Pick<Expense, 'fundSource'>): ExpenseFundSource {
   return expense.fundSource ?? DEFAULT_EXPENSE_FUND_SOURCE;
+}
+
+/**
+ * "El dinero de este gasto salió del efectivo del POS." Único predicado del
+ * cuadre del día, el cuadre por fechas, la réplica multi-tienda y el cierre de
+ * efectivo — así las cuatro superficies no pueden divergir. Nombrado en el
+ * dominio a propósito: la regla es de negocio, no de una pantalla.
+ */
+export function isCashDrawerExpense(expense: Pick<Expense, 'fundSource'>): boolean {
+  return expenseFundSourceOf(expense) === ExpenseFundSource.Caja;
 }

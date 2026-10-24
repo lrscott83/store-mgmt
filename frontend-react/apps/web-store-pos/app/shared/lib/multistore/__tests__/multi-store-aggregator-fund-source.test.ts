@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Currency, ExpenseFundSource, SalePaymentMethod } from '@store-mgmt/domain';
+import { Currency, ExpenseFundSource, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Expense } from '@store-mgmt/domain';
 import { encryptEntity } from '../../storage/entity-crypto';
 import { setDek, clearDek } from '../../storage/data-key-store';
@@ -32,10 +32,10 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
   const date = overrides.date ?? new Date('2026-10-10T10:00:00');
   return {
     id: `e-${Math.random().toString(36).slice(2)}`,
-    type: 1,
+    type: ExpenseType.Salario,
     total: 20,
     date,
-    paymentType: 1,
+    paymentType: PaymentType.Efectivo,
     note: '',
     isActive: true,
     createdDate: date,

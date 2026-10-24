@@ -25,10 +25,9 @@ import type {
 } from '@store-mgmt/domain';
 import {
   DEFAULT_CURRENCY,
-  ExpenseFundSource,
   PaymentType as PaymentTypeEnum,
   SalePaymentMethod,
-  expenseFundSourceOf,
+  isCashDrawerExpense,
 } from '@store-mgmt/domain';
 import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { addDays, groupByLocalDay, localDayRange } from '~/shared/lib/date-utils';
@@ -650,7 +649,7 @@ export function computeStoreRangeSummary(
     expensesTotal = expenses.reduce((acc, e) => acc + e.total, 0);
     // expense-fund-source (2026-10-24): réplica del cuadre — solo `Caja`.
     expensesCashTotal = expenses
-      .filter((e) => expenseFundSourceOf(e) === ExpenseFundSource.Caja)
+      .filter(isCashDrawerExpense)
       .reduce((acc, e) => acc + e.total, 0);
   }
 

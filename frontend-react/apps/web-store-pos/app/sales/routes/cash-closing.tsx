@@ -106,11 +106,10 @@ export function CashClosingPage() {
   ]);
 
   const openingCash = parseAmount(openingText);
-  // expense-fund-source (2026-10-24): el Esperado del cierre resta los gastos
-  // pagados con dinero de la caja. Delegado al servicio: una sola fórmula para
-  // la vista, el borrador y el snapshot del cierre cerrado.
-  const cashExpensesTotal = service.getCashExpensesTotal(dayKey, selectedCurrency, storeId);
-  const expectedTotal = service.getExpectedTotal(
+  // expense-fund-source (2026-10-24, RDD R2-CLOSING-EXPENSES-RECOMPUTE): el
+  // Esperado y la línea informativa salen de UNA llamada, para que lo mostrado
+  // no pueda divergir de lo restado.
+  const { expectedTotal, cashExpensesTotal } = service.getExpectedBreakdown(
     dayKey,
     selectedCurrency,
     openingCash,
