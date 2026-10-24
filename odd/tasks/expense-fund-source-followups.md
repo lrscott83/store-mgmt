@@ -79,6 +79,26 @@ bounded to the three new test files with production code excluded.
 - `pnpm typecheck` → 0. `pnpm lint` → 0.
 - E2E: none modified, none run.
 
+### RDD outcome (this slice)
+
+- `assess --base-ref f897bc12 --committed-only` → `medium`, `review_due: false` (`under_budget`). The user asked for
+  the review anyway (L4).
+- Lineage `review-1bb4904a38a4ecb4`, target `sha256:b3dca8e8…`, lenses `risk`, `readability`, `reliability`.
+- Result: **approved**, authority **burned** (`gentle-ai.review-acknowledged/v1`, revision `sha256:52461f7b…`).
+- 5 advisory findings, all non-blocking:
+  - `R2-orphan-fund-source-comment` (readability): the comment left at `expense-form-modal.tsx:169` after extracting the
+    catalogue now floats with nothing to document.
+  - `R2-silent-fund-source-fallback` (readability): `fundSourceMessageId` falls back to the `Externo` id for an unmapped
+    enum member instead of failing loudly; an exhaustive `Record` would surface a gap.
+  - `R2-wall-clock-day-key-reintroduced` + `R3-1` (reliability): `cash-closing-fund-source-line.test.tsx:29` re-derives
+    `DAY` from `new Date()` at module load while seeding rows with the wall clock — the very pattern S12 removed from its
+    sibling.
+  - `R3-2` (reliability): switching from `panelAmount` to `toHaveTextContent('70 CUP')` weakened the cuadre assertions to
+    a substring match (`'170 CUP'` would pass).
+- The `risk` lens returned **no findings**.
+
+L4 (user, verbatim): "dale con RDD"
+
 ### Process note
 
 Two combined vitest invocations hung for 10 minutes. Cause: my `useMultiStore` mock returned a NEW `{ enabled, stores: [] }`
