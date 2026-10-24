@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
+import {
+  DEFAULT_CURRENCY,
+  EFeatures,
+  ExpenseFundSource,
+  expenseFundSourceOf,
+} from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
@@ -68,6 +73,11 @@ export function ExpensesHistoryPage() {
   const multiMonedas = hasMultiMonedasAvailable(user);
 
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
+  // expense-fund-source (2026-10-24): filtro por origen del dinero —
+  // `null` = todos, `Caja` solo lo que salió del POS, `Externo` el resto.
+  const [fundSourceFilter, setFundSourceFilter] = useState<ExpenseFundSource | null>(null);
+  const matchesFundSource = (e: Expense): boolean =>
+    fundSourceFilter === null || expenseFundSourceOf(e) === fundSourceFilter;
   const [dayGroups, setDayGroups] = useState<LocalDayGroup<Expense>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
   // Filtro de rango de fechas (2026-09-23) — el mismo DateRangeFilter compartido
@@ -212,6 +222,7 @@ export function ExpensesHistoryPage() {
     const visibleExpenses = (expenses: Expense[]): Expense[] =>
       multiActiveExpenses(expenses)
         .filter(inDateRange)
+        .filter(matchesFundSource)
         .filter((e) => !paymentActive || matchesExpensePaymentFilter(e, paymentActive));
     // El filtro de moneda se aplica ENCIMA de los demás, así cada panel por
     // tienda y el agregado de fuera de los paneles quedan en una sola moneda.
@@ -289,6 +300,7 @@ export function ExpensesHistoryPage() {
                   </label>
                 ))}
               </div>
+              <FundSourceFilter value={fundSourceFilter} onChange={setFundSourceFilter} />
               {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
               <div className="flex w-full justify-center">
                 <CurrencyFilter
@@ -383,8 +395,12 @@ export function ExpensesHistoryPage() {
         }))
         .filter((g) => g.items.length > 0)
     : dayGroups;
+  // expense-fund-source (2026-10-24): origen del dinero encima del filtro de moneda.
+  const fundFilteredDayGroups: LocalDayGroup<Expense>[] = paymentFilteredDayGroups
+    .map((g) => ({ ...g, items: g.items.filter(matchesFundSource) }))
+    .filter((g) => g.items.length > 0);
   // Filtro de moneda sobre las filas: cada día queda en una sola moneda.
-  const visibleDayGroups: LocalDayGroup<Expense>[] = paymentFilteredDayGroups
+  const visibleDayGroups: LocalDayGroup<Expense>[] = fundFilteredDayGroups
     .map((g) => ({ ...g, items: filterExpensesByCurrency(g.items) }))
     .filter((g) => g.items.length > 0);
 
@@ -449,6 +465,8 @@ export function ExpensesHistoryPage() {
           ))}
         </div>
 
+        <FundSourceFilter value={fundSourceFilter} onChange={setFundSourceFilter} />
+
         {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
         <div>
           <CurrencyFilter
@@ -501,6 +519,53 @@ export function ExpensesHistoryPage() {
         </div>
       </div>
     </Card>
+  );
+}
+
+/**
+ * expense-fund-source (2026-10-24): filtro por ORIGEN del dinero del gasto.
+ * `null` = todos. Es ortogonal al filtro de método de pago que ya existía.
+ */
+function FundSourceFilter({
+  value,
+  onChange,
+}: {
+  value: ExpenseFundSource | null;
+  onChange: (next: ExpenseFundSource | null) => void;
+}) {
+  const intl = useIntl();
+  const options: (ExpenseFundSource | null)[] = [
+    null,
+    ExpenseFundSource.Externo,
+    ExpenseFundSource.Caja,
+  ];
+  const labels: Record<string, string> = {
+    all: 'EXPENSES.FILTER.ALL_ORIGINS',
+    [ExpenseFundSource.Externo]: 'EXPENSES.FUND_SOURCE.EXTERNO',
+    [ExpenseFundSource.Caja]: 'EXPENSES.FUND_SOURCE.CAJA',
+  };
+  return (
+    <fieldset aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.FUND_SOURCE' })}>
+      <div className="flex flex-wrap gap-4">
+        {options.map((option) => (
+          <label
+            key={option === null ? 'all' : option}
+            className="flex items-center gap-1.5 text-sm text-text"
+          >
+            <input
+              type="radio"
+              name="expense-fund-source-filter"
+              checked={value === option}
+              onChange={() => onChange(option)}
+              className="text-primary focus:ring-primary"
+            />
+            {intl.formatMessage({
+              id: labels[option === null ? 'all' : String(option)],
+            })}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

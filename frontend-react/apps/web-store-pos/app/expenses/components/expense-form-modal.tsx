@@ -3,6 +3,8 @@ import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
 import {
   DEFAULT_CURRENCY,
+  DEFAULT_EXPENSE_FUND_SOURCE,
+  ExpenseFundSource,
   ExpenseType,
   PaymentType,
   SalePaymentMethod,
@@ -56,6 +58,9 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
             : PaymentType.Efectivo,
       note: expense.note ?? '',
       currency: expense.currency ?? DEFAULT_CURRENCY,
+      // expense-fund-source (2026-10-24): un gasto histórico (sin el campo) se
+      // edita mostrando `Externo`, igual que lo lee el cuadre.
+      fundSource: expense.fundSource ?? DEFAULT_EXPENSE_FUND_SOURCE,
     };
   }
   return {
@@ -70,6 +75,9 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
     paymentType: PaymentType.Efectivo,
     note: '',
     currency: DEFAULT_CURRENCY,
+    // expense-fund-source (2026-10-24): default Externo — ningún gasto nuevo
+    // descuenta la caja salvo que el usuario elija `Caja` a propósito.
+    fundSource: DEFAULT_EXPENSE_FUND_SOURCE,
   };
 }
 
@@ -150,7 +158,20 @@ export interface ExpenseFormInput {
   note: string;
   /** MultiMonedas: moneda del gasto (ausente = CUP). */
   currency: number;
+  /**
+   * Origen del dinero (expense-fund-source, 2026-10-24). `Caja` descuenta el
+   * efectivo del POS; `Externo` (default) no lo toca.
+   */
+  fundSource: ExpenseFundSource;
 }
+
+/** Origen del gasto, en el orden en que se ofrecen: Externo primero (default). */
+const FUND_SOURCES = [ExpenseFundSource.Externo, ExpenseFundSource.Caja];
+
+const FUND_SOURCE_KEYS: Record<ExpenseFundSource, string> = {
+  [ExpenseFundSource.Externo]: 'EXPENSES.FUND_SOURCE.EXTERNO',
+  [ExpenseFundSource.Caja]: 'EXPENSES.FUND_SOURCE.CAJA',
+};
 
 export function ExpenseFormModal({
   isOpen,
@@ -298,6 +319,33 @@ export function ExpenseFormModal({
             label={intl.formatMessage({ id: 'GENERAL.CURRENCY' })}
             testId="expense-currency-select"
           />
+
+          {/* Origen del dinero (expense-fund-source, 2026-10-24): dimensión
+              ORTOGONAL al método de pago — dice DE QUÉ dinero salió el gasto,
+              no cómo se pagó. Default `Externo`: solo `Caja` descuenta el
+              efectivo del POS en el cuadre y en el cierre. Es un grupo de
+              RADIOS, no un `<select>`: el E2E y los tests localizan el select
+              de método de pago por posición, y añadir un combobox los movería. */}
+          <fieldset>
+            <legend className="mb-1 block text-sm font-medium text-text">
+              {intl.formatMessage({ id: 'EXPENSES.FORM.FUND_SOURCE' })}
+            </legend>
+            <div className="flex flex-wrap gap-4">
+              {FUND_SOURCES.map((source) => (
+                <label key={source} className="flex items-center gap-1.5 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="expense-fund-source"
+                    value={source}
+                    checked={form.fundSource === source}
+                    onChange={() => setForm((f) => ({ ...f, fundSource: source }))}
+                    className="text-primary focus:ring-primary"
+                  />
+                  {intl.formatMessage({ id: FUND_SOURCE_KEYS[source] })}
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           {/* Payment type — formas de pago configuradas (2026-09-21): por moneda
               (con MultiMonedas) o Efectivo + Transferencia (CUP) sin Zelle (sin
