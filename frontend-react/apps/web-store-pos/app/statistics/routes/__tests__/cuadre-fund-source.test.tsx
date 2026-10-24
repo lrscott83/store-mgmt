@@ -131,6 +131,16 @@ function cashPanel(): HTMLElement {
   return screen.getByRole('button', { name: /Resumen Efectivo/ });
 }
 
+/**
+ * El importe EXACTO del header del panel, anclado por regex sobre el texto
+ * completo (`^Resumen Efectivo … $`). Un `toHaveTextContent('70 CUP')` suelto
+ * era un substring: `170 CUP` también lo contiene y el test pasaba con la cifra
+ * equivocada. Anclar el texto evita además depender de clases CSS.
+ */
+function expectCashAmount(amount: string): void {
+  expect(cashPanel()).toHaveTextContent(new RegExp(`^Resumen Efectivo\\s*${amount}$`));
+}
+
 describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,8 +160,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     renderPage();
     generate();
 
-    await waitFor(() => expect(cashPanel()).toHaveTextContent('70 CUP'));
-    expect(cashPanel()).toHaveTextContent('70 CUP');
+    await waitFor(() => expectCashAmount('70 CUP'));
   });
 
   it('does NOT subtract an Externo expense paid in cash', async () => {
@@ -168,7 +177,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     renderPage();
     generate();
 
-    await waitFor(() => expect(cashPanel()).toHaveTextContent('100 CUP'));
+    await waitFor(() => expectCashAmount('100 CUP'));
   });
 
   it('does NOT subtract a legacy expense with no fundSource field', async () => {
@@ -178,7 +187,7 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     renderPage();
     generate();
 
-    await waitFor(() => expect(cashPanel()).toHaveTextContent('100 CUP'));
+    await waitFor(() => expectCashAmount('100 CUP'));
   });
 
   it('keeps the expenses KPI summing both origins', async () => {
@@ -195,6 +204,6 @@ describe('CuadrePorFechasPage — expense fund source (expense-fund-source)', ()
     const grid = await screen.findByTestId('cuadre-kpi-grid');
     expect(within(grid).getByText('Gastos')).toBeInTheDocument();
     expect(within(grid).getAllByText(/150 CUP/).length).toBeGreaterThan(0);
-    expect(cashPanel()).toHaveTextContent('70 CUP');
+    expectCashAmount('70 CUP');
   });
 });

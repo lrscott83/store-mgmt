@@ -26,7 +26,18 @@ import { CashClosingPage } from '../cash-closing';
  */
 
 const STORE = 'store-cash-line';
-const DAY = toLocalDayKey(new Date());
+
+/**
+ * RDD R3-1: `DAY` y las filas sembradas salen del MISMO instante anclado a
+ * mediodía local. Antes, `DAY` se derivaba de `new Date()` al cargar el módulo y
+ * las filas de `new Date().toISOString()` (UTC) al sembrar: cruzar la medianoche
+ * entre ambos —o un huso donde la fecha UTC difiere de la local— dejaba las
+ * filas fuera del día que la página calcula.
+ */
+const NOW = new Date();
+NOW.setHours(12, 0, 0, 0);
+const DAY = toLocalDayKey(NOW);
+const SEEDED_AT = NOW.toISOString();
 
 function makeUser(): UserModel {
   return {
@@ -64,7 +75,7 @@ function seedCashSale(total: number): void {
     currency: Currency.CUP,
     salePaymentMethod: SalePaymentMethod.Efectivo,
     paymentType: PaymentType.Efectivo,
-    date: new Date().toISOString(),
+    date: SEEDED_AT,
     orderItems: [],
   });
   localStorage.setItem(key, JSON.stringify(list));
@@ -81,7 +92,7 @@ function seedExpense(
     id,
     type: ExpenseType.Transporte,
     total,
-    date: new Date().toISOString(),
+    date: SEEDED_AT,
     paymentType: PaymentType.Efectivo,
     isActive: true,
     currency: options.currency ?? Currency.CUP,
