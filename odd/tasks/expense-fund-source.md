@@ -45,6 +45,8 @@ L3 (user, answer on the new-expense default, verbatim): "a partird de ahora vamo
 
 L4 (user, 2026-10-24): "continua pero recuerda Recuerda usar los subagentes para el explorer, para el worker y las tareas que debes usar los subagentes. Usa codegraph para las cosas que debes usarlo y no usar grep o otro comando para esos casos". Handoff attempted and NOT available in this session: the `subagent` launch failed with `getaddrinfo ENOTFOUND opencode.ai`, so T3-T6 continued inline.
 
+L5 (user, verbatim): "y el RDD necesito que se haga".
+
 ### Evidence gathered before writing
 
 - `Expense` lives only in `localStorage` (`ExpenseOfflineService`); no backend counterpart (`grep "class Expense|ExpenseType"` over `backend/src` returns nothing).
@@ -67,6 +69,21 @@ L4 (user, 2026-10-24): "continua pero recuerda Recuerda usar los subagentes para
   test untouched — and `e2e/support/expense-form-modal.ts` (untouchable) still targets the last combobox.
 - The origin label was NOT added to `expense-list.tsx`: its 3-column grid and plain-text payment cell are pinned by
   `expense-list.test.tsx`. The history's origin filter is the discovery path instead.
+
+### RDD outcome
+
+- `review mode status` → on (global).
+- `review assess --base-ref qa --committed-only` → `medium`, `review_due: false`, `under_budget`.
+- User asked for the review anyway (L5). Candidate frozen at `f1c97368..9d246612` (21 paths, 1324 changed lines), lenses `risk`, `readability`, `reliability`, consent granted.
+- Result: **approved**. Lineage `review-98515af4d619796a`, authority **burned** (`gentle-ai.review-acknowledged/v1`, revision `sha256:07cea2b3…`).
+- 14 advisory findings, all `informational` / non-blocking, no correction transition offered. They are follow-ups, never a reason to re-review this candidate:
+  - `R1-001` (risk): the import-update path coerces an absent `fundSource` to `Externo`, so an import from a legacy device downgrades a locally-`Caja` expense. Deliberate per S4 and pinned by a test, but it is a silent classification loss.
+  - `R2-CASH-ORIGIN-PREDICATE-DUP` (readability): the predicate `expenseFundSourceOf(e) === ExpenseFundSource.Caja` is open-coded in five places; a named domain helper (`isCashDrawerExpense`) would prevent drift.
+  - `R2-FUND-SOURCE-I18N-DUP`, `R2-HISTORY-LABEL-MAP`, `R2-HISTORY-DOUBLE-FILTER`, `R2-CLOSING-EXPENSES-RECOMPUTE`, `R2-TEST-MAGIC-ENUM-LITERALS` (readability/suggestions): duplication and loose maps.
+  - `R3-1`, `R3-2`, `R3-3` (reliability): the form origin control, the history origin filter and the closing's new visible line have no assertions.
+  - `R3-4` (reliability): the row label renamed `Gastos` → `Gastos de caja` is an unrequested user-visible change (done for accuracy; no test pins the old label).
+  - `R3-6` (reliability): the test title at `today-stats-fund-source.test.tsx:182` contradicts its assertion — the test EXPECTS the 40 to be subtracted.
+- Delivery is not part of the review: commit, push and PR stay human decisions.
 
 ### Verification evidence
 
