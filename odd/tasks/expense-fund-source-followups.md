@@ -48,15 +48,40 @@ S13 - `R2-HISTORY-DOUBLE-FILTER` — re-examined and NOT reproducible: the fund-
 
 | ID | Scope | S# | Route | Status |
 |----|-------|----|-------|--------|
-| T1 | Domain predicate + shared origin catalogue; five consumers switched. | S2, S3 | inline | pending |
-| T2 | Import merge preserves the local classification when the payload is silent. | S1 | inline | pending |
-| T3 | Closing breakdown returned by one call (view + snapshot). | S4 | inline | pending |
-| T4 | New component tests: form origin control, history origin filter, closing line. | S6-S8 | deferred writer | pending |
-| T5 | Fix my own new tests: enum literals, panel query, title, fixed day, label pin. | S5, S9-S12 | inline | pending |
-| T6 | Full checks + RDD re-assessment. | all | inline | pending |
+| T1 | Domain predicate + shared origin catalogue; five consumers switched. | S2, S3 | inline | done - `2a29232e` |
+| T2 | Import merge preserves the local classification when the payload is silent. | S1 | inline | done - `2a29232e` |
+| T3 | Closing breakdown returned by one call (view + snapshot). | S4 | inline | done - `2a29232e` |
+| T4 | New component tests: form origin control, history origin filter, closing line. | S6-S8 | inline (deferred writer unavailable) | done - see evidence |
+| T5 | Fix my own new tests: enum literals, panel query, title, fixed day, label pin. | S5, S9-S12 | inline | done - `2a29232e` |
+| T6 | Full checks + RDD re-assessment. | all | inline | done - see evidence |
 
 ## Log
 
 L1 (user, verbatim): "aplica todos esos hallazgos como trabajo a aparte"
 
 L2 (user, verbatim): "continua pero recuerda Recuerda usar los subagentes para el explorer, para el worker y las tareas que debes usar los subagentes. Usa codegraph para las cosas que debes usarlo y no usar grep o otro comando para esos casos"
+
+L3 (user, verbatim): "para que los permisos fuera de la carpeta?" — I had chained two workspaces with `cd ../../`; from then on every command uses an explicit `workdir` inside its own package.
+
+### Delegation note
+
+The 3 test suites of T4 were delegated to a `gentle-ai-worker` and NOT executed by it: the launch failed with
+`Free usage limit reached. Subscribe to OpenCode Go to keep going`. T4 was then written inline. The worker brief was
+bounded to the three new test files with production code excluded.
+
+### Verification evidence
+
+- New coverage (all green): `expense-form-modal-fund-source.test.tsx` (6), `expenses-history-fund-source.test.tsx` (4),
+  `cash-closing-fund-source-line.test.tsx` (4) → 14 tests.
+- `apps/web-store-pos`: `pnpm vitest run` → **5980 passed, 2 failed, 6 skipped** over 428 files. The 2 failures are the
+  same pre-existing `scripts/__tests__/precache-built-invariants.test.mjs` pair that reads a stale `build/client`.
+- `packages/domain`: `pnpm build` + `pnpm test` → clean (227 passed).
+- `pnpm typecheck` → 0. `pnpm lint` → 0.
+- E2E: none modified, none run.
+
+### Process note
+
+Two combined vitest invocations hung for 10 minutes. Cause: my `useMultiStore` mock returned a NEW `{ enabled, stores: [] }`
+object on every render, and the history page's per-store effect depends on `stores`, so it re-ran forever. Fixed by
+hoisting a stable `multiStoreState`. The orphaned `node` workers of those runs were killed (only processes started after
+the hang began), never the pre-existing dev-server ones.
