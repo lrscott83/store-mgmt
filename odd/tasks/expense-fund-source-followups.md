@@ -97,6 +97,15 @@ bounded to the three new test files with production code excluded.
     a substring match (`'170 CUP'` would pass).
 - The `risk` lens returned **no findings**.
 
+### RDD outcome (test-hardening slice)
+
+- Candidate: `f363ff95` over `558b7bff` (3 paths, 56 lines), lens `reliability`.
+- Result: **approved with ZERO findings**. Lineage `review-1fc48d5b4a2ca158`, authority **burned**
+  (`gentle-ai.review-acknowledged/v1`, revision `sha256:cb44eaae…`).
+- The reviewer confirmed the noon-anchored day removes the wall-clock skew and that the anchored regex no longer lets
+  `170 CUP` satisfy a `70 CUP` expectation.
+
+
 L4 (user, verbatim): "dale con RDD"
 
 ### Process note
