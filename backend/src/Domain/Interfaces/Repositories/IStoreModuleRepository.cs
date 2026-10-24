@@ -20,6 +20,16 @@ namespace Domain.Interfaces.Repositories
         Task<IReadOnlyCollection<int>> GetPublicActiveModuleIdsByStoreIdAsync(Guid storeId);
 
         /// <summary>
+        /// De una lista de tiendas, cuáles tienen ese módulo ACTIVO. Una sola consulta para toda
+        /// la lista (evita el N+1 de preguntar tienda por tienda). Mismo criterio que
+        /// <see cref="GetPublicActiveModuleIdsByStoreIdAsync"/>: solo importa `StoreModule.IsActive`.
+        /// </summary>
+        Task<IReadOnlyCollection<Guid>> GetStoreIdsWithActiveModuleAsync(
+            IEnumerable<Guid> storeIds,
+            int moduleId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Todas las filas ACTIVAS, de TODAS las tiendas (sin filtro de tenant), para los módulos
         /// indicados. La usa la cascada del catálogo global: al apagar un módulo, sus
         /// <c>StoreModule</c> activos se apagan también (decisión del owner 2026-10-14).

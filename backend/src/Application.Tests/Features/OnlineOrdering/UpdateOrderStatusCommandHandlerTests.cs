@@ -3,7 +3,10 @@ using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderStatus;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
+using Domain.Entities.OrderSalesCommissions;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
+using Domain.Entities.ProductSalesCommissions;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -34,6 +37,10 @@ public class UpdateOrderStatusCommandHandlerTests
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IOrderRepository> _orderRepository = new();
+    private readonly Mock<IStoreModuleRepository> _storeModuleRepository = new();
+    private readonly Mock<IOrderSalesManagerRepository> _orderSalesManagerRepository = new();
+    private readonly Mock<IProductSalesCommissionRepository> _productSalesCommissionRepository = new();
+    private readonly Mock<IOrderSalesCommissionRepository> _orderSalesCommissionRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -52,13 +59,32 @@ public class UpdateOrderStatusCommandHandlerTests
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+
+        // T6 defaults: sin módulo 21 activo y sin atribución no se genera ninguna comisión.
+        // Los tests de comisión sobreescriben estos setups.
+        _storeModuleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync([]);
+        _orderSalesManagerRepository
+            .Setup(x => x.GetByOrderIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((OrderSalesManager?)null);
+        _productSalesCommissionRepository
+            .Setup(x => x.GetByProductIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((ProductSalesCommission?)null);
+        _orderSalesCommissionRepository
+            .Setup(x => x.GetByOrderItemIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((OrderSalesCommission?)null);
     }
 
     private UpdateOrderStatusCommandHandler Handler() => new(
         _unitOfWork.Object,
         _httpContextService.Object,
         _orderRepository.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _storeModuleRepository.Object,
+        _orderSalesManagerRepository.Object,
+        _productSalesCommissionRepository.Object,
+        _orderSalesCommissionRepository.Object);
 
     /// <summary>
     /// Pedido online de la tienda en un estado concreto. El estado se fija directo a propósito: es

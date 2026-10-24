@@ -5,6 +5,7 @@ using Domain.Common.Results;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Roles;
+using Domain.Entities.SalesManagers;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreUsers;
 using Domain.Entities.UserRoles;
@@ -26,6 +27,7 @@ public class AuthenticationServiceTests
 {
     // Mock dependencies
     private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<ISalesManagerRepository> _mockSalesManagerRepository;
     private readonly Mock<IHashPasswordService> _mockHashPasswordService;
     private readonly Mock<IOfflinePreHashProtector> _mockPreHashProtector;
     private readonly Mock<ILogger<AuthenticationService>> _mockLogger;
@@ -38,6 +40,7 @@ public class AuthenticationServiceTests
     public AuthenticationServiceTests()
     {
         _mockUserRepository = new Mock<IUserRepository>();
+        _mockSalesManagerRepository = new Mock<ISalesManagerRepository>();
         _mockHashPasswordService = new Mock<IHashPasswordService>();
         _mockPreHashProtector = new Mock<IOfflinePreHashProtector>();
         _mockLogger = new Mock<ILogger<AuthenticationService>>();
@@ -50,6 +53,7 @@ public class AuthenticationServiceTests
     {
         return new AuthenticationService(
             _mockUserRepository.Object,
+            _mockSalesManagerRepository.Object,
             _mockHashPasswordService.Object,
             _mockPreHashProtector.Object,
             _mockLogger.Object);
@@ -156,6 +160,63 @@ public class AuthenticationServiceTests
         // Assert
         result.Succeeded.Should().BeTrue();
         result.Data.Should().Be(_testUserId);
+    }
+
+    /// <summary>
+    /// T4 / R1-INACTIVE-MANAGER-RESOLUTION: un gestor de ventas activo entra SIN tienda
+    /// (Owner-level), y un gestor inactivo es rechazado aunque su User siga activo.
+    /// </summary>
+    [Fact]
+    public async Task IsValidUserAsync_ShouldReturnSuccess_WhenUserIsAnActiveSalesManagerWithoutStore()
+    {
+        var service = CreateService();
+        var login = "gestor";
+        var password = "ValidPassword123!";
+
+        var user = CreateActiveUserWithNavProps(login);
+        user.Password = "$2a$11$stored_bcrypt_hash";
+        user.Owner = null;
+        user.ReSeller = null;
+        user.StoreUser = null;
+
+        var manager = SalesManager.Create(user.Id, Guid.NewGuid(), Guid.NewGuid());
+        _mockUserRepository.Setup(x => x.GetByLoginWithRelatedAsync(login)).ReturnsAsync(user);
+        _mockSalesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(user.Id, true))
+            .ReturnsAsync(manager);
+        _mockHashPasswordService.Setup(x => x.VerifyPassword(password, user.Password)).Returns(true);
+
+        var result = await service.IsValidUserAsync(login, password);
+
+        result.Succeeded.Should().BeTrue("un gestor activo no necesita tienda");
+        result.Data.Should().Be(user.Id);
+    }
+
+    [Fact]
+    public async Task IsValidUserAsync_ShouldRejectAnInactiveSalesManager()
+    {
+        var service = CreateService();
+        var login = "gestor-inactivo";
+        var password = "ValidPassword123!";
+
+        var user = CreateActiveUserWithNavProps(login);
+        user.Password = "$2a$11$stored_bcrypt_hash";
+        user.Owner = null;
+        user.ReSeller = null;
+        user.StoreUser = null;
+
+        var manager = SalesManager.Create(user.Id, Guid.NewGuid(), Guid.NewGuid());
+        manager.IsActive = false;
+        _mockUserRepository.Setup(x => x.GetByLoginWithRelatedAsync(login)).ReturnsAsync(user);
+        _mockSalesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(user.Id, true))
+            .ReturnsAsync(manager);
+        _mockHashPasswordService.Setup(x => x.VerifyPassword(password, user.Password)).Returns(true);
+
+        var result = await service.IsValidUserAsync(login, password);
+
+        result.Succeeded.Should().BeFalse("un gestor inactivo no puede entrar");
+        result.Errors.Should().Contain(UserErrors.AccountInactive);
     }
 
     [Fact]

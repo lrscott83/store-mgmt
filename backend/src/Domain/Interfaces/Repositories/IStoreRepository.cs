@@ -55,6 +55,12 @@ namespace Domain.Interfaces.Repositories
         /// </summary>
         Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync();
 
+        /// <summary>
+        /// Tiendas activas de un Owner con catálogo web publicado (S3/D5). El gestor de ventas
+        /// pertenece al Owner, no a una tienda; esta es la lista de catálogos que puede abrir.
+        /// </summary>
+        Task<IReadOnlyList<Store>> GetActiveStoresWithCatalogByOwnerIdAsync(Guid ownerId);
+
         new Task<bool> ExistsAsync(Guid id);
         Task<IEnumerable<Store>> GetPaidStoresAsync();
         Task<IEnumerable<Store>> GetPaidStoresByReSellerUserAsync(Guid reSellerUserId);

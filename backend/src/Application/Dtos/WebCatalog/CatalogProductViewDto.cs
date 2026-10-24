@@ -31,5 +31,11 @@ namespace Application.Dtos.WebCatalog
         /// <summary>Precio final combinando % y monto rebajado.</summary>
         public decimal FinalPrice { get; set; }
         public bool HasDiscount { get; set; }
+        /// <summary>
+        /// Orden de la CATEGORÍA del producto (0 si la navegación no vino cargada). Lo necesita la
+        /// importación Catálogo Web → POS: el POS conserva el orden de categoría, no solo el del
+        /// producto, que ya viaja en <see cref="Order"/>.
+        /// </summary>
+        public int CategoryOrder { get; set; }
     }
 }

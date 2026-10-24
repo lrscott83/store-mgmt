@@ -139,6 +139,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                 IsSuperAdmin = _httpContextService.IsSuperAdmin,
                 IsOwnerAdmin = _httpContextService.IsOwnerAdmin,
                 IsReSeller = _httpContextService.IsReSeller,
+                IsGestorVentas = _httpContextService.IsGestorVentas,
                 SelectedStoreId = user.SelectedStoreId,
                 StoreModuleIds = storeModuleIds,
                 IsActive = user.IsActive,

@@ -34,6 +34,7 @@ namespace SMCA.WebApi.Services
                     var isGlobalAdmin = await _userRoleRepository.IsSuperAdmin(currentUser.Id);
                     var isStoreAdmin = await _userRoleRepository.IsStoreAdmin(currentUser.Id);
                     var isReSeller = await _userRoleRepository.IsReSeller(currentUser.Id);
+                    var isGestorVentas = await _userRoleRepository.IsGestorVentas(currentUser.Id);
                     var featureIds = await _userRoleRepository.GetUserFeatureIdsForClaims(currentUser.Id, currentUser.SelectedStoreId);
                     var packedFeatureIds = featureIds.PackFeatureIdsIntoString();
 
@@ -42,6 +43,7 @@ namespace SMCA.WebApi.Services
                     claims.Add(new Claim(StringValueUtils.SuperAdminClaim, isGlobalAdmin.ToString().ToLower())); // TODO: add permissions and claims
                     claims.Add(new Claim(StringValueUtils.AdminClaim, isStoreAdmin.ToString().ToLower()));
                     claims.Add(new Claim(StringValueUtils.ReSellerClaim, isReSeller.ToString().ToLower()));
+                    claims.Add(new Claim(StringValueUtils.GestorVentasClaim, isGestorVentas.ToString().ToLower()));
                     claims.Add(new Claim(StringValueUtils.FeaturesClaim, packedFeatureIds));
                 }
             }

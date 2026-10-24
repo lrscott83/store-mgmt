@@ -58,6 +58,7 @@ namespace SMCA.WebApi.Services
         public bool IsSuperAdminOrOwnerAdmin => IsSuperAdmin || IsOwnerAdmin;
 
         public bool IsReSeller => GetClaimValue(StringValueUtils.ReSellerClaim) == "true";
+        public bool IsGestorVentas => GetClaimValue(StringValueUtils.GestorVentasClaim) == "true";
 
         /// <summary>
         /// The store published by <see cref="Filters.AdminStoreScopeAttribute"/>, or null. Reading it

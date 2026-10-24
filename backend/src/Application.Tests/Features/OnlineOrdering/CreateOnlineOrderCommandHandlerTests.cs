@@ -5,7 +5,9 @@ using Application.UnitOfWorks;
 using System.Text.Json;
 using Domain.Common.Enums;
 using Domain.Entities.OrderItems;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
+using Domain.Entities.SalesManagers;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.StoreCatalogSettings;
@@ -62,6 +64,8 @@ public class CreateOnlineOrderCommandHandlerTests
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStoreModuleRepository> _moduleRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
+    private readonly Mock<ISalesManagerRepository> _salesManagerRepository = new();
+    private readonly Mock<IOrderSalesManagerRepository> _orderSalesManagerRepository = new();
 
     private readonly string _slug = "tienda-ana";
     private Guid _storeId;
@@ -101,7 +105,9 @@ public class CreateOnlineOrderCommandHandlerTests
         _orderRepository.Object,
         _settingsRepository.Object,
         _moduleRepository.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _salesManagerRepository.Object,
+        _orderSalesManagerRepository.Object);
 
     /// <summary>
     /// La tienda NO tiene activo "Pedidos WhatsApp" (19): no hay carrito ni pedidos nuevos, así que
@@ -149,12 +155,19 @@ public class CreateOnlineOrderCommandHandlerTests
     /// FILTRANDO por los ids pedidos: así una línea que el catálogo ya no publica sale como
     /// "no encontrada", igual que en producción (donde la consulta trae solo los publicados).
     /// </summary>
-    private Guid Publish(string name, decimal price, Currency? currency = null)
+    private Guid Publish(
+        string name,
+        decimal price,
+        Currency? currency = null,
+        int percentDiscountPrice = 0,
+        int discountPrice = 0)
     {
         var category = ProductCategory.Create(_storeId, "General", 1, _tenantId, "general");
         Product product = Product.Create(name, _categoryId, price, 1, true, true, "B-1", _tenantId);
         product.Category = category;
         product.Currency = currency ?? Currency.CUP;
+        product.PercentDiscountPrice = percentDiscountPrice;
+        product.DiscountPrice = discountPrice;
         _published.Add(product);
 
         _productRepository
@@ -238,6 +251,95 @@ public class CreateOnlineOrderCommandHandlerTests
         persisted.OrderItems.Single().Price.Should().Be(100m);
         persisted.OrderItems.Single().Quantity.Should().Be(2);
         persisted.OrderItems.Single().Currency.Should().Be(Currency.CUP);
+    }
+
+    /// <summary>
+    /// S11 del feature Gestores de Ventas: el `OrderItem` guarda el precio base, el % de descuento
+    /// y el descuento fijo del producto en el momento del pedido, además del precio final y la
+    /// moneda. Es el snapshot con el que se calcula la comisión.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldSnapshotTheProductPriceComponentsOnTheOrderItem()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m, percentDiscountPrice: 1250, discountPrice: 500);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        persisted.Should().NotBeNull();
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(1250);
+        item.DiscountPrice.Should().Be(500);
+        item.Price.Should().Be(82.5m, "el precio final sigue siendo el que muestra el catálogo");
+        item.Currency.Should().Be(Currency.CUP);
+    }
+
+    /// <summary>
+    /// R3-SNAPSHOT-FREEZE (review de T1): el snapshot de escalares se copia al crear el pedido y
+    /// no depende de la instancia viva del producto. La independencia de la COMISIÓN frente al
+    /// catálogo vivo se pinza en T6, cuando exista el cálculo; este test no la sustituye.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldKeepTheSnapshotFrozen_WhenTheProductChangesAfterTheOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m, percentDiscountPrice: 1250, discountPrice: 500);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        Product published = _published.Single(p => p.Id == productId);
+        published.Price = 999m;
+        published.PercentDiscountPrice = 0;
+        published.DiscountPrice = 0;
+
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(1250);
+        item.DiscountPrice.Should().Be(500);
+        item.Price.Should().Be(82.5m);
+    }
+
+    /// <summary>
+    /// R3-NULL-VS-ZERO-CONTRACT (review de T1): un pedido nuevo de un producto sin descuentos
+    /// guarda `0/0` (cero conocido), no `null` (legacy/sin snapshot).
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldPersistZeroDiscountsAsKnownZero_NotNull()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 1);
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        var item = persisted!.OrderItems.Single();
+        item.BasePrice.Should().Be(100m);
+        item.PercentDiscountPrice.Should().Be(0);
+        item.DiscountPrice.Should().Be(0);
     }
 
     /// <summary>
@@ -962,6 +1064,68 @@ public class CreateOnlineOrderCommandHandlerTests
 
         _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
         _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// T5b: cuando el endpoint gestor-only marca `SalesManagerUserId`, el pedido se atribuye en
+    /// la MISMA transacción (tabla propia `OrderSalesManager`). El público no lo marca y no crea
+    /// atribución.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldAttributeTheOrderToTheGestor_WhenSalesManagerUserIdIsSet()
+    {
+        Store store = PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestoresVentas]);
+
+        var manager = SalesManager.Create(Guid.NewGuid(), store.OwnerId, _tenantId);
+        _salesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(manager.UserId, false))
+            .ReturnsAsync(manager);
+        _orderSalesManagerRepository
+            .Setup(x => x.AddAsync(It.IsAny<OrderSalesManager>()))
+            .ReturnsAsync((OrderSalesManager attribution) => attribution);
+
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
+        command.SalesManagerUserId = manager.UserId;
+
+        await Handler().Handle(command, CancellationToken.None);
+
+        _orderSalesManagerRepository.Verify(
+            x => x.AddAsync(It.Is<OrderSalesManager>(a =>
+                a.SalesManagerId == manager.Id
+                && a.OwnerId == store.OwnerId
+                && a.StoreId == store.Id)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldRejectAGestorFromAnotherOwner()
+    {
+        Store store = PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestoresVentas]);
+
+        var foreignManager = SalesManager.Create(Guid.NewGuid(), Guid.NewGuid(), _tenantId);
+        _salesManagerRepository
+            .Setup(x => x.GetByUserIdAsync(foreignManager.UserId, false))
+            .ReturnsAsync(foreignManager);
+
+        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 1);
+        command.SalesManagerUserId = foreignManager.UserId;
+
+        Func<Task> act = () => Handler().Handle(command, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<ApiException>())
+            .Which.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
     }
 
     /// <summary>

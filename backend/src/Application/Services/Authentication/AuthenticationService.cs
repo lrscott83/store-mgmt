@@ -3,6 +3,7 @@ using Domain.Common.Enums;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellers;
+using Domain.Entities.SalesManagers;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
@@ -13,17 +14,20 @@ namespace Application.Services.Authentication
     public class AuthenticationService : IAuthenticationService
     {
         private readonly IUserRepository _userRepository;
+        private readonly ISalesManagerRepository _salesManagerRepository;
         private readonly IHashPasswordService _hashPasswordService;
         private readonly IOfflinePreHashProtector _preHashProtector;
         private readonly ILogger<AuthenticationService> _logger;
 
         public AuthenticationService(
             IUserRepository userRepository,
+            ISalesManagerRepository salesManagerRepository,
             IHashPasswordService hashPasswordService,
             IOfflinePreHashProtector preHashProtector,
             ILogger<AuthenticationService> logger)
         {
             _userRepository = userRepository;
+            _salesManagerRepository = salesManagerRepository;
             _hashPasswordService = hashPasswordService;
             _preHashProtector = preHashProtector;
             _logger = logger;
@@ -71,6 +75,19 @@ namespace Application.Services.Authentication
                 if (!reSeller.IsActive)
                 {
                     _logger.LogWarning("Login failed for {Login}: reseller is inactive", login);
+                    return Result.Failure<Guid>(UserErrors.AccountInactive);
+                }
+                return Result.Success(user.Id);
+            }
+
+            // Gestor de ventas: Owner-level, sin tienda. Su perfil manda sobre el gate de
+            // "tienda activa": un gestor activo entra sin StoreUser/Owner; uno inactivo no.
+            SalesManager? salesManager = await _salesManagerRepository.GetByUserIdAsync(user.Id, includeInactive: true);
+            if (salesManager != null)
+            {
+                if (!salesManager.IsActive)
+                {
+                    _logger.LogWarning("Login failed for {Login}: sales manager is inactive", login);
                     return Result.Failure<Guid>(UserErrors.AccountInactive);
                 }
                 return Result.Success(user.Id);

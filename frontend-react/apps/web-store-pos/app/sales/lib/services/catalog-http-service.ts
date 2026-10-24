@@ -41,6 +41,13 @@ export interface CatalogProductView {
   price: number;
   currency: string;
   order: number;
+  /**
+   * Orden de la CATEGORÍA del producto (0 si la navegación no vino cargada). Lo necesita la
+   * importación Catálogo Web → POS: el POS conserva también el orden de categoría, no solo el del
+   * producto. Opcional porque el backend lo expone desde T1 y los consumidores de la vista no lo
+   * usan; cuando viaja, siempre es un número.
+   */
+  categoryOrder?: number;
   /** false = la copia publicada está despublicada (fuera de venta o inactivo). */
   availableToSale: boolean;
   isActive: boolean;
@@ -767,6 +774,22 @@ export const catalogHttpService = {
   ): Promise<BaseResponseModel<PublicOrderCreated>> {
     const response = await apiClient.post<BaseResponseModel<PublicOrderCreated>>(
       `/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Alta del pedido del GESTOR de ventas (T5b/T5c). Mismo payload que el público; el backend
+   * pone la atribución desde el token, nunca desde el cuerpo. El slug va en la ruta y el
+   * servidor verifica que la tienda pertenezca al Owner del gestor y tenga el módulo 21.
+   */
+  async createSalesManagerOrder(
+    storeSlug: string,
+    payload: CreatePublicOrderRequest,
+  ): Promise<BaseResponseModel<PublicOrderCreated>> {
+    const response = await apiClient.post<BaseResponseModel<PublicOrderCreated>>(
+      `/v1/sales-managers/orders/${encodeURIComponent(storeSlug)}`,
       payload,
     );
     return response.data;

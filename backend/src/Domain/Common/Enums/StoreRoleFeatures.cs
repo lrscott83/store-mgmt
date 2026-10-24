@@ -310,5 +310,19 @@ namespace Domain.Common.Enums
         PedidosWhatsAppAdmin,
 
         #endregion
+
+        #region Gestores de ventas features
+
+        // Gestores de ventas (feature 125, módulo 21) es del Owner (coordinador): configura la
+        // comisión por producto, crea gestores y marca comisiones pagadas. El gestor es
+        // Owner-level, no StoreUser, y no se resuelve por StoreRoleFeature: su vista se gatea
+        // por el rol GestorVentas. Sin esta entrada el módulo 21 quedaría invisible para
+        // AllowedFeaturesService y para StoreRoleFeatureGenerator (gotcha AGENTS.md 2026-09-20).
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.GestoresVentas)]
+        [HasModule(ModuleType.GestoresVentas)]
+        GestoresVentasAdmin,
+
+        #endregion
     }
 }

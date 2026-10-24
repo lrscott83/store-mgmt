@@ -15,6 +15,12 @@ namespace Domain.Interfaces.Repositories
         Task<bool> HasAnyAvailableToSaleProductByStoreId(Guid id);
 
         /// <summary>
+        /// `true` solo si el producto pertenece a una categoría de ESA tienda. Es la puerta para
+        /// configurar una comisión por producto sin aceptar ids de otra tienda.
+        /// </summary>
+        Task<bool> BelongsToStoreAsync(Guid storeId, Guid productId);
+
+        /// <summary>
         /// TODOS los productos de las categorías de una tienda, con su categoría y su galería del
         /// catálogo web. Es la lectura de la sincronización (activos e inactivos, en venta o no):
         /// los que dejaron de estar en venta se publican desactivados, nunca se borran (decisión D6).

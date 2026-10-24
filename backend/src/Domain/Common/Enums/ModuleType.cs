@@ -69,5 +69,10 @@ namespace Domain.Common.Enums
         // (Pedidos / Ventas / Repartidores), con la feature OnlineOrders (123) movida aquí.
         [Description("Gestión de pedidos")]
         GestionPedidos = 20,
+
+        // Gestores de ventas = módulo opt-in para el Owner (coordinador) y sus gestores.
+        // Solo se incluye en Superior (3) y VIP (4); no se asigna a ninguna tienda por defecto.
+        [Description("Gestores de ventas")]
+        GestoresVentas = 21,
     }
 }

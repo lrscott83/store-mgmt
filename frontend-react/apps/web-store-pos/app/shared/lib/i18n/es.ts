@@ -218,6 +218,7 @@ const messages: Record<string, string> = {
   'MENU.ADMIN': 'ADMINISTRACIÓN',
   'MENU.SALES': 'VENTA',
   'MENU.WEB_CATALOG_GROUP': 'CATÁLOGO WEB',
+  'MENU.GESTORES_VENTAS': 'GESTORES DE VENTAS',
   'MENU.INVENTORY': 'INVENTARIO',
   'MENU.EXPENSES': 'GASTOS',
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
@@ -241,6 +242,8 @@ const messages: Record<string, string> = {
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
+  'MENU.GESTORES_COMMISSIONS': 'Comisiones por producto',
+  'MENU.GESTORES_COMMISSIONS_LIST': 'Comisiones',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
   // cierre-efectivo: ítem justo debajo de "Vender" (S5).
@@ -251,6 +254,75 @@ const messages: Record<string, string> = {
   'MENU.TODAY_STATS': 'Cuadre del día',
   'MENU.CREDITS_HISTORY': 'Créditos',
   'MENU.ORDERS_HISTORY': 'Ventas',
+
+  // Gestores de ventas (módulo 21, feature 125): configuración de comisión del Owner.
+  'GESTORES.TITLE': 'Comisiones por producto',
+  'GESTORES.SUBTITLE':
+    'Define cuánto gana el gestor por unidad vendida de cada producto: un porcentaje sobre el precio o un monto fijo, y en qué moneda se le paga. Un producto sin comisión no genera ganancia para el gestor.',
+  'GESTORES.LOAD_ERROR': 'No se pudieron cargar los productos y las comisiones.',
+  'GESTORES.EMPTY': 'Todavía no hay productos para configurar.',
+  'GESTORES.TYPE': 'Comisión',
+  'GESTORES.NONE': 'Sin comisión',
+  'GESTORES.PERCENTAGE': 'Porcentaje',
+  'GESTORES.FIXED': 'Monto fijo',
+  'GESTORES.PERCENT_VALUE': '% por unidad',
+  'GESTORES.FIXED_VALUE': 'Monto por unidad',
+  'GESTORES.CURRENCY': 'Moneda',
+  'GESTORES.SAVE': 'Guardar',
+  'GESTORES.REMOVE': 'Quitar',
+  'GESTORES.SAVED': 'Comisión guardada.',
+  'GESTORES.REMOVED': 'Comisión eliminada.',
+  'GESTORES.INVALID_VALUE': 'Escribe un monto válido mayor o igual a 0.',
+  'GESTORES.SAVE_ERROR': 'No se pudo guardar la comisión. Revisa tu conexión e inténtalo de nuevo.',
+
+  // Vista del gestor de ventas (módulo 21, T9).
+  'GESTOR.TITLE': 'Mis pedidos y comisiones',
+  'GESTOR.SUBTITLE': 'Hola, {name}. Aquí ves tus pedidos, lo que has ganado y los catálogos de las tiendas.',
+  'GESTOR.LOGOUT': 'Salir',
+  'GESTOR.LOAD_ERROR': 'No se pudieron cargar tus pedidos y comisiones.',
+  'GESTOR.SECTION_ERROR': 'No se pudo cargar esta sección. Recarga la página o inténtalo de nuevo.',
+  'GESTOR.CATALOGS': 'Catálogos de las tiendas',
+  'GESTOR.CATALOGS_EMPTY': 'Tu Owner todavía no tiene catálogos publicados disponibles.',
+  'GESTOR.ORDERS': 'Mis pedidos',
+  'GESTOR.ORDERS_EMPTY': 'Todavía no tienes pedidos.',
+  'GESTOR.COMMISSIONS': 'Mis comisiones',
+  'GESTOR.COMMISSIONS_EMPTY': 'Todavía no tienes comisiones. Se generan cuando el pedido se entrega.',
+  'GESTOR.CODE': 'Pedido',
+  'GESTOR.STORE': 'Tienda',
+  'GESTOR.DATE': 'Fecha',
+  'GESTOR.STATUS': 'Estado',
+  'GESTOR.TOTAL': 'Total',
+  'GESTOR.PRODUCT': 'Producto',
+  'GESTOR.AMOUNT': 'Comisión',
+  'GESTOR.PAID': 'Pagada',
+  'GESTOR.PENDING': 'Pendiente',
+  'GESTOR.PAID_AT': 'Pagada el {date}',
+
+  // Comisiones de los gestores (T10).
+  'OWNER_COMMISSIONS.TITLE': 'Comisiones de los gestores',
+  'OWNER_COMMISSIONS.SUBTITLE':
+    'Lo que debes a cada gestor. Filtra por estado o por gestor y marca el pago completo cuando le pagues; no hay pagos parciales.',
+  'OWNER_COMMISSIONS.STATUS_FILTER': 'Estado',
+  'OWNER_COMMISSIONS.MANAGER_FILTER': 'Gestor',
+  'OWNER_COMMISSIONS.ALL': 'Todas',
+  'OWNER_COMMISSIONS.ALL_MANAGERS': 'Todos los gestores',
+  'OWNER_COMMISSIONS.PENDING': 'Pendiente',
+  'OWNER_COMMISSIONS.PAID': 'Pagada',
+  'OWNER_COMMISSIONS.EMPTY': 'No hay comisiones con ese filtro.',
+  'OWNER_COMMISSIONS.LOAD_ERROR': 'No se pudieron cargar las comisiones.',
+  'OWNER_COMMISSIONS.DATE': 'Fecha',
+  'OWNER_COMMISSIONS.MANAGER': 'Gestor',
+  'OWNER_COMMISSIONS.ORDER': 'Pedido',
+  'OWNER_COMMISSIONS.PRODUCT': 'Producto',
+  'OWNER_COMMISSIONS.STORE': 'Tienda',
+  'OWNER_COMMISSIONS.STATUS': 'Estado',
+  'OWNER_COMMISSIONS.AMOUNT': 'Comisión',
+  'OWNER_COMMISSIONS.PAY': 'Marcar pagada',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TITLE': 'Registrar el pago',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TEXT':
+    '¿Registrar el pago completo de {amount} a {manager}? Esta acción no se puede deshacer.',
+  'OWNER_COMMISSIONS.PAID_OK': 'Pago registrado.',
+  'OWNER_COMMISSIONS.PAY_ERROR': 'No se pudo registrar el pago. Revisa tu conexión e inténtalo de nuevo.',
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
@@ -891,6 +963,23 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.COL_ROW': 'Fila',
   'PRODUCTS.CSV.COL_STATUS': 'Estado',
   'PRODUCTS.CSV.STATUS_VALID': 'Válido',
+  // Importación Catálogo Web → POS (plan web-catalog-to-pos-import): trae al catálogo local los
+  // productos publicados que aún no existan aquí. Los fallos se nombran uno a uno.
+  'PRODUCTS.WEB_IMPORT.BUTTON': 'Importar desde Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.IMPORTING': 'Importando...',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE': 'Importar desde el Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE':
+    'Se añadirán al catálogo del POS los productos del catálogo web que todavía no existan. La importación puede reordenar los productos que ya están en la misma categoría. ¿Desea continuar?',
+  'PRODUCTS.WEB_IMPORT.SUCCESS':
+    'Importación completada: {imported} productos importados y {existing} ya existentes.',
+  'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY':
+    'Se importaron {imported} productos y {existing} ya existían. No se pudieron importar:',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED':
+    'La categoría "{name}" no se pudo insertar; sus {count} productos no fueron importados.',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED_ONE':
+    'La categoría "{name}" no se pudo insertar; su producto no fue importado.',
+  'PRODUCTS.WEB_IMPORT.PRODUCT_FAILED': 'El producto "{name}" no se pudo insertar.',
+  'PRODUCTS.WEB_IMPORT.LOAD_FAILED': 'No se pudo leer el catálogo web.',
   'PRODUCTS.CATEGORY.CREATE': 'Crear categoría',
   'PRODUCTS.CATEGORY.EDIT': 'Editar categoría',
   // Angular PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY — header FAB label (also reused, per

@@ -97,5 +97,15 @@ namespace Infrastructure.Persistence.Repositories
                                 ur.Role.IsActive &&
                                 ur.Role.Id == (int)RoleType.ReSeller);
         }
+
+        public async Task<bool> IsGestorVentas(Guid userId)
+        {
+            return await _userRoles
+                .IgnoreQueryFilters()
+                .AnyAsync(ur => ur.UserId == userId && ur.User.IsActive &&
+                                ur.IsActive &&
+                                ur.Role.IsActive &&
+                                ur.Role.Id == (int)RoleType.GestorVentas);
+        }
     }
 }

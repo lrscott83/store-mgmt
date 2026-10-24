@@ -35,10 +35,18 @@ export default [
   // cliente final, y el backend lo sirve de forma anónima (PublicCatalogController).
   route('catalog/:storeSlug', 'catalog/routes/public-catalog.tsx'),
 
+  // Vista del GESTOR de ventas (módulo 21, T9): SIN layout del POS — el gestor no tiene tienda.
+  // `authLoader` es el único guard; el backend autoriza cada GET por el rol Owner-level.
+  route('gestor', 'gestor/routes/dashboard.tsx'),
+
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
     // Sales â€” Products
     route('sales/products', 'sales/routes/products.tsx'),
+    // Gestores de ventas (módulo 21): configuración de comisión por producto del Owner.
+    route('sales/gestores', 'sales/gestores/routes/gestores-commissions.tsx'),
+    // Comisiones de los gestores (T10): pendientes/pagadas, filtros y pago completo.
+    route('sales/gestores/commissions', 'sales/gestores/routes/owner-commissions.tsx'),
     // Catálogo Web (módulo 18, plan 2026-09-27): publica la tienda en /catalog/<slug>.
     route('sales/web-catalog', 'sales/routes/web-catalog.tsx'),
     // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Mismo gate que el
