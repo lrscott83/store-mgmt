@@ -330,16 +330,16 @@ async function runPaidOnlineOrderSync(
 
     const items = response.data.items;
 
-    for (const item of items) {
-      // Read once per page instead of once per item: the local order list grows with the
-      // store's whole sales history.
-      const registeredIds = new Set(
-        deps.orderService
-          .getStorageOrders()
-          .map((order) => order.onlineOrderId)
-          .filter((id): id is string => Boolean(id)),
-      );
+    // Read the local history once per page, not once per order: it grows with the store's
+    // whole sales history.
+    const registeredIds = new Set(
+      deps.orderService
+        .getStorageOrders()
+        .map((order) => order.onlineOrderId)
+        .filter((id): id is string => Boolean(id)),
+    );
 
+    for (const item of items) {
       if (registeredIds.has(item.id)) {
         result.skipped += 1;
         continue;
@@ -355,8 +355,10 @@ async function runPaidOnlineOrderSync(
       // it anyway, because the sale was never written.
       try {
         const outcome = await registerOnlineOrderSale(detail.data, deps);
-        if (outcome.registered) result.registered += 1;
-        else if (outcome.reason === 'failed') result.failed += 1;
+        if (outcome.registered) {
+          result.registered += 1;
+          registeredIds.add(item.id);
+        } else if (outcome.reason === 'failed') result.failed += 1;
         else result.skipped += 1;
       } catch {
         result.failed += 1;

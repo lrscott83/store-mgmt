@@ -100,6 +100,7 @@ function makeDeps(
     paidOrders?: Array<{ id: string }>;
     listFails?: boolean;
     createOrderFails?: boolean;
+    createOrderThrows?: boolean;
     hasInventoryModule?: boolean;
     lines?: OnlineOrderDetail['lines'];
   } = {},
@@ -107,6 +108,8 @@ function makeDeps(
   const stored = options.stored ?? [];
 
   const createOrder = vi.fn(async (...args: unknown[]) => {
+    if (options.createOrderThrows) throw new Error('offline write failed');
+
     if (options.createOrderFails) {
       return { succeeded: false, data: null, message: null, actionCode: null, errors: [] };
     }
@@ -299,6 +302,29 @@ describe('registerOnlineOrderSale', () => {
     expect(outcome.reason).toBe('failed');
     expect(harness.createInventoryEntry).toHaveBeenCalledWith('p1', 3, 10, Currency.CUP);
     expect(harness.deleteInventoryEntry).toHaveBeenCalledWith('p1', 'entry-1');
+  });
+
+  it('puts the stock back when the sale write throws', async () => {
+    const harness = makeDeps({
+      products: { p1: makeProduct() },
+      available: { p1: 2 },
+      createOrderThrows: true,
+    });
+
+    const outcome = await registerOnlineOrderSale(makeDetail(), harness.deps);
+
+    expect(outcome.reason).toBe('failed');
+    expect(harness.createInventoryEntry).toHaveBeenCalledWith('p1', 3, 10, Currency.CUP);
+    expect(harness.deleteInventoryEntry).toHaveBeenCalledWith('p1', 'entry-1');
+  });
+
+  it('keeps the stock entries of a sale that was written', async () => {
+    const harness = makeDeps({ products: { p1: makeProduct() }, available: { p1: 2 } });
+
+    const outcome = await registerOnlineOrderSale(makeDetail(), harness.deps);
+
+    expect(outcome.registered).toBe(true);
+    expect(harness.deleteInventoryEntry).not.toHaveBeenCalled();
   });
 
   it('touches no inventory when the store lacks the module', async () => {
