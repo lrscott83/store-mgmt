@@ -9,9 +9,12 @@ import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import { showToastSuccess } from '~/shared/lib/toast';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasInventoryModuleAvailable,
+  isUserAuthorized,
+} from '~/shared/lib/auth/authorization-service';
 import { OrderDetailModal, formatOrderDate } from '../components/ordering/order-detail-modal';
 import { statusLabel } from '../lib/ordering-labels';
 import {
@@ -96,6 +99,9 @@ export function OrderingOrdersPage() {
   const user = useAuthStore((state) => state.user);
   const storeId = user?.selectedStoreId ?? '';
   const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
+  // Same gate as the cart (`EFeatures.Sale`): somebody who cannot register a sale by hand
+  // must not have one registered for them by opening this page.
+  const canRegisterSales = user ? isUserAuthorized(user, [EFeatures.Sale], user.selectedStoreId) : false;
 
   const [panels, setPanels] = useState<Panels>(emptyPanels);
   const [openPanels, setOpenPanels] = useState<Record<OnlineOrderStatus, boolean>>({
@@ -178,19 +184,40 @@ export function OrderingOrdersPage() {
   }, [loadPanel]);
 
   /**
-   * Paid web-catalog orders become POS sales here. It is best-effort on purpose: the order
-   * panel must keep working offline, and the next load retries whatever could not be written
-   * because the idempotency key (`onlineOrderId`) makes a re-run harmless.
+   * Paid web-catalog orders become POS sales here. It stays best-effort — the order panel must
+   * keep working offline — but the outcome is no longer silent: what was registered, and what
+   * failed, is surfaced to the operator. The idempotency key (`onlineOrderId`) makes a retry on
+   * the next load harmless.
    */
   const syncOnlineOrderSales = useCallback(async () => {
-    if (!storeId) return;
+    if (!storeId || !canRegisterSales) return;
 
     try {
-      await syncPaidOnlineOrderSales(createOnlineOrderSaleDeps(storeId, hasInventoryModule));
+      const outcome = await syncPaidOnlineOrderSales(
+        createOnlineOrderSaleDeps(storeId, hasInventoryModule),
+      );
+
+      if (outcome.registered > 0) {
+        showToastSuccess(
+          intl.formatMessage(
+            { id: 'ORDERING_ORDERS.SALES_REGISTERED' },
+            { count: String(outcome.registered) },
+          ),
+        );
+      }
+
+      if (outcome.failed > 0) {
+        showToastError(
+          intl.formatMessage(
+            { id: 'ORDERING_ORDERS.SALES_REGISTER_FAILED' },
+            { count: String(outcome.failed) },
+          ),
+        );
+      }
     } catch {
-      // Silent: the sale is retried on the next panel load with no duplicate risk.
+      showToastError(intl.formatMessage({ id: 'ORDERING_ORDERS.SALES_REGISTER_FAILED' }, { count: '?' }));
     }
-  }, [storeId, hasInventoryModule]);
+  }, [storeId, canRegisterSales, hasInventoryModule, intl]);
 
   useEffect(() => {
     void syncOnlineOrderSales();

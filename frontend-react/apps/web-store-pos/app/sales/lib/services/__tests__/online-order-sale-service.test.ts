@@ -86,6 +86,7 @@ interface DepsHarness {
   deps: OnlineOrderSaleDeps;
   createOrder: ReturnType<typeof vi.fn>;
   createInventoryEntry: ReturnType<typeof vi.fn>;
+  deleteInventoryEntry: ReturnType<typeof vi.fn>;
   stored: Order[];
   listOrders: ReturnType<typeof vi.fn>;
   getOrder: ReturnType<typeof vi.fn>;
@@ -98,11 +99,18 @@ function makeDeps(
     stored?: Order[];
     paidOrders?: Array<{ id: string }>;
     listFails?: boolean;
+    createOrderFails?: boolean;
+    hasInventoryModule?: boolean;
+    lines?: OnlineOrderDetail['lines'];
   } = {},
 ): DepsHarness {
   const stored = options.stored ?? [];
 
   const createOrder = vi.fn(async (...args: unknown[]) => {
+    if (options.createOrderFails) {
+      return { succeeded: false, data: null, message: null, actionCode: null, errors: [] };
+    }
+
     const snapshot = args[8] as { onlineOrderId?: string | null } | undefined;
     const created = makeStoredOrder({ onlineOrderId: snapshot?.onlineOrderId ?? null });
     stored.push(created);
@@ -116,7 +124,13 @@ function makeDeps(
     };
   });
 
-  const createInventoryEntry = vi.fn();
+  let entrySeq = 0;
+  const createInventoryEntry = vi.fn(() => {
+    entrySeq += 1;
+    return { data: { id: `entry-${entrySeq}` }, succeeded: true, errors: [] };
+  });
+
+  const deleteInventoryEntry = vi.fn(() => ({ succeeded: true, errors: [] }));
 
   const listOrders = vi.fn(async (filters: { page?: number; pageSize?: number } = {}) => {
     if (options.listFails) {
@@ -157,7 +171,7 @@ function makeDeps(
 
   const getOrder = vi.fn(async (id: string) => ({
     succeeded: true,
-    data: makeDetail({ id }),
+    data: makeDetail({ id, ...(options.lines ? { lines: options.lines } : {}) }),
     message: null,
     actionCode: null,
     errors: [],
@@ -165,7 +179,7 @@ function makeDeps(
 
   const deps: OnlineOrderSaleDeps = {
     storeId: STORE_ID,
-    hasInventoryModule: true,
+    hasInventoryModule: options.hasInventoryModule ?? true,
     orderService: {
       createOrder: createOrder as unknown as OnlineOrderSaleDeps['orderService']['createOrder'],
       getStorageOrders: () => stored,
@@ -180,6 +194,8 @@ function makeDeps(
       }),
       createInventoryEntry:
         createInventoryEntry as unknown as OnlineOrderSaleDeps['inventoryService']['createInventoryEntry'],
+      deleteInventoryEntry:
+        deleteInventoryEntry as unknown as OnlineOrderSaleDeps['inventoryService']['deleteInventoryEntry'],
     },
     orderingService: {
       listOrders: listOrders as unknown as OnlineOrderSaleDeps['orderingService']['listOrders'],
@@ -187,7 +203,15 @@ function makeDeps(
     },
   };
 
-  return { deps, createOrder, createInventoryEntry, stored, listOrders, getOrder };
+  return {
+    deps,
+    createOrder,
+    createInventoryEntry,
+    deleteInventoryEntry,
+    stored,
+    listOrders,
+    getOrder,
+  };
 }
 
 describe('registerOnlineOrderSale', () => {
@@ -263,6 +287,53 @@ describe('registerOnlineOrderSale', () => {
     expect(harness.createOrder).toHaveBeenCalledTimes(1);
   });
 
+  it('puts the stock back when the sale cannot be written', async () => {
+    const harness = makeDeps({
+      products: { p1: makeProduct() },
+      available: { p1: 2 },
+      createOrderFails: true,
+    });
+
+    const outcome = await registerOnlineOrderSale(makeDetail(), harness.deps);
+
+    expect(outcome.reason).toBe('failed');
+    expect(harness.createInventoryEntry).toHaveBeenCalledWith('p1', 3, 10, Currency.CUP);
+    expect(harness.deleteInventoryEntry).toHaveBeenCalledWith('p1', 'entry-1');
+  });
+
+  it('touches no inventory when the store lacks the module', async () => {
+    const harness = makeDeps({
+      products: { p1: makeProduct() },
+      available: { p1: 0 },
+      hasInventoryModule: false,
+    });
+
+    await registerOnlineOrderSale(makeDetail(), harness.deps);
+
+    expect(harness.createInventoryEntry).not.toHaveBeenCalled();
+    expect(harness.createOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('touches no inventory for a product that does not discount from it', async () => {
+    const harness = makeDeps({
+      products: { p1: makeProduct({ discountFromInvantory: false }) },
+      available: { p1: 0 },
+    });
+
+    await registerOnlineOrderSale(makeDetail(), harness.deps);
+
+    expect(harness.createInventoryEntry).not.toHaveBeenCalled();
+  });
+
+  it('skips an order without lines', async () => {
+    const harness = makeDeps({ products: { p1: makeProduct() } });
+
+    const outcome = await registerOnlineOrderSale(makeDetail({ lines: [] }), harness.deps);
+
+    expect(outcome).toEqual({ registered: false, onlineOrderId: 'oo-1', reason: 'empty' });
+    expect(harness.createOrder).not.toHaveBeenCalled();
+  });
+
   it('registers the line anyway when the product is not in the local catalog', async () => {
     const harness = makeDeps({ available: { p1: 0 } });
 
@@ -285,13 +356,24 @@ describe('buildSaleCartItems', () => {
   it('keeps the local product identity but the order snapshot price', () => {
     const harness = makeDeps({ products: { p1: makeProduct({ price: 99 }) } });
 
-    const items = buildSaleCartItems(
+    const { cartItems } = buildSaleCartItems(
       [{ productId: 'p1', name: 'Coca Cola', quantity: 2, price: 10, currency: Currency.CUP, lineTotal: 20 }],
       harness.deps,
     );
 
-    expect(items[0]!.product.price).toBe(99);
-    expect(items[0]!.price).toBe(10);
+    expect(cartItems[0]!.product.price).toBe(99);
+    expect(cartItems[0]!.price).toBe(10);
+  });
+
+  it('reports the entries it created so a failed sale can put the stock back', () => {
+    const harness = makeDeps({ products: { p1: makeProduct() }, available: { p1: 1 } });
+
+    const { createdEntries } = buildSaleCartItems(
+      [{ productId: 'p1', name: 'Coca Cola', quantity: 4, price: 10, currency: Currency.CUP, lineTotal: 40 }],
+      harness.deps,
+    );
+
+    expect(createdEntries).toEqual([{ productId: 'p1', entryId: 'entry-1' }]);
   });
 });
 
@@ -355,5 +437,20 @@ describe('syncPaidOnlineOrderSales', () => {
     expect(result).toEqual({ registered: 0, skipped: 0, failed: 0 });
     expect(harness.getOrder).not.toHaveBeenCalled();
     expect(harness.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('counts a detail read failure without stopping the page', async () => {
+    const harness = makeDeps({ products: { p1: makeProduct() }, paidOrders: [{ id: 'oo-1' }] });
+    harness.getOrder.mockResolvedValueOnce({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [],
+    });
+
+    const result = await syncPaidOnlineOrderSales(harness.deps);
+
+    expect(result).toEqual({ registered: 0, skipped: 0, failed: 1 });
   });
 });

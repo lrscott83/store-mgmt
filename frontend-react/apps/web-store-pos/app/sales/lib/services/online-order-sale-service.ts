@@ -25,7 +25,7 @@ import {
  * A sale is registered in the POS local storage for every web-catalog order that becomes
  * paid. This module owns that bridge:
  *
- *   1. Read every paid order from the API, page by page (read-only; the backend is never
+ *   1. Read the paid orders from the API, page by page (read-only; the backend is never
  *      written).
  *   2. For each order without a local sale carrying its id, make sure the inventory can
  *      absorb it — adding an entry for the MISSING quantity only, with the sale price as
@@ -33,10 +33,18 @@ import {
  *      like the cart does.
  *
  * Idempotency lives on the sale itself: `Order.onlineOrderId` is the key, so re-running the
- * sync never duplicates a sale. Runs are also single-flight: the panel fires the sync on mount
- * and again after every transition, and two overlapping runs would otherwise both pass the
- * guard before either writes.
+ * sync never duplicates a sale. Runs are serialized in-process and, when the runtime supports
+ * it, across tabs.
  */
+
+/** Server page size for the paid-order scan; 100 is the endpoint's hard cap. */
+const PAID_ORDERS_PAGE_SIZE = 100;
+
+/**
+ * Upper bound on pages per run. The scan stops earlier on an empty or short page; this only
+ * keeps a misreporting `total` from turning the loop into an unbounded request stream.
+ */
+const PAID_ORDERS_MAX_PAGES = 50;
 
 /** Services the bridge needs. Narrowed to the members it actually calls, so tests can fake them. */
 export interface OnlineOrderSaleDeps {
@@ -44,7 +52,10 @@ export interface OnlineOrderSaleDeps {
   hasInventoryModule: boolean;
   orderService: Pick<OrderOfflineService, 'createOrder' | 'getStorageOrders'>;
   productRepository: Pick<ProductRepository, 'getProductById'>;
-  inventoryService: Pick<InventoryOfflineService, 'getAvailableQuantity' | 'createInventoryEntry'>;
+  inventoryService: Pick<
+    InventoryOfflineService,
+    'getAvailableQuantity' | 'createInventoryEntry' | 'deleteInventoryEntry'
+  >;
   orderingService: Pick<typeof orderingHttpService, 'listOrders' | 'getOrder'>;
 }
 
@@ -67,6 +78,12 @@ export function isOnlineOrderSaleRegistered(orders: Order[], onlineOrderId: stri
   return orders.some((order) => order.onlineOrderId === onlineOrderId);
 }
 
+interface CartItemsWithEntries {
+  cartItems: CartItem[];
+  /** Entries created for this order, so a failed sale can put the stock back. */
+  createdEntries: Array<{ productId: string; entryId: string }>;
+}
+
 /**
  * Adds an inventory entry for exactly what the product lacks to cover `line.quantity`.
  *
@@ -79,6 +96,7 @@ function ensureStockEntry(
   line: OnlineOrderDetailLine,
   product: Product,
   deps: OnlineOrderSaleDeps,
+  createdEntries: CartItemsWithEntries['createdEntries'],
 ): void {
   if (!deps.hasInventoryModule || !product.discountFromInvantory) return;
 
@@ -86,7 +104,15 @@ function ensureStockEntry(
   const missing = round2(line.quantity - available);
   if (missing <= 0) return;
 
-  deps.inventoryService.createInventoryEntry(line.productId, missing, line.price, line.currency);
+  const created = deps.inventoryService.createInventoryEntry(
+    line.productId,
+    missing,
+    line.price,
+    line.currency,
+  );
+
+  const entryId = created?.data?.id;
+  if (entryId) createdEntries.push({ productId: line.productId, entryId });
 }
 
 /**
@@ -118,15 +144,18 @@ function productFromOrderLine(line: OnlineOrderDetailLine): Product {
 /**
  * Cart lines for the sale: the LOCAL product when it exists (so category, business id and
  * catalog order stay real) with the order's snapshot price, or a product synthesized from the
- * line when the catalog does not have it yet.
+ * line when the catalog does not have it yet. Returns the entries it created so the caller can
+ * compensate them if the sale cannot be written.
  */
 export function buildSaleCartItems(
   lines: readonly OnlineOrderDetailLine[],
   deps: OnlineOrderSaleDeps,
-): CartItem[] {
-  return lines.map((line) => {
+): CartItemsWithEntries {
+  const createdEntries: CartItemsWithEntries['createdEntries'] = [];
+
+  const cartItems = lines.map((line) => {
     const product = deps.productRepository.getProductById(line.productId);
-    if (product) ensureStockEntry(line, product, deps);
+    if (product) ensureStockEntry(line, product, deps, createdEntries);
 
     return {
       product: product ?? productFromOrderLine(line),
@@ -134,6 +163,8 @@ export function buildSaleCartItems(
       price: line.price,
     };
   });
+
+  return { cartItems, createdEntries };
 }
 
 /**
@@ -162,6 +193,20 @@ export function buildCashPayment(total: number, currency: Currency): OrderPaymen
   ];
 }
 
+/** Puts back the stock this order added when the sale itself could not be written. */
+function rollbackStockEntries(
+  createdEntries: CartItemsWithEntries['createdEntries'],
+  deps: OnlineOrderSaleDeps,
+): void {
+  for (const entry of createdEntries) {
+    try {
+      deps.inventoryService.deleteInventoryEntry(entry.productId, entry.entryId);
+    } catch {
+      // Best effort: a leftover entry is recoverable by hand; a lost sale is not.
+    }
+  }
+}
+
 /**
  * Registers the POS sale for ONE paid online order. Never throws; the outcome reports why
  * nothing was written.
@@ -182,7 +227,7 @@ export async function registerOnlineOrderSale(
     return { registered: false, onlineOrderId: detail.id, reason: 'empty' };
   }
 
-  const cartItems = buildSaleCartItems(detail.lines, deps);
+  const { cartItems, createdEntries } = buildSaleCartItems(detail.lines, deps);
   const currency = (cartItems[0].product.currency ?? DEFAULT_CURRENCY) as Currency;
   const total = round2(
     cartItems.reduce(
@@ -193,49 +238,64 @@ export async function registerOnlineOrderSale(
 
   const snapshot: OrderSnapshot = { storeId: deps.storeId, onlineOrderId: detail.id };
 
-  const response = await deps.orderService.createOrder(
-    cartItems,
-    OrderType.Normal,
-    false,
-    PaymentType.Efectivo,
-    detail.code ? `Pedido web #${detail.code}` : 'Pedido web',
-    detail.customerName ?? '',
-    SalePaymentMethod.Efectivo,
-    buildCashPayment(total, currency),
-    snapshot,
-  );
+  try {
+    const response = await deps.orderService.createOrder(
+      cartItems,
+      OrderType.Normal,
+      false,
+      PaymentType.Efectivo,
+      detail.code ? `Pedido web #${detail.code}` : 'Pedido web',
+      detail.customerName ?? '',
+      SalePaymentMethod.Efectivo,
+      buildCashPayment(total, currency),
+      snapshot,
+    );
 
-  return {
-    registered: response.succeeded,
-    onlineOrderId: detail.id,
-    reason: response.succeeded ? undefined : 'failed',
-  };
+    if (!response.succeeded) rollbackStockEntries(createdEntries, deps);
+
+    return {
+      registered: response.succeeded,
+      onlineOrderId: detail.id,
+      reason: response.succeeded ? undefined : 'failed',
+    };
+  } catch {
+    rollbackStockEntries(createdEntries, deps);
+    return { registered: false, onlineOrderId: detail.id, reason: 'failed' };
+  }
 }
 
-/** Server page size for the paid-order scan; 100 is the endpoint's hard cap. */
-const PAID_ORDERS_PAGE_SIZE = 100;
-
 /**
- * Upper bound on pages per run. The scan stops earlier on an empty or short page; this only
- * keeps a misreporting `total` from turning the loop into an unbounded request stream.
+ * Serializes one store's reconciliation for the lifetime of this runtime. The panel starts the
+ * sync on mount and again after every status transition without awaiting it, so two runs can
+ * overlap and both pass the check-then-act guard before either writes.
  */
-const PAID_ORDERS_MAX_PAGES = 50;
+interface ExclusiveLockManager {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+}
 
-/**
- * Single-flight guard. The panel starts the sync on mount and again after every status
- * transition without awaiting it, so two runs can overlap. Sharing the in-flight promise keeps
- * the check-then-act idempotency from being evaluated twice before either run writes.
- */
+function getLockManager(): ExclusiveLockManager | null {
+  const locks = (globalThis.navigator as Navigator & { locks?: ExclusiveLockManager } | undefined)
+    ?.locks;
+  return locks ?? null;
+}
+
 let inFlightSync: { storeId: string; promise: Promise<OnlineOrderSaleSyncResult> } | null = null;
+
+async function runExclusively<T>(storeId: string, run: () => Promise<T>): Promise<T> {
+  const locks = getLockManager();
+  if (!locks) return run();
+
+  // One lock name per store: two tabs of the same store cannot reconcile at the same time, so
+  // the second one sees the first one's sales instead of duplicating them.
+  return locks.request(`lizoft.online-order-sale-sync-${storeId}`, run);
+}
 
 /**
  * Conciles the paid online orders against the local sales.
  *
- * No date window on purpose: an order created yesterday and paid today is just as much a sale
- * of TODAY — the sale date is the moment it is written, which is the moment the payment is
- * seen. Filtering by the order's creation date (what the API's `from`/`to` hit) would silently
- * drop that case, which is a normal one: the order sits unpaid overnight and the customer pays
- * the next day.
+ * Every paid order without a local sale is registered now, whatever its creation date: the
+ * sale date is the moment it is written, which is the moment the payment is seen. An order
+ * created yesterday and paid today is a sale of today.
  *
  * Every page is read: a store with more paid orders than one page would otherwise keep the
  * same first page forever and never reach the rest.
@@ -245,7 +305,7 @@ export function syncPaidOnlineOrderSales(
 ): Promise<OnlineOrderSaleSyncResult> {
   if (inFlightSync?.storeId === deps.storeId) return inFlightSync.promise;
 
-  const promise = runPaidOnlineOrderSync(deps).finally(() => {
+  const promise = runExclusively(deps.storeId, () => runPaidOnlineOrderSync(deps)).finally(() => {
     if (inFlightSync?.promise === promise) inFlightSync = null;
   });
 
@@ -271,7 +331,16 @@ async function runPaidOnlineOrderSync(
     const items = response.data.items;
 
     for (const item of items) {
-      if (isOnlineOrderSaleRegistered(deps.orderService.getStorageOrders(), item.id)) {
+      // Read once per page instead of once per item: the local order list grows with the
+      // store's whole sales history.
+      const registeredIds = new Set(
+        deps.orderService
+          .getStorageOrders()
+          .map((order) => order.onlineOrderId)
+          .filter((id): id is string => Boolean(id)),
+      );
+
+      if (registeredIds.has(item.id)) {
         result.skipped += 1;
         continue;
       }
@@ -282,10 +351,16 @@ async function runPaidOnlineOrderSync(
         continue;
       }
 
-      const outcome = await registerOnlineOrderSale(detail.data, deps);
-      if (outcome.registered) result.registered += 1;
-      else if (outcome.reason === 'failed') result.failed += 1;
-      else result.skipped += 1;
+      // One throwing order must not poison the rest of the page: the next page load retries
+      // it anyway, because the sale was never written.
+      try {
+        const outcome = await registerOnlineOrderSale(detail.data, deps);
+        if (outcome.registered) result.registered += 1;
+        else if (outcome.reason === 'failed') result.failed += 1;
+        else result.skipped += 1;
+      } catch {
+        result.failed += 1;
+      }
     }
 
     inspected += items.length;
