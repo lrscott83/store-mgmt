@@ -10,8 +10,14 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { showToastSuccess } from '~/shared/lib/toast';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { OrderDetailModal, formatOrderDate } from '../components/ordering/order-detail-modal';
 import { statusLabel } from '../lib/ordering-labels';
+import {
+  createOnlineOrderSaleDeps,
+  syncPaidOnlineOrderSales,
+} from '../lib/services/online-order-sale-service';
 import {
   allowedTransitionsFrom,
   orderingHttpService,
@@ -87,6 +93,9 @@ function emptyPanels(): Panels {
 
 export function OrderingOrdersPage() {
   const intl = useIntl();
+  const user = useAuthStore((state) => state.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
   const [panels, setPanels] = useState<Panels>(emptyPanels);
   const [openPanels, setOpenPanels] = useState<Record<OnlineOrderStatus, boolean>>({
@@ -168,6 +177,25 @@ export function OrderingOrdersPage() {
     void Promise.all(PANEL_ORDER.map((status) => loadPanel(status, 1)));
   }, [loadPanel]);
 
+  /**
+   * Paid web-catalog orders become POS sales here. It is best-effort on purpose: the order
+   * panel must keep working offline, and the next load retries whatever could not be written
+   * because the idempotency key (`onlineOrderId`) makes a re-run harmless.
+   */
+  const syncOnlineOrderSales = useCallback(async () => {
+    if (!storeId) return;
+
+    try {
+      await syncPaidOnlineOrderSales(createOnlineOrderSaleDeps(storeId, hasInventoryModule));
+    } catch {
+      // Silent: the sale is retried on the next panel load with no duplicate risk.
+    }
+  }, [storeId, hasInventoryModule]);
+
+  useEffect(() => {
+    void syncOnlineOrderSales();
+  }, [syncOnlineOrderSales]);
+
   async function runTransition(
     order: OnlineOrderListItem,
     next: OnlineOrderStatus,
@@ -188,6 +216,10 @@ export function OrderingOrdersPage() {
       await Promise.all(
         PANEL_ORDER.map((status) => loadPanel(status, panels[status].page)),
       );
+
+      // Moving an order to Entregado marks it Paid on the server (delivering IS collecting),
+      // so the sale has to be registered right here, not on the next page load.
+      void syncOnlineOrderSales();
       return true;
     } catch (err) {
       showBlockingError(

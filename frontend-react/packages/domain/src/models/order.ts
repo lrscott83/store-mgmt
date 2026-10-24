@@ -81,4 +81,10 @@ export interface Order extends AuditableBaseModel {
   saleCurrencyRateId?: string | null;
   /** Moment from which the sale-currency rate was in force. */
   saleCurrencyRateEffectiveFrom?: Date | null;
+  /**
+   * Id of the web-catalog online order this POS sale was generated from. `null`/absent on every
+   * sale registered by hand in the POS. The pair (`onlineOrderId`, order) is the idempotency key:
+   * one online order produces at most one local sale.
+   */
+  onlineOrderId?: string | null;
 }
