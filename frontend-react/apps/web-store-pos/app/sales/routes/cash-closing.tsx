@@ -18,7 +18,6 @@ import { DenominationCountCard } from '../components/denomination-count-card';
 import {
   CashClosingOfflineService,
   differenceOf,
-  expectedTotalOf,
 } from '../lib/cash-closing/cash-closing-offline-service';
 import {
   CashClosingStatus,
@@ -63,7 +62,13 @@ export function CashClosingPage() {
   const service = useMemo(() => new CashClosingOfflineService(storeId), [storeId]);
 
   const currencyOptions = useMemo(
-    () => presentCurrencies(service.getCashSalesEntries(dayKey, storeId)),
+    () =>
+      presentCurrencies([
+        ...service.getCashSalesEntries(dayKey, storeId),
+        // expense-fund-source (2026-10-24): una moneda que solo aparece en
+        // gastos de caja también debe poder cerrarse.
+        ...service.getCashExpensesEntries(dayKey, storeId),
+      ]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [service, dayKey, storeId, revision],
   );
@@ -101,8 +106,16 @@ export function CashClosingPage() {
   ]);
 
   const openingCash = parseAmount(openingText);
-  const cashSalesTotal = service.getCashSalesTotal(dayKey, selectedCurrency, storeId);
-  const expectedTotal = expectedTotalOf(openingCash, cashSalesTotal);
+  // expense-fund-source (2026-10-24): el Esperado del cierre resta los gastos
+  // pagados con dinero de la caja. Delegado al servicio: una sola fórmula para
+  // la vista, el borrador y el snapshot del cierre cerrado.
+  const cashExpensesTotal = service.getCashExpensesTotal(dayKey, selectedCurrency, storeId);
+  const expectedTotal = service.getExpectedTotal(
+    dayKey,
+    selectedCurrency,
+    openingCash,
+    storeId,
+  );
   const countedTotal = countedTotalOf(toDenominations(counts));
   const difference = differenceOf(countedTotal, expectedTotal);
   const differenceClassName = difference < 0 ? 'text-danger' : 'text-success';
@@ -240,6 +253,18 @@ export function CashClosingPage() {
           testId="cash-closing-difference"
         />
       </div>
+
+      {/* expense-fund-source (2026-10-24): qué parte del Esperado son gastos
+          pagados con dinero de la caja. Solo informativo — ya está restado. */}
+      <p
+        data-testid="cash-closing-cash-expenses"
+        className="mb-4 text-sm text-text-muted"
+      >
+        {intl.formatMessage(
+          { id: 'CASH_CLOSING.CASH_EXPENSES' },
+          { amount: formatMoneyWithCurrency(cashExpensesTotal, selectedCurrency) },
+        )}
+      </p>
 
       {/* Apertura (S9) */}
       <div className="mb-4 flex flex-col gap-1">

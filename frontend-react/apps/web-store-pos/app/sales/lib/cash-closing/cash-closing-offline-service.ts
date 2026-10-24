@@ -1,4 +1,4 @@
-import { Result, SalePaymentMethod } from '@store-mgmt/domain';
+import { ExpenseFundSource, expenseFundSourceOf, Result, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Currency } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -12,6 +12,7 @@ import { resolveCurrency } from '~/shared/lib/currency-totals';
 import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { round2 } from '~/shared/lib/money';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import {
   CashClosingStatus,
   countedTotalOf,
@@ -30,9 +31,20 @@ export interface CashClosingDraft {
   readonly comment: string;
 }
 
-/** Esperado = apertura + efectivo de la venta del día (S7). Puro. */
-export function expectedTotalOf(openingCash: number, cashSalesTotal: number): number {
-  return round2(openingCash + cashSalesTotal);
+/**
+ * Esperado = apertura + efectivo de la venta del día − gastos pagados CON
+ * DINERO DE LA CAJA (S7, expense-fund-source 2026-10-24). Puro.
+ *
+ * Antes de `expense-fund-source`, el cierre no restaba ningún gasto: el cajero
+ * sacaba dinero del cajón y el arqueo lo reportaba como faltante. Solo los
+ * gastos `Caja` se restan; los `Externo` no tocaron el cajón.
+ */
+export function expectedTotalOf(
+  openingCash: number,
+  cashSalesTotal: number,
+  cashExpensesTotal = 0,
+): number {
+  return round2(openingCash + cashSalesTotal - cashExpensesTotal);
 }
 
 /** `counted − expected`, redondeado (S7/S8). Puro. */
@@ -161,6 +173,38 @@ export class CashClosingOfflineService {
     return round2(total);
   }
 
+  /**
+   * Gastos del día pagados CON DINERO DE LA CAJA (todas las monedas), como
+   * entradas monetarias: alimenta el selector de moneda y la resta del Esperado
+   * (expense-fund-source, 2026-10-24). Solo `fundSource === Caja`: un gasto
+   * `Externo` (o un histórico sin el campo) nunca tocó el cajón.
+   */
+  getCashExpensesEntries(
+    dayKey: string,
+    storeId: string = this.storeId,
+  ): { amount: number; currency: Currency }[] {
+    const { start, end } = localDayRange(fromLocalDayKey(dayKey));
+    const expenses = new ExpenseOfflineService(storeId).getActiveExpensesBetween(start, end);
+    return expenses
+      .filter((expense) => expenseFundSourceOf(expense) === ExpenseFundSource.Caja)
+      .map((expense) => ({
+        amount: round2(expense.total),
+        currency: resolveCurrency(expense.currency),
+      }));
+  }
+
+  /** Gastos de caja del día en la moneda elegida (S7). */
+  getCashExpensesTotal(
+    dayKey: string,
+    currency: Currency,
+    storeId: string = this.storeId,
+  ): number {
+    const total = this.getCashExpensesEntries(dayKey, storeId)
+      .filter((entry) => entry.currency === currency)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    return round2(total);
+  }
+
   /** Esperado para un (día, moneda) con la apertura indicada (S7). */
   getExpectedTotal(
     dayKey: string,
@@ -168,7 +212,11 @@ export class CashClosingOfflineService {
     openingCash: number,
     storeId: string = this.storeId,
   ): number {
-    return expectedTotalOf(openingCash, this.getCashSalesTotal(dayKey, currency, storeId));
+    return expectedTotalOf(
+      openingCash,
+      this.getCashSalesTotal(dayKey, currency, storeId),
+      this.getCashExpensesTotal(dayKey, currency, storeId),
+    );
   }
 
   /**
@@ -194,6 +242,9 @@ export class CashClosingOfflineService {
       draft.openingCash,
       storeId,
     );
+    // expense-fund-source (2026-10-24): se congela junto al Esperado para que
+    // el cierre cerrado sea auditable (cuánto del Esperado eran gastos de caja).
+    const cashExpensesTotal = this.getCashExpensesTotal(draft.dayKey, draft.currency, storeId);
 
     const record: CashClosing = {
       id,
@@ -205,6 +256,7 @@ export class CashClosingOfflineService {
       status: CashClosingStatus.Open,
       countedTotal,
       expectedTotal,
+      cashExpensesTotal,
       difference: differenceOf(countedTotal, expectedTotal),
       createdDate: existing?.createdDate ?? now,
       createdByName: existing?.createdByName ?? actor,

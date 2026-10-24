@@ -1190,6 +1190,8 @@ const messages: Record<string, string> = {
   'CASH_CLOSING.COUNTED': 'Contado',
   'CASH_CLOSING.DIFFERENCE': 'Diferencia',
   'CASH_CLOSING.OPENING': 'Apertura',
+  // expense-fund-source (2026-10-24): gastos del día pagados con dinero de la caja.
+  'CASH_CLOSING.CASH_EXPENSES': 'Gastos de caja restados del Esperado: {amount}',
   'CASH_CLOSING.COUNT_TITLE': 'Conteo',
   'CASH_CLOSING.DENOMINATION': 'Denominación',
   'CASH_CLOSING.QUANTITY': 'Cantidad',
@@ -1504,6 +1506,13 @@ const messages: Record<string, string> = {
   'EXPENSES.FORM.PAYMENT_TYPE': 'Tipo de pago',
   'EXPENSES.FORM.NOTE': 'Nota',
   'EXPENSES.FORM.TOTAL_REQUIRED': 'El total debe ser mayor a 0',
+  // expense-fund-source (2026-10-24): DE QUÉ dinero salió el gasto.
+  'EXPENSES.FORM.FUND_SOURCE': 'Origen',
+  'EXPENSES.FUND_SOURCE.CAJA': 'Caja',
+  'EXPENSES.FUND_SOURCE.EXTERNO': 'Externo',
+
+  // Expenses — Fund source filter (history)
+  'EXPENSES.FILTER.ALL_ORIGINS': 'Todos los orígenes',
 
   // Expenses — Expense types
   'EXPENSES.TYPE.SALARIO': 'Salario',

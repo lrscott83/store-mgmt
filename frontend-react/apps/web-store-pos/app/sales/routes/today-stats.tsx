@@ -3,9 +3,11 @@ import { useIntl } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
+  ExpenseFundSource,
   ExpenseType,
   PaymentType,
   SalePaymentMethod,
+  expenseFundSourceOf,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { normalizedOrderPaymentMethod, resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
@@ -238,8 +240,11 @@ export function TodayStatsPage() {
   const paidCreditsCashEntries: CurrencyAmount[] = visiblePaidSaleCredits
     .filter((c) => c.paidType === PaymentType.Efectivo)
     .map((c) => ({ amount: c.total, currency: c.currency }));
+  // expense-fund-source (2026-10-24): solo los gastos pagados CON DINERO DE LA
+  // CAJA descuentan el efectivo. `paymentType === Efectivo` era el proxy viejo y
+  // confundía "pagado en efectivo" con "salió de lo recaudado".
   const expensesCashEntries: CurrencyAmount[] = visibleExpenses
-    .filter((e) => e.paymentType === PaymentType.Efectivo)
+    .filter((e) => expenseFundSourceOf(e) === ExpenseFundSource.Caja)
     .map((e) => ({ amount: e.total, currency: e.currency }));
   const transferEntries: CurrencyAmount[] = visibleOrders
     .filter(
@@ -323,7 +328,7 @@ export function TodayStatsPage() {
               {hasExpensesModule && (
                 <tr className="border-b border-border last:border-0">
                   <td className="p-1">
-                    <span className="font-bold text-text">Gastos</span>
+                    <span className="font-bold text-text">Gastos de caja</span>
                   </td>
                   <td className="p-1 text-right">
                     <span className="font-bold text-danger whitespace-nowrap">
