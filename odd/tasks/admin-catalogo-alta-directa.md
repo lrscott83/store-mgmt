@@ -75,3 +75,13 @@ L3 (2026-10-26, implementación, evidencia):
 - Verificación observada: `dotnet build src/SMCA.sln` Build succeeded; `AdminCatalogCreate` 7/7;
   regresión `AdminWebCatalog|AdminCatalogImport` 22/22; Vitest 66/66 (nuevos + vista existente);
   `pnpm typecheck` 5/5; `pnpm lint` 4/4. E2E existentes sin tocar.
+
+L4 (2026-10-26, instrucción del owner, verbatim):
+> "elimina ese test, solamente esto es para la vista del SuperAdmin, en la vista del owner no tienes que hacer ningun cambio. Entendido?????????????"
+
+- La vista del SuperAdmin oculta el bloque de sincronización (botón "Sincronizar Catálogo" y
+  "Última sincronización"); el dueño conserva ambos sin cambios. El aviso de "sin publicar" usa un
+  texto propio del admin que ya no menciona sincronizar.
+- Se eliminó el test **SCOPE-2** de `web-catalog.test.tsx` (afirmaba el botón en modo admin),
+  autorizado explícitamente por el owner. El test del dueño sobre el botón sigue intacto.
+- Verificación: Vitest 60/60 en los dos archivos tocados; `typecheck` 5/5; `lint` 4/4.
