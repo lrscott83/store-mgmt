@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Store } from '@store-mgmt/domain';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { Card } from '~/shared/components/ui/card';
 import { Spinner } from '~/shared/components/ui/spinner';
@@ -9,6 +8,7 @@ import {
   CatalogSourceKind,
   catalogStatsHttpService,
   type CatalogStats,
+  type CatalogStatsOverview,
 } from '../lib/services/catalog-stats-http-service';
 
 export const clientLoader = superAdminLoader;
@@ -39,63 +39,92 @@ function formatDay(value: string, locale: string): string {
 
 export function AdminCatalogStatsPage() {
   const { formatMessage, locale } = useIntl();
-  const [stores, setStores] = useState<Store[]>([]);
+  // `''` es la vista GENERAL: el agregado de todas las tiendas.
   const [storeId, setStoreId] = useState('');
   const [days, setDays] = useState<number>(30);
-  const [stats, setStats] = useState<CatalogStats | null>(null);
+  const [overview, setOverview] = useState<CatalogStatsOverview | null>(null);
+  const [storeStats, setStoreStats] = useState<CatalogStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
-  const requestId = useRef(0);
+  const overviewRequest = useRef(0);
+  const storeRequest = useRef(0);
+  // Dos lecturas corren en paralelo al cambiar el periodo; el spinner se apaga cuando terminan las dos.
+  const pending = useRef(0);
 
-  useEffect(() => {
-    let active = true;
-    void catalogStatsHttpService
-      .listStores()
-      .then((result) => {
-        if (!active) return;
-        if (!result.succeeded) {
-          setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
-          return;
-        }
-        setStores(result.data);
-        if (result.data.length > 0) setStoreId((current) => current || result.data[0].id);
-      })
-      .catch(() => {
-        if (active) setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
-      });
-    return () => {
-      active = false;
-    };
-  }, [formatMessage]);
+  const begin = useCallback(() => {
+    pending.current += 1;
+    setLoading(true);
+  }, []);
 
-  const loadStats = useCallback(
-    async (selectedStoreId: string, range: number) => {
-      const currentRequest = ++requestId.current;
-      setLoading(true);
+  const end = useCallback(() => {
+    pending.current = Math.max(0, pending.current - 1);
+    if (pending.current === 0) setLoading(false);
+  }, []);
+
+  const loadOverview = useCallback(
+    async (range: number) => {
+      const current = ++overviewRequest.current;
+      begin();
       setError(undefined);
       try {
-        const result = await catalogStatsHttpService.getStats(selectedStoreId, range);
-        if (currentRequest !== requestId.current) return;
+        const result = await catalogStatsHttpService.getOverview(range);
+        if (current !== overviewRequest.current) return;
         if (result.succeeded) {
-          setStats(result.data);
+          setOverview(result.data);
         } else {
-          setStats(null);
+          setOverview(null);
           setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
         }
       } catch (err) {
-        if (currentRequest !== requestId.current) return;
-        setStats(null);
+        if (current !== overviewRequest.current) return;
+        setOverview(null);
         setError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
       } finally {
-        if (currentRequest === requestId.current) setLoading(false);
+        if (current === overviewRequest.current) end();
       }
     },
-    [formatMessage],
+    [begin, end, formatMessage],
+  );
+
+  const loadStoreStats = useCallback(
+    async (selectedStoreId: string, range: number) => {
+      const current = ++storeRequest.current;
+      begin();
+      try {
+        const result = await catalogStatsHttpService.getStats(selectedStoreId, range);
+        if (current !== storeRequest.current) return;
+        if (result.succeeded) {
+          setStoreStats(result.data);
+        } else {
+          setStoreStats(null);
+          setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
+        }
+      } catch (err) {
+        if (current !== storeRequest.current) return;
+        setStoreStats(null);
+        setError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
+      } finally {
+        if (current === storeRequest.current) end();
+      }
+    },
+    [begin, end, formatMessage],
   );
 
   useEffect(() => {
-    if (storeId) void loadStats(storeId, days);
-  }, [storeId, days, loadStats]);
+    void loadOverview(days);
+  }, [days, loadOverview]);
+
+  useEffect(() => {
+    if (storeId) void loadStoreStats(storeId, days);
+  }, [storeId, days, loadStoreStats]);
+
+  // La selección solo vale si la tienda sigue teniendo visitas en el periodo vigente.
+  const selectedStore = overview?.stores.find((store) => store.storeId === storeId);
+  const effectiveStoreId = selectedStore ? storeId : '';
+  const stats = selectedStore ? storeStats : overview?.totals ?? null;
+  const storeName = selectedStore
+    ? selectedStore.name
+    : formatMessage({ id: 'ADMIN_CATALOG_STATS.ALL_STORES' });
 
   const maxDailyVisits = useMemo(
     () => Math.max(1, ...(stats?.daily.map((day) => day.visits) ?? [0])),
@@ -105,8 +134,6 @@ export function AdminCatalogStatsPage() {
     () => Math.max(1, ...(stats?.sources.map((source) => source.visits) ?? [0])),
     [stats],
   );
-
-  const selectedStore = stores.find((store) => store.id === storeId);
 
   return (
     <div className="space-y-6 p-4">
@@ -120,12 +147,13 @@ export function AdminCatalogStatsPage() {
             <span>{formatMessage({ id: 'ADMIN_CATALOG_STATS.STORE' })}</span>
             <select
               className="rounded border px-3 py-2"
-              value={storeId}
+              value={effectiveStoreId}
               onChange={(event) => setStoreId(event.target.value)}
               data-testid="catalog-stats-store"
             >
-              {stores.map((store) => (
-                <option key={store.id} value={store.id}>
+              <option value="">{formatMessage({ id: 'ADMIN_CATALOG_STATS.ALL_STORES' })}</option>
+              {overview?.stores.map((store) => (
+                <option key={store.storeId} value={store.storeId}>
                   {store.name}
                 </option>
               ))}
@@ -149,12 +177,13 @@ export function AdminCatalogStatsPage() {
       </Card>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && !error && stores.length === 0 && (
+      {loading && <Spinner label={formatMessage({ id: 'GENERAL.LOADING' })} />}
+
+      {!loading && !error && overview && overview.stores.length === 0 && (
         <p className="text-sm text-text-muted">
-          {formatMessage({ id: 'ADMIN_CATALOG_STATS.NO_STORES' })}
+          {formatMessage({ id: 'ADMIN_CATALOG_STATS.NO_STORES_WITH_VISITS' })}
         </p>
       )}
-      {loading && <Spinner label={formatMessage({ id: 'GENERAL.LOADING' })} />}
 
       {!loading && !error && stats && (
         <>
@@ -162,7 +191,7 @@ export function AdminCatalogStatsPage() {
             padding="tight"
             title={formatMessage(
               { id: 'ADMIN_CATALOG_STATS.SUMMARY_TITLE' },
-              { store: selectedStore?.name ?? '', days: stats.days },
+              { store: storeName, days: stats.days },
             )}
           >
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
