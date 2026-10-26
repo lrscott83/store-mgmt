@@ -69,6 +69,7 @@ export function TodayExpensesPage() {
           salePaymentMethod: data.salePaymentMethod,
           note: data.note,
           currency: data.currency,
+          fundSource: data.fundSource,
         })
       : // Angular parity: createExpense always uses `new Date()` — never a user-editable date.
         svc.create({
@@ -79,6 +80,7 @@ export function TodayExpensesPage() {
           salePaymentMethod: data.salePaymentMethod,
           note: data.note,
           currency: data.currency,
+          fundSource: data.fundSource,
         });
 
     if (!result.succeeded) {

@@ -1,4 +1,4 @@
-import { Result, SalePaymentMethod } from '@store-mgmt/domain';
+import { isCashDrawerExpense, Result, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Currency } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -12,6 +12,7 @@ import { resolveCurrency } from '~/shared/lib/currency-totals';
 import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { round2 } from '~/shared/lib/money';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import {
   CashClosingStatus,
   countedTotalOf,
@@ -30,9 +31,20 @@ export interface CashClosingDraft {
   readonly comment: string;
 }
 
-/** Esperado = apertura + efectivo de la venta del día (S7). Puro. */
-export function expectedTotalOf(openingCash: number, cashSalesTotal: number): number {
-  return round2(openingCash + cashSalesTotal);
+/**
+ * Esperado = apertura + efectivo de la venta del día − gastos pagados CON
+ * DINERO DE LA CAJA (S7, expense-fund-source 2026-10-24). Puro.
+ *
+ * Antes de `expense-fund-source`, el cierre no restaba ningún gasto: el cajero
+ * sacaba dinero del cajón y el arqueo lo reportaba como faltante. Solo los
+ * gastos `Caja` se restan; los `Externo` no tocaron el cajón.
+ */
+export function expectedTotalOf(
+  openingCash: number,
+  cashSalesTotal: number,
+  cashExpensesTotal = 0,
+): number {
+  return round2(openingCash + cashSalesTotal - cashExpensesTotal);
 }
 
 /** `counted − expected`, redondeado (S7/S8). Puro. */
@@ -43,6 +55,12 @@ export function differenceOf(countedTotal: number, expectedTotal: number): numbe
 /** Clave de un registro: un cierre por (día, moneda). */
 export function cashClosingId(dayKey: string, currency: Currency): string {
   return `${dayKey}|${currency}`;
+}
+
+/** Esperado y gastos de caja de un (día, moneda), calculados juntos. */
+export interface ExpectedBreakdown {
+  readonly expectedTotal: number;
+  readonly cashExpensesTotal: number;
 }
 
 /**
@@ -161,6 +179,61 @@ export class CashClosingOfflineService {
     return round2(total);
   }
 
+  /**
+   * Gastos del día pagados CON DINERO DE LA CAJA (todas las monedas), como
+   * entradas monetarias: alimenta el selector de moneda y la resta del Esperado
+   * (expense-fund-source, 2026-10-24). Solo `fundSource === Caja`: un gasto
+   * `Externo` (o un histórico sin el campo) nunca tocó el cajón.
+   */
+  getCashExpensesEntries(
+    dayKey: string,
+    storeId: string = this.storeId,
+  ): { amount: number; currency: Currency }[] {
+    const { start, end } = localDayRange(fromLocalDayKey(dayKey));
+    const expenses = new ExpenseOfflineService(storeId).getActiveExpensesBetween(start, end);
+    return expenses
+      .filter(isCashDrawerExpense)
+      .map((expense) => ({
+        amount: round2(expense.total),
+        currency: resolveCurrency(expense.currency),
+      }));
+  }
+
+  /** Gastos de caja del día en la moneda elegida (S7). */
+  getCashExpensesTotal(
+    dayKey: string,
+    currency: Currency,
+    storeId: string = this.storeId,
+  ): number {
+    const total = this.getCashExpensesEntries(dayKey, storeId)
+      .filter((entry) => entry.currency === currency)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    return round2(total);
+  }
+
+  /**
+   * Esperado + gastos de caja en UNA sola lectura (RDD R2-CLOSING-EXPENSES-RECOMPUTE):
+   * la vista muestra `cashExpensesTotal` y resta `expectedTotal`, así que ambos
+   * deben salir del mismo cálculo — si se pidieran por separado, la línea visible
+   * podría no coincidir con lo restado.
+   */
+  getExpectedBreakdown(
+    dayKey: string,
+    currency: Currency,
+    openingCash: number,
+    storeId: string = this.storeId,
+  ): ExpectedBreakdown {
+    const cashExpensesTotal = this.getCashExpensesTotal(dayKey, currency, storeId);
+    return {
+      expectedTotal: expectedTotalOf(
+        openingCash,
+        this.getCashSalesTotal(dayKey, currency, storeId),
+        cashExpensesTotal,
+      ),
+      cashExpensesTotal,
+    };
+  }
+
   /** Esperado para un (día, moneda) con la apertura indicada (S7). */
   getExpectedTotal(
     dayKey: string,
@@ -168,7 +241,7 @@ export class CashClosingOfflineService {
     openingCash: number,
     storeId: string = this.storeId,
   ): number {
-    return expectedTotalOf(openingCash, this.getCashSalesTotal(dayKey, currency, storeId));
+    return this.getExpectedBreakdown(dayKey, currency, openingCash, storeId).expectedTotal;
   }
 
   /**
@@ -188,12 +261,16 @@ export class CashClosingOfflineService {
     const now = new Date().toISOString();
     const denominations = this.normalizeDenominations(draft.denominations);
     const countedTotal = countedTotalOf(denominations);
-    const expectedTotal = this.getExpectedTotal(
+    const expected = this.getExpectedBreakdown(
       draft.dayKey,
       draft.currency,
       draft.openingCash,
       storeId,
     );
+    const expectedTotal = expected.expectedTotal;
+    // expense-fund-source (2026-10-24): se congela junto al Esperado para que
+    // el cierre cerrado sea auditable (cuánto del Esperado eran gastos de caja).
+    const cashExpensesTotal = expected.cashExpensesTotal;
 
     const record: CashClosing = {
       id,
@@ -205,6 +282,7 @@ export class CashClosingOfflineService {
       status: CashClosingStatus.Open,
       countedTotal,
       expectedTotal,
+      cashExpensesTotal,
       difference: differenceOf(countedTotal, expectedTotal),
       createdDate: existing?.createdDate ?? now,
       createdByName: existing?.createdByName ?? actor,

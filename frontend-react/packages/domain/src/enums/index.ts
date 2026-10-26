@@ -145,6 +145,30 @@ export enum ExpenseType {
 }
 
 /**
+ * expense-fund-source (2026-10-24): DE DÓNDE salió el dinero de un gasto.
+ *
+ * Es una dimensión ORTOGONAL al método de pago: `paymentType` /
+ * `salePaymentMethod` dicen CÓMO se pagó (efectivo, transferencia, Zelle);
+ * esto dice DE QUÉ dinero salió. Pagar en efectivo con dinero del dueño no es
+ * lo mismo que pagar en efectivo con lo recaudado en el POS — confundirlos es
+ * lo que descuadraba el arqueo.
+ *
+ * Enum CONGELADO por valor desde el día 1 (misma regla que `Currency` y
+ * `SalePaymentMethod`): la serialización es el número. `Caja = 0` es el valor
+ * "activo" (descuenta la caja), por eso el default es `Externo = 1` y no al
+ * revés: un gasto histórico sin el campo NUNCA debe descontar la caja.
+ */
+export enum ExpenseFundSource {
+  /** Salió del efectivo recaudado en el POS (caja del día). */
+  Caja = 0,
+  /** Salió de fuera del POS: bolsillo del dueño, banco, capital. */
+  Externo = 1,
+}
+
+/** Default de todo gasto con origen ausente: no toca la caja. */
+export const DEFAULT_EXPENSE_FUND_SOURCE: ExpenseFundSource = ExpenseFundSource.Externo;
+
+/**
  * currency-in-costs-and-prices (plan 2026-09-16): moneda de los precios y
  * costos del negocio de la tienda (orders, products, expenses, credits,
  * inventory, warehouses). Espejo por VALOR del enum C# `Domain.Common.Enums.Currency`
