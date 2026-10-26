@@ -101,3 +101,5 @@ L14 (cierre de los advisories, 2026-10-26, pedido del usuario: "dale con todo lo
 
 
 
+
+L15 (RDD del slice de cierre, 2026-10-26). ssess --base-ref cc876299 --committed-only → isk: medium, eview_due: false, eview_due_reason: under_budget, 4 paths / 189 líneas. Candidato bajo presupuesto: no abre revisión y queda pendiente en la rebanada, según el contrato.
