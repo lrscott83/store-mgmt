@@ -40,6 +40,12 @@ Corregido en `0344434f` y `538128e5`: clave propia (`SiteTelemetry:Salt`), sin f
 - `R1-1`/`R3-003`: sin política de retención para `SiteEvent`.
 - `R1-2`: el contrato "append-only" es solo documentación; el repositorio expone update/delete.
 
+### Clave de hash en el código (decisión de producto, 2026-10-26)
+
+A petición explícita, la telemetría dejó de leer configuración: `Application.Common.Telemetry.TelemetryHashKey` es una constante `internal` compartida por el sitio y el catálogo. Se eliminaron `SiteTelemetry:Salt`, `CatalogTelemetry:Salt`, el fallback a `Jwt:SecretKey` y la entrada en `appsettings.Tests.json`.
+
+El review de ese cambio volvió a marcarlo **CRITICAL** (`R1-hardcoded-anonymization-key`): con la clave en el repositorio, un deploy que antes configuraba un salt pierde la propiedad de no-reproducibilidad, y quien tenga el código y la tabla puede revertir las huellas sobre IPv4 + User-Agent. El usuario **aceptó el riesgo explícitamente**; la revisión se abandonó con registro de auditoría (`review/abandon`, `operator_disposition`) y sin recibo de aprobación.
+
 ## Tasks
 
 - **T1** ✅ Dominio + infraestructura + migración `20261026183144_Add-SiteEvents` + script `41-20261026-Add-SiteEvents.sql` (generado con `dotnet ef migrations script` desde la migración anterior, con guard `ON CONFLICT` y verificación). inline.
