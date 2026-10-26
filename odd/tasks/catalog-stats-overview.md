@@ -60,6 +60,17 @@ Se añadió también a la E2E la invariante que pide el usuario: `Totals.Visits 
 
 L9 (RDD, 2026-10-26). `gentle-ai review mode status` → `receipt-driven development: on (decided by global)`. `gentle-ai review assess --base-ref 1d4735cb^ --committed-only` sobre `b49fc781` → `risk: medium`, `review_due: false`, `review_due_reason: under_budget`, 14 paths / 1085 líneas cambiadas. Per el contrato de RDD, un candidato bajo presupuesto no abre revisión: la rebanada queda pendiente hasta que un commit posterior alcance el presupuesto. Nada que ackear.
 
+L10 (RDD forzado, 2026-10-26, pedido explícito del usuario: "fuerzala"). Consentimiento `granted` relatado en un prompt bloqueante; START con 2 lentes (`review-resilience`, `review-reliability`) sobre 14 archivos / 1088 líneas, línea `review-98c6397b71076614`, target `sha256:bcc8e842…b91b383`. Resultado: **approved**, autoridad quemada (`review/acknowledge-approved`, revisión `sha256:d21629f6…`, `authority: burned`). Cero correcciones: los 10 hallazgos son **advisories informativos**.
+- R4-001 / R3-4: el barrido global no tiene cota, ni índice líder por fecha, ni instrumentación (ya registrado como L4).
+- R4-002: si una petición nunca resuelve, el contador de pendientes mantiene el spinner (no hay timeout/abort en esa ruta).
+- R4-003: un fallo del overview deja sin KPIs, sin selector y sin selección a la vez (una sola lectura).
+- R4-004: el conteo global de pedidos no acepta `CancellationToken`.
+- R3-1: el test de ventana compara contra `DateTime.UtcNow.Date` en el assert (falla si cruza medianoche UTC).
+- R3-2: las consultas del agregado no comparten transacción, así que `Totals.Visits == Stores.Sum(Visits)` puede diferir con escrituras concurrentes.
+- R3-3: `IgnoreQueryFilters` en el conteo global de pedidos desactiva todos los filtros, no solo el de tienda.
+- R3-5 / R3-6: sin cobertura de orden multi-tienda ni del camino positivo de persistencia de la selección.
+
+
 
 
 
