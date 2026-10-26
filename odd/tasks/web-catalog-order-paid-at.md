@@ -21,10 +21,10 @@ Branch: `feat/online-order-paid-at` (base `dev`). Delivery: single work unit. Ru
 
 | ID | Specs | Route | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| T1 | S1, S2 | inline | done | RED observed, then GREEN: `UpdateOrderPaymentStatusCommandHandlerTests` + `UpdateOrderStatusCommandHandlerTests` |
-| T2 | S3 | inline | done | migration + generated script |
-| T3 | S4 | inline | done | DTOs, mappings, frontend mirror + modal |
-| T4 | S5 | inline | done | focused suites green |
+| T1 | S1, S2 | inline | done | RED observed (`PaidAt` null in 2 tests) → GREEN: 53/53 in `UpdateOrderPaymentStatusCommandHandlerTests` + `UpdateOrderStatusCommandHandlerTests` |
+| T2 | S3 | inline | done | migration `20261026150500_Add-Order-PaidAt`, applied to `smca_test`; script `41-20261026-Add-Order-PaidAt.sql` generated with `-From 20261021231114_Add-OrderSalesManager-Attribution` and patched (header, `ON CONFLICT`, verification, rollback) |
+| T3 | S4 | inline | done | DTOs + both mappings; frontend mirror, modal row and `ORDERING_ORDERS.COL_PAID_AT`; 2/2 modal tests |
+| T4 | S5 | inline | done | `dotnet build backend/src/SMCA.sln` 0 errors; Application.Tests 1528/1528; touched vitest files 54/54 |
 
 ## Log
 
@@ -32,3 +32,7 @@ Branch: `feat/online-order-paid-at` (base `dev`). Delivery: single work unit. Ru
 - **L2**: Scope read — the web-catalog order is `Domain.Entities.Orders.Order` created by `PublicOrderingController` / `CreateOnlineOrderCommand`; payment is the independent `PaymentStatus` axis (D3/D12), changed only by `Order.ChangePaymentStatus`.
 - **L3**: Design decision — `PaidAt` is cleared when the payment returns to `Pending` (the codebase treats that move as a correction, not a new payment). Re-marking an already-paid order preserves the first date.
 - **L4**: Assumption A1 — the owner sees the date in the order detail modal; the column alone is not "constancia" in the UI.
+- **L5**: Work unit `19a53e97` (base `466ae8a8`). Independent verifier: PASS, no blockers, verdict S1-S5 met. Advisories (non-blocking): (a) modal copy is "Fecha de pago" instead of the doc's paraphrase "Pagado el"; (b) two of the new tests compared dates without asserting non-null first — corrected by adding `Should().NotBeNull()` before each comparison; (c) no backfill for orders paid before the migration (deliberate: the moment was never recorded); (d) EF schema scripts are not re-runnable beyond the history insert, as the rest of the repo.
+- **L6**: RDD `assess` on `466ae8a8..19a53e97`: tier `medium` (`executable_change` on the SQL script), `review_due: false`, `review_due_reason: under_budget`. No native review started; the independent verifier covered the high-risk item (migration).
+- **L7**: Pre-existing environment issue, NOT caused by this change: `frontend-react/packages/domain/dist` is stale (2026-07-16) and lacks `ExpenseFundSource` / `isCashDrawerExpense`, so the fund-source / multistore / cash-closing / today-stats / cuadre suites (21 files, 83 tests) fail and `typecheck` reports errors only in those areas. Touched ordering files have zero type errors.
+- **L8**: Migration applied to the real `smca_test` database (`dotnet ef database update`); E2E not run (no E2E covers the payment-update endpoint, and existing E2E files are untouchable, so adding one was out of proportion for a nullable column).
