@@ -240,7 +240,7 @@ public class AssignOrderDriverCommandHandlerTests
         DeliveryDriver driver = ActiveDriver();
         Order order = OrderFor(OrderDeliveryType.Delivery);
         order.Status = OrderStatus.Preparado;
-        order.PaymentStatus = OrderPaymentStatus.Pending;
+        order.ChangePaymentStatus(OrderPaymentStatus.Pending);
         Returns(order);
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);

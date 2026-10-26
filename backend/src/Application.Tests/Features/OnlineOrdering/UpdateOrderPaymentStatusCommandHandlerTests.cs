@@ -60,7 +60,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
             _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
-        order.PaymentStatus = paymentStatus;
+        order.ChangePaymentStatus(paymentStatus);
         order.Status = status;
         return order;
     }

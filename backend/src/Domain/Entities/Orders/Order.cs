@@ -48,7 +48,12 @@ namespace Domain.Entities.Orders
         /// <summary>Estado del pedido online (D11). El POS nunca lo mueve.</summary>
         public OrderStatus Status { get; set; } = OrderStatus.Creado;
         /// <summary>Pago manual Pendiente/Paid (D3/D12), independiente de <see cref="Status"/>.</summary>
-        public OrderPaymentStatus PaymentStatus { get; set; } = OrderPaymentStatus.Pending;
+        /// <remarks>
+        /// Setter privado a propósito: el pago solo se mueve por <see cref="ChangePaymentStatus"/>,
+        /// que es la puerta que además sella o borra <see cref="PaidAt"/>. Con un setter público,
+        /// una asignación directa dejaría la fecha mintiendo sin que nada fallara.
+        /// </remarks>
+        public OrderPaymentStatus PaymentStatus { get; private set; } = OrderPaymentStatus.Pending;
         /// <summary>
         /// Momento (UTC) en que el pedido quedó pagado, o null si sigue pendiente. Es la constancia
         /// del pago: la escribe SOLO <see cref="ChangePaymentStatus"/>, que además la borra al
@@ -182,10 +187,15 @@ namespace Domain.Entities.Orders
         /// <param name="next">Estado de destino.</param>
         /// <param name="driverId">Repartidor. Obligatorio con <see cref="OrderStatus.Transportando"/>.</param>
         /// <param name="cancellationReason">Razón. Obligatoria con <see cref="OrderStatus.Cancelado"/>.</param>
+        /// <param name="clock">
+        /// Reloj con el que se sella <see cref="PaidAt"/> al entregar. null = reloj del sistema; los
+        /// tests pasan uno fijo para que la fecha sea afirmable sin ventanas de tiempo real.
+        /// </param>
         public void ChangeStatus(
             OrderStatus next,
             Guid? driverId = null,
-            string? cancellationReason = null)
+            string? cancellationReason = null,
+            TimeProvider? clock = null)
         {
             if (!AllowedTransitionsFrom(Status, DeliveryType).Contains(next))
                 throw new InvalidOrderStatusTransitionException(Status, next);
@@ -219,7 +229,7 @@ namespace Domain.Entities.Orders
             // dejar en Pending por descuido. Pasa por la MISMA puerta que el pago manual, así que
             // el cobro deja también su constancia (`PaidAt`).
             if (next == OrderStatus.Entregado)
-                ChangePaymentStatus(OrderPaymentStatus.Paid);
+                ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
         }
 
         /// <summary>
@@ -253,7 +263,11 @@ namespace Domain.Entities.Orders
         /// <see cref="OrderPaymentStatus.Pending"/>. Un segundo "pagado" sobre un pedido que ya lo
         /// estaba conserva la fecha (la del primer cobro) en vez de moverla.
         /// </summary>
-        public void ChangePaymentStatus(OrderPaymentStatus next)
+        /// <param name="next">Pago de destino.</param>
+        /// <param name="clock">
+        /// Reloj con el que se sella la fecha. null = reloj del sistema; los tests pasan uno fijo.
+        /// </param>
+        public void ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
         {
             if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
                 throw new DeliveredOrderCannotBeUnpaidException();
@@ -261,7 +275,7 @@ namespace Domain.Entities.Orders
             if (next == OrderPaymentStatus.Paid)
             {
                 if (PaymentStatus != OrderPaymentStatus.Paid)
-                    PaidAt = DateTime.UtcNow;
+                    PaidAt = (clock ?? TimeProvider.System).GetUtcNow().UtcDateTime;
             }
             else if (next == OrderPaymentStatus.Pending)
             {

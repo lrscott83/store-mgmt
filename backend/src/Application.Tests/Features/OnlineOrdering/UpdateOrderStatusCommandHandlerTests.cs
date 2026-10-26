@@ -261,7 +261,7 @@ public class UpdateOrderStatusCommandHandlerTests
     public async Task Handle_WithANonDeliveringTransition_ShouldNotTouchThePaymentStatus()
     {
         Order order = OrderIn(OrderStatus.Creado);
-        order.PaymentStatus = OrderPaymentStatus.Pending;
+        order.ChangePaymentStatus(OrderPaymentStatus.Pending);
         Returns(order);
 
         await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);

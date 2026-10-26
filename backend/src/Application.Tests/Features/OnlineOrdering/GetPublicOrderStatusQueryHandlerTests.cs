@@ -81,8 +81,8 @@ public class GetPublicOrderStatusQueryHandlerTests
             [new OrderLine(Guid.NewGuid(), "Arroz", 2, 100m, Currency.CUP)],
             deliveryAddress: "Calle 23 #45",
             notes: "Tocar el timbre");
+        order.ChangePaymentStatus(paymentStatus);
         order.Status = status;
-        order.PaymentStatus = paymentStatus;
         return order;
     }
 

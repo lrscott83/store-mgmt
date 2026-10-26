@@ -74,7 +74,10 @@ describe('OrderDetailModal — paid date', () => {
     );
 
     await waitFor(() => expect(screen.getByText('PED-1')).toBeTruthy());
-    expect(screen.getByText('Fecha de pago')).toBeTruthy();
+    const label = screen.getByText('Fecha de pago');
+    expect(label.nextElementSibling?.textContent).toBe(
+      new Date('2026-10-26T15:05:00Z').toLocaleString('es-ES'),
+    );
   });
 
   it('shows no paid date while the order is pending', async () => {

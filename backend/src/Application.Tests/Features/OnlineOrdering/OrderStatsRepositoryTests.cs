@@ -73,8 +73,8 @@ public class OrderStatsRepositoryTests
     {
         Order order = Domain.Entities.Orders.Order.Create(
             storeId, OrderType.WhatsApp, string.Empty, total, 1, date, tenantId);
+        order.ChangePaymentStatus(paymentStatus);
         order.Status = status;
-        order.PaymentStatus = paymentStatus;
         order.DeliveryType = deliveryType;
         order.Currency = currency;
         return order;
