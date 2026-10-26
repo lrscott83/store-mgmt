@@ -83,6 +83,11 @@ L12 (ejecución de L11). Se descartó el plan anterior (acotar la ventana / SQL 
 - Frontend: un fallo transitorio conserva el último overview bueno (KPIs, selector y selección) (R4-003); el efecto de selección vuelve a limpiar solo cuando un overview exitoso ya no trae la tienda (A1); el timeout de 30 s del `api-client` ya libera el contador de pendientes (R4-002, sin código).
 - R4-001: el barrido ya no materializa filas y cada día usa el índice. No se añade telemetría porque la capa Application no tiene logging y añadir la dependencia por una línea queda fuera de este cambio.
 
+L13 (revisión RDD del slice nuevo, 2026-10-26). El primer candidato (`8edf1744..f280d182`, 267 líneas) se pasó del presupuesto de contexto del reviewer (`lens_context_budget_exceeded`) porque el `*.Designer.cs` generado pesa ~3876 líneas. Se reordenaron los commits para que la migración generada quede ANTES del slice revisado: `e29a4226` (migración + script) → `5ced6897` (código backend) → `f280d182` (frontend + doc).
+El reviewer levantó 2 CRITICAL del recorte, no del código: el índice aparecía sin su migración dentro de la ventana y el escenario multi-tienda estaba dentro de un E2E que ya existía en la base. Corrección (`5c1f532a`, 93 líneas declaradas): el escenario multi-tienda pasa a `CatalogOverviewStatsMultiStoreE2ETests.cs`, `CatalogOverviewStatsE2ETests.cs` vuelve byte por byte a la versión de `e29a4226`, y la configuración del índice nombra su migración y su script. Revisión final: **approved** (linaje `review-e5c2738dc11973c7`, autoridad quemada), sin correcciones adicionales.
+Advisories informativos de esa revisión: (a) el cambio de filtro del conteo global de pedidos no tiene test que lo fije; (b) el bucle por día añade N round-trips secuenciales dentro del snapshot (tradeoff elegido a propósito); (c) no hay test de frontera entre días ni del corte del último día en `toUtc`; (d) retener el último overview bueno puede dejar los KPIs en el periodo anterior mientras el drill-down ya pide el nuevo, bajo el banner de error.
+
+
 
 
 
