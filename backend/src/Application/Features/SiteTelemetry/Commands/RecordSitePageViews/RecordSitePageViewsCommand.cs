@@ -46,7 +46,7 @@ namespace Application.Features.SiteTelemetry.Commands.RecordSitePageViews
         private readonly ISiteEventRepository _siteEventRepository;
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
-        private readonly string _telemetrySalt;
+        private readonly string? _telemetrySalt;
 
         public RecordSitePageViewsCommandHandler(
             ISiteEventRepository siteEventRepository,
@@ -57,9 +57,11 @@ namespace Application.Features.SiteTelemetry.Commands.RecordSitePageViews
             _siteEventRepository = siteEventRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
-            _telemetrySalt = configuration["CatalogTelemetry:Salt"]
-                ?? configuration["Jwt:SecretKey"]
-                ?? "catalog-telemetry";
+            // La clave es REQUERIDA. Sin ella, el hash del visitante sería adivinable sobre el
+            // espacio IPv4 + el diccionario de User-Agents, y la tabla dejaría de ser anónima.
+            // Nunca se cae al secreto de firma del JWT ni a una constante del repositorio: si
+            // falta, la ingesta falla en voz alta (ver `Handle`).
+            _telemetrySalt = configuration["SiteTelemetry:Salt"] ?? configuration["CatalogTelemetry:Salt"];
         }
 
         public async Task<ResponseResult<bool>> Handle(RecordSitePageViewsCommand request,
@@ -71,6 +73,11 @@ namespace Application.Features.SiteTelemetry.Commands.RecordSitePageViews
             if (CatalogBotDetector.IsBot(request.UserAgent))
                 return ResponseResult.Success(false);
 
+            // Fail-closed: sin clave de anonimización no se escribe NADA. Guardar un hash con una
+            // clave adivinable sería peor que no tener telemetría.
+            if (string.IsNullOrWhiteSpace(_telemetrySalt))
+                throw new InvalidOperationException(
+                    "Falta SiteTelemetry:Salt (o CatalogTelemetry:Salt): sin clave la telemetría no puede anonimizar.");
             DateTime now = DateTime.UtcNow;
             string ipAddress = _httpContextService.IPAddress;
             string visitorHash = SiteTelemetryHash.Visitor(ipAddress, request.UserAgent, now, _telemetrySalt);
