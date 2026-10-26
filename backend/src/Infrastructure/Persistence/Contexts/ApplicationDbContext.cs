@@ -36,6 +36,7 @@ using Domain.Entities.StoreUsages;
 using Domain.Entities.Plans;
 using Domain.Entities.CatalogEvents;
 using Domain.Entities.SalesManagers;
+using Domain.Entities.SiteTelemetry;
 using Domain.Entities.ProductSalesCommissions;
 using Domain.Entities.OrderSalesCommissions;
 using Domain.Entities.OrderSalesManagers;
@@ -158,6 +159,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new NotificationEntityTypeConfiguration());
             builder.ApplyConfiguration(new StoreCatalogSettingsEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreCatalogImageEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new SiteEventEntityTypeConfiguration());
             builder.ApplyConfiguration(new DeliveryDriverEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new CatalogEventEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new SalesManagerEntityTypeConfiguration(this));
@@ -187,6 +189,8 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StoreCatalogSettings> StoreCatalogSettings { get; set; }
         internal DbSet<StoreCatalogImage> StoreCatalogImage { get; set; }
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
+
+        internal DbSet<SiteEvent> SiteEvent { get; set; }
         internal DbSet<CatalogEvent> CatalogEvent { get; set; }
         internal DbSet<SalesManager> SalesManager { get; set; }
         internal DbSet<ProductSalesCommission> ProductSalesCommission { get; set; }
