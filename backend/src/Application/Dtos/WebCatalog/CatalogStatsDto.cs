@@ -38,4 +38,19 @@ namespace Application.Dtos.WebCatalog
     public sealed record CatalogProductStatsDto(Guid ProductId, string Name, int Views);
 
     public sealed record CatalogDayStatsDto(DateTime Day, int Visits);
+
+    /// <summary>
+    /// Panel GENERAL del catálogo: el mismo contrato de una tienda agregado para todas
+    /// (`Totals`), más la lista de tiendas con visitas en el periodo (la que alimenta el selector).
+    /// Composición en vez de herencia porque `CatalogStatsDto` es la forma cerrada de una tienda.
+    /// </summary>
+    public sealed class CatalogStatsOverviewDto
+    {
+        public CatalogStatsDto Totals { get; init; } = new();
+
+        /// <summary>Solo tiendas con visitas en el periodo, ordenadas por visitas descendente.</summary>
+        public IReadOnlyList<CatalogStoreStatsDto> Stores { get; init; } = [];
+    }
+
+    public sealed record CatalogStoreStatsDto(Guid StoreId, string Name, int Visits);
 }

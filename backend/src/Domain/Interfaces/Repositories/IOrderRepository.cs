@@ -86,6 +86,12 @@ namespace Domain.Interfaces.Repositories
         /// conversión del catálogo: no cuenta ventas del POS ni pedidos de otro tipo.
         /// </summary>
         Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc);
+
+        /// <summary>
+        /// Pedidos ONLINE (OrderType.WhatsApp) de TODAS las tiendas en un rango. Numerador de la
+        /// conversión del panel general; mismo criterio que la sobrecarga por tienda.
+        /// </summary>
+        Task<int> CountOnlineOrdersAsync(DateTime fromUtc, DateTime toUtc);
     }
 
     /// <summary>
