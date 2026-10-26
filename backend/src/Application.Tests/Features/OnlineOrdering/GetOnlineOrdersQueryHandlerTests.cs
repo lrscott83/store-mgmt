@@ -126,7 +126,7 @@ public class GetOnlineOrdersQueryHandlerTests
         order.Total = 1500m;
         order.Currency = Currency.USD;
         order.Status = OrderStatus.Preparado;
-        order.PaymentStatus = OrderPaymentStatus.Paid;
+        order.ChangePaymentStatus(OrderPaymentStatus.Paid);
         order.DriverId = driver.Id;
         order.Driver = driver;
         Returns(order);
@@ -144,6 +144,7 @@ public class GetOnlineOrdersQueryHandlerTests
         item.Currency.Should().Be(Currency.USD);
         item.Status.Should().Be(OrderStatus.Preparado);
         item.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
+        item.PaidAt.Should().Be(order.PaidAt);
         item.DriverId.Should().Be(driver.Id);
         item.DriverName.Should().Be("Ana");
         item.Date.Should().Be(order.Date);

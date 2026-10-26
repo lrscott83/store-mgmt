@@ -584,6 +584,7 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.COL_TOTAL': 'Total',
   'ORDERING_ORDERS.COL_STATUS': 'Estado',
   'ORDERING_ORDERS.COL_PAYMENT': 'Pago',
+  'ORDERING_ORDERS.COL_PAID_AT': 'Fecha de pago',
   'ORDERING_ORDERS.COL_DRIVER': 'Repartidor',
   'ORDERING_ORDERS.COL_DATE': 'Fecha',
   'ORDERING_ORDERS.STATUS_CREADO': 'Creado',

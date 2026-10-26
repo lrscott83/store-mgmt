@@ -192,6 +192,7 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
             Currency = order.Currency,
             Status = order.Status,
             PaymentStatus = order.PaymentStatus,
+            PaidAt = order.PaidAt,
             DriverId = order.DriverId,
             DriverName = order.Driver?.Name,
             Date = order.Date,

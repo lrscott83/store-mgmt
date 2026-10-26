@@ -49,6 +49,14 @@ namespace Domain.Entities.Orders
         public OrderStatus Status { get; set; } = OrderStatus.Creado;
         /// <summary>Pago manual Pendiente/Paid (D3/D12), independiente de <see cref="Status"/>.</summary>
         public OrderPaymentStatus PaymentStatus { get; set; } = OrderPaymentStatus.Pending;
+        /// <summary>
+        /// Momento (UTC) en que el pedido quedó pagado, o null si sigue pendiente. Es la constancia
+        /// del pago: la escribe SOLO <see cref="ChangePaymentStatus"/>, que además la borra al
+        /// volver a <see cref="OrderPaymentStatus.Pending"/> —un pedido pendiente no puede
+        /// conservar la fecha de un pago que ya no tiene— y NO la mueve si el pedido ya estaba
+        /// pagado, para que la fecha sea la del primer cobro y no la de un segundo clic.
+        /// </summary>
+        public DateTime? PaidAt { get; private set; }
         /// <summary>Nombre de quien pide. null en las ventas del POS.</summary>
         public string? CustomerName { get; set; }
         /// <summary>Teléfono de quien pide. null en las ventas del POS.</summary>
@@ -208,9 +216,10 @@ namespace Domain.Entities.Orders
             Status = next;
 
             // Entregar equivale a haber cobrado: el pago deja de ser un eje que alguien pueda
-            // dejar en Pending por descuido.
+            // dejar en Pending por descuido. Pasa por la MISMA puerta que el pago manual, así que
+            // el cobro deja también su constancia (`PaidAt`).
             if (next == OrderStatus.Entregado)
-                PaymentStatus = OrderPaymentStatus.Paid;
+                ChangePaymentStatus(OrderPaymentStatus.Paid);
         }
 
         /// <summary>
@@ -238,11 +247,26 @@ namespace Domain.Entities.Orders
         /// <see cref="OrderStatus.Creado"/> puede estar pagado por adelantado—, con UNA excepción:
         /// un pedido <see cref="OrderStatus.Entregado"/> ya está pagado por definición, así que
         /// devolverlo a <see cref="OrderPaymentStatus.Pending"/> sería contradecir la entrega.
+        ///
+        /// Es también la ÚNICA puerta de <see cref="PaidAt"/>: sellar al entrar en
+        /// <see cref="OrderPaymentStatus.Paid"/> y borrar al volver a
+        /// <see cref="OrderPaymentStatus.Pending"/>. Un segundo "pagado" sobre un pedido que ya lo
+        /// estaba conserva la fecha (la del primer cobro) en vez de moverla.
         /// </summary>
         public void ChangePaymentStatus(OrderPaymentStatus next)
         {
             if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
                 throw new DeliveredOrderCannotBeUnpaidException();
+
+            if (next == OrderPaymentStatus.Paid)
+            {
+                if (PaymentStatus != OrderPaymentStatus.Paid)
+                    PaidAt = DateTime.UtcNow;
+            }
+            else if (next == OrderPaymentStatus.Pending)
+            {
+                PaidAt = null;
+            }
 
             PaymentStatus = next;
         }

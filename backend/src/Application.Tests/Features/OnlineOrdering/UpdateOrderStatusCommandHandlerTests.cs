@@ -186,6 +186,25 @@ public class UpdateOrderStatusCommandHandlerTests
         order.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
     }
 
+    /// <summary>
+    /// Entregar paga el pedido, y ese pago es el que deja la constancia: la fecha de cobro se
+    /// escribe por la MISMA puerta que el pago manual, no por una rama paralela del estado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ToEntregado_ShouldStampThePaidMoment()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Pickup);
+        Returns(order);
+        DateTime before = DateTime.UtcNow;
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado),
+            CancellationToken.None);
+
+        order.PaidAt.Should().NotBeNull();
+        order.PaidAt!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
     [Fact]
     public async Task Handle_WithAValidTransition_ShouldReturnSuccess()
     {

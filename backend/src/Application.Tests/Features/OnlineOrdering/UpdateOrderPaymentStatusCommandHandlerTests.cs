@@ -100,6 +100,65 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         order.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
     }
 
+    /// <summary>
+    /// Marcar pagado deja la constancia: la fecha del cobro, en UTC. Se comprueba la ventana y no
+    /// un valor exacto porque el reloj lo pone el dominio, no el test.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FromPendingToPaid_ShouldStampThePaidMoment()
+    {
+        Order order = OrderWith(OrderPaymentStatus.Pending);
+        Returns(order);
+        DateTime before = DateTime.UtcNow;
+
+        await Handler().Handle(
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+
+        order.PaidAt.Should().NotBeNull();
+        order.PaidAt!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// Marcar pagado dos veces NO reescribe la fecha: la constancia es la del primer cobro, y un
+    /// segundo clic (o un reintento del panel) no puede moverla.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MarkingAnAlreadyPaidOrderAgain_ShouldKeepTheOriginalPaidMoment()
+    {
+        Order order = OrderWith(OrderPaymentStatus.Pending);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+        DateTime? firstPaidAt = order.PaidAt;
+        firstPaidAt.Should().NotBeNull();
+
+        await Handler().Handle(
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+
+        order.PaidAt.Should().Be(firstPaidAt);
+    }
+
+    /// <summary>
+    /// Volver a pendiente deshace el pago, así que la fecha no puede quedarse: un pedido pendiente
+    /// con fecha de cobro es una contradicción que la vista mostraría tal cual.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FromPaidToPending_ShouldClearThePaidMoment()
+    {
+        Order order = OrderWith(OrderPaymentStatus.Pending);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+        order.PaidAt.Should().NotBeNull();
+
+        await Handler().Handle(
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Pending), CancellationToken.None);
+
+        order.PaidAt.Should().BeNull();
+    }
+
     [Fact]
     public async Task Handle_WithAValidPaymentStatus_ShouldReturnSuccess()
     {
