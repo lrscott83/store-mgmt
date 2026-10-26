@@ -58,5 +58,8 @@ L8 (verificación independiente, 2026-10-26). El verifier confirmó S1–S7 cump
 Se añadieron 4 tests de regresión a la página (11 total). **A2**: la suite E2E de catálogo es sensible al estado compartido; en esta sesión volvió a dar 90/90 verde después de esperar 3 s y matar `testhost`, y la clase nueva pasa 2/2 aislada. La cifra de L5 no es reproducible al 100% por esa razón, no por el cambio.
 Se añadió también a la E2E la invariante que pide el usuario: `Totals.Visits == Stores.Sum(Visits)` ("es una suma") y el clamp de ventana por HTTP.
 
+L9 (RDD, 2026-10-26). `gentle-ai review mode status` → `receipt-driven development: on (decided by global)`. `gentle-ai review assess --base-ref 1d4735cb^ --committed-only` sobre `b49fc781` → `risk: medium`, `review_due: false`, `review_due_reason: under_budget`, 14 paths / 1085 líneas cambiadas. Per el contrato de RDD, un candidato bajo presupuesto no abre revisión: la rebanada queda pendiente hasta que un commit posterior alcance el presupuesto. Nada que ackear.
+
+
 
 
