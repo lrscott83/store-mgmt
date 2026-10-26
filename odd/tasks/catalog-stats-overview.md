@@ -24,7 +24,7 @@ S7. Sin cambios de esquema ni migraciones. No se toca ningún E2E existente: la 
 | ID | Specs | Route | Status |
 | --- | --- | --- | --- |
 | T1 | S4, S5 | inline | done — `GetOverviewStatsAsync` + overload global de pedidos; `1d4735cb` |
-| T2 | S4, S5, S6 | inline | done — query, DTOs, endpoint y helpers compartidos; per-tienda intacto; `1d4735cb` |
+| T2 | S4, S5, S6 | inline | done — query, DTOs, endpoint; per-tienda restaurado a su forma original (sin helper compartido); `1d4735cb` |
 | T3 | S4, S5 | inline | done — 5 tests de handler (incluye clamp 365); `1d4735cb` |
 | T4 | S4, S5 | inline | done — E2E nuevo: agregado + invariante `Visits > 0` + 403 al dueño; `1d4735cb` |
 | T5 | S1, S2, S3 | inline | done — vista general por defecto y select filtrado. |
@@ -47,5 +47,8 @@ L5 (verificación, 2026-10-26):
 - `pnpm --filter @store-mgmt/web-store-pos test -- --run app/admin/catalog-stats` → 7 passed.
 - `pnpm --filter @store-mgmt/web-store-pos typecheck` → sin errores. `lint` → sin warnings.
 
-L6 (diferencial per-tienda): el endpoint `GET /v1/stores/{storeId}/catalog-stats` conserva sus 4 tests de handler y su E2E intactos y verdes; la extracción a `CatalogStatsComposition` es un movimiento de código sin cambio de salida (misma ventana, mismos orígenes densificados, misma serie diaria).
+L6 (diferencial per-tienda): el endpoint `GET /v1/stores/{storeId}/catalog-stats` conserva sus 4 tests de handler y su E2E intactos y verdes.
+
+L7 (corrección de alcance, 2026-10-26, pedido del usuario): "reviertelo. La idea es mantener lo que estaba tambien por tienda pero solo al inicio tener un resumen con todas las tiendas." Se deshizo la extracción de `CatalogStatsComposition`: `GetCatalogStatsQuery.cs` vuelve a ser el archivo original byte por byte (diff vacío contra el commit previo) y el handler general se queda con su propia ventana/densificado. No se tocó nada más del panel por tienda. Re-verificado: build OK, 1532 unit tests, 90 E2E de catálogo.
+
 

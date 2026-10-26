@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Dtos.WebCatalog;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Interfaces.Repositories;
 
 namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
@@ -9,21 +10,22 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
     /// Estadísticas del catálogo de TODAS las tiendas. Endpoint SuperAdmin: es la vista general del
     /// panel, y devuelve además las tiendas con visitas en el periodo para alimentar el selector.
     ///
-    /// <para><b>Semántica del agregado.</b> `VisitorHash` se calcula por tienda + día + IP + UA y
-    /// `SessionHash` incluye la tienda, así que el número global es exactamente la SUMA de los
-    /// únicos por tienda: una misma persona que entra a dos tiendas cuenta en las dos. Eso es lo que
-    /// mide el panel general y está documentado para no prometer un "único de plataforma" que el
-    /// hash no puede calcular.</para>
+    /// <para><b>Es una suma.</b> Se lee la MISMA tabla de eventos con la MISMA ventana que el panel
+    /// por tienda, sin el filtro por tienda: `VisitorHash` y `SessionHash` incluyen la tienda, así
+    /// que el total global es exactamente la suma de los valores por tienda. No hay tablas nuevas,
+    /// ni caché, ni agregados persistidos.</para>
     /// </summary>
     public sealed record GetCatalogStatsOverviewQuery(int Days = GetCatalogStatsOverviewQuery.DefaultDays)
         : IQuery<CatalogStatsOverviewDto>
     {
-        public const int DefaultDays = CatalogStatsComposition.DefaultDays;
+        public const int DefaultDays = 30;
     }
 
     public sealed class GetCatalogStatsOverviewQueryHandler
         : IQueryHandler<GetCatalogStatsOverviewQuery, CatalogStatsOverviewDto>
     {
+        private const int MaxDays = 365;
+
         private readonly ICatalogEventRepository _catalogEventRepository;
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
@@ -41,8 +43,11 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
         public async Task<ResponseResult<CatalogStatsOverviewDto>> Handle(GetCatalogStatsOverviewQuery query,
             CancellationToken cancellationToken)
         {
-            int days = CatalogStatsComposition.ResolveDays(query.Days);
-            (DateTime fromUtc, DateTime toUtc) = CatalogStatsComposition.ResolveWindow(days);
+            int days = Math.Clamp(query.Days <= 0 ? GetCatalogStatsOverviewQuery.DefaultDays : query.Days, 1, MaxDays);
+
+            // La misma ventana inclusiva de `days` días calendario UTC del panel por tienda.
+            DateTime toUtc = DateTime.UtcNow;
+            DateTime fromUtc = toUtc.Date.AddDays(-(days - 1));
 
             CatalogOverviewSnapshot snapshot = await _catalogEventRepository
                 .GetOverviewStatsAsync(fromUtc, toUtc, cancellationToken);
@@ -50,6 +55,15 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
             int orders = await _orderRepository.CountOnlineOrdersAsync(fromUtc, toUtc);
 
             CatalogStatsSnapshot totals = snapshot.Totals;
+
+            Dictionary<CatalogSource, int> visitsBySource = totals.Sources
+                .ToDictionary(source => source.Source, source => source.Visits);
+
+            List<CatalogSourceStatsDto> sources = Enum.GetValues<CatalogSource>()
+                .Select(source => new CatalogSourceStatsDto(
+                    source,
+                    visitsBySource.GetValueOrDefault(source)))
+                .ToList();
 
             List<Guid> topProductIds = totals.TopProducts
                 .Select(product => product.ProductId)
@@ -66,6 +80,19 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
                     productViews.Views))
                 .ToList();
 
+            Dictionary<DateTime, int> visitsByDay = totals.Daily
+                .ToDictionary(day => day.Day.Date, day => day.Visits);
+
+            var daily = new List<CatalogDayStatsDto>(days);
+            for (DateTime day = fromUtc.Date; day <= toUtc.Date; day = day.AddDays(1))
+            {
+                daily.Add(new CatalogDayStatsDto(day, visitsByDay.GetValueOrDefault(day)));
+            }
+
+            double conversionRate = totals.Visits == 0
+                ? 0
+                : Math.Round((double)orders / totals.Visits, 4);
+
             return ResponseResult.Success(new CatalogStatsOverviewDto
             {
                 Totals = new CatalogStatsDto
@@ -75,10 +102,10 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
                     Visitors = totals.Visitors,
                     PageViews = totals.PageViews,
                     Orders = orders,
-                    ConversionRate = CatalogStatsComposition.ConversionRate(totals.Visits, orders),
-                    Sources = CatalogStatsComposition.DenseSources(totals),
+                    ConversionRate = conversionRate,
+                    Sources = sources,
                     TopProducts = topProducts,
-                    Daily = CatalogStatsComposition.DenseDaily(totals.Daily, fromUtc, toUtc),
+                    Daily = daily,
                 },
                 Stores = snapshot.Stores
                     .Select(store => new CatalogStoreStatsDto(store.StoreId, store.Name, store.Visits))
