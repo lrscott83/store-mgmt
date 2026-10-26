@@ -124,12 +124,17 @@ export function AdminCatalogStatsPage() {
     if (storeId) void loadStoreStats(storeId, days);
   }, [storeId, days, loadStoreStats]);
 
-  // La selección solo sobrevive mientras la tienda tenga visitas en el periodo vigente. Se limpia
-  // el estado real (no solo el valor mostrado) para que no se re-seleccione sola más adelante.
+  // La selección solo sobrevive mientras haya un overview válido que contenga la tienda. Se limpia
+  // el estado real (no solo el valor mostrado) también cuando el periodo no se pudo leer: si no,
+  // una tienda oculta se re-selecciona sola cuando vuelve a aparecer en un periodo posterior.
   useEffect(() => {
-    if (!storeId || !overview) return;
+    if (!storeId) return;
+    if (!overview) {
+      if (overviewError) setStoreId('');
+      return;
+    }
     if (!overview.stores.some((store) => store.storeId === storeId)) setStoreId('');
-  }, [storeId, overview]);
+  }, [storeId, overview, overviewError]);
 
   const selectedStore = overview?.stores.find((store) => store.storeId === storeId);
   const effectiveStoreId = selectedStore ? storeId : '';

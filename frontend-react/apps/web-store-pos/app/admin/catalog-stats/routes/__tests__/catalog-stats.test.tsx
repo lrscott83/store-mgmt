@@ -263,4 +263,27 @@ describe('AdminCatalogStatsPage', () => {
     expect(screen.getByTestId('catalog-stats-store')).toHaveValue('');
     expect(serviceMock.getStats).not.toHaveBeenCalled();
   });
+
+  it('no re-selecciona sola la tienda si el overview falló mientras estaba elegida', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-1' },
+    });
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30));
+
+    serviceMock.getOverview.mockResolvedValueOnce(failed());
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+    expect(
+      await screen.findByText('No se pudieron cargar las estadísticas.'),
+    ).toBeInTheDocument();
+
+    serviceMock.getStats.mockClear();
+    fireEvent.click(screen.getByTestId('catalog-stats-days-30'));
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenLastCalledWith(30));
+
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('');
+    expect(serviceMock.getStats).not.toHaveBeenCalled();
+  });
 });

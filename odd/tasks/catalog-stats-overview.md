@@ -54,7 +54,7 @@ L7 (corrección de alcance, 2026-10-26, pedido del usuario): "reviertelo. La ide
 L8 (verificación independiente, 2026-10-26). El verifier confirmó S1–S7 cumplidos y la invariante per-tienda por hash de archivo, y encontró **2 regresiones mías** al partir el loader único en dos:
 - **B1** el contador `pending` se fugaba cuando una respuesta llegaba superada (`end()` estaba condicionado al request vigente) → spinner infinito. Fix: cada `begin()` tiene exactamente un `end()` en `finally`.
 - **B2** el error de un drill-down fallido no se limpiaba al volver a General ni al elegir otra tienda → pantalla vacía con mensaje obsoleto. Fix: un estado de error por lectura (`overviewError` / `storeError`), el render usa el de la vista visible; se elimina el acoplamiento que compartía un solo `error`.
-- **A1** (advisory) la selección oculta podía re-seleccionarse sola: ahora un efecto limpia el `storeId` real cuando la tienda deja de tener visitas en el periodo.
+- **A1** (advisory) la selección oculta podía re-seleccionarse sola: ahora un efecto limpia el `storeId` real cuando la tienda deja de tener visitas en el periodo **o cuando el overview falla** (residual cerrado a pedido del usuario).
 Se añadieron 4 tests de regresión a la página (11 total). **A2**: la suite E2E de catálogo es sensible al estado compartido; en esta sesión volvió a dar 90/90 verde después de esperar 3 s y matar `testhost`, y la clase nueva pasa 2/2 aislada. La cifra de L5 no es reproducible al 100% por esa razón, no por el cambio.
 Se añadió también a la E2E la invariante que pide el usuario: `Totals.Visits == Stores.Sum(Visits)` ("es una suma") y el clamp de ventana por HTTP.
 
