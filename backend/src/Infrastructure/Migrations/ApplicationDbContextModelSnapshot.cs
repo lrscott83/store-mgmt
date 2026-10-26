@@ -128,6 +128,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("OccurredAt", "SessionHash");
+
                     b.HasIndex("StoreId", "OccurredAt");
 
                     b.HasIndex("StoreId", "SessionHash");
