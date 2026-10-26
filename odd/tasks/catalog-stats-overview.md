@@ -17,7 +17,7 @@ S5. Semántica del agregado, documentada en código: `Visitantes únicos` es la 
 
 S6. El endpoint per-tienda `GET /v1/stores/{storeId}/catalog-stats` no cambia de comportamiento: mismos números, misma ventana, mismo gate SuperAdmin.
 
-S7. Sin cambios de esquema ni migraciones. No se toca ningún E2E existente: la cobertura nueva va en archivos nuevos.
+S7. Sin cambios de esquema no pedidos. **Enmendada 2026-10-26 (L11):** se añade el índice `(OccurredAt, SessionHash)` con migración EF `20261026210157_Add-CatalogEvents-OccurredAt-SessionHash-Index` y script `backend/scripts/41-20261026-Add-CatalogEvents-OccurredAt-SessionHash-Index.sql`. Ningún otro cambio de esquema. No se toca ningún E2E existente: la cobertura nueva va en archivos nuevos.
 
 ## Tasks
 
@@ -28,7 +28,9 @@ S7. Sin cambios de esquema ni migraciones. No se toca ningún E2E existente: la 
 | T3 | S4, S5 | inline | done — 5 tests de handler (incluye clamp 365); `1d4735cb` |
 | T4 | S4, S5 | inline | done — E2E nuevo: agregado + invariante `Visits > 0` + 403 al dueño; `1d4735cb` |
 | T5 | S1, S2, S3 | inline | done — vista general por defecto y select filtrado. |
-| T6 | S1, S2, S3 | inline | done — 7 tests de página (Vitest). |
+| T6 | S1, S2, S3 | inline | done — 14 tests de página (Vitest). |
+| T7 | S4, S5, S7 | delegated (worker) | done — serie diaria por día con `[day, day+1)`, índice `(OccurredAt, SessionHash)` + migración/script, snapshot `RepeatableRead`, token en el conteo global, E2E multi-tienda; `6de5a1b6` |
+| T8 | S1, S2, S3 | delegated (worker) | done — un fallo transitorio conserva el último overview bueno (KPIs + selector + selección); tests del camino positivo. |
 
 ## Log
 
@@ -69,6 +71,18 @@ L10 (RDD forzado, 2026-10-26, pedido explícito del usuario: "fuerzala"). Consen
 - R3-2: las consultas del agregado no comparten transacción, así que `Totals.Visits == Stores.Sum(Visits)` puede diferir con escrituras concurrentes.
 - R3-3: `IgnoreQueryFilters` en el conteo global de pedidos desactiva todos los filtros, no solo el de tienda.
 - R3-5 / R3-6: sin cobertura de orden multi-tienda ni del camino positivo de persistencia de la selección.
+
+L11 (corrección de enfoque, 2026-10-26, verbatim del usuario): "revisa bien compadre, porque hay cosas que se buscan por dia y esa no es la solucion, quizas poner un indice por fecha y hacer un filtro por <= y < que el dia siguiente como se hace en los filtros del POS con localStorage. Por favor, no inventes cosas y revisa antes soluciones similares y si no me preguntas porque la idea no hacer distintas. Entendido??????????"
+
+L12 (ejecución de L11). Se descartó el plan anterior (acotar la ventana / SQL crudo). Precedentes encontrados y reutilizados: `NormalizeFrom`/`NormalizeTo` (`GetOnlineOrderStatsQuery.cs:171-191`) ya definen el rango por día completo; los índices del repo son `HasIndex` simples o compuestos (`OrderEntityTypeConfiguration.cs:20-21`, `CatalogEventEntityTypeConfiguration.cs:31-34`); no hay SQL crudo en producción. Cambios:
+- Serie diaria: `COUNT(DISTINCT SessionHash)` por día en `[day, day+1)` (último día cortado en `toUtc`), sin materializar filas. TODO EF/LINQ.
+- Índice `(OccurredAt, SessionHash)` + migración `20261026210157` + script `41-…` (aplicado a `smca_test`, verificado en `pg_indexes`).
+- Lecturas de eventos dentro de una transacción `RepeatableRead` (R3-2).
+- `CountOnlineOrdersAsync(from, to, ct)` sin `IgnoreQueryFilters` (R3-3, R4-004).
+- Test de ventana a prueba de medianoche UTC (R3-1); E2E con dos tiendas, orden descendente e igualdad de la suma (R3-5).
+- Frontend: un fallo transitorio conserva el último overview bueno (KPIs, selector y selección) (R4-003); el efecto de selección vuelve a limpiar solo cuando un overview exitoso ya no trae la tienda (A1); el timeout de 30 s del `api-client` ya libera el contador de pendientes (R4-002, sin código).
+- R4-001: el barrido ya no materializa filas y cada día usa el índice. No se añade telemetría porque la capa Application no tiene logging y añadir la dependencia por una línea queda fuera de este cambio.
+
 
 
 

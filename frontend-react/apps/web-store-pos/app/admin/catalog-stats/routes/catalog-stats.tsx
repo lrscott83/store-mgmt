@@ -77,12 +77,12 @@ export function AdminCatalogStatsPage() {
         if (result.succeeded) {
           setOverview(result.data);
         } else {
-          setOverview(null);
+          // Un fallo transitorio no invalida la última lectura buena: los KPIs, el selector y la
+          // tienda elegida siguen siendo válidos y se muestran junto al error.
           setOverviewError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
         }
       } catch (err) {
         if (current !== overviewRequest.current) return;
-        setOverview(null);
         setOverviewError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
       } finally {
         end();
@@ -124,17 +124,13 @@ export function AdminCatalogStatsPage() {
     if (storeId) void loadStoreStats(storeId, days);
   }, [storeId, days, loadStoreStats]);
 
-  // La selección solo sobrevive mientras haya un overview válido que contenga la tienda. Se limpia
-  // el estado real (no solo el valor mostrado) también cuando el periodo no se pudo leer: si no,
-  // una tienda oculta se re-selecciona sola cuando vuelve a aparecer en un periodo posterior.
+  // La selección solo se limpia cuando un overview EXITOSO ya no contiene la tienda (dejó de tener
+  // visitas en el periodo). Ya no hace falta una rama de "overview falló": `loadOverview` conserva
+  // la última lectura buena ante un error transitorio, así que un fallo no invalida la selección.
   useEffect(() => {
-    if (!storeId) return;
-    if (!overview) {
-      if (overviewError) setStoreId('');
-      return;
-    }
+    if (!storeId || !overview) return;
     if (!overview.stores.some((store) => store.storeId === storeId)) setStoreId('');
-  }, [storeId, overview, overviewError]);
+  }, [storeId, overview]);
 
   const selectedStore = overview?.stores.find((store) => store.storeId === storeId);
   const effectiveStoreId = selectedStore ? storeId : '';
@@ -203,7 +199,7 @@ export function AdminCatalogStatsPage() {
         </p>
       )}
 
-      {!loading && !error && stats && (
+      {!loading && stats && (
         <>
           <Card
             padding="tight"

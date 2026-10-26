@@ -163,6 +163,28 @@ describe('AdminCatalogStatsPage', () => {
     expect(screen.queryByTestId('catalog-stat-VISITS')).not.toBeInTheDocument();
   });
 
+  it('un fallo transitorio del overview conserva los KPIs y el selector de la última lectura buena', async () => {
+    renderPage();
+    expect(await screen.findByTestId('catalog-stat-VISITS')).toHaveTextContent('12');
+
+    serviceMock.getOverview.mockResolvedValueOnce(failed());
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+
+    expect(
+      await screen.findByText('No se pudieron cargar las estadísticas.'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+
+    // El error no oculta la última lectura buena: KPIs y selector siguen visibles.
+    expect(screen.getByTestId('catalog-stat-VISITS')).toHaveTextContent('12');
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Todas las tiendas',
+      'Tienda Uno',
+      'Tienda Dos',
+    ]);
+  });
+
   it('muestra el estado vacío cuando no hay productos vistos', async () => {
     serviceMock.getOverview.mockResolvedValue(
       ok(overview({ totals: stats({ topProducts: [] }) })),
@@ -264,7 +286,7 @@ describe('AdminCatalogStatsPage', () => {
     expect(serviceMock.getStats).not.toHaveBeenCalled();
   });
 
-  it('no re-selecciona sola la tienda si el overview falló mientras estaba elegida', async () => {
+  it('conserva la tienda elegida al cambiar el periodo y pide ambas lecturas con el rango nuevo', async () => {
     renderPage();
     await screen.findByTestId('catalog-stat-VISITS');
 
@@ -273,17 +295,49 @@ describe('AdminCatalogStatsPage', () => {
     });
     await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30));
 
+    serviceMock.getOverview.mockClear();
+    serviceMock.getStats.mockClear();
+    // La tienda mantiene visitas en el periodo nuevo, así que la selección debe sobrevivir.
+    serviceMock.getOverview.mockResolvedValueOnce(
+      ok(overview({ totals: stats({ days: 7, visits: 99 }) })),
+    );
+    serviceMock.getStats.mockResolvedValueOnce(ok(stats({ days: 7, visits: 5 })));
+
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 7));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('store-1');
+    // Se sigue viendo el drill-down, no el agregado.
+    expect(screen.getByTestId('catalog-stat-VISITS')).toHaveTextContent(/^5$/);
+  });
+
+  it('conserva la tienda elegida si el overview falló mientras estaba elegida', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-1' },
+    });
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30));
+
+    // Un fallo transitorio del overview ya NO limpia la selección: el overview bueno se conserva.
     serviceMock.getOverview.mockResolvedValueOnce(failed());
     fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
-    expect(
-      await screen.findByText('No se pudieron cargar las estadísticas.'),
-    ).toBeInTheDocument();
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
 
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('store-1');
+    expect(serviceMock.getStats).toHaveBeenLastCalledWith('store-1', 7);
+
+    // Y el estado real no se perdió: el periodo anterior la sigue pidiendo con su selección.
     serviceMock.getStats.mockClear();
     fireEvent.click(screen.getByTestId('catalog-stats-days-30'));
     await waitFor(() => expect(serviceMock.getOverview).toHaveBeenLastCalledWith(30));
 
-    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('');
-    expect(serviceMock.getStats).not.toHaveBeenCalled();
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('store-1');
+    expect(serviceMock.getStats).toHaveBeenLastCalledWith('store-1', 30);
   });
 });
