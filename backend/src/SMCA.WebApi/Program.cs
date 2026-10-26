@@ -203,6 +203,11 @@ app.UseStaticFiles();
 // vuelve a preguntar y recibe 304 si el archivo no cambió, o 200 con la versión nueva
 // si cambió (una imagen editada deja de servirse vieja; una sin cambios no se
 // re-descarga). ETag/Last-Modified los emite el middleware de estáticos.
+// Telemetría del manual de usuario (S2/S3): cuenta la entrada al HTML y la descarga del PDF.
+// Va ANTES de los estáticos del manual para poder mirar el status real de la respuesta y contar
+// solo 200 (un 304 es revalidación, no visita). Ver `ManualViewTelemetryMiddleware`.
+app.UseMiddleware<ManualViewTelemetryMiddleware>();
+
 var manualRoot = Path.Combine(app.Environment.ContentRootPath, "help");
 if (Directory.Exists(manualRoot))
 {
