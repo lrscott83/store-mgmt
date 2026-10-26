@@ -142,6 +142,22 @@ export enum ExpenseType {
   Divisa = 9,
   Impuesto = 10,
   Otro = 100,
+  /**
+   * Nomencladores fiscales de la ONAT (Ley 181/2025). Se agregan al final para no
+   * tocar los valores existentes: la serialización histórica es el número.
+   * `Impuesto = 10` sigue siendo el cajón de "otro tributo" y `Otro = 100` un gasto
+   * no fiscal.
+   */
+  ContribucionZonas = 11,
+  ArrendamientoEntidades = 12,
+  ExoneracionReparaciones = 13,
+  ContribucionSeguridadSocial = 14,
+  ContribucionEspecialSeguridadSocial = 15,
+  ImpuestoVentas = 16,
+  CuotaMensual = 17,
+  FuerzaTrabajo = 18,
+  ImpuestoSellos = 19,
+  Anuncios = 20,
 }
 
 /**

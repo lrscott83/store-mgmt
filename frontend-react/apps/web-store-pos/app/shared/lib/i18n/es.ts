@@ -1549,6 +1549,20 @@ const messages: Record<string, string> = {
   'EXPENSES.TYPE.DIVISA': 'Divisa',
   'EXPENSES.TYPE.IMPUESTO': 'Impuesto',
   'EXPENSES.TYPE.OTRO': 'Otro',
+  'EXPENSES.TYPE.IMPUESTO_VENTAS': 'Impuesto sobre Ventas o Servicios (10 %)',
+  'EXPENSES.TYPE.FUERZA_TRABAJO': 'Impuesto por la Utilización de la Fuerza de Trabajo',
+  'EXPENSES.TYPE.IMPUESTO_SELLOS': 'Impuesto sobre Documentos / sellos del timbre',
+  'EXPENSES.TYPE.ANUNCIOS': 'Tasa por Radicación de Anuncios y Propaganda Comercial',
+  'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL':
+    'Contribución Especial a la Seguridad Social (20 %)',
+  'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL': 'Contribución a la Seguridad Social (14 %)',
+  'EXPENSES.TYPE.CUOTA_MENSUAL':
+    'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales (5 %)',
+  'EXPENSES.TYPE.CONTRIBUCION_ZONAS':
+    'Contribución para la restauración y preservación de zonas',
+  'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES': 'Arrendamiento de bienes a entidades estatales',
+  'EXPENSES.TYPE.EXONERACION_REPARACIONES':
+    'Importes exonerados por asumir gastos de reparaciones',
 
   // Reports — Today
   'REPORTS.TODAY.TITLE': 'Reportes de hoy',

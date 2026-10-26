@@ -94,6 +94,16 @@ const EXPENSE_TYPES = [
   ExpenseType.Divisa,
   ExpenseType.Impuesto,
   ExpenseType.Otro,
+  ExpenseType.ImpuestoVentas,
+  ExpenseType.FuerzaTrabajo,
+  ExpenseType.ImpuestoSellos,
+  ExpenseType.Anuncios,
+  ExpenseType.ContribucionEspecialSeguridadSocial,
+  ExpenseType.ContribucionSeguridadSocial,
+  ExpenseType.CuotaMensual,
+  ExpenseType.ContribucionZonas,
+  ExpenseType.ArrendamientoEntidades,
+  ExpenseType.ExoneracionReparaciones,
 ];
 
 const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
@@ -108,6 +118,17 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
   [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
+  [ExpenseType.ImpuestoVentas]: 'EXPENSES.TYPE.IMPUESTO_VENTAS',
+  [ExpenseType.FuerzaTrabajo]: 'EXPENSES.TYPE.FUERZA_TRABAJO',
+  [ExpenseType.ImpuestoSellos]: 'EXPENSES.TYPE.IMPUESTO_SELLOS',
+  [ExpenseType.Anuncios]: 'EXPENSES.TYPE.ANUNCIOS',
+  [ExpenseType.ContribucionEspecialSeguridadSocial]:
+    'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL',
+  [ExpenseType.ContribucionSeguridadSocial]: 'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL',
+  [ExpenseType.CuotaMensual]: 'EXPENSES.TYPE.CUOTA_MENSUAL',
+  [ExpenseType.ContribucionZonas]: 'EXPENSES.TYPE.CONTRIBUCION_ZONAS',
+  [ExpenseType.ArrendamientoEntidades]: 'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES',
+  [ExpenseType.ExoneracionReparaciones]: 'EXPENSES.TYPE.EXONERACION_REPARACIONES',
 };
 
 /** Opción del select de formas de pago: método real (persistido) + etiqueta visible. */

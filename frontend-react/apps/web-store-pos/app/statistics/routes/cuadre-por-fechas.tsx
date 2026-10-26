@@ -72,6 +72,17 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
   [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
+  [ExpenseType.ImpuestoVentas]: 'EXPENSES.TYPE.IMPUESTO_VENTAS',
+  [ExpenseType.FuerzaTrabajo]: 'EXPENSES.TYPE.FUERZA_TRABAJO',
+  [ExpenseType.ImpuestoSellos]: 'EXPENSES.TYPE.IMPUESTO_SELLOS',
+  [ExpenseType.Anuncios]: 'EXPENSES.TYPE.ANUNCIOS',
+  [ExpenseType.ContribucionEspecialSeguridadSocial]:
+    'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL',
+  [ExpenseType.ContribucionSeguridadSocial]: 'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL',
+  [ExpenseType.CuotaMensual]: 'EXPENSES.TYPE.CUOTA_MENSUAL',
+  [ExpenseType.ContribucionZonas]: 'EXPENSES.TYPE.CONTRIBUCION_ZONAS',
+  [ExpenseType.ArrendamientoEntidades]: 'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES',
+  [ExpenseType.ExoneracionReparaciones]: 'EXPENSES.TYPE.EXONERACION_REPARACIONES',
 };
 
 // payment-methods-percent-tax (plan 2026-09-17): los históricos Tarjeta se
