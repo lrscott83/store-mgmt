@@ -27,7 +27,8 @@ namespace Application.Tests.Features.WebCatalog.Queries
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(snapshot);
             _orderRepository
-                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()))
                 .ReturnsAsync(0);
         }
 
@@ -48,7 +49,8 @@ namespace Application.Tests.Features.WebCatalog.Queries
                     new CatalogStoreVisits(_storeId, "Tienda Uno", 4),
                 ]));
             _orderRepository
-                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()))
                 .ReturnsAsync(2);
             _productRepository
                 .Setup(x => x.GetNamesByIdsAsync(
@@ -82,10 +84,12 @@ namespace Application.Tests.Features.WebCatalog.Queries
             SetupSnapshot(new CatalogOverviewSnapshot(
                 new CatalogStatsSnapshot(0, 0, 0, [], [], []), []));
 
-            await Handler().Handle(new GetCatalogStatsOverviewQuery(7), CancellationToken.None);
+            using var cts = new CancellationTokenSource();
+            await Handler().Handle(new GetCatalogStatsOverviewQuery(7), cts.Token);
 
             _orderRepository.Verify(
-                x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>()), Times.Once);
+                x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), cts.Token),
+                Times.Once);
         }
 
         [Fact]
@@ -95,34 +99,50 @@ namespace Application.Tests.Features.WebCatalog.Queries
             DateTime? eventsTo = null;
             DateTime? ordersFrom = null;
             DateTime? ordersTo = null;
+            CancellationToken eventsToken = default;
+            CancellationToken ordersToken = default;
 
             _catalogEventRepository
                 .Setup(x => x.GetOverviewStatsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<DateTime, DateTime, CancellationToken>((from, to, _) =>
+                .Callback<DateTime, DateTime, CancellationToken>((from, to, token) =>
                 {
                     eventsFrom = from;
                     eventsTo = to;
+                    eventsToken = token;
                 })
                 .ReturnsAsync(new CatalogOverviewSnapshot(
                     new CatalogStatsSnapshot(0, 0, 0, [], [], []), []));
             _orderRepository
-                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>()))
-                .Callback<DateTime, DateTime>((from, to) =>
+                .Setup(x => x.CountOnlineOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<DateTime, DateTime, CancellationToken>((from, to, token) =>
                 {
                     ordersFrom = from;
                     ordersTo = to;
+                    ordersToken = token;
                 })
                 .ReturnsAsync(0);
 
-            await Handler().Handle(new GetCatalogStatsOverviewQuery(7), CancellationToken.None);
+            using var cts = new CancellationTokenSource();
+            DateTime before = DateTime.UtcNow.Date;
+            await Handler().Handle(new GetCatalogStatsOverviewQuery(7), cts.Token);
+            DateTime after = DateTime.UtcNow.Date;
 
             eventsFrom.Should().NotBeNull();
             eventsTo.Should().NotBeNull();
-            eventsTo!.Value.Date.Should().Be(DateTime.UtcNow.Date);
+
+            // La fecha se acota con el reloj de ANTES y DESPUÉS de la invocación: si la prueba cruza
+            // la medianoche UTC, el extremo derecho sigue siendo una de las dos, no un `UtcNow`
+            // leído tarde en el assert.
+            eventsTo!.Value.Date.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
             eventsFrom.Should().Be(eventsTo!.Value.Date.AddDays(-6));
             ordersFrom.Should().Be(eventsFrom);
             ordersTo.Should().Be(eventsTo);
+
+            // El token del request viaja a las DOS lecturas del panel.
+            eventsToken.Should().Be(cts.Token);
+            ordersToken.Should().Be(cts.Token);
         }
 
         [Fact]

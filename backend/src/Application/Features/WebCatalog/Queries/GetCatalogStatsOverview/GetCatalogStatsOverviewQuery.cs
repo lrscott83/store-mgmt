@@ -52,7 +52,7 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatsOverview
             CatalogOverviewSnapshot snapshot = await _catalogEventRepository
                 .GetOverviewStatsAsync(fromUtc, toUtc, cancellationToken);
 
-            int orders = await _orderRepository.CountOnlineOrdersAsync(fromUtc, toUtc);
+            int orders = await _orderRepository.CountOnlineOrdersAsync(fromUtc, toUtc, cancellationToken);
 
             CatalogStatsSnapshot totals = snapshot.Totals;
 

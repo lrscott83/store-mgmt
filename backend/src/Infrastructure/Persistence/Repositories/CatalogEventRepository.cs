@@ -1,3 +1,4 @@
+using System.Data;
 using Domain.Common.Enums;
 using Domain.Entities.CatalogEvents;
 using Domain.Interfaces.Repositories;
@@ -86,9 +87,16 @@ namespace Infrastructure.Persistence.Repositories
         /// alimenta el selector: solo se publican las tiendas con al menos una visita, porque el
         /// selector del panel general no debe ofrecer tiendas en cero.
         ///
-        /// El trabajo de conteo/agrupación ocurre en la BASE. La única materialización es la serie
-        /// diaria `(OccurredAt, SessionHash)`, que no puede agruparse por día en SQL con Npgsql
-        /// (mismo motivo documentado arriba) y proyecta solo dos columnas.
+        /// TODO el trabajo de conteo/agrupación ocurre en la BASE, incluida la serie diaria: se pide
+        /// un <c>COUNT(DISTINCT "SessionHash")</c> por día de la ventana en lugar de materializar
+        /// <c>(OccurredAt, SessionHash)</c> de todo el periodo para agrupar en memoria. Cada día es
+        /// el rango semicerrado <c>[day, day + 1)</c> que cubre el índice
+        /// <c>(OccurredAt, SessionHash)</c>, y así la serie tampoco trae filas a la aplicación.
+        ///
+        /// <para>Todas las lecturas van en UNA transacción <see cref="IsolationLevel.RepeatableRead"/>.
+        /// El handler publica <c>Totals.Visits</c> y <c>Stores.Sum(Visits)</c> como la misma cifra;
+        /// sin un snapshot único, un evento escrito entre las dos consultas haría que la suma del
+        /// desglose no cuadre con el total. Es solo de lectura: no escribe ni bloquea filas.</para>
         ///
         /// El filtro global por tenant queda ACTIVO: el endpoint es SuperAdmin (lo deja pasar) y
         /// nunca se sirve esta lectura a un rol de tienda.
@@ -96,6 +104,9 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<CatalogOverviewSnapshot> GetOverviewStatsAsync(DateTime fromUtc, DateTime toUtc,
             CancellationToken cancellationToken)
         {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead, cancellationToken);
+
             IQueryable<CatalogEvent> query = _events
                 .Where(e => e.OccurredAt >= fromUtc && e.OccurredAt <= toUtc);
 
@@ -136,17 +147,23 @@ namespace Infrastructure.Persistence.Repositories
                 .ThenBy(store => store.Name)
                 .ToList();
 
-            var dailyRows = await query
-                .Select(e => new { e.OccurredAt, e.SessionHash })
-                .ToListAsync(cancellationToken);
-
-            List<CatalogDayVisits> daily = dailyRows
-                .GroupBy(row => row.OccurredAt.Date)
-                .Select(group => new CatalogDayVisits(
-                    group.Key,
-                    group.Select(row => row.SessionHash).Distinct().Count()))
-                .OrderBy(day => day.Day)
-                .ToList();
+            // Serie diaria en SQL: un `COUNT(DISTINCT "SessionHash")` por día de la ventana. El
+            // rango semicerrado `[day, day + 1)` es el que usa el índice `(OccurredAt, SessionHash)`
+            // y evita materializar `(OccurredAt, SessionHash)` de todo el periodo. El último día se
+            // corta en `toUtc` (extremo inclusivo del resto de la consulta) para que la serie no
+            // cuente eventos posteriores al instante consultado.
+            var daily = new List<CatalogDayVisits>();
+            for (DateTime day = fromUtc.Date; day <= toUtc.Date; day = day.AddDays(1))
+            {
+                DateTime dayStart = day;
+                DateTime dayEnd = day == toUtc.Date ? toUtc.AddTicks(1) : day.AddDays(1);
+                int visitsForDay = await _events
+                    .Where(e => e.OccurredAt >= dayStart && e.OccurredAt < dayEnd)
+                    .Select(e => e.SessionHash)
+                    .Distinct()
+                    .CountAsync(cancellationToken);
+                daily.Add(new CatalogDayVisits(day, visitsForDay));
+            }
 
             var productRows = await query
                 .Where(e => e.Type == CatalogEventType.ProductView && e.ProductId != null)
@@ -164,6 +181,8 @@ namespace Infrastructure.Persistence.Repositories
             List<CatalogProductViews> topProducts = productRows
                 .Select(row => new CatalogProductViews(row.ProductId, row.Views))
                 .ToList();
+
+            await transaction.CommitAsync(cancellationToken);
 
             return new CatalogOverviewSnapshot(
                 new CatalogStatsSnapshot(pageViews, visits, visitors, sources, topProducts, daily),
