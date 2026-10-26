@@ -88,3 +88,4 @@ L12 (ejecución de L11). Se descartó el plan anterior (acotar la ventana / SQL 
 
 
 
+
