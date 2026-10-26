@@ -335,6 +335,8 @@ const messages: Record<string, string> = {
     'Completa la descripción, los descuentos y las imágenes de tus productos y publica el catálogo de tu tienda.',
   'WEB_CATALOG.PUBLIC_URL': 'Dirección pública',
   'WEB_CATALOG.NOT_PUBLISHED': 'El catálogo aún no está publicado. Pulsa Sincronizar Catálogo.',
+  'WEB_CATALOG.NOT_PUBLISHED_ADMIN':
+    'El catálogo aún no tiene una dirección pública. Crea una categoría y su primer producto.',
   'WEB_CATALOG.COPY_URL': 'Copiar',
   'WEB_CATALOG.COPIED': 'Dirección copiada',
   'WEB_CATALOG.OPEN': 'Ver catálogo',

@@ -1260,6 +1260,9 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
   const publicUrl = status?.catalogUrl
     ? new URL(status.catalogUrl, window.location.origin).toString()
     : '';
+  // En la vista del SuperAdmin no hay sincronización: el alta es directa y online. El bloque de
+  // sincronización (botón y última sincronización) es exclusivo de la vista del dueño.
+  const isAdminView = Boolean(storeId);
 
   return (
     <div className="space-y-4">
@@ -1268,14 +1271,18 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
         title={
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>{intl.formatMessage({ id: 'WEB_CATALOG.TITLE' })}</span>
-            <Button
-              variant="fab"
-              onClick={handleSync}
-              disabled={isSyncing}
-              data-testid="catalog-sync-button"
-            >
-              {intl.formatMessage({ id: isSyncing ? 'WEB_CATALOG.SYNCING' : 'WEB_CATALOG.SYNC' })}
-            </Button>
+            {!isAdminView && (
+              <Button
+                variant="fab"
+                onClick={handleSync}
+                disabled={isSyncing}
+                data-testid="catalog-sync-button"
+              >
+                {intl.formatMessage({
+                  id: isSyncing ? 'WEB_CATALOG.SYNCING' : 'WEB_CATALOG.SYNC',
+                })}
+              </Button>
+            )}
           </div>
         }
       >
@@ -1315,16 +1322,22 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
             </div>
           ) : (
             <InfoBox variant="info">
-              {intl.formatMessage({ id: 'WEB_CATALOG.NOT_PUBLISHED' })}
+              {intl.formatMessage({
+                id: isAdminView
+                  ? 'WEB_CATALOG.NOT_PUBLISHED_ADMIN'
+                  : 'WEB_CATALOG.NOT_PUBLISHED',
+              })}
             </InfoBox>
           )}
 
-          <p className="mt-2 text-xs text-text-muted" data-testid="catalog-last-sync">
-            {intl.formatMessage({ id: 'WEB_CATALOG.LAST_SYNC' })}:{' '}
-            {status?.catalogSyncedAt
-              ? formatSyncedAt(status.catalogSyncedAt)
-              : intl.formatMessage({ id: 'WEB_CATALOG.NEVER_SYNCED' })}
-          </p>
+          {!isAdminView && (
+            <p className="mt-2 text-xs text-text-muted" data-testid="catalog-last-sync">
+              {intl.formatMessage({ id: 'WEB_CATALOG.LAST_SYNC' })}:{' '}
+              {status?.catalogSyncedAt
+                ? formatSyncedAt(status.catalogSyncedAt)
+                : intl.formatMessage({ id: 'WEB_CATALOG.NEVER_SYNCED' })}
+            </p>
+          )}
 
           <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[

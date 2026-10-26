@@ -259,6 +259,9 @@ describe('WebCatalogSettingsView — alta directa del SuperAdmin', () => {
     expect(await screen.findByTestId('catalog-new-category-button')).toHaveTextContent(
       'Nueva categoría',
     );
+    // La vista del SuperAdmin no sincroniza: el alta es directa y online.
+    expect(screen.queryByTestId('catalog-sync-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-last-sync')).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByTestId('catalog-category-toggle-c1'));
 
