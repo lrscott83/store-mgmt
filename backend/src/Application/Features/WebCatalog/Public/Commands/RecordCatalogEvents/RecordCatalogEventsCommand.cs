@@ -6,7 +6,6 @@ using Domain.Common.Enums;
 using Domain.Entities.CatalogEvents;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
-using Microsoft.Extensions.Configuration;
 
 namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
 {
@@ -47,24 +46,19 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
         private readonly IProductRepository _productRepository;
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
-        private readonly string _telemetrySalt;
 
         public RecordCatalogEventsCommandHandler(
             IStoreRepository storeRepository,
             ICatalogEventRepository catalogEventRepository,
             IProductRepository productRepository,
             IApplicationUnitOfWork applicationUnitOfWork,
-            IHttpContextService httpContextService,
-            IConfiguration configuration)
+            IHttpContextService httpContextService)
         {
             _storeRepository = storeRepository;
             _catalogEventRepository = catalogEventRepository;
             _productRepository = productRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
-            _telemetrySalt = configuration["CatalogTelemetry:Salt"]
-                ?? configuration["Jwt:SecretKey"]
-                ?? "catalog-telemetry";
         }
 
         public async Task<ResponseResult<bool>> Handle(RecordCatalogEventsCommand request,
@@ -86,7 +80,7 @@ namespace Application.Features.WebCatalog.Public.Commands.RecordCatalogEvents
             DateTime now = DateTime.UtcNow;
             string ipAddress = _httpContextService.IPAddress;
             string visitorHash = CatalogTelemetryHash.Visitor(
-                store.Id, ipAddress, request.UserAgent, now, _telemetrySalt);
+                store.Id, ipAddress, request.UserAgent, now);
             string sessionHash = CatalogTelemetryHash.Session(store.Id, visitorHash, now);
             CatalogDeviceType deviceType = CatalogDeviceClassifier.Resolve(request.UserAgent);
 

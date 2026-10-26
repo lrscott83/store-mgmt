@@ -5,7 +5,6 @@ using Domain.Common.Enums;
 using Domain.Entities.SiteTelemetry;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 
@@ -22,25 +21,17 @@ namespace Application.Tests.Features.SiteTelemetry
         private readonly Mock<ISiteEventRepository> _siteEventRepository = new();
         private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
         private readonly Mock<IHttpContextService> _httpContextService = new();
-        private readonly IConfiguration _configuration;
 
         public RecordSitePageViewsCommandHandlerTests()
         {
             _httpContextService.SetupGet(x => x.IPAddress).Returns("1.2.3.4");
             _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-            _configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["CatalogTelemetry:Salt"] = "test-salt",
-                })
-                .Build();
         }
 
         private RecordSitePageViewsCommandHandler Handler() => new(
             _siteEventRepository.Object,
             _unitOfWork.Object,
-            _httpContextService.Object,
-            _configuration);
+            _httpContextService.Object);
 
         private static SitePageViewRequest PageView(string path, string? utmSource = null) => new()
         {

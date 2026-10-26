@@ -36,14 +36,13 @@ namespace SMCA.WebApi.Middlewares
         }
 
         public async Task InvokeAsync(HttpContext context, ISiteEventRepository repository,
-            IApplicationUnitOfWork unitOfWork, IHttpContextService httpContextService,
-            IConfiguration configuration)
+            IApplicationUnitOfWork unitOfWork, IHttpContextService httpContextService)
         {
             await _next(context);
 
             try
             {
-                await TryRecordAsync(context, repository, unitOfWork, httpContextService, configuration);
+                await TryRecordAsync(context, repository, unitOfWork, httpContextService);
             }
             catch (Exception ex)
             {
@@ -52,8 +51,7 @@ namespace SMCA.WebApi.Middlewares
         }
 
         private async Task TryRecordAsync(HttpContext context, ISiteEventRepository repository,
-            IApplicationUnitOfWork unitOfWork, IHttpContextService httpContextService,
-            IConfiguration configuration)
+            IApplicationUnitOfWork unitOfWork, IHttpContextService httpContextService)
         {
             string path = context.Request.Path.Value ?? string.Empty;
             if (!path.StartsWith(SiteEventCatalog.ManualRootPath, StringComparison.Ordinal))
@@ -62,23 +60,12 @@ namespace SMCA.WebApi.Middlewares
             if (!SiteEventCatalog.TryResolveManualView(path, context.Response.StatusCode, out string canonicalPath))
                 return;
 
-            // La clave de anonimización es REQUERIDA: nunca se cae al secreto de firma del JWT ni a
-            // una constante del repositorio. Sin clave no se escribe nada (la respuesta ya salió,
-            // así que fallar aquí no rompería la descarga; simplemente no se registra).
-            string? salt = configuration["SiteTelemetry:Salt"] ?? configuration["CatalogTelemetry:Salt"];
-            if (string.IsNullOrWhiteSpace(salt))
-            {
-                _logger.LogWarning(
-                    "Telemetría del manual deshabilitada: falta SiteTelemetry:Salt (o CatalogTelemetry:Salt).");
-                return;
-            }
-
             string userAgent = context.Request.Headers.UserAgent.ToString();
             if (CatalogBotDetector.IsBot(userAgent))
                 return;
 
             DateTime now = DateTime.UtcNow;
-            string visitorHash = SiteTelemetryHash.Visitor(httpContextService.IPAddress, userAgent, now, salt);
+            string visitorHash = SiteTelemetryHash.Visitor(httpContextService.IPAddress, userAgent, now);
             string sessionHash = SiteTelemetryHash.Session(visitorHash, now);
             (CatalogSource source, string? referrerHost) = CatalogSourceClassifier.Resolve(
                 null, null, context.Request.Headers.Referer.ToString());
