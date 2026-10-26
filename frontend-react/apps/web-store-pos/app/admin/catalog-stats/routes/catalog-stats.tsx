@@ -121,8 +121,11 @@ export function AdminCatalogStatsPage() {
   }, [days, loadOverview]);
 
   useEffect(() => {
-    if (storeId) void loadStoreStats(storeId, days);
-  }, [storeId, days, loadStoreStats]);
+    // El drill-down solo se pide cuando el overview vigente es del mismo periodo: si la última
+    // lectura buena quedó de otro rango (fallo transitorio), los KPIs y la tabla de la tienda no
+    // pueden describir ventanas distintas bajo el mismo banner.
+    if (storeId && overview?.totals.days === days) void loadStoreStats(storeId, days);
+  }, [storeId, days, overview, loadStoreStats]);
 
   // La selección solo se limpia cuando un overview EXITOSO ya no contiene la tienda (dejó de tener
   // visitas en el periodo). Ya no hace falta una rama de "overview falló": `loadOverview` conserva

@@ -87,6 +87,13 @@ L13 (revisión RDD del slice nuevo, 2026-10-26). El primer candidato (`8edf1744.
 El reviewer levantó 2 CRITICAL del recorte, no del código: el índice aparecía sin su migración dentro de la ventana y el escenario multi-tienda estaba dentro de un E2E que ya existía en la base. Corrección (`5c1f532a`, 93 líneas declaradas): el escenario multi-tienda pasa a `CatalogOverviewStatsMultiStoreE2ETests.cs`, `CatalogOverviewStatsE2ETests.cs` vuelve byte por byte a la versión de `e29a4226`, y la configuración del índice nombra su migración y su script. Revisión final: **approved** (linaje `review-e5c2738dc11973c7`, autoridad quemada), sin correcciones adicionales.
 Advisories informativos de esa revisión: (a) el cambio de filtro del conteo global de pedidos no tiene test que lo fije; (b) el bucle por día añade N round-trips secuenciales dentro del snapshot (tradeoff elegido a propósito); (c) no hay test de frontera entre días ni del corte del último día en `toUtc`; (d) retener el último overview bueno puede dejar los KPIs en el periodo anterior mientras el drill-down ya pide el nuevo, bajo el banner de error.
 
+L14 (cierre de los advisories, 2026-10-26, pedido del usuario: "dale con todo lo que queda").
+- (a) cerrado: `CatalogOverviewStatsWindowE2ETests.Overview_counts_online_orders_from_every_store_and_keeps_the_conversion_consistent` siembra un pedido `WhatsApp` en DOS tiendas y un `Normal` del POS; exige `Totals.Orders == 2` (ve todas las tiendas, no cuenta el POS) y que `ConversionRate == Orders / Visits` de la misma respuesta.
+- (c) cerrado: `Daily_series_buckets_events_by_utc_day_and_the_window_excludes_older_days` inserta eventos con `OccurredAt` explícito (2 hoy, 1 ayer, 1 hace 3 días) y exige los buckets exactos, el hueco en cero, `Daily.Sum == Totals.Visits`, y que `days=1` cuente solo hoy (corte del último día y exclusión de días previos).
+- (d) cerrado: el drill-down solo se pide cuando `overview.totals.days === days`, así que un overview retenido de otro periodo no convive con una tabla de la tienda de otro rango. Test de página ajustado.
+- (b) **no es un defecto**: es el coste del patrón elegido (una consulta por día con rango `[day, day+1)` sobre el índice). El tope de 365 días ya lo acota y la UI solo expone 7/30. Se deja documentado, no se cambia la estrategia.
+
+
 
 
 

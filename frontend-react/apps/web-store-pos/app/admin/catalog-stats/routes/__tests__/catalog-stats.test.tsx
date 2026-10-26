@@ -323,17 +323,19 @@ describe('AdminCatalogStatsPage', () => {
     });
     await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30));
 
-    // Un fallo transitorio del overview ya NO limpia la selección: el overview bueno se conserva.
+    // Un fallo transitorio no limpia la selección, pero tampoco pide el drill-down de un periodo
+    // que no se pudo leer: los KPIs retenidos son del rango anterior y no pueden convivir con una
+    // tabla de otro rango.
+    serviceMock.getStats.mockClear();
     serviceMock.getOverview.mockResolvedValueOnce(failed());
     fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
     await waitFor(() => expect(serviceMock.getOverview).toHaveBeenCalledWith(7));
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
 
     expect(screen.getByTestId('catalog-stats-store')).toHaveValue('store-1');
-    expect(serviceMock.getStats).toHaveBeenLastCalledWith('store-1', 7);
+    expect(serviceMock.getStats).not.toHaveBeenCalled();
 
-    // Y el estado real no se perdió: el periodo anterior la sigue pidiendo con su selección.
-    serviceMock.getStats.mockClear();
+    // Al volver a un periodo que sí se lee, la selección sigue y se pide con ese rango.
     fireEvent.click(screen.getByTestId('catalog-stats-days-30'));
     await waitFor(() => expect(serviceMock.getOverview).toHaveBeenLastCalledWith(30));
 
