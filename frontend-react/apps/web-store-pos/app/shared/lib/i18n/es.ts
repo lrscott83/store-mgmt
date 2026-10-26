@@ -351,6 +351,21 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.STATS_WITHOUT_IMAGE': 'Sin imagen',
   'WEB_CATALOG.NO_PRODUCTS':
     'Esta tienda aún no tiene catálogo aquí. Pulsa Sincronizar Catálogo para subir los productos y categorías que ya tienes en el dispositivo; si la tienda está vacía, créalos antes en Catálogo Productos.',
+  // Alta directa del SuperAdmin (2026-10-26): categorías y productos se crean en la MISMA vista
+  // store-scoped y sobre las MISMAS tablas del catálogo. El dueño no ve estas acciones.
+  'WEB_CATALOG.NEW_CATEGORY': 'Nueva categoría',
+  'WEB_CATALOG.NEW_CATEGORY_ORDER_HINT': 'Déjalo vacío para añadirla al final.',
+  'WEB_CATALOG.NEW_CATEGORY_ORDER_INVALID': 'El orden debe ser un número entero mayor o igual que 0.',
+  'WEB_CATALOG.CATEGORY_CREATED': 'Categoría creada',
+  'WEB_CATALOG.CATEGORY_CREATE_ERROR': 'No se pudo crear la categoría',
+  'WEB_CATALOG.ADMIN_EMPTY':
+    'Esta tienda aún no tiene categorías en el catálogo. Crea la primera con "Nueva categoría".',
+  'WEB_CATALOG.NEW_PRODUCT': 'Nuevo producto',
+  'WEB_CATALOG.CATEGORY': 'Categoría',
+  'WEB_CATALOG.PRODUCT_CREATED': 'Producto creado en el catálogo',
+  'WEB_CATALOG.PRODUCT_CREATE_ERROR': 'No se pudo crear el producto',
+  'WEB_CATALOG.PRODUCT_IMAGE_ERROR':
+    'El producto se creó, pero no se pudo subir la imagen principal',
   'WEB_CATALOG.DESCRIPTION': 'Descripción',
   'WEB_CATALOG.DESCRIPTION_PLACEHOLDER': 'Escribe una descripción para el catálogo (texto simple)',
   'WEB_CATALOG.DESCRIPTION_COUNTER': '{count}/{max} caracteres',

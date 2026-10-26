@@ -21,6 +21,17 @@ export const MAX_PERCENT_SCALED = 100 * PERCENT_SCALE;
 export const MAX_CATALOG_IMAGES = 6;
 export const MAX_CATALOG_IMAGE_BYTES = 2 * 1024 * 1024;
 
+/** Formatos que acepta el backend para las imágenes del catálogo (reglas compartidas). */
+export const ALLOWED_CATALOG_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * true si el archivo cumple las reglas locales de imagen del catálogo: los MISMOS formatos y el
+ * MISMO tamaño que valida el backend (`CatalogImageUploadRules`), para no subir en balde.
+ */
+export function isValidCatalogImage(file: File): boolean {
+  return ALLOWED_CATALOG_IMAGE_TYPES.includes(file.type) && file.size <= MAX_CATALOG_IMAGE_BYTES;
+}
+
 /** Longitud máxima de la descripción (espejo de ProductEntityLimits.DescriptionMaxLength). */
 export const MAX_DESCRIPTION_LENGTH = 4000;
 

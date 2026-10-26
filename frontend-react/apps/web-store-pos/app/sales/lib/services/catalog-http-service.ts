@@ -66,6 +66,40 @@ export interface CatalogProductView {
   hasDiscount: boolean;
 }
 
+/** Categoría del catálogo de la tienda (alta directa del SuperAdmin, store-scoped). */
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  order: number;
+}
+
+/**
+ * Cuerpo del alta de categoría: `order` ausente deja que el backend la ponga al final. No se
+ * inventa un orden en el cliente porque la vista no conoce el máximo real de la tienda.
+ */
+export interface CatalogCategoryCreate {
+  name: string;
+  order?: number;
+}
+
+/**
+ * Cuerpo del alta de producto desde el catálogo. `currency` viaja por VALOR del enum `Currency`
+ * (igual que `UpdateProductCatalogFieldsCommand`); ausente = CUP en el backend.
+ */
+export interface CatalogProductCreate {
+  categoryId: string;
+  name: string;
+  price: number;
+  currency?: number;
+  description?: string;
+  order?: number;
+}
+
+/** Lo único que devuelve el alta: el id con el que se sube la imagen y se recarga el panel. */
+export interface CatalogProductCreated {
+  id: string;
+}
+
 /**
  * Cuerpo de `PUT /v1/catalog/products/{id}`: SOLO los campos del catálogo (decisión D8).
  * Un campo ausente no se toca; el backend no recibe el resto del producto, así que esta vista
@@ -486,6 +520,39 @@ function createCatalogConfigClient(basePath: string) {
     async getProducts(): Promise<BaseResponseModel<CatalogProductView[]>> {
       const response = await apiClient.get<BaseResponseModel<CatalogProductView[]>>(
         `${basePath}/products`,
+      );
+      return response.data;
+    },
+
+    /** Categorías de la tienda ordenadas por `order` (panel del catálogo admin). */
+    async getCategories(): Promise<BaseResponseModel<CatalogCategory[]>> {
+      const response = await apiClient.get<BaseResponseModel<CatalogCategory[]>>(
+        `${basePath}/categories`,
+      );
+      return response.data;
+    },
+
+    /** Alta de categoría. Sin `order` el backend la deja al final: el cliente no lo adivina. */
+    async createCategory(
+      payload: CatalogCategoryCreate,
+    ): Promise<BaseResponseModel<CatalogCategory>> {
+      const response = await apiClient.post<BaseResponseModel<CatalogCategory>>(
+        `${basePath}/categories`,
+        payload,
+      );
+      return response.data;
+    },
+
+    /**
+     * Alta de producto en el catálogo publicado. Devuelve SOLO el id: la imagen principal se sube
+     * después con `uploadImage`, porque necesita ese id.
+     */
+    async createProduct(
+      payload: CatalogProductCreate,
+    ): Promise<BaseResponseModel<CatalogProductCreated>> {
+      const response = await apiClient.post<BaseResponseModel<CatalogProductCreated>>(
+        `${basePath}/products`,
+        payload,
       );
       return response.data;
     },

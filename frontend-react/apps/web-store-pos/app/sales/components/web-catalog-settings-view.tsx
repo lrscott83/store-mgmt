@@ -12,16 +12,25 @@ import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CatalogCsvImportCard } from '../components/catalog-csv-import-card';
+import { CatalogCreateCategoryModal } from '../components/catalog-create-category-modal';
+import { CatalogCreateProductModal } from '../components/catalog-create-product-modal';
+import type { CatalogProductDraft } from '../components/catalog-create-product-modal';
 import { CatalogLocationCard } from '../components/catalog-location-card';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
-import { MAX_CATALOG_IMAGE_BYTES, MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
+import {
+  isValidCatalogImage,
+  MAX_CATALOG_IMAGE_BYTES,
+  MAX_DESCRIPTION_LENGTH,
+} from '../lib/catalog/web-catalog-format';
 import {
   catalogClientForStore,
   catalogHttpService,
   CatalogShowcaseKind,
   type CatalogBranding,
   type CatalogBrandingUpdate,
+  type CatalogCategory,
+  type CatalogCategoryCreate,
   type CatalogProductFields,
   type CatalogProductView,
   type CatalogShowcaseImage,
@@ -41,23 +50,12 @@ export interface WebCatalogSettingsViewProps {
   storeId?: string;
 }
 
-/** Formatos de imagen que acepta el backend para el catálogo (marca, showcase y producto). */
-const ALLOWED_CATALOG_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
 /**
  * Imágenes máximas POR CONJUNTO del showcase (espejo de
  * `Domain/Entities/StoreCatalogImages/StoreCatalogImage.MaxImagesPerKind`). Los conjuntos no
  * comparten cupo: son dos listas independientes (decisión C1).
  */
 const MAX_SHOWCASE_IMAGES = 10;
-
-/**
- * true si el archivo cumple las reglas locales de imagen del catálogo: los MISMOS formatos y el
- * MISMO tamaño que valida el backend (`CatalogImageUploadRules`), para no subir en balde.
- */
-function isValidCatalogImage(file: File): boolean {
-  return ALLOWED_CATALOG_IMAGE_TYPES.includes(file.type) && file.size <= MAX_CATALOG_IMAGE_BYTES;
-}
 
 /**
  * Formatea la marca de la última sincronización. El backend guarda UTC, y según la columna el
@@ -539,6 +537,8 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
   const sessionStoreId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   /** Tienda cuyo catálogo se edita: la de la RUTA (SuperAdmin) o la de la SESIÓN (dueño). */
   const locationStoreId = storeId ?? sessionStoreId;
+  /** `storeId` presente = vista del SuperAdmin. Las acciones de alta SOLO existen aquí. */
+  const isAdmin = storeId !== undefined;
   const catalog = useMemo(
     () => (storeId ? catalogClientForStore(storeId) : catalogHttpService),
     [storeId],
@@ -546,6 +546,15 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
 
   const [status, setStatus] = useState<CatalogStatus | null>(null);
   const [products, setProducts] = useState<CatalogProductView[]>([]);
+  /**
+   * Categorías de la tienda (solo admin). Los paneles se construyen desde aquí, así que una
+   * categoría recién creada aparece aunque no tenga productos. La vista del dueño NO las pide:
+   * su lista de paneles sigue saliendo de los productos.
+   */
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  /** Categoría del panel desde el que se abrió "Nuevo producto" (null = modal cerrado). */
+  const [productModalCategoryId, setProductModalCategoryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
@@ -607,6 +616,25 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
   }, [loadData]);
 
   /**
+   * Categorías del catálogo (solo admin). Se cargan APARTE del catálogo: si esta lista falla, los
+   * paneles siguen saliendo de los productos y la vista no se cae. El alta de categoría y la de
+   * producto la recargan junto con el catálogo para que un panel vacío aparezca de inmediato.
+   */
+  const loadCategories = useCallback(async () => {
+    if (!isAdmin || typeof catalog.getCategories !== 'function') return;
+    try {
+      const result = await catalog.getCategories();
+      if (result.succeeded) setCategories(result.data ?? []);
+    } catch {
+      // Lista de apoyo: el catálogo y sus productos siguen utilizables sin ella.
+    }
+  }, [catalog, isAdmin]);
+
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
+
+  /**
    * La marca se carga APARTE del catálogo: si este endpoint falla (una tienda con la fila de
    * pedidos pero sin la de marca, un 403 puntual) el catálogo y sus productos siguen siendo
    * utilizables. Solo la sección de marca se queda sin configurar.
@@ -655,16 +683,26 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
     void loadShowcase();
   }, [loadShowcase]);
 
-  /** Productos agrupados por categoría, conservando el orden que ya trae el backend. */
+  /**
+   * Paneles por categoría. En admin la lista de categorías es la fuente de verdad (incluye las
+   * vacías); los productos cuya categoría no venga en la lista se anexan al final para no perder
+   * ninguno. En la vista del dueño no se pide esa lista: el agrupado sigue saliendo de los
+   * productos, exactamente como antes.
+   */
   const groups = useMemo(() => {
     const grouped = new Map<string, { name: string; products: CatalogProductView[] }>();
+    if (isAdmin) {
+      for (const category of categories) {
+        grouped.set(category.id, { name: category.name, products: [] });
+      }
+    }
     for (const product of products) {
       const group = grouped.get(product.categoryId) ?? { name: product.categoryName, products: [] };
       group.products.push(product);
       grouped.set(product.categoryId, group);
     }
     return [...grouped.entries()].map(([key, group]) => ({ key, ...group }));
-  }, [products]);
+  }, [products, categories, isAdmin]);
 
   /**
    * El diff contra el producto ORIGINAL: solo lo que el dueño editó de verdad entra. Un producto
@@ -733,6 +771,90 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
       );
     } finally {
       setIsSyncing(false);
+    }
+  }
+
+  /**
+   * Alta de categoría (solo admin). El endpoint es store-scoped: la tienda sale de la RUTA, no de
+   * la sesión. Al terminar se recargan catálogo Y categorías para que el panel nuevo —aunque esté
+   * vacío— aparezca de inmediato.
+   */
+  async function handleCreateCategory(payload: CatalogCategoryCreate): Promise<boolean> {
+    if (typeof catalog.createCategory !== 'function') return false;
+    try {
+      const result = await catalog.createCategory(payload);
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.CATEGORY_CREATE_ERROR' }),
+        );
+        return false;
+      }
+      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.CATEGORY_CREATED' }));
+      await Promise.all([loadData(), loadCategories()]);
+      return true;
+    } catch (err) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.CATEGORY_CREATE_ERROR') }),
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Alta de producto (solo admin): primero el POST y después la imagen principal, porque la subida
+   * necesita el id que devuelve el alta. Si la imagen falla, el producto YA existe: se reporta el
+   * fallo de la imagen sin perderlo ni repetir el alta.
+   */
+  async function handleCreateProduct(draft: CatalogProductDraft): Promise<boolean> {
+    if (typeof catalog.createProduct !== 'function') return false;
+    const { image, ...fields } = draft;
+    try {
+      const result = await catalog.createProduct(fields);
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.PRODUCT_CREATE_ERROR' }),
+        );
+        return false;
+      }
+
+      const productId = result.data?.id;
+      if (!productId) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.PRODUCT_CREATE_ERROR' }),
+        );
+        return false;
+      }
+
+      if (image) {
+        try {
+          const uploaded = await catalog.uploadImage(productId, image);
+          if (!uploaded.succeeded) {
+            showBlockingError(
+              intl.formatMessage({ id: 'GENERAL.ERROR' }),
+              intl.formatMessage({ id: 'WEB_CATALOG.PRODUCT_IMAGE_ERROR' }),
+            );
+          }
+        } catch (err) {
+          showBlockingError(
+            intl.formatMessage({ id: 'GENERAL.ERROR' }),
+            intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.PRODUCT_IMAGE_ERROR') }),
+          );
+        }
+      }
+
+      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.PRODUCT_CREATED' }));
+      await Promise.all([loadData(), loadCategories()]);
+      return true;
+    } catch (err) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.PRODUCT_CREATE_ERROR') }),
+      );
+      return false;
     }
   }
 
@@ -1344,11 +1466,27 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
         </InfoBox>
       )}
 
-      {!isLoading && !error && products.length === 0 && (
-        <InfoBox variant="info" className="text-center">
-          {intl.formatMessage({ id: 'WEB_CATALOG.NO_PRODUCTS' })}
-        </InfoBox>
+      {isAdmin && !isLoading && !error && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setIsCategoryModalOpen(true)}
+            data-testid="catalog-new-category-button"
+          >
+            {intl.formatMessage({ id: 'WEB_CATALOG.NEW_CATEGORY' })}
+          </Button>
+        </div>
       )}
+
+      {!isLoading &&
+        !error &&
+        (isAdmin ? categories.length === 0 && products.length === 0 : products.length === 0) && (
+          <InfoBox variant="info" className="text-center">
+            {intl.formatMessage({
+              id: isAdmin ? 'WEB_CATALOG.ADMIN_EMPTY' : 'WEB_CATALOG.NO_PRODUCTS',
+            })}
+          </InfoBox>
+        )}
 
       {!isLoading &&
         groups.map((group) => (
@@ -1358,6 +1496,17 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
             name={group.name}
             count={group.products.length}
           >
+            {isAdmin && (
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setProductModalCategoryId(group.key)}
+                  data-testid={`catalog-new-product-${group.key}`}
+                >
+                  {intl.formatMessage({ id: 'WEB_CATALOG.NEW_PRODUCT' })}
+                </Button>
+              </div>
+            )}
             {group.products.map((product) => (
               <CatalogProductEditor
                 key={product.id}
@@ -1414,6 +1563,22 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
             })}
           </Button>
         </div>
+      )}
+
+      {isAdmin && isCategoryModalOpen && (
+        <CatalogCreateCategoryModal
+          onSave={handleCreateCategory}
+          onClose={() => setIsCategoryModalOpen(false)}
+        />
+      )}
+
+      {isAdmin && productModalCategoryId !== null && (
+        <CatalogCreateProductModal
+          categories={groups.map((group) => ({ id: group.key, name: group.name }))}
+          defaultCategoryId={productModalCategoryId}
+          onSave={handleCreateProduct}
+          onClose={() => setProductModalCategoryId(null)}
+        />
       )}
     </div>
   );
