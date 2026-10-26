@@ -93,6 +93,11 @@ export interface OrderSnapshot {
   change?: number;
   /** Store the sale belongs to; defaults to the service's own store. */
   storeId?: string;
+  /**
+   * Web-catalog online order this sale was generated from. Persisted as
+   * `Order.onlineOrderId`; absent on hand-registered POS sales.
+   */
+  onlineOrderId?: string | null;
 }
 
 function generateId(): string {
@@ -608,6 +613,9 @@ export class OrderOfflineService {
       saleCurrencyRateApplied: snapshot?.saleCurrencyRate?.value ?? 1,
       saleCurrencyRateId: snapshot?.saleCurrencyRate?.id ?? null,
       saleCurrencyRateEffectiveFrom: snapshot?.saleCurrencyRate?.effectiveFrom ?? null,
+      // Web-catalog origin: null on every hand-registered POS sale, and the idempotency key
+      // that keeps one online order from producing two local sales.
+      onlineOrderId: snapshot?.onlineOrderId ?? null,
       // Every order persists a payment trail: the supplied non-empty list, or the
       // single identity row synthesized above.
       payments: resolvedPayments,

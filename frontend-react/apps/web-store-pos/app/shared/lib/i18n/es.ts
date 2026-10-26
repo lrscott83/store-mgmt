@@ -624,6 +624,8 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.DRIVERS_UNAVAILABLE':
     'No se pudo cargar el catálogo de repartidores: no puedes asignarlos a un pedido.',
   'ORDERING_ORDERS.STATUS_CHANGED': 'Estado del pedido actualizado',
+  'ORDERING_ORDERS.SALES_REGISTERED': 'Ventas registradas desde pedidos web: {count}',
+  'ORDERING_ORDERS.SALES_REGISTER_FAILED': 'Pedidos pagados que no se pudieron registrar en el POS: {count}',
   'ORDERING_ORDERS.STATUS_FAILED': 'No se pudo cambiar el estado del pedido',
   'ORDERING_ORDERS.DRIVER_CHANGED': 'Repartidor del pedido actualizado',
   'ORDERING_ORDERS.DRIVER_FAILED': 'No se pudo asignar el repartidor',

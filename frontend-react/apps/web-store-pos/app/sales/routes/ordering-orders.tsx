@@ -9,9 +9,18 @@ import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import { showToastSuccess } from '~/shared/lib/toast';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import {
+  hasInventoryModuleAvailable,
+  isUserAuthorized,
+} from '~/shared/lib/auth/authorization-service';
 import { OrderDetailModal, formatOrderDate } from '../components/ordering/order-detail-modal';
 import { statusLabel } from '../lib/ordering-labels';
+import {
+  createOnlineOrderSaleDeps,
+  syncPaidOnlineOrderSales,
+} from '../lib/services/online-order-sale-service';
 import {
   allowedTransitionsFrom,
   orderingHttpService,
@@ -87,6 +96,12 @@ function emptyPanels(): Panels {
 
 export function OrderingOrdersPage() {
   const intl = useIntl();
+  const user = useAuthStore((state) => state.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
+  // Same gate as the cart (`EFeatures.Sale`): somebody who cannot register a sale by hand
+  // must not have one registered for them by opening this page.
+  const canRegisterSales = user ? isUserAuthorized(user, [EFeatures.Sale], user.selectedStoreId) : false;
 
   const [panels, setPanels] = useState<Panels>(emptyPanels);
   const [openPanels, setOpenPanels] = useState<Record<OnlineOrderStatus, boolean>>({
@@ -168,6 +183,46 @@ export function OrderingOrdersPage() {
     void Promise.all(PANEL_ORDER.map((status) => loadPanel(status, 1)));
   }, [loadPanel]);
 
+  /**
+   * Paid web-catalog orders become POS sales here. It stays best-effort — the order panel must
+   * keep working offline — but the outcome is no longer silent: what was registered, and what
+   * failed, is surfaced to the operator. The idempotency key (`onlineOrderId`) makes a retry on
+   * the next load harmless.
+   */
+  const syncOnlineOrderSales = useCallback(async () => {
+    if (!storeId || !canRegisterSales) return;
+
+    try {
+      const outcome = await syncPaidOnlineOrderSales(
+        createOnlineOrderSaleDeps(storeId, hasInventoryModule),
+      );
+
+      if (outcome.registered > 0) {
+        showToastSuccess(
+          intl.formatMessage(
+            { id: 'ORDERING_ORDERS.SALES_REGISTERED' },
+            { count: String(outcome.registered) },
+          ),
+        );
+      }
+
+      if (outcome.failed > 0) {
+        showToastError(
+          intl.formatMessage(
+            { id: 'ORDERING_ORDERS.SALES_REGISTER_FAILED' },
+            { count: String(outcome.failed) },
+          ),
+        );
+      }
+    } catch {
+      showToastError(intl.formatMessage({ id: 'ORDERING_ORDERS.SALES_REGISTER_FAILED' }, { count: '?' }));
+    }
+  }, [storeId, canRegisterSales, hasInventoryModule, intl]);
+
+  useEffect(() => {
+    void syncOnlineOrderSales();
+  }, [syncOnlineOrderSales]);
+
   async function runTransition(
     order: OnlineOrderListItem,
     next: OnlineOrderStatus,
@@ -188,6 +243,10 @@ export function OrderingOrdersPage() {
       await Promise.all(
         PANEL_ORDER.map((status) => loadPanel(status, panels[status].page)),
       );
+
+      // Moving an order to Entregado marks it Paid on the server (delivering IS collecting),
+      // so the sale has to be registered right here, not on the next page load.
+      void syncOnlineOrderSales();
       return true;
     } catch (err) {
       showBlockingError(
