@@ -51,7 +51,7 @@ namespace SMCA.WebApi.Middlewares
             }
         }
 
-        private static async Task TryRecordAsync(HttpContext context, ISiteEventRepository repository,
+        private async Task TryRecordAsync(HttpContext context, ISiteEventRepository repository,
             IApplicationUnitOfWork unitOfWork, IHttpContextService httpContextService,
             IConfiguration configuration)
         {
@@ -62,14 +62,22 @@ namespace SMCA.WebApi.Middlewares
             if (!SiteEventCatalog.TryResolveManualView(path, context.Response.StatusCode, out string canonicalPath))
                 return;
 
+            // La clave de anonimización es REQUERIDA: nunca se cae al secreto de firma del JWT ni a
+            // una constante del repositorio. Sin clave no se escribe nada (la respuesta ya salió,
+            // así que fallar aquí no rompería la descarga; simplemente no se registra).
+            string? salt = configuration["SiteTelemetry:Salt"] ?? configuration["CatalogTelemetry:Salt"];
+            if (string.IsNullOrWhiteSpace(salt))
+            {
+                _logger.LogWarning(
+                    "Telemetría del manual deshabilitada: falta SiteTelemetry:Salt (o CatalogTelemetry:Salt).");
+                return;
+            }
+
             string userAgent = context.Request.Headers.UserAgent.ToString();
             if (CatalogBotDetector.IsBot(userAgent))
                 return;
 
             DateTime now = DateTime.UtcNow;
-            string salt = configuration["CatalogTelemetry:Salt"]
-                ?? configuration["Jwt:SecretKey"]
-                ?? "catalog-telemetry";
             string visitorHash = SiteTelemetryHash.Visitor(httpContextService.IPAddress, userAgent, now, salt);
             string sessionHash = SiteTelemetryHash.Session(visitorHash, now);
             (CatalogSource source, string? referrerHost) = CatalogSourceClassifier.Resolve(
