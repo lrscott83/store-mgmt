@@ -81,6 +81,14 @@ public sealed class CatalogOverviewStatsE2ETests
             // La invariante del selector: ninguna tienda sin visitas en el periodo.
             overview.Stores.Should().OnlyContain(store => store.Visits > 0);
             overview.Stores.Should().BeInDescendingOrder(store => store.Visits);
+
+            // "Es una suma": el hash de sesión incluye la tienda, así que el total global es
+            // exactamente la suma del desglose por tienda del mismo periodo.
+            overview.Totals.Visits.Should().Be(overview.Stores.Sum(store => store.Visits));
+
+            // La ventana se clampa igual que en el panel por tienda.
+            (await GetOverviewAsync(admin, 0)).Totals.Days.Should().Be(30);
+            (await GetOverviewAsync(admin, 500)).Totals.Days.Should().Be(365);
         }
         finally
         {
@@ -104,5 +112,13 @@ public sealed class CatalogOverviewStatsE2ETests
         {
             await WebCatalogSeed.CleanupAsync(_f, fixture);
         }
+    }
+
+    private static async Task<CatalogStatsOverviewDto> GetOverviewAsync(HttpClient admin, int days)
+    {
+        var response = await admin.GetFromJsonAsync<ApiResponse<CatalogStatsOverviewDto>>(
+            $"/api/v1/stores/catalog-stats?days={days}", ApiResponse.Json);
+        response!.Succeeded.Should().BeTrue();
+        return response.Data!;
     }
 }

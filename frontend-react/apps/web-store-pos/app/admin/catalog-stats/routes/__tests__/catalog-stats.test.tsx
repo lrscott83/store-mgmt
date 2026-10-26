@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { AdminCatalogStatsPage } from '../catalog-stats';
@@ -50,6 +50,18 @@ function overview(overrides: Record<string, unknown> = {}) {
 
 function ok<T>(data: T) {
   return { succeeded: true, data, message: '', actionCode: 200, errors: [] };
+}
+
+function failed() {
+  return { succeeded: false, data: null, message: 'boom', actionCode: 500, errors: [] };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe('AdminCatalogStatsPage', () => {
@@ -159,5 +171,96 @@ describe('AdminCatalogStatsPage', () => {
     renderPage();
 
     expect(await screen.findByText('Todavía no hay productos vistos.')).toBeInTheDocument();
+  });
+
+  it('no deja el spinner encendido cuando llega una respuesta superada', async () => {
+    const first = deferred<ReturnType<typeof ok>>();
+    serviceMock.getOverview.mockReturnValueOnce(first.promise);
+    renderPage();
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenCalledTimes(1));
+
+    const second = deferred<ReturnType<typeof ok>>();
+    serviceMock.getOverview.mockReturnValueOnce(second.promise);
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenCalledTimes(2));
+
+    // La respuesta vigente termina primero y la superada después: el contador de cargas pendientes
+    // tiene que bajar en las dos, o el spinner no se apaga nunca.
+    await act(async () => {
+      second.resolve(ok(overview({ totals: stats({ days: 7 }) })));
+    });
+    await act(async () => {
+      first.resolve(ok(overview()));
+    });
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(screen.getByTestId('catalog-stat-VISITS')).toBeInTheDocument();
+  });
+
+  it('se recupera de un drill-down fallido al volver a la vista general', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+
+    serviceMock.getStats.mockResolvedValueOnce(failed());
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-1' },
+    });
+    expect(
+      await screen.findByText('No se pudieron cargar las estadísticas.'),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: '' },
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText('No se pudieron cargar las estadísticas.')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('catalog-stat-VISITS')).toHaveTextContent('12');
+  });
+
+  it('se recupera de un drill-down fallido al elegir otra tienda', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+
+    serviceMock.getStats.mockResolvedValueOnce(failed());
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-1' },
+    });
+    await screen.findByText('No se pudieron cargar las estadísticas.');
+
+    serviceMock.getStats.mockResolvedValueOnce(
+      ok(stats({ visits: 4, visitors: 2, pageViews: 5 })),
+    );
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-2' },
+    });
+
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenLastCalledWith('store-2', 30));
+    await waitFor(() =>
+      expect(screen.queryByText('No se pudieron cargar las estadísticas.')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('catalog-stat-VISITS')).toHaveTextContent('4');
+  });
+
+  it('no re-selecciona sola la tienda que dejó de tener visitas', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-stat-VISITS');
+
+    fireEvent.change(screen.getByTestId('catalog-stats-store'), {
+      target: { value: 'store-1' },
+    });
+    await waitFor(() => expect(serviceMock.getStats).toHaveBeenCalledWith('store-1', 30));
+
+    serviceMock.getOverview.mockResolvedValueOnce(ok(overview({ stores: [] })));
+    fireEvent.click(screen.getByTestId('catalog-stats-days-7'));
+    await waitFor(() => expect(screen.getByTestId('catalog-stats-store')).toHaveValue(''));
+
+    serviceMock.getStats.mockClear();
+    fireEvent.click(screen.getByTestId('catalog-stats-days-30'));
+    await waitFor(() => expect(serviceMock.getOverview).toHaveBeenLastCalledWith(30));
+
+    expect(screen.getByTestId('catalog-stats-store')).toHaveValue('');
+    expect(serviceMock.getStats).not.toHaveBeenCalled();
   });
 });

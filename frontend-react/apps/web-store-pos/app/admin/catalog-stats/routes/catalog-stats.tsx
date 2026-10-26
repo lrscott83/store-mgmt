@@ -45,7 +45,9 @@ export function AdminCatalogStatsPage() {
   const [overview, setOverview] = useState<CatalogStatsOverview | null>(null);
   const [storeStats, setStoreStats] = useState<CatalogStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  // Un error por lectura: el de un drill-down no puede ocultar la vista general ni al revés.
+  const [overviewError, setOverviewError] = useState<string | undefined>(undefined);
+  const [storeError, setStoreError] = useState<string | undefined>(undefined);
   const overviewRequest = useRef(0);
   const storeRequest = useRef(0);
   // Dos lecturas corren en paralelo al cambiar el periodo; el spinner se apaga cuando terminan las dos.
@@ -56,6 +58,9 @@ export function AdminCatalogStatsPage() {
     setLoading(true);
   }, []);
 
+  // Cada `begin()` tiene exactamente un `end()`, incluso si la respuesta llega superada: el
+  // contador no puede quedarse colgado (un `end()` condicionado al request vigente filtraba una
+  // unidad por cada cancelación y dejaba el spinner encendido para siempre).
   const end = useCallback(() => {
     pending.current = Math.max(0, pending.current - 1);
     if (pending.current === 0) setLoading(false);
@@ -65,7 +70,7 @@ export function AdminCatalogStatsPage() {
     async (range: number) => {
       const current = ++overviewRequest.current;
       begin();
-      setError(undefined);
+      setOverviewError(undefined);
       try {
         const result = await catalogStatsHttpService.getOverview(range);
         if (current !== overviewRequest.current) return;
@@ -73,14 +78,14 @@ export function AdminCatalogStatsPage() {
           setOverview(result.data);
         } else {
           setOverview(null);
-          setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
+          setOverviewError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
         }
       } catch (err) {
         if (current !== overviewRequest.current) return;
         setOverview(null);
-        setError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
+        setOverviewError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
       } finally {
-        if (current === overviewRequest.current) end();
+        end();
       }
     },
     [begin, end, formatMessage],
@@ -90,6 +95,7 @@ export function AdminCatalogStatsPage() {
     async (selectedStoreId: string, range: number) => {
       const current = ++storeRequest.current;
       begin();
+      setStoreError(undefined);
       try {
         const result = await catalogStatsHttpService.getStats(selectedStoreId, range);
         if (current !== storeRequest.current) return;
@@ -97,14 +103,14 @@ export function AdminCatalogStatsPage() {
           setStoreStats(result.data);
         } else {
           setStoreStats(null);
-          setError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
+          setStoreError(formatMessage({ id: 'ADMIN_CATALOG_STATS.ERROR' }));
         }
       } catch (err) {
         if (current !== storeRequest.current) return;
         setStoreStats(null);
-        setError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
+        setStoreError(formatMessage({ id: httpErrorKey(err, 'ADMIN_CATALOG_STATS.ERROR') }));
       } finally {
-        if (current === storeRequest.current) end();
+        end();
       }
     },
     [begin, end, formatMessage],
@@ -118,10 +124,17 @@ export function AdminCatalogStatsPage() {
     if (storeId) void loadStoreStats(storeId, days);
   }, [storeId, days, loadStoreStats]);
 
-  // La selección solo vale si la tienda sigue teniendo visitas en el periodo vigente.
+  // La selección solo sobrevive mientras la tienda tenga visitas en el periodo vigente. Se limpia
+  // el estado real (no solo el valor mostrado) para que no se re-seleccione sola más adelante.
+  useEffect(() => {
+    if (!storeId || !overview) return;
+    if (!overview.stores.some((store) => store.storeId === storeId)) setStoreId('');
+  }, [storeId, overview]);
+
   const selectedStore = overview?.stores.find((store) => store.storeId === storeId);
   const effectiveStoreId = selectedStore ? storeId : '';
   const stats = selectedStore ? storeStats : overview?.totals ?? null;
+  const error = selectedStore ? storeError : overviewError;
   const storeName = selectedStore
     ? selectedStore.name
     : formatMessage({ id: 'ADMIN_CATALOG_STATS.ALL_STORES' });
