@@ -20,6 +20,7 @@ estado Abierta→Cerrada y comentario obligatorio cuando no cuadra.
   gate `EFeatures.Sale`, misma autorización que Vender).
 - **S6** — Vista con header (título de tarjeta) **`"Cierre Efectivo"`**.
 - **S7** — Resumen con **`"Esperado"` (`efectivo de la venta del día + apertura`)**, **`"Contado"`** y **`"Diferencia"`**.
+  *Superado el 2026-10-24 por `odd/tasks/expense-fund-source.md` S7: el Esperado resta también los gastos pagados con dinero de la caja (`fundSource = Caja`). Los cierres ya `Closed` conservan su snapshot congelado.*
 - **S8** — **Diferencia**: negativa se muestra con signo `-` y en **rojo**; positiva o cero en **verde**.
 - **S9** — Textbox para el valor de la **Apertura** del día.
 - **S10** — Card **`"Conteo"`**: denominaciones de billetes alineadas a la izquierda, en el centro botón `-`,

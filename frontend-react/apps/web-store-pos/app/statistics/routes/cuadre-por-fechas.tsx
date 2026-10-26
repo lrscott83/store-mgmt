@@ -6,6 +6,7 @@ import {
   ExpenseType,
   PaymentType,
   SalePaymentMethod,
+  isCashDrawerExpense,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import {
@@ -326,9 +327,8 @@ export function CuadrePorFechasPage() {
       const expenseService = new ExpenseOfflineService(storeId);
       expenses = expenseService.getActiveExpensesBetween(rangeStart, rangeEnd);
       expensesTotal = expenses.reduce((acc, e) => acc + e.total, 0);
-      expensesCashTotal = expenses
-        .filter((e) => e.paymentType === PaymentType.Efectivo)
-        .reduce((acc, e) => acc + e.total, 0);
+      // expense-fund-source (2026-10-24): solo `Caja` descuenta el efectivo.
+      expensesCashTotal = expenses.filter(isCashDrawerExpense).reduce((acc, e) => acc + e.total, 0);
     }
 
     let saleCredits: SaleCredit[] = [];
@@ -708,7 +708,7 @@ export function CuadrePorFechasPage() {
                     {hasExpensesModule && (
                       <tr className="border-b border-border last:border-0">
                         <td className="p-1">
-                          <span className="font-bold text-text">Gastos</span>
+                          <span className="font-bold text-text">Gastos de caja</span>
                         </td>
                         <td className="p-1 text-right">
                           <span className="font-bold text-danger whitespace-nowrap">
@@ -1016,7 +1016,7 @@ function filterSummaryByCurrency(summary: RangeSummary, currency: Currency): Ran
     salesCashTotal: sum(salesCashEntries),
     salesCardTotal: sum(salesCardEntries),
     expensesCashTotal: expenses
-      .filter((e) => e.paymentType === PaymentType.Efectivo)
+      .filter(isCashDrawerExpense)
       .reduce((acc, e) => acc + e.total, 0),
     paidCreditsCashTotal: paidSaleCredits
       .filter((c) => c.paidType === PaymentType.Efectivo)
@@ -1116,7 +1116,7 @@ function MultiStoreCuadreBody({
             {hasExpensesModule && (
               <tr className="border-b border-border last:border-0">
                 <td className="p-1">
-                  <span className="font-bold text-text">Gastos</span>
+                  <span className="font-bold text-text">Gastos de caja</span>
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-danger whitespace-nowrap">
