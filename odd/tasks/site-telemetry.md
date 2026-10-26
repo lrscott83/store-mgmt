@@ -12,6 +12,34 @@ Rama: `test`. Entrega: captura de eventos, sin panel de lectura. Runner frontend
 - **S6** El beacon es fire-and-forget: un fallo de red o de endpoint nunca rompe la página ni bloquea al visitante.
 - **S7** El manual se cuenta en el servidor porque no es una ruta de React: son archivos estáticos servidos en `Program.cs:206-221`.
 
+## RDD
+
+Corrí RDD **tarde**: los 5 commits se hicieron sin evaluar y sin revisar. Se corrigió después, revisando commit por commit en un worktree aparte (el candidato completo no cabía: `lens_context_budget_exceeded` por los archivos generados de la migración).
+
+| Commit | Resultado |
+|---|---|
+| `247283ae` dominio+migración | aprobado, 5 hallazgos informativos |
+| `f0e805f2` beacon | **corrección obligatoria**: `R1-telemetry-salt-fallback` (CRITICAL, verificado por refuter) → corregido → aprobado |
+| `c8144201` middleware manual | aprobado; reaparece el mismo fallback de salt en el middleware → corregido después |
+| `48d89ff9` frontend | aprobado, 6 hallazgos informativos |
+| `bef9555e` docs | `closed`, riesgo low, sin review |
+
+### El hallazgo real que encontró el review
+
+`RecordSitePageViewsCommandHandler` resolvía la clave del hash como `CatalogTelemetry:Salt` → `Jwt:SecretKey` → constante `"catalog-telemetry"`. Sin salt configurado (el estado real del repo: no existe esa clave en ningún `appsettings`), el `VisitorHash` quedaba llaveado con un valor legible en el repo y reutilizaba el secreto de firma del JWT. Brute-forceable sobre IPv4 + User-Agent = telemetría pseudónima, no anónima.
+
+Corregido en `0344434f` y `538128e5`: clave propia (`SiteTelemetry:Salt`), sin fallback al JWT ni a constantes. El beacon falla cerrado (excepción); el middleware del manual no escribe nada y avisa en el log.
+
+### Hallazgos informativos pendientes (no bloquean, no se arreglaron)
+
+- `R4-1`/`R4-2`: el beacon no degrada ante una caída de base; un salt ausente devuelve 500 en todas las peticiones. La solución correcta es validar en el arranque, no por request.
+- `R1-3` (middleware): cada `GET /api/manual/` escribe una fila y esa ruta no tiene rate limit.
+- `R3-ROOT-WIRING-UNPROVED`: `root.test.tsx` mockea el hook sin afirmar que se llama; borrar la llamada de `root.tsx` deja la suite verde.
+- `R3-HOOK-DEDUPE-UNTESTED`: el guard del `ref` (no contar doble en StrictMode, sí contar al volver) no tiene test.
+- `R3-SYNC-THROW-PATH`, `R3-UTM-EMPTY-VALUE`: sin cobertura el throw síncrono y el UTM vacío.
+- `R1-1`/`R3-003`: sin política de retención para `SiteEvent`.
+- `R1-2`: el contrato "append-only" es solo documentación; el repositorio expone update/delete.
+
 ## Tasks
 
 - **T1** ✅ Dominio + infraestructura + migración `20261026183144_Add-SiteEvents` + script `41-20261026-Add-SiteEvents.sql` (generado con `dotnet ef migrations script` desde la migración anterior, con guard `ON CONFLICT` y verificación). inline.
