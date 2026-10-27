@@ -2886,6 +2886,125 @@ namespace Infrastructure.Migrations
                     b.ToTable("StoreRoleFeature");
                 });
 
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DownloadCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StoreName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UploadedByFullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("StoreSyncFile");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFileDownload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("DownloadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("StoreSyncFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("StoreSyncFileId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("StoreSyncFileDownload");
+                });
+
             modelBuilder.Entity("Domain.Entities.StoreUsages.StoreUsage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3751,6 +3870,28 @@ namespace Infrastructure.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFileDownload", b =>
+                {
+                    b.HasOne("Domain.Entities.StoreSyncFiles.StoreSyncFile", "StoreSyncFile")
+                        .WithMany("Downloads")
+                        .HasForeignKey("StoreSyncFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("StoreSyncFile");
+                });
+
             modelBuilder.Entity("Domain.Entities.StoreUsages.StoreUsage", b =>
                 {
                     b.HasOne("Domain.Entities.Stores.Store", "Store")
@@ -3900,6 +4041,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.StorePaymentStatuses.StorePaymentStatus", b =>
                 {
                     b.Navigation("StorePayments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.Navigation("Downloads");
                 });
 
             modelBuilder.Entity("Domain.Entities.Stores.Store", b =>

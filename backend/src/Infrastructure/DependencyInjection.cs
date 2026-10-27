@@ -28,6 +28,10 @@ namespace Infrastructure
             services.Configure<CatalogImageStorageOptions>(configuration.GetSection("Storage"));
             services.AddSingleton<ICatalogImageStorage, CatalogImageStorage>();
 
+            // Repositorio de backups del POS: los ZIP cifrados en disco, la metadata en tabla.
+            services.Configure<StoreSyncFileStorageOptions>(configuration.GetSection("Storage"));
+            services.AddSingleton<IStoreSyncFileStorage, StoreSyncFileStorage>();
+
             services.AddSingleton<OutboxMessagesInterceptor>();
 
             services.AddScoped<UpdateAuditableEntitiesInterceptor>();
@@ -108,6 +112,8 @@ namespace Infrastructure
             services.AddScoped<IProductSalesCommissionRepository, ProductSalesCommissionRepository>();
             services.AddScoped<IOrderSalesCommissionRepository, OrderSalesCommissionRepository>();
             services.AddScoped<IOrderSalesManagerRepository, OrderSalesManagerRepository>();
+            // Sincronización del POS por el servidor: ficheros por tienda + marcas de descarga.
+            services.AddScoped<IStoreSyncFileRepository, StoreSyncFileRepository>();
         }
     }
 }
