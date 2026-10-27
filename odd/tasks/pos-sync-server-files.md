@@ -1,7 +1,7 @@
 # POS sync files — repositorio de backups en el backend
 
 Objetivo: un lugar en el backend donde Owner y StoreUsers suben y descargan los ZIP cifrados que el POS ya exporta, sin tocar el export/import local.
-Branch: `test`. Delivery: `ask-on-risk`. Test runner: `dotnet test` (backend) + `pnpm test` (frontend-react).
+Branch: `feat/pos-sync-server-files`. Delivery: `ask-on-risk`. Test runner: `dotnet test` (backend) + `pnpm test` (frontend-react).
 
 ## Specs
 
@@ -109,3 +109,17 @@ Ninguno de los hallazgos abrió corrección ni reabre la revisión. Quedan como 
 - El arreglo de `DbTestHelpers.ResetDataAsync` (L5) quedó autorizado, aplicado y probado con filas huérfanas reales.
 - Los dos riesgos de alto valor (item 2 e item 5) pasaron revisión nativa y quedaron aprobados con su autoridad quemada (L8). Los hallazgos restantes son no bloqueantes y quedan como trabajo posterior.
 - El primer intento de revisión del feature completo quedó sin autoridad por `lens_context_budget_exceeded`; la decisión de no reescribir la historia se mantiene, y la cobertura de los dos riesgos se obtuvo con candidatos recortados.
+
+### L10 — Cierre de los hallazgos de L8 (commits `114c4b06`, `9dd7a5eb`, `c3eb5ece`)
+Los hallazgos no bloqueantes de L8 se atendieron después del cierre del feature, en tres commits sobre `feat/pos-sync-server-files`:
+
+- **`114c4b06` — ámbito.** El commit `65086ec1` había añadido una rama SuperAdmin que resolvía las tiendas con `IgnoreQueryFilters` (alcance cross-tenant, verificado en `StoreRepository.cs:104-123`). S5 habla de Owner y StoreUser, no de SuperAdmin, así que la rama se retiró: un SuperAdmin cae en el camino del claim y ve solo la tienda que tenga seleccionada. Nuevo test unitario `Handle_WhenTheCallerIsASuperAdmin_ShouldNotWidenToEveryTenant`.
+- **`9dd7a5eb` — cobertura de lo ya corregido.** `StoreSyncFileStorageTests` (sistema de ficheros real, carpeta temporal por GUID) prueba que una copia que falla a mitad no deja ni el fichero final ni el temporal; E2E `Download_mark_cannot_belong_to_a_different_tenant_than_its_file` prueba la FK compuesta contra PostgreSQL real.
+- **`c3eb5ece` — hallazgos del review de `114c4b06`.** El comentario del ámbito afirmaba que el comportamiento era "igual que antes", cuando la rama retirada lo había hecho tenant-wide; ahora dice explícitamente que ES un cambio de comportamiento. El E2E comprueba el NOMBRE de la restricción violada (`FK_StoreSyncFileDownload_StoreSyncFile_StoreSyncFileId_TenantId`) para que otro rechazo al guardar no lo deje verde por el motivo equivocado. El test de storage ya no exige que la carpeta temporal sobreviva al fallo.
+
+**Revisión nativa de `114c4b06` + `9dd7a5eb`**: preflight con lentes `review-risk` y `review-reliability`, consentimiento concedido por el owner, lineage `review-b54a5715ae0abcff`, veredicto **approved** y autoridad quemada (`gentle-ai.review-acknowledged/v1`). Hallazgos no bloqueantes (`R3-001`, `R3-002`, `R3-003`) atendidos en `c3eb5ece`. `c3eb5ece` se evaluó contra la frontera `9dd7a5eb`: `medium` / `under_budget`, sin revisión debida.
+
+**Evidencia observada:**
+- `Application.Tests` filtrado `~StoreSync` → **57/57 passed**; suite completa `Application.Tests` → **1628/1628 passed**.
+- `SMCA.WebApi.E2ETests` filtrado `~StoreSyncFilesTests` → **7/7 passed**, con el guard `Database=smca_test` presente y build limpio.
+- `git status` limpio tras `c3eb5ece`.
