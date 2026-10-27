@@ -1,6 +1,6 @@
 # Manual de usuario — VendeDTo
 
-**Versión:** 1.1 · **Fecha:** 2026-10-16
+**Versión:** 1.2 · **Fecha:** 2026-10-27
 **Dirigido a:** el **Dueño** (Administrador de tienda) y sus **Empleados** (Usuario de tienda).
 
 **Cómo leerlo.** La **Parte 1** es la puesta en marcha: se hace una vez, cuando montas la
@@ -305,6 +305,12 @@ filtrar por rango de fechas y por estado (**Todos / Por Pagar / Pagados**).
 
 ![Pagar un crédito: la forma de pago y la nota](img/38-pagar-credito.png)
 
+**Historial de créditos** (para días anteriores):
+
+![Créditos: el historial con el filtro Por Pagar y el acordeón del día desplegado](img/57-creditos-historial-1.png)
+
+![Créditos: continuación del historial](img/57-creditos-historial-2.png)
+
 
 
 ## 12. Cierre de caja
@@ -351,6 +357,45 @@ es la sección 12.
 ![Ventas del día: las ventas de hoy con sus filtros por método de pago, estado y moneda](img/15-ventas-del-dia.png)
 
 ![Cuadre del día: paneles de Resumen Efectivo, transferencias, gastos, créditos y ventas](img/14-cuadre-dia.png)
+
+
+## 13.1 Historial de ventas
+
+**Qué es.** Consultar **todas** las ventas guardadas (no solo las de hoy), con filtros y el
+detalle agrupado por día; y, si tienes varias tiendas, verlas juntas en una sola pantalla.
+
+**Cómo se hace.**
+1. Ve a **Ventas → Ventas**. El encabezado muestra cuántas ventas entran en el filtro y su
+   importe total.
+2. Filtra por **rango de fechas**, por **método de pago** (Todas / Efectivo / …) y por estado
+   (**Todas / Pagadas / Créditos**). Si tienes varias monedas aparece también el filtro de
+   **moneda**.
+3. Pulsa un **día** para desplegar sus ventas. Cada venta muestra su hora, su método de pago y
+   su total; con la flecha de la venta ves su detalle.
+4. Con el **engranaje del día** puedes **generar el reporte** de ese día o abrir el **Resumen
+   de ventas** del día.
+
+**Con varias tiendas.** Si eres **Dueño** y tienes el módulo **MultiStores** con **dos o más
+tiendas activas**, la misma pantalla cambia a paneles por tienda:
+- Arriba eliges **Todas las tiendas** o una tienda concreta.
+- Cada tienda es un **panel colapsable** con su contador y su total; dentro va el acordeón por
+  día con las ventas de **esa** tienda.
+- Los filtros de **fechas**, **método de pago**, **Pagadas/Créditos** y **moneda** son
+  **globales**: se aplican a todas las tiendas a la vez.
+
+**A tener en cuenta.** El historial es **solo lectura**: aquí no se editan ni se eliminan
+ventas. Para editar o cancelar una venta de hoy usa **Ventas del día**. Una venta cancelada no
+aparece en el historial.
+
+![Historial de ventas: filtros de fecha, método de pago y estado, y el acordeón del día desplegado](img/55-historial-ventas-1.png)
+
+![Historial de ventas: continuación del día desplegado](img/55-historial-ventas-2.png)
+
+**Con varias tiendas**, el historial se reparte en un panel por tienda:
+
+![Historial de ventas multi-tienda: selector Todas las tiendas, totales y un panel por tienda con su día desplegado](img/56-historial-ventas-multitienda-1.png)
+
+![Historial de ventas multi-tienda: el segundo panel por tienda](img/56-historial-ventas-multitienda-2.png)
 
 
 ---
@@ -415,6 +460,12 @@ que ya se vendió no se puede anular. La fecha siempre es la del día.
 
 ![Entradas del día: las compras registradas hoy](img/11-entradas-dia.png)
 
+**Historial de entradas** (todos los días, agrupado por día):
+
+![Entradas: el historial con el acordeón del día desplegado](img/59-entradas-historial-1.png)
+
+![Entradas: continuación del historial](img/59-entradas-historial-2.png)
+
 
 ## 16. Cantidades del día
 
@@ -451,21 +502,24 @@ recalcula). La ganancia total se pinta en verde si es positiva y en rojo si es n
 
 ## 18. Salida
 
-**Qué es.** La pantalla **Salida** abre la venta con un **selector de tipo de pedido** (por defecto
-Mayorista) sobre las categorías de productos. Comparte el carrito de la venta.
+**Qué es.** Registrar una **salida de inventario que no es una venta**: una **merma** (producto
+dañado, vencido o perdido), un **ajuste** de existencias o **otro** detalle que saca mercancía
+del almacén.
 
 **Cómo se hace.**
 1. Ve a **Inventario → Salida**.
-2. Elige el **tipo** en el selector de la esquina superior, navega por categorías y añade lo que
-   corresponda.
-3. Confirma desde el carrito, igual que cualquier venta.
+2. En **Tipo** elige **Merma**, **Ajuste** u **Otro**. El selector **no ofrece Normal ni
+   Mayorista**: la venta normal se registra en **Vender** y la venta al por mayor en **Vender
+   Mayorista**.
+3. Navega por las categorías, añade los productos y sus cantidades y confirma desde el carrito,
+   igual que en una venta.
 
-**A tener en cuenta.** La etiqueta del menú invita a pensar en *mermas o salidas no de venta*, pero
-la pantalla funciona como una **venta** con tipo de pedido seleccionable. **Confirmar con el
-Dueño** si el uso previsto es ese antes de documentarlo con más detalle.
+**A tener en cuenta.** La salida comparte el carrito de la venta y el **tipo elegido queda
+guardado en la orden**, para que puedas distinguir después una merma de un ajuste. El
+inventario se descuenta según la casilla **Descuenta del Inventario** de cada producto, igual
+que en una venta.
 
-**📷 Imagen sugerida.** La pantalla **Salida** con el selector de **tipo** arriba y una categoría con
-sus productos.
+![Salida: el selector Tipo con Merma (solo Merma, Ajuste y Otro) y las categorías de productos](img/58-salida.png)
 
 ---
 
@@ -581,6 +635,12 @@ alimentan el **Cuadre del día** y las **Estadísticas**.
 ![Gastos del día: botón Gasto y la lista de gastos del día](img/10-gastos.png)
 
 ![Nuevo gasto: tipo, total, moneda, tipo de pago y nota](img/36-nuevo-gasto.png)
+
+**Historial de gastos** (todos los días, agrupado por día):
+
+![Gastos: el historial con el acordeón del día desplegado](img/60-gastos-historial-1.png)
+
+![Gastos: continuación del historial](img/60-gastos-historial-2.png)
 
 
 ## 23. Reportes
@@ -760,8 +820,9 @@ falla, para enviar el detalle.
 
 ## Anexo — Qué NO cubre este manual
 
-Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp** y
-las **configuraciones**. Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
+Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp**,
+las **configuraciones** y el **modo multi-tienda del historial de ventas** (cuando el módulo
+MultiStores está activo). Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
 Superior), las pantallas de **Gestión de pedidos** (atender los pedidos, repartidores y ventas de
 pedidos) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).
