@@ -46,9 +46,10 @@ namespace Application.Features.StoreSync
             //
             // NO hay rama para SuperAdmin a propósito (hallazgo R1-SUPERADMIN-SCOPE del review): darle
             // "todas las tiendas de todos los tenants" con IgnoreQueryFilters ampliaría el alcance de
-            // una pantalla que no es suya y convertiría este helper en una vía para leer backups de
-            // cualquier instalación. Un SuperAdmin no tiene tienda seleccionada, así que cae en el
-            // camino del claim —vacío— y el resultado es "ninguna", igual que antes de este cambio.
+            // una pantalla que no es suya (S5 habla de Owner y de StoreUser) y convertiría este helper
+            // en una vía para leer y borrar backups de cualquier instalación. Ojo: esa rama existió y
+            // se quitó aquí, así que el cambio ES de comportamiento —un SuperAdmin deja de ver todas
+            // las tiendas—. Cae en el camino del claim y ve solo la tienda que tenga seleccionada.
             if (httpContextService.IsReSeller)
             {
                 IEnumerable<Store> resold = await storeRepository.GetActiveStoresByReSellerUserIdAsync(

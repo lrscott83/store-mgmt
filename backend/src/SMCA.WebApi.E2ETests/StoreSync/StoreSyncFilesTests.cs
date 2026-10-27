@@ -538,8 +538,14 @@ public sealed class StoreSyncFilesTests
 
             Func<Task> act = () => db.SaveChangesAsync();
 
-            await act.Should().ThrowAsync<DbUpdateException>(
-                "el tenant de la marca no puede diferir del tenant de su fichero");
+            DbUpdateException failure = (await act.Should().ThrowAsync<DbUpdateException>(
+                "el tenant de la marca no puede diferir del tenant de su fichero")).Which;
+
+            // La restricción violada tiene NOMBRE, y se comprueba: sin esto, cualquier otro rechazo
+            // al guardar (otra FK, un guard nuevo) dejaría verde este test por el motivo equivocado.
+            failure.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+                .Which.ConstraintName.Should()
+                .Be("FK_StoreSyncFileDownload_StoreSyncFile_StoreSyncFileId_TenantId");
         }
         finally
         {

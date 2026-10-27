@@ -60,10 +60,13 @@ public sealed class StoreSyncFileStorageTests : IDisposable
 
         await act.Should().ThrowAsync<IOException>();
 
-        Directory.Exists(_root).Should().BeTrue("la carpeta se creó para escribir el temporal");
+        // La carpeta puede existir (con el temporal ya borrado) o haberse limpiado entera: las dos
+        // cosas son correctas. Lo que NO puede quedar es un fichero, ni el final ni un temporal.
+        IEnumerable<string> leftovers = Directory.Exists(_root)
+            ? Directory.GetFiles(_root, "*", SearchOption.AllDirectories)
+            : [];
 
-        Directory.GetFiles(_root, "*", SearchOption.AllDirectories)
-            .Should().BeEmpty("ni el destino final ni el temporal pueden sobrevivir a un fallo a mitad");
+        leftovers.Should().BeEmpty("ni el destino final ni el temporal pueden sobrevivir a un fallo a mitad");
     }
 
     /// <summary>Un stream que entrega unos bytes y revienta, como un cliente que corta la subida.</summary>
