@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { ExpenseType } from '@store-mgmt/domain';
+import { ExpenseType, EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
-import { ownerOnlyLoader } from '~/auth/routes/loaders';
+import { ownerModuleLoader, ownerOnlyLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
   cierreAnual,
@@ -20,8 +20,18 @@ import type { OnatMonthOverrides, OnatOverride, OnatOverrides } from '~/onat/lib
 /**
  * S2: el Vector Fiscal es del Owner — `isOwnerAdmin` y NO `isSuperAdmin`.
  * Cualquier otro rol se deniega igual que en el resto de loaders (logout + /login).
+ *
+ * Encima va el módulo ONAT (22), que nace inactivo: mientras `/me` no lo devuelva
+ * en `storeModuleIds` la pantalla queda apagada aunque el usuario sea el dueño.
+ * `ownerModuleLoader` solo no basta para el "solo el Owner": no excluye a un
+ * SuperAdmin que además sea OwnerAdmin (`loaders.ts`), por eso se encadenan los
+ * dos guards.
  */
-export const clientLoader = ownerOnlyLoader;
+export async function clientLoader() {
+  const ownerResult = await ownerOnlyLoader();
+  if (ownerResult) return ownerResult;
+  return ownerModuleLoader(EModules.Onat)();
+}
 
 const CUP_FORMATTER = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
 const MONTH_FORMATTER = new Intl.DateTimeFormat('es-ES', { month: 'long' });

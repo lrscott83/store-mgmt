@@ -76,6 +76,19 @@ beforeEach(() => {
 
 describeOwnerOnlyLoader('clientLoader de Vector Fiscal (solo el Owner)', clientLoader);
 
+describe('módulo ONAT (módulo 22)', () => {
+  it('desloguea al Owner cuando el módulo Onat no está disponible', async () => {
+    session.user = makeUser({ storeModuleIds: [] });
+
+    const result = await clientLoader();
+
+    expect(session.logout).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(302);
+    expect((result as Response).headers.get('Location')).toBe('/login');
+  });
+});
+
 describe('Vector Fiscal (S3, S4, S5, S6, S8)', () => {
   it('muestra los encabezados, el año actual por defecto y doce filas mensuales', async () => {
     session.user = makeUser();

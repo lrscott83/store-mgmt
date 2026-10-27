@@ -3,17 +3,18 @@ import { createElement } from 'react';
 import type { ReactElement } from 'react';
 import { render } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 
 /**
  * Arnés compartido de las pruebas de rutas ONAT.
  *
- * Las dos pantallas (Vector Fiscal y Configuraciones) usan el mismo guard
- * `ownerOnlyLoader` y leen la sesión por `useAuthStore`, así que duplicaban el
- * mock del store, la sesión mutable y las pruebas de denegación del loader.
- * Aquí viven una sola vez; un cambio en el contrato del guard se prueba en un
- * único sitio.
+ * Las dos pantallas (Vector Fiscal y Configuraciones) comparten el mismo guard:
+ * `ownerOnlyLoader` más el módulo ONAT (22). Leen la sesión por `useAuthStore`,
+ * así que duplicaban el mock del store, la sesión mutable y las pruebas de
+ * denegación del loader. Aquí viven una sola vez; un cambio en el contrato del
+ * guard se prueba en un único sitio.
  */
 
 /** Sesión mutable: el loader y las páginas leen la misma sesión que en la app. */
@@ -41,7 +42,13 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   ),
 }));
 
-/** Owner autenticado por defecto; cada prueba ajusta solo lo que le importa. */
+/**
+ * Owner autenticado por defecto; cada prueba ajusta solo lo que le importa.
+ * Trae el módulo ONAT (22) en `storeModuleIds` para que el guard deje pasar al
+ * Owner: sin él la vista está apagada a propósito (el módulo nace inactivo y
+ * `/me` no lo devuelve). Una prueba que quiera el Owner SIN el módulo pasa
+ * `storeModuleIds: []`.
+ */
 export function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
     id: 'u1',
@@ -56,7 +63,7 @@ export function makeUser(overrides: Partial<UserModel> = {}): UserModel {
     expiresIn: Date.now() + 1000000,
     roles: [],
     featureIds: [],
-    storeModuleIds: [],
+    storeModuleIds: [EModules.Onat],
     isSuperAdmin: false,
     isOwnerAdmin: true,
     isReSeller: false,

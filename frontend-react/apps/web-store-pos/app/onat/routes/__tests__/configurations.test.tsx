@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import { MENU_GROUPS } from '~/shared/lib/config/menu-config';
 import { getOnatConfig, saveOnatConfig } from '~/onat/lib/onat-storage';
 import {
@@ -22,6 +23,19 @@ beforeEach(() => {
 });
 
 describeOwnerOnlyLoader('clientLoader de Configuraciones ONAT (solo el Owner)', clientLoader);
+
+describe('módulo ONAT (módulo 22)', () => {
+  it('desloguea al Owner cuando el módulo Onat no está disponible', async () => {
+    session.user = makeUser({ storeModuleIds: [] });
+
+    const result = await clientLoader();
+
+    expect(session.logout).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(302);
+    expect((result as Response).headers.get('Location')).toBe('/login');
+  });
+});
 
 describe('Configuraciones del Vector Fiscal (S11)', () => {
   it('carga la configuración guardada del Owner', () => {
@@ -152,7 +166,7 @@ describe('menú ONAT (S1)', () => {
     expect(labels.indexOf('MENU.ONAT')).toBe(labels.indexOf('MENU.MANAGEMENT') - 1);
   });
 
-  it('ofrece Vector Fiscal y Configuraciones solo al Owner', () => {
+  it('ofrece Vector Fiscal y Configuraciones solo al Owner y con el módulo 22', () => {
     const group = MENU_GROUPS.find((candidate) => candidate.groupLabel === 'MENU.ONAT');
 
     expect(group).toBeDefined();
@@ -167,8 +181,9 @@ describe('menú ONAT (S1)', () => {
     const storeUser = makeUser({ isOwnerAdmin: false });
 
     for (const item of items) {
-      expect(item.featureIds).toBeUndefined();
-      expect(item.moduleId).toBeUndefined();
+      expect(item.featureIds).toEqual([EFeatures.Onat]);
+      expect(item.moduleId).toBe(EModules.Onat);
+      expect(item.moduleIds).toEqual([EModules.Onat]);
       expect(Object.keys(item)).not.toContain('icon');
       expect(item.rolesOnly?.(owner)).toBe(true);
       expect(item.rolesOnly?.(superAdmin)).toBe(false);

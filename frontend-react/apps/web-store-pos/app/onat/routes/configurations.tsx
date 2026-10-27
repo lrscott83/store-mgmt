@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { ownerOnlyLoader } from '~/auth/routes/loaders';
+import { EModules } from '@store-mgmt/domain';
+import { ownerModuleLoader, ownerOnlyLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
   getOnatConfig,
@@ -12,9 +13,17 @@ import {
 /**
  * S2: la configuración fiscal es del Owner — `isOwnerAdmin` y NO `isSuperAdmin`.
  * Cualquier otro rol se deniega igual que en el resto de loaders (logout + /login).
+ *
+ * Encima va el módulo ONAT (22), que nace inactivo: mientras `/me` no lo devuelva
+ * en `storeModuleIds` la pantalla queda apagada aunque el usuario sea el dueño.
+ * `ownerModuleLoader` solo no basta para el "solo el Owner": no excluye a un
+ * SuperAdmin que además sea OwnerAdmin (`loaders.ts`), por eso se encadenan los
+ * dos guards.
  */
 export async function clientLoader() {
-  return ownerOnlyLoader();
+  const ownerResult = await ownerOnlyLoader();
+  if (ownerResult) return ownerResult;
+  return ownerModuleLoader(EModules.Onat)();
 }
 
 /**
