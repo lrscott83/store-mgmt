@@ -257,6 +257,17 @@ $env:CAPTURE_ONLY='new'; node scripts/capture-manual.mjs
 El modo `CAPTURE_ONLY=new` hace el mismo sembrado (lo necesitan las vistas) pero **solo escribe**
 las imágenes nuevas de la tabla siguiente; no toca `01`…`54`.
 
+### Optimización al generar (2026-10-27)
+
+`pnpm generate:manual` **no copia las imágenes tal cual**: recorta el espacio muerto inferior,
+convierte los PNG a **WebP sin pérdida** y elige siempre el archivo más pequeño (si el WebP de un
+JPG pesa más, conserva el JPG). Las fuentes de `docs/manual/img/` **no se modifican**. Además el
+HTML generado añade `loading="lazy"`, `decoding="async"` y `width`/`height` a cada `<img>`.
+
+Resultado medido: imágenes servidas **10,62 MB → 5,17 MB**. El PDF se queda en ~9 MB porque
+Chromium imprime a resolución completa y no reutiliza el WebP; se descarga aparte y no afecta a la
+carga de la página. Análisis completo en `docs/plans/2026-10-27-manual-image-optimization.md`.
+
 ### Imágenes nuevas (2026-10-27)
 
 | Archivo | Sección | Qué muestra |
