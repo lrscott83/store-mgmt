@@ -3,7 +3,11 @@ import type { LoaderFunctionArgs } from 'react-router';
 import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import {
+  isModuleAvailable,
+  isOwnerOnly,
+  isUserAuthorized,
+} from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import { clearDek } from '~/shared/lib/storage/data-key-store';
@@ -176,7 +180,7 @@ export async function ownerOnlyLoader(): Promise<Response | null> {
   if (!user || !isAuthenticated) {
     return denyAccess();
   }
-  if (!user.isOwnerAdmin || user.isSuperAdmin) {
+  if (!isOwnerOnly(user)) {
     return denyAccess();
   }
   return null;

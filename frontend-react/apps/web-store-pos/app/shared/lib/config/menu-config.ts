@@ -1,5 +1,6 @@
 import { EFeatures, EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
+import { isOwnerOnly } from '~/shared/lib/auth/authorization-service';
 
 export interface MenuItem {
   label: string;
@@ -548,12 +549,12 @@ export const MENU_GROUPS: MenuGroup[] = [
       {
         label: 'MENU.VECTOR_FISCAL',
         path: '/onat/vector-fiscal',
-        rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin,
+        rolesOnly: isOwnerOnly,
       },
       {
         label: 'MENU.ONAT_CONFIGURATIONS',
         path: '/onat/configurations',
-        rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin,
+        rolesOnly: isOwnerOnly,
       },
     ],
   },

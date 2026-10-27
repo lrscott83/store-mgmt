@@ -2251,6 +2251,39 @@ const messages: Record<string, string> = {
   'ONAT.REMOVE_ACTIVITY': 'Eliminar',
   'ONAT.SAVE': 'Guardar',
   'ONAT.SAVED': 'Configuración guardada.',
+
+  // Vector Fiscal — pantalla principal (S3, S4, S5, S6, S8): un vector por Owner
+  // con los meses del año, las sobrescrituras del Owner y el cierre anual.
+  'ONAT.VECTOR_TITLE': 'Vector Fiscal',
+  'ONAT.VECTOR_SUBTITLE':
+    'Ingresos, gastos y tributos de tu negocio mes a mes, con el cierre anual calculado sobre los totales del año.',
+  'ONAT.CUP_NOTE': 'Todos los importes están en CUP.',
+  'ONAT.YEAR': 'Año',
+  'ONAT.MONTH': 'Mes',
+  'ONAT.INCOME': 'Ingresos',
+  'ONAT.EXPENSES': 'Gastos',
+  'ONAT.TAXES': 'Tributos',
+  'ONAT.BEFORE': 'antes {value}',
+  'ONAT.EDIT_INCOME': 'Editar ingresos de {month}',
+  'ONAT.EDIT_EXPENSES': 'Editar gastos de {month}',
+  'ONAT.INPUT_INCOME': 'Ingresos de {month}',
+  'ONAT.INPUT_EXPENSES': 'Gastos de {month}',
+  'ONAT.SAVE_ROW': 'Guardar',
+  'ONAT.CANCEL_ROW': 'Cancelar',
+  'ONAT.SAVE_INCOME': 'Guardar ingresos de {month}',
+  'ONAT.SAVE_EXPENSES': 'Guardar gastos de {month}',
+  'ONAT.CANCEL_EDIT': 'Cancelar la edición de {month}',
+  'ONAT.INVALID_AMOUNT': 'Escribe un importe válido mayor o igual a 0.',
+  'ONAT.ANNUAL_CLOSE': 'Cierre anual',
+  'ONAT.ANNUAL_CLOSE_HINT':
+    'Se calcula con los totales del año y los tributos deducibles que hayas registrado.',
+  'ONAT.CLOSE_BASE': 'Base imponible',
+  'ONAT.CLOSE_TAX': 'Impuesto',
+  'ONAT.CLOSE_TAX_DUE': 'Impuesto a pagar',
+  'ONAT.CLOSE_EARLY_BONUS': 'Bonificación por pronto pago',
+  'ONAT.CLOSE_TOTAL': 'Total a pagar',
+  'ONAT.CLOSE_PAY_BEFORE': 'Paga antes del 28 de febrero',
+  'ONAT.WARNINGS': 'Avisos',
 };
 
 export default messages;
