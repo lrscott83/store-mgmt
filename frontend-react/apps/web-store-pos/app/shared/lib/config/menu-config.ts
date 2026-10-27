@@ -540,6 +540,24 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    // Grupo Onat (S1): Vector Fiscal y su configuración, inmediatamente antes de
+    // Gestión. Solo el dueño; sin iconos, como el resto del menú. No lleva módulo
+    // ni featureIds: es una vista 100 % frontend, sin backend nuevo.
+    groupLabel: 'MENU.ONAT',
+    items: [
+      {
+        label: 'MENU.VECTOR_FISCAL',
+        path: '/onat/vector-fiscal',
+        rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin,
+      },
+      {
+        label: 'MENU.ONAT_CONFIGURATIONS',
+        path: '/onat/configurations',
+        rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin,
+      },
+    ],
+  },
+  {
     groupLabel: 'MENU.MANAGEMENT',
     moduleId: EModules.Management,
     items: [

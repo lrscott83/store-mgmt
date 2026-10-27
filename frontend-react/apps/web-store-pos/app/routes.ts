@@ -154,6 +154,9 @@ export default [
     // Management â€” Configurations
     route('management/configurations', 'management/configurations/routes/configurations.tsx'),
 
+    // Onat — Configuraciones del Vector Fiscal (S11): solo el Owner (ownerOnlyLoader).
+    route('onat/configurations', 'onat/routes/configurations.tsx'),
+
     // Admin â€” Features
     route('admin/features', 'admin/features/routes/features.tsx'),
 

@@ -161,6 +161,27 @@ export async function adminLoader(): Promise<Response | null> {
   return null;
 }
 
+/**
+ * Guard de "solo el Owner" (S2): admite ÚNICAMENTE una sesión autenticada con
+ * `isOwnerAdmin === true` Y `isSuperAdmin !== true`. Cualquier otro rol —
+ * SuperAdmin, ReSeller o usuario de tienda — se deniega exactamente como el
+ * resto de loaders (`denyAccess`: logout + redirección a /login).
+ *
+ * Existe como loader propio porque ningún guard anterior expresa esta
+ * combinación: `adminLoader` deja pasar al SuperAdmin y `featureLoader` le da
+ * bypass junto al OwnerAdmin.
+ */
+export async function ownerOnlyLoader(): Promise<Response | null> {
+  const { user, isAuthenticated } = getAuthState();
+  if (!user || !isAuthenticated) {
+    return denyAccess();
+  }
+  if (!user.isOwnerAdmin || user.isSuperAdmin) {
+    return denyAccess();
+  }
+  return null;
+}
+
 export function adminFeatureLoader(featureIds: number[]) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const adminResult = await adminLoader();

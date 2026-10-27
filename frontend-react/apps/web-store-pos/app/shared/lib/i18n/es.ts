@@ -224,6 +224,8 @@ const messages: Record<string, string> = {
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
   'MENU.REPORTS': 'REPORTES',
   'MENU.STATISTICS': 'ESTADÍSTICAS',
+  // Grupo Onat (Vector Fiscal): grupo propio, inmediatamente antes de Gestión.
+  'MENU.ONAT': 'Onat',
   'MENU.MANAGEMENT': 'GESTIÓN',
   // Módulo Elaboración (17): grupo propio con recetas y elaboraciones.
   'MENU.ELABORATION': 'ELABORACIÓN',
@@ -858,6 +860,10 @@ const messages: Record<string, string> = {
   // Menu items — Synchronization (Angular MENU.SYNCHRONIZATION.*)
   'MENU.EXPORT': 'Exportar',
   'MENU.IMPORT': 'Importar',
+
+  // Menu items — Onat (grupo propio antes de Gestión; solo el dueño).
+  'MENU.VECTOR_FISCAL': 'Vector Fiscal',
+  'MENU.ONAT_CONFIGURATIONS': 'Configuraciones',
 
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
@@ -2225,6 +2231,26 @@ const messages: Record<string, string> = {
   'NOTIFICATIONS.PERMISSION_RESTORED': 'Se activaron las notificaciones del navegador.',
   'NOTIFICATIONS.PERMISSION_STILL_DENIED':
     'El navegador sigue bloqueando las notificaciones. Habilítelas en los ajustes del sitio.',
+
+  // Vector Fiscal — Configuraciones (S11): datos fiscales del Owner y sus
+  // actividades. Los textos visibles son exactamente estos (los fija el test).
+  'ONAT.CONFIGURATIONS_TITLE': 'Configuraciones del Vector Fiscal',
+  'ONAT.CONFIGURATIONS_SUBTITLE':
+    'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
+  'ONAT.NAME': 'Nombre',
+  'ONAT.NIT': 'NIT',
+  'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
+  'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
+  'ONAT.MUNICIPALITY': 'Municipio',
+  'ONAT.PROVINCE': 'Provincia',
+  'ONAT.ACTIVITIES': 'Actividades',
+  'ONAT.ACTIVITIES_EMPTY': 'Todavía no has agregado actividades.',
+  'ONAT.ACTIVITY_NAME': 'Nombre de la actividad',
+  'ONAT.ACTIVITY_CODE': 'Código de la actividad',
+  'ONAT.ADD_ACTIVITY': 'Adicionar actividad',
+  'ONAT.REMOVE_ACTIVITY': 'Eliminar',
+  'ONAT.SAVE': 'Guardar',
+  'ONAT.SAVED': 'Configuración guardada.',
 };
 
 export default messages;
