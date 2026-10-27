@@ -12,6 +12,8 @@
  * - Moneda: cada importe se convierte a CUP con las tasas de la tienda de
  *   origen y la fecha del registro (S10). Sin tasa, el importe vale 0, se
  *   acumula en `skipped` y se reporta en `warnings`; nunca se inventa una tasa.
+ * - Fechas: un registro sin fecha utilizable se descarta, suma a `skipped` y se
+ *   reporta con su propio aviso; nunca aborta la tienda que lo contiene.
  * - Multi-tienda: las tiendas del selector se suman. Una tienda ilegible se
  *   omite con un warning en vez de romper el vector (S5).
  */
@@ -44,8 +46,14 @@ export interface OnatMonth {
   readonly month: number;
   /** Ordinarias no-crédito + créditos cobrados, en CUP. */
   readonly income: number;
-  /** Total de gastos del mes, en CUP. */
+  /** Total de gastos del mes, en CUP (incluye los fiscales). */
   readonly expenses: number;
+  /**
+   * Gastos del mes que NO son tributos ONAT, en CUP. Es la cifra que alimenta
+   * `gastos` en el cierre anual (S8): los tributos se restan por sus propias
+   * líneas y contarlos también aquí los descontaría dos veces.
+   */
+  readonly nonTaxExpenses: number;
   /** Gastos con `type === Salario`, en CUP. */
   readonly salaries: number;
   /** Gastos fiscales por tipo; solo los tipos con importe mayor que cero. */
@@ -54,15 +62,24 @@ export interface OnatMonth {
 
 export interface OnatAggregationResult {
   months: OnatMonth[];
-  /** Una línea por tienda omitida o por moneda sin tasa. */
+  /** Una línea por tienda omitida, moneda sin tasa o registro sin fecha válida. */
   warnings: string[];
-  /** Cantidad de importes descartados por no tener tasa de cambio disponible. */
+  /** Importes descartados por no tener tasa de cambio o fecha utilizables. */
   skipped: number;
 }
+
+type UndatedRecordKind = 'orden' | 'crédito' | 'gasto';
+
+const UNDATED_RECORD_WORDING: Record<UndatedRecordKind, string> = {
+  orden: 'venta sin fecha válida',
+  crédito: 'crédito sin fecha de cobro válida',
+  gasto: 'gasto sin fecha válida',
+};
 
 interface MonthAccumulator {
   income: number;
   expenses: number;
+  nonTaxExpenses: number;
   salaries: number;
   taxesByType: Partial<Record<ExpenseType, number>>;
 }
@@ -108,6 +125,11 @@ function amountInCup(
   return converted.data / 100;
 }
 
+/** Una fecha leída de almacenamiento puede no ser `Date` o ser `Invalid Date`. */
+function isUsableDate(value: unknown): value is Date {
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
+
 function monthIndexOf(date: Date, year: number): number | null {
   return date.getFullYear() === year ? date.getMonth() : null;
 }
@@ -138,13 +160,23 @@ export async function aggregateOnatMonths(
   const accumulators: MonthAccumulator[] = Array.from({ length: 12 }, () => ({
     income: 0,
     expenses: 0,
+    nonTaxExpenses: 0,
     salaries: 0,
     taxesByType: {},
   }));
 
   const warnings: string[] = [];
   const warnedCurrencies = new Set<string>();
+  const warnedUndated = new Set<string>();
   let skipped = 0;
+
+  const reportUndatedRecord = (storeId: string, kind: UndatedRecordKind): void => {
+    skipped += 1;
+    const key = `${storeId}:${kind}`;
+    if (warnedUndated.has(key)) return;
+    warnedUndated.add(key);
+    warnings.push(`Tienda ${storeId}: ${UNDATED_RECORD_WORDING[kind]}; importe omitido.`);
+  };
 
   const reportMissingRate = (
     storeId: string,
@@ -165,6 +197,10 @@ export async function aggregateOnatMonths(
     for (const order of orders) {
       // Una venta a crédito se cobra por `SaleCredit.paidDate`, nunca por su fecha.
       if (order.isCredit) continue;
+      if (!isUsableDate(order.date)) {
+        reportUndatedRecord(storeId, 'orden');
+        continue;
+      }
       const month = monthIndexOf(order.date, year);
       if (month === null) continue;
       const amount = amountInCup(order.total, order.currency, order.date, rates);
@@ -178,6 +214,12 @@ export async function aggregateOnatMonths(
 
   const addCreditIncome = (storeId: string, credits: SaleCredit[], rates: ChannelRate[]): void => {
     for (const credit of credits) {
+      // S9: el crédito se imputa por `paidDate`; sin fecha de cobro utilizable
+      // no se puede fechar, así que se descarta sin abortar la tienda.
+      if (!isUsableDate(credit.paidDate)) {
+        reportUndatedRecord(storeId, 'crédito');
+        continue;
+      }
       const month = monthIndexOf(credit.paidDate, year);
       if (month === null) continue;
       const amount = amountInCup(credit.total, credit.currency, credit.paidDate, rates);
@@ -191,6 +233,10 @@ export async function aggregateOnatMonths(
 
   const addExpenses = (storeId: string, expenses: Expense[], rates: ChannelRate[]): void => {
     for (const expense of expenses) {
+      if (!isUsableDate(expense.date)) {
+        reportUndatedRecord(storeId, 'gasto');
+        continue;
+      }
       const month = monthIndexOf(expense.date, year);
       if (month === null) continue;
       const amount = amountInCup(expense.total, expense.currency, expense.date, rates);
@@ -201,28 +247,45 @@ export async function aggregateOnatMonths(
 
       const monthAccumulator = accumulators[month];
       monthAccumulator.expenses += amount;
-      if (expense.type === ExpenseType.Salario) monthAccumulator.salaries += amount;
       if (isFiscalExpenseType(expense.type)) {
         monthAccumulator.taxesByType[expense.type] =
           (monthAccumulator.taxesByType[expense.type] ?? 0) + amount;
+      } else {
+        monthAccumulator.nonTaxExpenses += amount;
       }
+      if (expense.type === ExpenseType.Salario) monthAccumulator.salaries += amount;
+    }
+  };
+
+  /**
+   * La lectura de una tienda es lo único que puede fallar y omitir la tienda; la
+   * acumulación se hace fuera para que un registro malformado no se reporte como
+   * una tienda ilegible ni descarte lo ya sumado.
+   */
+  const readStore = async (storeId: string) => {
+    try {
+      const dek = await unwrapStoreDek(storeId);
+      return {
+        rates: readStoreChannelRates(storeId, dek),
+        orders: readStoreActiveOrdersBetween(storeId, dek, yearStart, yearEnd),
+        credits: readStorePaidSaleCreditsBetween(storeId, dek, yearStart, yearEnd),
+        expenses: readStoreActiveExpensesBetween(storeId, dek, yearStart, yearEnd),
+      };
+    } catch {
+      return null;
     }
   };
 
   for (const storeId of input.storeIds) {
-    try {
-      const dek = await unwrapStoreDek(storeId);
-      const rates = readStoreChannelRates(storeId, dek);
-      const orders = readStoreActiveOrdersBetween(storeId, dek, yearStart, yearEnd);
-      const credits = readStorePaidSaleCreditsBetween(storeId, dek, yearStart, yearEnd);
-      const expenses = readStoreActiveExpensesBetween(storeId, dek, yearStart, yearEnd);
-
-      addOrderIncome(storeId, orders, rates);
-      addCreditIncome(storeId, credits, rates);
-      addExpenses(storeId, expenses, rates);
-    } catch {
+    const store = await readStore(storeId);
+    if (store === null) {
       warnings.push(`Tienda ${storeId} omitida: no se pudieron leer sus datos.`);
+      continue;
     }
+
+    addOrderIncome(storeId, store.orders, store.rates);
+    addCreditIncome(storeId, store.credits, store.rates);
+    addExpenses(storeId, store.expenses, store.rates);
   }
 
   return {
@@ -230,6 +293,7 @@ export async function aggregateOnatMonths(
       month,
       income: round2(accumulator.income),
       expenses: round2(accumulator.expenses),
+      nonTaxExpenses: round2(accumulator.nonTaxExpenses),
       salaries: round2(accumulator.salaries),
       taxesByType: roundedTaxes(accumulator.taxesByType),
     })),

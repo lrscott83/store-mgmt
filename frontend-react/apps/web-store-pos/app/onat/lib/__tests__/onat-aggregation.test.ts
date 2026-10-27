@@ -165,6 +165,35 @@ describe('aggregateOnatMonths — gastos', () => {
     expect(result.months[3].salaries).toBe(9_500);
   });
 
+  it('separa los gastos no fiscales para que el cierre anual no los reste dos veces', async () => {
+    fixture.expenses.s1 = [
+      makeExpense('e-operativo', {
+        type: ExpenseType.Transporte,
+        total: 500,
+        date: localDate(5, 1),
+      }),
+      makeExpense('e-fiscal', {
+        type: ExpenseType.ImpuestoVentas,
+        total: 1_200,
+        date: localDate(5, 2),
+      }),
+      makeExpense('e-cuota', {
+        type: ExpenseType.CuotaMensual,
+        total: 300,
+        date: localDate(5, 3),
+      }),
+    ];
+
+    const result = await aggregateOnatMonths({ storeIds: ['s1'], year: YEAR });
+
+    expect(result.months[5].expenses).toBe(2_000);
+    expect(result.months[5].nonTaxExpenses).toBe(500);
+    expect(result.months[5].taxesByType).toEqual({
+      [ExpenseType.ImpuestoVentas]: 1_200,
+      [ExpenseType.CuotaMensual]: 300,
+    });
+  });
+
   it('agrupa los gastos fiscales por tipo y descarta los importes en cero', async () => {
     fixture.expenses.s1 = [
       makeExpense('e1', {
@@ -261,5 +290,27 @@ describe('aggregateOnatMonths — multi-tienda', () => {
     expect(result.months[6].income).toBe(100);
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toContain('s2');
+  });
+});
+
+describe('aggregateOnatMonths — registros sin fecha válida', () => {
+  it('descarta el crédito sin fecha de cobro sin abortar la tienda ni perder sus ingresos', async () => {
+    fixture.orders.s1 = [makeOrder('o1', { date: localDate(7, 1), total: 100 })];
+    fixture.credits.s1 = [
+      makeCredit('c-ok', { paidDate: localDate(7, 2), total: 50 }),
+      makeCredit('c-malo', {
+        paidDate: 'no-es-una-fecha' as unknown as Date,
+        total: 999,
+      }),
+    ];
+
+    const result = await aggregateOnatMonths({ storeIds: ['s1'], year: YEAR });
+
+    // La orden y el crédito válido siguen contando: la lectura no se abortó.
+    expect(result.months[7].income).toBe(150);
+    expect(result.skipped).toBe(1);
+    expect(result.warnings).toEqual([
+      'Tienda s1: crédito sin fecha de cobro válida; importe omitido.',
+    ]);
   });
 });

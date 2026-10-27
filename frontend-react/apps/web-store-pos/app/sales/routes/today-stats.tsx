@@ -3,7 +3,6 @@ import { useIntl } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
-  ExpenseType,
   PaymentType,
   SalePaymentMethod,
   isCashDrawerExpense,
@@ -11,6 +10,7 @@ import {
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { normalizedOrderPaymentMethod, resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
+import { EXPENSE_TYPE_LABEL_KEYS } from '~/expenses/lib/expense-type-labels';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
@@ -35,34 +35,6 @@ import { buildCategoryCartItemsView } from '../lib/category-cart-items-view';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
-
-// Angular's expense-list.component.html column 1 (getExpenseTypeText) — 1:1 mapping,
-// duplicated here (not exported by app/expenses/components/expense-list.tsx) to avoid
-// coupling the Sales module to the Expenses module's presentational component.
-const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
-  [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
-  [ExpenseType.Transporte]: 'EXPENSES.TYPE.TRANSPORTE',
-  [ExpenseType.Alquiler]: 'EXPENSES.TYPE.ALQUILER',
-  [ExpenseType.Corriente]: 'EXPENSES.TYPE.CORRIENTE',
-  [ExpenseType.Agua]: 'EXPENSES.TYPE.AGUA',
-  [ExpenseType.Comida]: 'EXPENSES.TYPE.COMIDA',
-  [ExpenseType.Operaciones]: 'EXPENSES.TYPE.OPERACIONES',
-  [ExpenseType.Viaje]: 'EXPENSES.TYPE.VIAJE',
-  [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
-  [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
-  [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
-  [ExpenseType.ImpuestoVentas]: 'EXPENSES.TYPE.IMPUESTO_VENTAS',
-  [ExpenseType.FuerzaTrabajo]: 'EXPENSES.TYPE.FUERZA_TRABAJO',
-  [ExpenseType.ImpuestoSellos]: 'EXPENSES.TYPE.IMPUESTO_SELLOS',
-  [ExpenseType.Anuncios]: 'EXPENSES.TYPE.ANUNCIOS',
-  [ExpenseType.ContribucionEspecialSeguridadSocial]:
-    'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL',
-  [ExpenseType.ContribucionSeguridadSocial]: 'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL',
-  [ExpenseType.CuotaMensual]: 'EXPENSES.TYPE.CUOTA_MENSUAL',
-  [ExpenseType.ContribucionZonas]: 'EXPENSES.TYPE.CONTRIBUCION_ZONAS',
-  [ExpenseType.ArrendamientoEntidades]: 'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES',
-  [ExpenseType.ExoneracionReparaciones]: 'EXPENSES.TYPE.EXONERACION_REPARACIONES',
-};
 
 // Gastos: mismo reemplazo Tarjeta → Transferencia a nivel display.
 function valueClassName(value: number): string {
@@ -393,7 +365,7 @@ export function TodayStatsPage() {
                   {visibleExpenses.map((expense) => (
                     <tr key={expense.id} className="border-b border-border last:border-0">
                       <td className="p-1 text-text">
-                        {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                        {intl.formatMessage({ id: EXPENSE_TYPE_LABEL_KEYS[expense.type] })}
                       </td>
                       <td className="p-1 text-right text-danger">
                         {/* Angular renders this via <app-expense-list>, whose payment marker is

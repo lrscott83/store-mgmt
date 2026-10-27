@@ -20,6 +20,13 @@ import { ONAT_TAXONOMY, isFiscalExpenseType } from '../onat-taxonomy';
 const OWNER_ID = 'owner-1';
 const CONFIG_KEY = `lizoft.onat-config-${OWNER_ID}`;
 
+/** Simula cuota agotada o modo privado: `setItem` lanza en vez de escribir. */
+function mockThrowingSetItem() {
+  return vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new Error('QuotaExceededError');
+  });
+}
+
 function makeCierre(overrides: Partial<CierreAnualInput> = {}): CierreAnualInput {
   return {
     ingresos: 0,
@@ -240,6 +247,12 @@ describe('onat-taxonomy', () => {
     });
   });
 
+  it('describe la cuota mensual como pago a cuenta del Impuesto sobre Ingresos Personales', () => {
+    expect(ONAT_TAXONOMY[ExpenseType.CuotaMensual]?.descripcion).toBe(
+      'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales',
+    );
+  });
+
   it('solo considera fiscales a los tipos presentes en la tabla', () => {
     expect(isFiscalExpenseType(ExpenseType.CuotaMensual)).toBe(true);
     expect(isFiscalExpenseType(ExpenseType.ImpuestoVentas)).toBe(true);
@@ -301,19 +314,48 @@ describe('onat-storage', () => {
   });
 
   it('conserva el original congelado al editar dos veces el mismo campo (S3)', () => {
-    setOnatOverride(OWNER_ID, 2026, 3, 'ingresos', 298_000, 312_500);
-    const segundo = setOnatOverride(OWNER_ID, 2026, 3, 'ingresos', 999_999, 350_000);
+    setOnatOverride({
+      ownerId: OWNER_ID,
+      year: 2026,
+      month: 3,
+      field: 'ingresos',
+      original: 298_000,
+      value: 312_500,
+    });
+    const segundo = setOnatOverride({
+      ownerId: OWNER_ID,
+      year: 2026,
+      month: 3,
+      field: 'ingresos',
+      original: 999_999,
+      value: 350_000,
+    });
 
-    expect(segundo['2026']?.['3']?.ingresos).toMatchObject({
+    expect(segundo).toEqual({ succeeded: true });
+    expect(getOnatOverrides(OWNER_ID)['2026']?.['3']?.ingresos).toMatchObject({
       original: 298_000,
       value: 350_000,
     });
-    expect(getOnatOverrides(OWNER_ID)['2026']?.['3']?.ingresos?.original).toBe(298_000);
   });
 
   it('mantiene independientes los overrides de ingresos y gastos', () => {
-    setOnatOverride(OWNER_ID, 2026, 3, 'ingresos', 298_000, 312_500);
-    const overrides = setOnatOverride(OWNER_ID, 2026, 3, 'gastos', 100_000, 90_000);
+    setOnatOverride({
+      ownerId: OWNER_ID,
+      year: 2026,
+      month: 3,
+      field: 'ingresos',
+      original: 298_000,
+      value: 312_500,
+    });
+    setOnatOverride({
+      ownerId: OWNER_ID,
+      year: 2026,
+      month: 3,
+      field: 'gastos',
+      original: 100_000,
+      value: 90_000,
+    });
+    const overrides = getOnatOverrides(OWNER_ID);
 
     expect(overrides['2026']?.['3']?.ingresos?.original).toBe(298_000);
     expect(overrides['2026']?.['3']?.gastos?.original).toBe(100_000);
@@ -336,11 +378,71 @@ describe('onat-storage', () => {
         actividades: [],
       });
       expect(getOnatOverrides(OWNER_ID)).toEqual({});
-      expect(setOnatOverride(OWNER_ID, 2026, 3, 'ingresos', 1, 2)).toEqual({});
+      expect(
+        saveOnatConfig({
+          ownerId: OWNER_ID,
+          nombre: '',
+          nit: '',
+          domicilioFiscal: '',
+          domicilioLegal: '',
+          municipio: '',
+          provincia: '',
+          actividades: [],
+        }),
+      ).toEqual({ succeeded: false });
+      expect(
+        setOnatOverride({
+          ownerId: OWNER_ID,
+          year: 2026,
+          month: 3,
+          field: 'ingresos',
+          original: 1,
+          value: 2,
+        }),
+      ).toEqual({ succeeded: false });
       expect(getItem).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
       getItem.mockRestore();
+    }
+  });
+
+  it('devuelve un resultado fallido cuando localStorage rechaza la configuración', () => {
+    const setItem = mockThrowingSetItem();
+    const config = {
+      ownerId: OWNER_ID,
+      nombre: 'Bodega Liz',
+      nit: '',
+      domicilioFiscal: '',
+      domicilioLegal: '',
+      municipio: '',
+      provincia: '',
+      actividades: [],
+    };
+
+    try {
+      expect(saveOnatConfig(config)).toEqual({ succeeded: false });
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('devuelve un resultado fallido cuando localStorage rechaza el override', () => {
+    const setItem = mockThrowingSetItem();
+
+    try {
+      expect(
+        setOnatOverride({
+          ownerId: OWNER_ID,
+          year: 2026,
+          month: 3,
+          field: 'gastos',
+          original: 100_000,
+          value: 90_000,
+        }),
+      ).toEqual({ succeeded: false });
+    } finally {
+      setItem.mockRestore();
     }
   });
 });

@@ -26,6 +26,8 @@ export const clientLoader = ownerOnlyLoader;
 const CUP_FORMATTER = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
 const MONTH_FORMATTER = new Intl.DateTimeFormat('es-ES', { month: 'long' });
 const YEAR_RANGE = 5;
+/** Año ancla del formateador: solo importa el índice del mes, no el año. */
+const MONTH_ANCHOR_YEAR = 2020;
 
 const LABEL_CLASSES = 'text-sm font-medium text-text';
 const SELECT_CLASSES =
@@ -48,7 +50,8 @@ interface EditableAmountProps {
   field: OverrideField;
   amount: number;
   override: OnatOverride | undefined;
-  onSave: (month: OnatMonth, field: OverrideField, value: number) => void;
+  /** Devuelve `false` cuando la escritura falló; la celda sigue editable. */
+  onSave: (month: OnatMonth, field: OverrideField, value: number) => boolean;
 }
 
 /**
@@ -57,12 +60,12 @@ interface EditableAmountProps {
  * zonas, los arrendamientos y las exoneraciones se restan por su propia línea y
  * la cuota mensual es un pago a cuenta, así que quedan fuera de esta suma.
  */
-const TRIBUTOS_DEDUCIBLES: readonly OnatTaxonomyEntry[] = Object.values(ONAT_TAXONOMY).filter(
-  (entry): entry is OnatTaxonomyEntry =>
-    entry !== undefined &&
-    entry.deducibleDeLaBase &&
-    !entry.pagoACuenta &&
-    entry.seccionDj08 === 'F',
+const TAXONOMY_ENTRIES: readonly OnatTaxonomyEntry[] = Object.values(ONAT_TAXONOMY).filter(
+  (entry): entry is OnatTaxonomyEntry => entry !== undefined,
+);
+
+const TRIBUTOS_DEDUCIBLES: readonly OnatTaxonomyEntry[] = TAXONOMY_ENTRIES.filter(
+  (entry) => entry.deducibleDeLaBase && !entry.pagoACuenta && entry.seccionDj08 === 'F',
 );
 
 function formatCup(value: number): string {
@@ -70,7 +73,7 @@ function formatCup(value: number): string {
 }
 
 function monthLabel(month: number): string {
-  return MONTH_FORMATTER.format(new Date(2020, month, 1));
+  return MONTH_FORMATTER.format(new Date(MONTH_ANCHOR_YEAR, month, 1));
 }
 
 /**
@@ -125,6 +128,7 @@ function EditableAmount({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [invalid, setInvalid] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const editMessageId = field === 'ingresos' ? 'ONAT.EDIT_INCOME' : 'ONAT.EDIT_EXPENSES';
   const inputMessageId = field === 'ingresos' ? 'ONAT.INPUT_INCOME' : 'ONAT.INPUT_EXPENSES';
@@ -133,23 +137,34 @@ function EditableAmount({
   const startEditing = () => {
     setDraft(String(amount));
     setInvalid(false);
+    setSaveFailed(false);
     setEditing(true);
   };
 
   const cancelEditing = () => {
     setEditing(false);
     setInvalid(false);
+    setSaveFailed(false);
   };
 
   const save = () => {
-    const parsed = Number(draft);
+    // Un borrador vacío no es un 0: `Number('')` sí da 0, así que el vacío se
+    // rechaza explícitamente para no guardar un importe que el Owner no escribió.
+    const trimmed = draft.trim();
+    const parsed = trimmed === '' ? Number.NaN : Number(trimmed);
     if (!Number.isFinite(parsed) || parsed < 0) {
       setInvalid(true);
+      setSaveFailed(false);
       return;
     }
-    onSave(month, field, parsed);
+    if (!onSave(month, field, parsed)) {
+      // La celda sigue en edición para que el Owner pueda reintentar.
+      setSaveFailed(true);
+      return;
+    }
     setEditing(false);
     setInvalid(false);
+    setSaveFailed(false);
   };
 
   if (!editing) {
@@ -181,11 +196,18 @@ function EditableAmount({
         onChange={(event) => {
           setDraft(event.target.value);
           setInvalid(false);
+          setSaveFailed(false);
         }}
       />
 
       {invalid && (
         <span className="text-xs text-danger">{intl.formatMessage({ id: 'ONAT.INVALID_AMOUNT' })}</span>
+      )}
+
+      {saveFailed && (
+        <span role="alert" className="text-xs text-danger">
+          {intl.formatMessage({ id: 'ONAT.SAVE_ERROR' })}
+        </span>
       )}
 
       <div className="flex gap-2">
@@ -266,7 +288,14 @@ export function VectorFiscalPage() {
 
     return {
       ingresos: rows.reduce((total, row) => total + row.income, 0),
-      gastos: rows.reduce((total, row) => total + row.expenses, 0),
+      // S8: solo los gastos no fiscales. Los tributos, zonas, arrendamientos,
+      // exoneraciones y la cuota se restan por sus propias líneas del cierre.
+      // S4: si el Owner sobrescribió el gasto de un mes, esa cifra manda; el
+      // override es el gasto del mes que el Owner ve en la tabla.
+      gastos: months.reduce((total, month) => {
+        const override = monthOverridesFor(overrides, year, month.month)?.gastos;
+        return total + (override?.value ?? month.nonTaxExpenses);
+      }, 0),
       tributosDeducibles: TRIBUTOS_DEDUCIBLES.reduce(
         (total, entry) => total + sumTaxBucket(months, entry.tipo),
         0,
@@ -276,7 +305,17 @@ export function VectorFiscalPage() {
       exoneraciones: sumTaxBucket(months, ExpenseType.ExoneracionReparaciones),
       cuotasPagadas: sumTaxBucket(months, ExpenseType.CuotaMensual),
     };
-  }, [aggregation, rows]);
+  }, [aggregation, overrides, rows, year]);
+
+  /** S6 — tributos pagados del año, con el código ONAT de la taxonomía. */
+  const paidTaxes = useMemo(() => {
+    if (!aggregation) return [];
+
+    return TAXONOMY_ENTRIES.map((entry) => ({
+      entry,
+      amount: sumTaxBucket(aggregation.months, entry.tipo),
+    })).filter((line) => line.amount > 0);
+  }, [aggregation]);
 
   const cierre = useMemo(
     () =>
@@ -296,13 +335,22 @@ export function VectorFiscalPage() {
     [annualTotals, pagaAntesDel28Febrero],
   );
 
-  const saveOverride = (month: OnatMonth, field: OverrideField, value: number) => {
-    if (!ownerId) return;
+  const saveOverride = (month: OnatMonth, field: OverrideField, value: number): boolean => {
+    if (!ownerId) return false;
     // S3/S4: `original` es el agregado de ESTE instante, no un valor recalculado.
     const aggregated = field === 'ingresos' ? month.income : month.expenses;
-    setOnatOverride(ownerId, year, month.month, field, aggregated, value);
+    const result = setOnatOverride({
+      ownerId,
+      year,
+      month: month.month,
+      field,
+      original: aggregated,
+      value,
+    });
+    if (!result.succeeded) return false;
     // Recargar para que el paréntesis del original salga del dato persistido.
     setOverrides(getOnatOverrides(ownerId));
+    return true;
   };
 
   return (
@@ -388,6 +436,30 @@ export function VectorFiscalPage() {
             </table>
           </section>
 
+          {paidTaxes.length > 0 && (
+            <section
+              aria-labelledby="onat-paid-taxes"
+              className="space-y-2 rounded-lg border border-border bg-surface p-4"
+            >
+              <h2 id="onat-paid-taxes" className="text-sm font-semibold text-text">
+                {intl.formatMessage({ id: 'ONAT.PAID_TAXES' })}
+              </h2>
+              <ul className="space-y-1">
+                {paidTaxes.map(({ entry, amount }) => (
+                  <li
+                    key={entry.tipo}
+                    className="flex items-baseline justify-between gap-3 border-b border-border pb-1 last:border-b-0"
+                  >
+                    <span className="text-sm text-text">
+                      {`${entry.descripcion} (${entry.codigoOnat ?? intl.formatMessage({ id: 'ONAT.NO_CODE' })})`}
+                    </span>
+                    <span className="text-sm font-medium text-text">{formatCup(amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
             <div>
               <h2 className="text-sm font-semibold text-text">
@@ -420,12 +492,20 @@ export function VectorFiscalPage() {
             </dl>
           </section>
 
-          {aggregation.warnings.length > 0 && (
+          {(aggregation.warnings.length > 0 || aggregation.skipped > 0) && (
             <section className="rounded-lg border border-border bg-surface p-3">
               <h2 className="text-sm font-semibold text-text">
                 {intl.formatMessage({ id: 'ONAT.WARNINGS' })}
               </h2>
               <ul className="mt-1 list-inside list-disc space-y-1 text-xs text-text-muted">
+                {aggregation.skipped > 0 && (
+                  <li>
+                    {intl.formatMessage(
+                      { id: 'ONAT.SKIPPED_RATES' },
+                      { count: aggregation.skipped },
+                    )}
+                  </li>
+                )}
                 {aggregation.warnings.map((warning, index) => (
                   <li key={`${index}-${warning}`}>{warning}</li>
                 ))}

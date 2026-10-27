@@ -76,6 +76,7 @@ export function OnatConfigurationsPage() {
 
   const [form, setForm] = useState<OnatConfigForm>(createEmptyForm);
   const [savedMessage, setSavedMessage] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     if (!ownerId) {
@@ -93,9 +94,14 @@ export function OnatConfigurationsPage() {
     });
   }, [ownerId]);
 
+  const clearStatus = () => {
+    setSavedMessage('');
+    setSaveFailed(false);
+  };
+
   const updateField = (field: TextField, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setSavedMessage('');
+    clearStatus();
   };
 
   const updateActivity = (index: number, field: keyof OnatActivity, value: string) => {
@@ -105,7 +111,7 @@ export function OnatConfigurationsPage() {
         position === index ? { ...actividad, [field]: value } : actividad,
       ),
     }));
-    setSavedMessage('');
+    clearStatus();
   };
 
   const addActivity = () => {
@@ -113,7 +119,7 @@ export function OnatConfigurationsPage() {
       ...prev,
       actividades: [...prev.actividades, { nombre: '', codigo: '' }],
     }));
-    setSavedMessage('');
+    clearStatus();
   };
 
   const removeActivity = (index: number) => {
@@ -121,11 +127,18 @@ export function OnatConfigurationsPage() {
       ...prev,
       actividades: prev.actividades.filter((_, position) => position !== index),
     }));
-    setSavedMessage('');
+    clearStatus();
   };
 
   const save = () => {
-    saveOnatConfig({ ownerId, ...form });
+    const result = saveOnatConfig({ ownerId, ...form });
+    if (!result.succeeded) {
+      // Nunca un éxito falso: el almacenamiento rechazó la escritura.
+      setSavedMessage('');
+      setSaveFailed(true);
+      return;
+    }
+    setSaveFailed(false);
     setSavedMessage(intl.formatMessage({ id: 'ONAT.SAVED' }));
   };
 
@@ -228,6 +241,12 @@ export function OnatConfigurationsPage() {
         {savedMessage !== '' && (
           <p role="status" className="text-sm font-medium text-success">
             {savedMessage}
+          </p>
+        )}
+
+        {saveFailed && (
+          <p role="alert" className="text-sm font-medium text-danger">
+            {intl.formatMessage({ id: 'ONAT.SAVE_ERROR' })}
           </p>
         )}
       </div>

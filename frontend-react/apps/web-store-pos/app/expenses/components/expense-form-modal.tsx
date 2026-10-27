@@ -22,6 +22,7 @@ import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { CurrencySelect, hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { EXPENSE_TYPE_OPTIONS } from '../lib/expense-type-labels';
 import { FUND_SOURCE_OPTIONS } from '../lib/fund-source-label';
 
 interface ExpenseFormModalProps {
@@ -81,55 +82,6 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
     fundSource: DEFAULT_EXPENSE_FUND_SOURCE,
   };
 }
-
-const EXPENSE_TYPES = [
-  ExpenseType.Salario,
-  ExpenseType.Transporte,
-  ExpenseType.Alquiler,
-  ExpenseType.Corriente,
-  ExpenseType.Agua,
-  ExpenseType.Comida,
-  ExpenseType.Operaciones,
-  ExpenseType.Viaje,
-  ExpenseType.Divisa,
-  ExpenseType.Impuesto,
-  ExpenseType.Otro,
-  ExpenseType.ImpuestoVentas,
-  ExpenseType.FuerzaTrabajo,
-  ExpenseType.ImpuestoSellos,
-  ExpenseType.Anuncios,
-  ExpenseType.ContribucionEspecialSeguridadSocial,
-  ExpenseType.ContribucionSeguridadSocial,
-  ExpenseType.CuotaMensual,
-  ExpenseType.ContribucionZonas,
-  ExpenseType.ArrendamientoEntidades,
-  ExpenseType.ExoneracionReparaciones,
-];
-
-const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
-  [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
-  [ExpenseType.Transporte]: 'EXPENSES.TYPE.TRANSPORTE',
-  [ExpenseType.Alquiler]: 'EXPENSES.TYPE.ALQUILER',
-  [ExpenseType.Corriente]: 'EXPENSES.TYPE.CORRIENTE',
-  [ExpenseType.Agua]: 'EXPENSES.TYPE.AGUA',
-  [ExpenseType.Comida]: 'EXPENSES.TYPE.COMIDA',
-  [ExpenseType.Operaciones]: 'EXPENSES.TYPE.OPERACIONES',
-  [ExpenseType.Viaje]: 'EXPENSES.TYPE.VIAJE',
-  [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
-  [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
-  [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
-  [ExpenseType.ImpuestoVentas]: 'EXPENSES.TYPE.IMPUESTO_VENTAS',
-  [ExpenseType.FuerzaTrabajo]: 'EXPENSES.TYPE.FUERZA_TRABAJO',
-  [ExpenseType.ImpuestoSellos]: 'EXPENSES.TYPE.IMPUESTO_SELLOS',
-  [ExpenseType.Anuncios]: 'EXPENSES.TYPE.ANUNCIOS',
-  [ExpenseType.ContribucionEspecialSeguridadSocial]:
-    'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL',
-  [ExpenseType.ContribucionSeguridadSocial]: 'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL',
-  [ExpenseType.CuotaMensual]: 'EXPENSES.TYPE.CUOTA_MENSUAL',
-  [ExpenseType.ContribucionZonas]: 'EXPENSES.TYPE.CONTRIBUCION_ZONAS',
-  [ExpenseType.ArrendamientoEntidades]: 'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES',
-  [ExpenseType.ExoneracionReparaciones]: 'EXPENSES.TYPE.EXONERACION_REPARACIONES',
-};
 
 /** Opción del select de formas de pago: método real (persistido) + etiqueta visible. */
 export interface ExpensePaymentOption {
@@ -293,9 +245,9 @@ export function ExpenseFormModal({
               }
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {EXPENSE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[t] })}
+              {EXPENSE_TYPE_OPTIONS.map(({ value, labelKey }) => (
+                <option key={value} value={value}>
+                  {intl.formatMessage({ id: labelKey })}
                 </option>
               ))}
             </select>

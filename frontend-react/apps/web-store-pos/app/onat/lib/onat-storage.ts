@@ -33,6 +33,19 @@ export interface OnatOverride {
   editedAt: string;
 }
 
+/** Resultado de una escritura: las dos únicas escrituras de esta capa fallan o no. */
+export type OnatWriteResult = { readonly succeeded: true } | { readonly succeeded: false };
+
+/** Entrada de `setOnatOverride`: un objeto con nombre para no confundir posiciones. */
+export interface OnatOverrideInput {
+  readonly ownerId: string;
+  readonly year: number;
+  readonly month: number;
+  readonly field: 'ingresos' | 'gastos';
+  readonly original: number;
+  readonly value: number;
+}
+
 export interface OnatMonthOverrides {
   ingresos?: OnatOverride;
   gastos?: OnatOverride;
@@ -55,6 +68,22 @@ function leerJson(clave: string): unknown {
     return crudo === null ? null : JSON.parse(crudo);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Única puerta de escritura. Cuota agotada, modo privado o una serialización
+ * imposible devuelven un resultado fallido en vez de escapar a un handler React.
+ */
+function escribirJson(clave: string, valor: unknown): OnatWriteResult {
+  if (typeof window === 'undefined') {
+    return { succeeded: false };
+  }
+  try {
+    localStorage.setItem(clave, JSON.stringify(valor));
+    return { succeeded: true };
+  } catch {
+    return { succeeded: false };
   }
 }
 
@@ -128,11 +157,8 @@ export function getOnatConfig(ownerId: string): OnatConfig {
   };
 }
 
-export function saveOnatConfig(config: OnatConfig): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  localStorage.setItem(CLAVE_CONFIG + config.ownerId, JSON.stringify(config));
+export function saveOnatConfig(config: OnatConfig): OnatWriteResult {
+  return escribirJson(CLAVE_CONFIG + config.ownerId, config);
 }
 
 /** Overrides de ingresos/gastos del Owner; descarta entradas corruptas. */
@@ -191,18 +217,12 @@ export function getOnatOverrides(ownerId: string): OnatOverrides {
  * y solo actualiza `value` y `editedAt`: el original queda congelado y no se
  * recalcula cuando entran ventas o gastos nuevos.
  */
-export function setOnatOverride(
-  ownerId: string,
-  year: number,
-  month: number,
-  field: 'ingresos' | 'gastos',
-  original: number,
-  value: number,
-): OnatOverrides {
+export function setOnatOverride(input: OnatOverrideInput): OnatWriteResult {
   if (typeof window === 'undefined') {
-    return {};
+    return { succeeded: false };
   }
 
+  const { ownerId, year, month, field, original, value } = input;
   const overrides = getOnatOverrides(ownerId);
   const yearKey = String(year);
   const monthKey = String(month);
@@ -220,7 +240,6 @@ export function setOnatOverride(
       : { ...mesAnterior, gastos: override };
 
   overrides[yearKey] = { ...overrides[yearKey], [monthKey]: mes };
-  localStorage.setItem(CLAVE_OVERRIDES + ownerId, JSON.stringify(overrides));
 
-  return overrides;
+  return escribirJson(CLAVE_OVERRIDES + ownerId, overrides);
 }

@@ -1,108 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { IntlProvider } from 'react-intl';
-import type { UserModel } from '@store-mgmt/domain';
-import esMessages from '~/shared/lib/i18n/es';
+import { fireEvent, screen } from '@testing-library/react';
 import { MENU_GROUPS } from '~/shared/lib/config/menu-config';
 import { getOnatConfig, saveOnatConfig } from '~/onat/lib/onat-storage';
-
-/** Sesión mutable: el loader y la página leen la misma sesión que en la app. */
-const session = vi.hoisted(() => ({
-  user: null as UserModel | null,
-  logout: vi.fn(),
-}));
-
-vi.mock('~/shared/lib/stores/auth-store', () => ({
-  useAuthStore: Object.assign(
-    vi.fn((selector?: (state: { user: UserModel | null }) => unknown) =>
-      selector ? selector({ user: session.user }) : { user: session.user },
-    ),
-    {
-      getState: () => ({
-        user: session.user,
-        isAuthenticated: session.user !== null,
-        logout: session.logout,
-      }),
-    },
-  ),
-}));
-
+import {
+  describeOwnerOnlyLoader,
+  makeUser,
+  renderWithIntl,
+  resetOnatRouteSession,
+  session,
+} from './onat-route-harness';
 import { OnatConfigurationsPage, clientLoader } from '../configurations';
 
-function makeUser(overrides: Partial<UserModel> = {}): UserModel {
-  return {
-    id: 'u1',
-    login: 'owner@test.com',
-    fullName: 'Owner',
-    cellPhone: '+1234567890',
-    email: 'owner@test.com',
-    isActive: true,
-    password: '',
-    authToken: 'tok',
-    refreshToken: 'ref',
-    expiresIn: Date.now() + 1000000,
-    roles: [],
-    featureIds: [],
-    storeModuleIds: [],
-    isSuperAdmin: false,
-    isOwnerAdmin: true,
-    isReSeller: false,
-    selectedStoreId: 's1',
-    paymentDueDate: null,
-    isInTrial: false,
-    paymentStatus: 'NoAplica',
-    ...overrides,
-  };
-}
-
 function renderPage() {
-  return render(
-    <IntlProvider locale="es" messages={esMessages}>
-      <OnatConfigurationsPage />
-    </IntlProvider>,
-  );
+  return renderWithIntl(<OnatConfigurationsPage />);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  resetOnatRouteSession();
 });
 
-describe('clientLoader de Configuraciones ONAT (solo el Owner)', () => {
-  it('deja pasar al Owner', async () => {
-    session.user = makeUser();
-
-    await expect(clientLoader()).resolves.toBeNull();
-  });
-
-  it('desloguea a un usuario de tienda', async () => {
-    session.user = makeUser({ isOwnerAdmin: false });
-
-    const result = await clientLoader();
-
-    expect(session.logout).toHaveBeenCalled();
-    expect(result).toBeInstanceOf(Response);
-    expect((result as Response).status).toBe(302);
-  });
-
-  it('desloguea al SuperAdmin aunque también sea OwnerAdmin', async () => {
-    session.user = makeUser({ isSuperAdmin: true, isOwnerAdmin: true });
-
-    const result = await clientLoader();
-
-    expect(session.logout).toHaveBeenCalled();
-    expect((result as Response).status).toBe(302);
-  });
-
-  it('desloguea a una sesión sin autenticar', async () => {
-    session.user = null;
-
-    const result = await clientLoader();
-
-    expect(session.logout).toHaveBeenCalled();
-    expect((result as Response).status).toBe(302);
-  });
-});
+describeOwnerOnlyLoader('clientLoader de Configuraciones ONAT (solo el Owner)', clientLoader);
 
 describe('Configuraciones del Vector Fiscal (S11)', () => {
   it('carga la configuración guardada del Owner', () => {

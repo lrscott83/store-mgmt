@@ -1555,15 +1555,15 @@ const messages: Record<string, string> = {
   'EXPENSES.TYPE.DIVISA': 'Divisa',
   'EXPENSES.TYPE.IMPUESTO': 'Impuesto',
   'EXPENSES.TYPE.OTRO': 'Otro',
-  'EXPENSES.TYPE.IMPUESTO_VENTAS': 'Impuesto sobre Ventas o Servicios (10 %)',
+  'EXPENSES.TYPE.IMPUESTO_VENTAS': 'Impuesto sobre Ventas o Servicios',
   'EXPENSES.TYPE.FUERZA_TRABAJO': 'Impuesto por la Utilización de la Fuerza de Trabajo',
   'EXPENSES.TYPE.IMPUESTO_SELLOS': 'Impuesto sobre Documentos / sellos del timbre',
   'EXPENSES.TYPE.ANUNCIOS': 'Tasa por Radicación de Anuncios y Propaganda Comercial',
   'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL':
-    'Contribución Especial a la Seguridad Social (20 %)',
-  'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL': 'Contribución a la Seguridad Social (14 %)',
+    'Contribución Especial a la Seguridad Social',
+  'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL': 'Contribución a la Seguridad Social',
   'EXPENSES.TYPE.CUOTA_MENSUAL':
-    'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales (5 %)',
+    'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales',
   'EXPENSES.TYPE.CONTRIBUCION_ZONAS':
     'Contribución para la restauración y preservación de zonas',
   'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES': 'Arrendamiento de bienes a entidades estatales',
@@ -2251,6 +2251,8 @@ const messages: Record<string, string> = {
   'ONAT.REMOVE_ACTIVITY': 'Eliminar',
   'ONAT.SAVE': 'Guardar',
   'ONAT.SAVED': 'Configuración guardada.',
+  'ONAT.SAVE_ERROR':
+    'No se pudo guardar. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
 
   // Vector Fiscal — pantalla principal (S3, S4, S5, S6, S8): un vector por Owner
   // con los meses del año, las sobrescrituras del Owner y el cierre anual.
@@ -2283,7 +2285,11 @@ const messages: Record<string, string> = {
   'ONAT.CLOSE_EARLY_BONUS': 'Bonificación por pronto pago',
   'ONAT.CLOSE_TOTAL': 'Total a pagar',
   'ONAT.CLOSE_PAY_BEFORE': 'Paga antes del 28 de febrero',
+  'ONAT.PAID_TAXES': 'Tributos pagados',
+  'ONAT.NO_CODE': 'Sin código',
   'ONAT.WARNINGS': 'Avisos',
+  'ONAT.SKIPPED_RATES':
+    '{count, plural, one {1 importe sin tasa de cambio disponible} other {# importes sin tasa de cambio disponible}}',
 };
 
 export default messages;

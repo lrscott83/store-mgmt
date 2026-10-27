@@ -3,7 +3,6 @@ import { useIntl, type IntlShape } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
-  ExpenseType,
   PaymentType,
   SalePaymentMethod,
   isCashDrawerExpense,
@@ -14,6 +13,7 @@ import {
   resolvedExpensePaymentMethod,
 } from '~/shared/lib/payment-method-resolved';
 import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
+import { EXPENSE_TYPE_LABEL_KEYS } from '~/expenses/lib/expense-type-labels';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
@@ -57,33 +57,6 @@ import {
 } from '~/shared/lib/multistore/multi-store-aggregator';
 
 export const clientLoader = featureLoader([EFeatures.Dashboard]);
-
-// Angular's expense-list.component.html column 1 (getExpenseTypeText) — same mapping
-// duplicated in today-stats.tsx (not exported by expense-list.tsx to avoid coupling).
-const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
-  [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
-  [ExpenseType.Transporte]: 'EXPENSES.TYPE.TRANSPORTE',
-  [ExpenseType.Alquiler]: 'EXPENSES.TYPE.ALQUILER',
-  [ExpenseType.Corriente]: 'EXPENSES.TYPE.CORRIENTE',
-  [ExpenseType.Agua]: 'EXPENSES.TYPE.AGUA',
-  [ExpenseType.Comida]: 'EXPENSES.TYPE.COMIDA',
-  [ExpenseType.Operaciones]: 'EXPENSES.TYPE.OPERACIONES',
-  [ExpenseType.Viaje]: 'EXPENSES.TYPE.VIAJE',
-  [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
-  [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
-  [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
-  [ExpenseType.ImpuestoVentas]: 'EXPENSES.TYPE.IMPUESTO_VENTAS',
-  [ExpenseType.FuerzaTrabajo]: 'EXPENSES.TYPE.FUERZA_TRABAJO',
-  [ExpenseType.ImpuestoSellos]: 'EXPENSES.TYPE.IMPUESTO_SELLOS',
-  [ExpenseType.Anuncios]: 'EXPENSES.TYPE.ANUNCIOS',
-  [ExpenseType.ContribucionEspecialSeguridadSocial]:
-    'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL',
-  [ExpenseType.ContribucionSeguridadSocial]: 'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL',
-  [ExpenseType.CuotaMensual]: 'EXPENSES.TYPE.CUOTA_MENSUAL',
-  [ExpenseType.ContribucionZonas]: 'EXPENSES.TYPE.CONTRIBUCION_ZONAS',
-  [ExpenseType.ArrendamientoEntidades]: 'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES',
-  [ExpenseType.ExoneracionReparaciones]: 'EXPENSES.TYPE.EXONERACION_REPARACIONES',
-};
 
 // payment-methods-percent-tax (plan 2026-09-17): los históricos Tarjeta se
 // muestran/agrupan como Transferencia (CUP).
@@ -780,7 +753,7 @@ export function CuadrePorFechasPage() {
                           <tr key={expense.id} className="border-b border-border last:border-0">
                             <td className="p-1 text-text">
                               {formatLocalDate(expense.date)} —{' '}
-                              {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                              {intl.formatMessage({ id: EXPENSE_TYPE_LABEL_KEYS[expense.type] })}
                             </td>
                             <td className="p-1 text-right text-danger">
                               <span className="whitespace-nowrap">
@@ -1178,7 +1151,7 @@ function MultiStoreCuadreBody({
                   <tr key={expense.id} className="border-b border-border last:border-0">
                     <td className="p-1 text-text">
                       {formatLocalDate(expense.date)} —{' '}
-                      {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                      {intl.formatMessage({ id: EXPENSE_TYPE_LABEL_KEYS[expense.type] })}
                     </td>
                     <td className="p-1 text-right text-danger">
                       <span className="whitespace-nowrap">

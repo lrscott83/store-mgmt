@@ -95,7 +95,7 @@ export const ONAT_TAXONOMY: Readonly<Partial<Record<ExpenseType, OnatTaxonomyEnt
     filaDj08: 22,
     deducibleDeLaBase: false,
     pagoACuenta: true,
-    descripcion: 'Cuota mensual a cuenta del Impuesto sobre Ventas o Servicios',
+    descripcion: 'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales',
   },
   [ExpenseType.ContribucionZonas]: {
     tipo: ExpenseType.ContribucionZonas,
