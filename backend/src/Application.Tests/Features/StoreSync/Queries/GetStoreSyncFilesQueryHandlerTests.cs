@@ -200,6 +200,30 @@ public class GetStoreSyncFilesQueryHandlerTests
             Times.Never);
     }
 
+    /// <summary>
+    /// Un SuperAdmin NO se convierte en "todas las tiendas de todos los tenants" (hallazgo
+    /// R1-SUPERADMIN-SCOPE): no tiene tienda seleccionada, así que cae en el camino del claim vacío
+    /// y el resultado es "ninguna". Ampliarlo aquí abriría los backups de cualquier instalación.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheCallerIsASuperAdmin_ShouldNotWidenToEveryTenant()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
+        _httpContextService.Setup(x => x.IsReSeller).Returns(false);
+        _httpContextService.Setup(x => x.StoreId).Returns(string.Empty);
+
+        var result = await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
+
+        result.Data.Should().BeEmpty();
+        _storeRepository.Verify(
+            x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()), Times.Never);
+        _fileRepository.Verify(
+            x => x.GetActiveOrderedByDateAsync(
+                It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     #endregion
 
     #region Shape and marks (S3, S4)

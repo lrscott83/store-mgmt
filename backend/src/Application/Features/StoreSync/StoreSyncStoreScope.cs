@@ -43,14 +43,12 @@ namespace Application.Features.StoreSync
             // Cada rol por SU vía. `GetActiveStoresByUserIdAsync` busca tiendas cuyo OWNER es el
             // usuario, así que para un StoreUser devuelve vacío: su ámbito es la tienda del claim,
             // que emite el servidor al iniciar sesión y no se puede falsificar desde el cuerpo.
-            if (httpContextService.IsSuperAdmin)
-            {
-                IEnumerable<Store> everyStore =
-                    await storeRepository.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(
-                        excludeStoreId: DataUtils.DefaultStore.Id);
-                return Distinct(everyStore);
-            }
-
+            //
+            // NO hay rama para SuperAdmin a propósito (hallazgo R1-SUPERADMIN-SCOPE del review): darle
+            // "todas las tiendas de todos los tenants" con IgnoreQueryFilters ampliaría el alcance de
+            // una pantalla que no es suya y convertiría este helper en una vía para leer backups de
+            // cualquier instalación. Un SuperAdmin no tiene tienda seleccionada, así que cae en el
+            // camino del claim —vacío— y el resultado es "ninguna", igual que antes de este cambio.
             if (httpContextService.IsReSeller)
             {
                 IEnumerable<Store> resold = await storeRepository.GetActiveStoresByReSellerUserIdAsync(
