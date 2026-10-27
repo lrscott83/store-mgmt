@@ -29,22 +29,32 @@ namespace Application.Features.StoreSync.Queries.GetStoreSyncFiles
     {
         private readonly IHttpContextService _httpContextService;
         private readonly IStoreSyncFileRepository _fileRepository;
+        private readonly IStoreRepository _storeRepository;
 
         public GetStoreSyncFilesQueryHandler(
             IHttpContextService httpContextService,
-            IStoreSyncFileRepository fileRepository)
+            IStoreSyncFileRepository fileRepository,
+            IStoreRepository storeRepository)
         {
             _httpContextService = httpContextService;
             _fileRepository = fileRepository;
+            _storeRepository = storeRepository;
         }
 
         public async Task<ResponseResult<IEnumerable<StoreSyncFileDto>>> Handle(
             GetStoreSyncFilesQuery query, CancellationToken cancellationToken)
         {
-            Guid? storeFilter = StoreSyncStoreScope.StoreFilterFor(_httpContextService);
+            // Mismo conjunto que usan las acciones (R3-3): lo que la lista muestra es exactamente
+            // lo que el llamador puede descargar o borrar. Un llamador sin tiendas recibe una lista
+            // vacía, no "todas".
+            IReadOnlyCollection<Guid> storeIds = await StoreSyncStoreScope.ResolveStoreIdsAsync(
+                _httpContextService, _storeRepository, cancellationToken);
+
+            if (storeIds.Count == 0)
+                return ResponseResult.Success<IEnumerable<StoreSyncFileDto>>([]);
 
             IReadOnlyList<StoreSyncFile> files =
-                await _fileRepository.GetActiveOrderedByDateAsync(storeFilter, cancellationToken);
+                await _fileRepository.GetActiveOrderedByDateAsync(storeIds, cancellationToken);
 
             // Sin ficheros no se consulta la base por marcas: `IN ()` no es SQL válido y el
             // repositorio lo corta, pero ni siquiera hace falta llegar allí.
@@ -55,8 +65,12 @@ namespace Application.Features.StoreSync.Queries.GetStoreSyncFiles
             IReadOnlyList<StoreSyncFileDownload> downloads = await _fileRepository.GetDownloadsByUserAsync(
                 userId, files.Select(file => file.Id).ToList(), cancellationToken);
 
-            Dictionary<Guid, StoreSyncFileDownload> marks =
-                downloads.ToDictionary(download => download.StoreSyncFileId);
+            // Tolerante a duplicados a propósito: el índice único debería impedirlos, pero si alguna
+            // fila histórica los tuviera, `ToDictionary` lanzaría y la lista respondería 500 para
+            // siempre. Agrupar degrada a "una marca" en vez de tumbar la pantalla.
+            Dictionary<Guid, StoreSyncFileDownload> marks = downloads
+                .GroupBy(download => download.StoreSyncFileId)
+                .ToDictionary(group => group.Key, group => group.First());
 
             return ResponseResult.Success<IEnumerable<StoreSyncFileDto>>(
                 files.Select(file => StoreSyncFileMapper.Map(file, marks.GetValueOrDefault(file.Id))).ToList());

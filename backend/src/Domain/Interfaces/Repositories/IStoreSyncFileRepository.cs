@@ -14,12 +14,12 @@ namespace Domain.Interfaces.Repositories
     public interface IStoreSyncFileRepository : IGenericRepository<StoreSyncFile, Guid>
     {
         /// <summary>
-        /// Ficheros ACTIVOS, del más reciente al más antiguo (S3). <paramref name="storeId"/> null
-        /// devuelve los de todas las tiendas visibles para el tenant (Owner/ReSeller); con valor,
-        /// solo los de esa tienda (StoreUser, S5).
+        /// Ficheros ACTIVOS de las tiendas indicadas, del más reciente al más antiguo (S3). El
+        /// conjunto sale del MISMO ámbito que autoriza las acciones (R3-3): una lista vacía devuelve
+        /// una lista vacía, nunca "todas".
         /// </summary>
-        Task<IReadOnlyList<StoreSyncFile>> GetActiveOrderedByDateAsync(Guid? storeId,
-            CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<StoreSyncFile>> GetActiveOrderedByDateAsync(
+            IReadOnlyCollection<Guid> storeIds, CancellationToken cancellationToken = default);
 
         /// <summary>Un fichero ACTIVO por su id, o null si no existe, está de baja o es de otro tenant.</summary>
         Task<StoreSyncFile?> GetActiveByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -31,12 +31,17 @@ namespace Domain.Interfaces.Repositories
         Task<IReadOnlyList<StoreSyncFileDownload>> GetDownloadsByUserAsync(Guid userId,
             IReadOnlyCollection<Guid> storeSyncFileIds, CancellationToken cancellationToken = default);
 
-        /// <summary>La marca concreta de (fichero, usuario), o null si ese usuario aún no lo descargó.</summary>
-        Task<StoreSyncFileDownload?> GetDownloadAsync(Guid storeSyncFileId, Guid userId,
+        /// <summary>
+        /// Registra la marca de descarga de forma IDEMPOTENTE: inserta la fila y, si ya existía para
+        /// ese (fichero, usuario), la ignora.
+        ///
+        /// Es un upsert en SQL y no "leer y luego insertar" a propósito (R3-2 de la revisión): dos
+        /// descargas simultáneas del mismo usuario leerían ambas "no hay marca" y la segunda chocaría
+        /// contra el índice único, devolviendo un 500 en una operación que el usuario ya había hecho
+        /// bien. Devuelve true si insertó la marca y false si ya estaba.
+        /// </summary>
+        Task<bool> MarkDownloadAsync(StoreSyncFileDownload download,
             CancellationToken cancellationToken = default);
-
-        /// <summary>Registra la marca de descarga. La escribe el UnitOfWork, no este método.</summary>
-        Task AddDownloadAsync(StoreSyncFileDownload download);
 
         /// <summary>
         /// Suma 1 al contador de descargas con un UPDATE atómico

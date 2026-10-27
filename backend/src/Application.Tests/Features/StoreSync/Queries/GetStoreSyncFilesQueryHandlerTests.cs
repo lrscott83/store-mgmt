@@ -1,5 +1,7 @@
 using Application.Abstractions.HttpContext;
 using Application.Features.StoreSync.Queries.GetStoreSyncFiles;
+using Domain.Common.Enums;
+using Domain.Entities.Stores;
 using Domain.Entities.StoreSyncFiles;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
@@ -10,9 +12,11 @@ namespace Application.Tests.Features.StoreSync.Queries;
 /// <summary>
 /// El listado tiene tres reglas y un contrato de forma:
 ///
-///   * El ámbito se decide ANTES de la consulta (S5): Owner y ReSeller piden todas las tiendas del
-///     tenant (filtro null); un StoreUser pide SOLO la tienda de su claim. Un claim vacío filtra por
-///     Guid.Empty, que no casa con ninguna fila — nunca "todas".
+///   * El ámbito se decide ANTES de la consulta (S5) y es EL MISMO que autoriza las acciones
+///     (R3-3): SuperAdmin todas las tiendas, ReSeller las que revende, cualquier otro rol las suyas.
+///     Antes la lista dejaba pasar al ReSeller como "todo el tenant" mientras las acciones solo
+///     aceptaban tiendas propias, así que veía ficheros que no podía tocar.
+///   * Un llamador SIN tiendas recibe una lista vacía: nunca se ensancha a "todas".
 ///   * La marca de descarga es POR USUARIO y en LOTE (S4): una consulta por fichero convertiría una
 ///     pantalla con cien ficheros en cien viajes. La marca no oculta ni bloquea nada.
 ///   * El orden es el que trae el repositorio (S3: fecha descendente) y el handler no lo altera.
@@ -24,21 +28,41 @@ public class GetStoreSyncFilesQueryHandlerTests
 {
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IStoreSyncFileRepository> _fileRepository = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
 
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _userId = Guid.NewGuid();
-    private readonly Guid _storeId = Guid.NewGuid();
+    private readonly Guid _storeId;
 
     public GetStoreSyncFilesQueryHandlerTests()
     {
+        Store ownedStore = NewStore();
+        _storeId = ownedStore.Id;
+
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
         _httpContextService.Setup(x => x.UserExternalId).Returns(_userId.ToString());
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(true);
         _httpContextService.Setup(x => x.IsReSeller).Returns(false);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+
+        // Por defecto el llamador administra UNA tienda: la del claim.
+        _storeRepository
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .ReturnsAsync([ownedStore]);
+        _storeRepository
+            .Setup(x => x.GetActiveStoresByReSellerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .ReturnsAsync([]);
+        _storeRepository
+            .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
+            .ReturnsAsync([]);
+        _storeRepository
+            .Setup(x => x.GetStoreByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(ownedStore);
 
         _fileRepository
-            .Setup(x => x.GetActiveOrderedByDateAsync(It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetActiveOrderedByDateAsync(
+                It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         _fileRepository
             .Setup(x => x.GetDownloadsByUserAsync(
@@ -48,7 +72,17 @@ public class GetStoreSyncFilesQueryHandlerTests
 
     private GetStoreSyncFilesQueryHandler Handler() => new(
         _httpContextService.Object,
-        _fileRepository.Object);
+        _fileRepository.Object,
+        _storeRepository.Object);
+
+    /// <summary>El id lo genera la entidad: el test lo lee de la tienda recién creada.</summary>
+    private Store NewStore() => Store.Create(
+        $"Tienda-{Guid.NewGuid():N}",
+        _userId,
+        true,
+        _tenantId,
+        DateOnly.FromDateTime(DateTime.UtcNow),
+        storePlanId: (int)StorePlanType.Superior);
 
     private StoreSyncFile File(
         string fileName,
@@ -76,7 +110,8 @@ public class GetStoreSyncFilesQueryHandlerTests
 
     private void Given(params StoreSyncFile[] files)
         => _fileRepository
-            .Setup(x => x.GetActiveOrderedByDateAsync(It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetActiveOrderedByDateAsync(
+                It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(files);
 
     private void GivenUserDownloaded(params StoreSyncFileDownload[] downloads)
@@ -85,35 +120,48 @@ public class GetStoreSyncFilesQueryHandlerTests
                 It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(downloads);
 
-    #region Scope (S5)
+    #region Scope (S5, R3-3)
 
-    /// <summary>El Owner pide TODAS las tiendas del tenant: filtro null, no la tienda seleccionada.</summary>
+    /// <summary>El Owner pregunta por SUS tiendas, no por "todas las del tenant".</summary>
     [Fact]
-    public async Task Handle_WhenTheCallerIsAnOwner_ShouldQueryEveryStoreOfTheTenant()
+    public async Task Handle_WhenTheCallerIsAnOwner_ShouldQueryOnlyTheStoresItOwns()
     {
         Given(File("centro.zip"));
 
         await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
 
         _fileRepository.Verify(
-            x => x.GetActiveOrderedByDateAsync(null, It.IsAny<CancellationToken>()), Times.Once);
+            x => x.GetActiveOrderedByDateAsync(
+                It.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 1 && ids.Contains(_storeId)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
-    /// <summary>El ReSeller ve lo mismo que el Owner: todas las tiendas de su tenant.</summary>
+    /// <summary>
+    /// El ReSeller listaba como "todo el tenant" y actuaba solo sobre tiendas propias (R3-3). Ahora
+    /// lista EXACTAMENTE el conjunto que resuelve para él, así que lo que ve es lo que puede tocar.
+    /// </summary>
     [Fact]
-    public async Task Handle_WhenTheCallerIsAReSeller_ShouldQueryEveryStoreOfTheTenant()
+    public async Task Handle_WhenTheCallerIsAReSeller_ShouldListTheStoresItResells()
     {
         _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
         _httpContextService.Setup(x => x.IsReSeller).Returns(true);
-        Given(File("centro.zip"));
+        Store resold = NewStore();
+        _storeRepository
+            .Setup(x => x.GetActiveStoresByReSellerUserIdAsync(_userId, It.IsAny<Guid?>()))
+            .ReturnsAsync([resold]);
+        Given(File("centro.zip", storeId: resold.Id));
 
         await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
 
         _fileRepository.Verify(
-            x => x.GetActiveOrderedByDateAsync(null, It.IsAny<CancellationToken>()), Times.Once);
+            x => x.GetActiveOrderedByDateAsync(
+                It.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 1 && ids.Contains(resold.Id)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
-    /// <summary>El StoreUser ve SOLO los ficheros de la tienda de su claim (S5).</summary>
+    /// <summary>El StoreUser ve SOLO la tienda que resuelve para él (S5).</summary>
     [Fact]
     public async Task Handle_WhenTheCallerIsAStoreUser_ShouldQueryOnlyItsStore()
     {
@@ -124,25 +172,32 @@ public class GetStoreSyncFilesQueryHandlerTests
         await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
 
         _fileRepository.Verify(
-            x => x.GetActiveOrderedByDateAsync(_storeId, It.IsAny<CancellationToken>()), Times.Once);
+            x => x.GetActiveOrderedByDateAsync(
+                It.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 1 && ids.Contains(_storeId)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     /// <summary>
-    /// Un StoreUser sin tienda en el claim NO se convierte en "todas": filtra por Guid.Empty.
-    /// Convertirlo en null abriría el repositorio entero a un token incompleto.
+    /// Un llamador sin tienda (un StoreUser cuyo claim no trae ninguna) NO se convierte en "todas":
+    /// ni siquiera se consulta el repositorio de ficheros. Un token incompleto no puede abrir la
+    /// instalación entera.
     /// </summary>
     [Fact]
-    public async Task Handle_WhenAStoreUserHasNoStoreClaim_ShouldNeverWidenToTheWholeTenant()
+    public async Task Handle_WhenTheCallerHasNoStores_ShouldReturnEmptyWithoutTouchingTheFiles()
     {
         _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
         _httpContextService.Setup(x => x.IsReSeller).Returns(false);
         _httpContextService.Setup(x => x.StoreId).Returns(string.Empty);
-        Given(File("centro.zip"));
 
-        await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
+        var result = await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
 
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().BeEmpty();
         _fileRepository.Verify(
-            x => x.GetActiveOrderedByDateAsync(Guid.Empty, It.IsAny<CancellationToken>()), Times.Once);
+            x => x.GetActiveOrderedByDateAsync(
+                It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion
@@ -209,6 +264,25 @@ public class GetStoreSyncFilesQueryHandlerTests
         var pendingDto = result.Data.Single(file => file.Id == pending.Id);
         pendingDto.DownloadedByMe.Should().BeFalse();
         pendingDto.DownloadedByMeAt.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Dos marcas para el MISMO fichero y usuario no pueden tumbar la pantalla (R3-2). El índice
+    /// único debería impedirlo, pero una fila histórica duplicada convertía la lista entera en un
+    /// 500 permanente; ahora se degrada a "una marca".
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenThereAreDuplicateMarks_ShouldStillReturnTheList()
+    {
+        StoreSyncFile file = File("descargado.zip");
+        Given(file);
+        GivenUserDownloaded(
+            StoreSyncFileDownload.Create(file.Id, _userId, _tenantId, DateTimeOffset.UtcNow.AddHours(-2)),
+            StoreSyncFileDownload.Create(file.Id, _userId, _tenantId, DateTimeOffset.UtcNow.AddHours(-1)));
+
+        var result = await Handler().Handle(new GetStoreSyncFilesQuery(), CancellationToken.None);
+
+        result.Data.Should().ContainSingle().Which.DownloadedByMe.Should().BeTrue();
     }
 
     /// <summary>

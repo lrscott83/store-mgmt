@@ -36,9 +36,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
             // La relación se declara AQUÍ, en el lado dependiente, y no también en la configuración
             // del fichero: es la misma relación y declararla dos veces solo abre la puerta a que las
             // dos versiones se contradigan (p. ej. una cascada y otra Restrict).
+            //
+            // FK COMPUESTA sobre (StoreSyncFileId, TenantId) → (Id, TenantId) (R1 de la revisión):
+            // así la base garantiza que la marca vive en el MISMO tenant que su fichero, en vez de
+            // confiar en que cada handler copie la columna desde el contexto correcto. El padre ya
+            // declara esa pareja como clave alterna.
             builder.HasOne(x => x.StoreSyncFile)
                 .WithMany(file => file.Downloads)
-                .HasForeignKey(x => x.StoreSyncFileId)
+                .HasForeignKey(x => new { x.StoreSyncFileId, x.TenantId })
+                .HasPrincipalKey(file => new { file.Id, file.TenantId })
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

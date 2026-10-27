@@ -66,7 +66,7 @@ public class DeleteStoreSyncFileCommandHandlerTests
             .ReturnsAsync(1);
 
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
             .ReturnsAsync([_store]);
         _storeRepository
             .Setup(x => x.GetStoreByIdAsync(_storeId))
@@ -204,7 +204,7 @@ public class DeleteStoreSyncFileCommandHandlerTests
     public async Task Handle_WhenTheFilesStoreIsOutsideTheCallersScope_ShouldReportNotFoundAndDeleteNothing()
     {
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
             .ReturnsAsync([]);
         StoreSyncFile file = GivenFile();
 

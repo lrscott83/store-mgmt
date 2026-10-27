@@ -76,8 +76,11 @@ public class DownloadStoreSyncFileQueryHandlerTests
             .ReturnsAsync(_transaction.Object);
 
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
             .ReturnsAsync([_store]);
+        _storeRepository
+            .Setup(x => x.GetActiveStoresByReSellerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .ReturnsAsync([]);
         _storeRepository
             .Setup(x => x.GetStoreByIdAsync(_storeId))
             .ReturnsAsync(_store);
@@ -89,15 +92,13 @@ public class DownloadStoreSyncFileQueryHandlerTests
             .Setup(x => x.OpenAsync(StorageKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => _blob);
 
+        // Upsert: la base decide si inserta (true) o si ya estaba (false). El handler llama SIEMPRE.
         _fileRepository
-            .Setup(x => x.GetDownloadAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StoreSyncFileDownload?)null);
+            .Setup(x => x.MarkDownloadAsync(It.IsAny<StoreSyncFileDownload>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _fileRepository
             .Setup(x => x.IncrementDownloadCountAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-        _fileRepository
-            .Setup(x => x.AddDownloadAsync(It.IsAny<StoreSyncFileDownload>()))
-            .Returns(Task.CompletedTask);
     }
 
     private DownloadStoreSyncFileQueryHandler Handler() => new(
@@ -169,11 +170,11 @@ public class DownloadStoreSyncFileQueryHandlerTests
         await Handler().Handle(new DownloadStoreSyncFileQuery(file.Id), CancellationToken.None);
 
         _unitOfWork.Verify(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _fileRepository.Verify(x => x.AddDownloadAsync(
+        _fileRepository.Verify(x => x.MarkDownloadAsync(
             It.Is<StoreSyncFileDownload>(download =>
                 download.StoreSyncFileId == file.Id
                 && download.UserId == _userId
-                && download.TenantId == _tenantId)), Times.Once);
+                && download.TenantId == _tenantId), It.IsAny<CancellationToken>()), Times.Once);
         _fileRepository.Verify(x => x.IncrementDownloadCountAsync(
             file.Id, _userId, It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -181,21 +182,24 @@ public class DownloadStoreSyncFileQueryHandlerTests
     }
 
     /// <summary>
-    /// La marca es ÚNICA por (fichero, usuario): una segunda descarga no inserta otra. Pero SÍ se
-    /// sirve otra vez y el contador sube otra vez — es informativa, no bloqueante (S4).
+    /// La marca es ÚNICA por (fichero, usuario) y la idempotencia la garantiza la BASE (R3-2): el
+    /// handler llama siempre al upsert, y un segundo intento no inserta otra fila. Pero SÍ se sirve
+    /// otra vez y el contador sube otra vez — es informativa, no bloqueante (S4).
     /// </summary>
     [Fact]
     public async Task Handle_WhenTheCallerAlreadyDownloadedIt_ShouldNotDuplicateTheMarkButShouldServeAndCountAgain()
     {
         StoreSyncFile file = GivenFile();
         _fileRepository
-            .Setup(x => x.GetDownloadAsync(file.Id, _userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(StoreSyncFileDownload.Create(file.Id, _userId, _tenantId, DateTimeOffset.UtcNow.AddDays(-1)));
+            .Setup(x => x.MarkDownloadAsync(It.IsAny<StoreSyncFileDownload>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         var result = await Handler().Handle(new DownloadStoreSyncFileQuery(file.Id), CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
-        _fileRepository.Verify(x => x.AddDownloadAsync(It.IsAny<StoreSyncFileDownload>()), Times.Never);
+        // Se llama igual — el ON CONFLICT es quien decide — pero una sola vez por descarga.
+        _fileRepository.Verify(x => x.MarkDownloadAsync(
+            It.IsAny<StoreSyncFileDownload>(), It.IsAny<CancellationToken>()), Times.Once);
         _fileRepository.Verify(x => x.IncrementDownloadCountAsync(
             file.Id, _userId, It.IsAny<CancellationToken>()), Times.Once);
         _transaction.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -232,7 +236,7 @@ public class DownloadStoreSyncFileQueryHandlerTests
     public async Task Handle_WhenTheFilesStoreIsOutsideTheCallersScope_ShouldReportNotFoundAndWriteNothing()
     {
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
             .ReturnsAsync([]);
         StoreSyncFile file = GivenFile();
 
@@ -242,7 +246,7 @@ public class DownloadStoreSyncFileQueryHandlerTests
         exception.Which.StatusCode.Should().Be(HttpStatusCode.NotFound);
         exception.Which.Message.Should().Be("StoreSyncFileNotFound");
         _storage.Verify(x => x.OpenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _fileRepository.Verify(x => x.AddDownloadAsync(It.IsAny<StoreSyncFileDownload>()), Times.Never);
+        _fileRepository.Verify(x => x.MarkDownloadAsync(It.IsAny<StoreSyncFileDownload>(), It.IsAny<CancellationToken>()), Times.Never);
         _fileRepository.Verify(x => x.IncrementDownloadCountAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -284,7 +288,7 @@ public class DownloadStoreSyncFileQueryHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        _fileRepository.Verify(x => x.AddDownloadAsync(It.IsAny<StoreSyncFileDownload>()), Times.Never);
+        _fileRepository.Verify(x => x.MarkDownloadAsync(It.IsAny<StoreSyncFileDownload>(), It.IsAny<CancellationToken>()), Times.Never);
         _fileRepository.Verify(x => x.IncrementDownloadCountAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);

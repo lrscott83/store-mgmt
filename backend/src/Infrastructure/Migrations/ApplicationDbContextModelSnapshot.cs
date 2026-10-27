@@ -2999,6 +2999,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("StoreSyncFileId", "TenantId");
+
                     b.HasIndex("StoreSyncFileId", "UserId")
                         .IsUnique();
 
@@ -3885,7 +3887,8 @@ namespace Infrastructure.Migrations
                 {
                     b.HasOne("Domain.Entities.StoreSyncFiles.StoreSyncFile", "StoreSyncFile")
                         .WithMany("Downloads")
-                        .HasForeignKey("StoreSyncFileId")
+                        .HasForeignKey("StoreSyncFileId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

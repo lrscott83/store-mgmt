@@ -88,14 +88,14 @@ public class UploadStoreSyncFileCommandHandlerTests
             .ReturnsAsync(SavedKey);
 
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
             .ReturnsAsync([_store]);
         _storeRepository
             .Setup(x => x.GetStoreByIdAsync(It.IsAny<Guid>()))
             .ReturnsAsync(_store);
 
         _userRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>()))
+            .Setup(x => x.GetUserByIdIncludingStoreAndRoles(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(User.Create(_ownerId, "owner", "hash", UploaderFullName, "0000000000", null, _tenantId));
 
         _fileRepository
@@ -161,6 +161,55 @@ public class UploadStoreSyncFileCommandHandlerTests
     }
 
     /// <summary>
+    /// El nombre persistido no puede llevar caracteres de control (R1): un CR, un LF o un NUL
+    /// sobreviven a `Path.GetFileName`, se guardan en la fila y luego viajan en la cabecera
+    /// `Content-Disposition`, donde invalidan la respuesta y dejan el fichero indescargable para
+    /// TODOS los que lo ven, no solo para quien lo subió.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheFileNameHasControlCharacters_ShouldStripThemBeforePersisting()
+    {
+        var result = await Handler().Handle(
+            Command(fileName: "respaldo\r\nX-Injected: 1\u0000.zip"), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _persisted!.FileName.Should().Be("respaldoX-Injected: 1.zip");
+        _persisted.FileName.Should().NotContain("\r").And.NotContain("\n").And.NotContain("\u0000");
+        result.Data.FileName.Should().Be("respaldoX-Injected: 1.zip");
+    }
+
+    /// <summary>Un nombre hecho SOLO de controles cae al nombre de reserva, no a una fila inválida.</summary>
+    [Fact]
+    public async Task Handle_WhenTheFileNameIsOnlyControlCharacters_ShouldFallBackToTheDefaultName()
+    {
+        await Handler().Handle(Command(fileName: "\r\n\u0000"), CancellationToken.None);
+
+        _persisted!.FileName.Should().Be("backup.zip");
+    }
+
+    /// <summary>
+    /// Un fallo del ALMACENAMIENTO (disco lleno, permiso, raíz inexistente) ya no escapa como
+    /// excepción sin localizar (R3-4): se traduce al 500 del repositorio y no se escribe ninguna fila.
+    /// El almacenamiento escribe a un temporal y renombra, así que tampoco queda un ZIP truncado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStorageFails_ShouldReportTheLocalizedServerErrorAndWriteNoRow()
+    {
+        _storage
+            .Setup(x => x.SaveAsync(It.IsAny<StoreSyncFileUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("disco lleno"));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        exception.Which.Message.Should().Be("StoreSyncFileUploadFailed");
+        _persisted.Should().BeNull();
+        _fileRepository.Verify(x => x.AddAsync(It.IsAny<StoreSyncFile>()), Times.Never);
+    }
+
+    /// <summary>
     /// La clave del blob lleva el id de la fila: el almacenamiento escribe ANTES de que la fila
     /// exista, así que el id tiene que nacer primero y ser el mismo en los dos sitios.
     /// </summary>
@@ -205,7 +254,7 @@ public class UploadStoreSyncFileCommandHandlerTests
     {
         Store other = Store.Create("Tienda Norte", _ownerId, true, _tenantId);
         _storeRepository
-            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(_ownerId, It.IsAny<Guid?>()))
+            .Setup(x => x.GetActiveStoresByUserIdAsync(_ownerId, It.IsAny<Guid?>()))
             .ReturnsAsync([_store, other]);
 
         var result = await Handler().Handle(Command(storeId: other.Id), CancellationToken.None);
@@ -348,7 +397,7 @@ public class UploadStoreSyncFileCommandHandlerTests
     [Fact]
     public async Task Handle_WhenTheUploaderDoesNotExist_ShouldRejectWithoutWriting()
     {
-        _userRepository.Setup(x => x.GetByIdAsync(_ownerId)).ReturnsAsync((User)null!);
+        _userRepository.Setup(x => x.GetUserByIdIncludingStoreAndRoles(_ownerId, It.IsAny<CancellationToken>())).ReturnsAsync((User)null!);
 
         Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
 

@@ -14,26 +14,29 @@ namespace Infrastructure.Persistence.Repositories
     /// </summary>
     public class StoreSyncFileRepository : GenericRepository<StoreSyncFile, Guid>, IStoreSyncFileRepository
     {
+        private readonly ApplicationDbContext _dbContext;
         private readonly DbSet<StoreSyncFile> _files;
         private readonly DbSet<StoreSyncFileDownload> _downloads;
 
         public StoreSyncFileRepository(ApplicationDbContext dbContext) : base(dbContext)
         {
+            _dbContext = dbContext;
             _files = dbContext.Set<StoreSyncFile>();
             _downloads = dbContext.Set<StoreSyncFileDownload>();
         }
 
-        public async Task<IReadOnlyList<StoreSyncFile>> GetActiveOrderedByDateAsync(Guid? storeId,
-            CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<StoreSyncFile>> GetActiveOrderedByDateAsync(
+            IReadOnlyCollection<Guid> storeIds, CancellationToken cancellationToken = default)
         {
+            // Un conjunto vacío no se traduce a `IN ()`: se corta antes, y el resultado vacío es el
+            // correcto (un llamador sin tiendas no ve nada, no lo ve todo).
+            if (storeIds.Count == 0)
+                return [];
+
             // Las filas dadas de baja no se listan: el borrado es lógico (conserva el historial),
             // pero el repositorio solo muestra lo que existe (S8).
-            IQueryable<StoreSyncFile> query = _files.Where(file => file.IsActive);
-
-            if (storeId.HasValue)
-                query = query.Where(file => file.StoreId == storeId.Value);
-
-            return await query
+            return await _files
+                .Where(file => file.IsActive && storeIds.Contains(file.StoreId))
                 .OrderByDescending(file => file.CreatedDate)
                 .ToListAsync(cancellationToken);
         }
@@ -54,14 +57,29 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task<StoreSyncFileDownload?> GetDownloadAsync(Guid storeSyncFileId, Guid userId,
+        public async Task<bool> MarkDownloadAsync(StoreSyncFileDownload download,
             CancellationToken cancellationToken = default)
-            => await _downloads.FirstOrDefaultAsync(
-                download => download.StoreSyncFileId == storeSyncFileId && download.UserId == userId,
-                cancellationToken);
+        {
+            // UPSERT, no "leer y luego insertar" (R3-2): con lectura previa, dos descargas
+            // simultáneas del mismo usuario ven ambas "no hay marca" y la segunda revienta contra
+            // el índice único con un 500 en una acción que el usuario ya hizo bien. Aquí la base
+            // decide: inserta si no está, ignora si está.
+            //
+            // SQL directo a propósito: EF no tiene upsert portable, y el ON CONFLICT usa
+            // exactamente el índice único que ya existe — sin él, este método no compilaría la
+            // intención y el esquema lo garantiza.
+            int affected = await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "StoreSyncFileDownload"
+                    ("Id", "StoreSyncFileId", "UserId", "DownloadedAt", "TenantId", "IsActive",
+                     "CreatedDate", "CreatedBy")
+                VALUES
+                    ({download.Id}, {download.StoreSyncFileId}, {download.UserId}, {download.DownloadedAt},
+                     {download.TenantId}, TRUE, {download.CreatedDate}, {download.CreatedBy})
+                ON CONFLICT ("StoreSyncFileId", "UserId") DO NOTHING
+                """, cancellationToken);
 
-        public async Task AddDownloadAsync(StoreSyncFileDownload download)
-            => await _downloads.AddAsync(download);
+            return affected > 0;
+        }
 
         public async Task<bool> IncrementDownloadCountAsync(Guid storeSyncFileId, Guid userId,
             CancellationToken cancellationToken = default)

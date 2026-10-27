@@ -90,15 +90,24 @@ namespace Application.Features.StoreSync.Commands.UploadStoreSyncFile
             if (store is null)
                 throw StoreSyncStoreScope.StoreNotAllowed(_localizer);
 
-            User? uploader = await _userRepository.GetByIdAsync(_httpContextService.UserExternalId.ToGuid());
+            // Token-aware a propósito (R3-6): es el único acceso a base del handler que no lo era,
+            // así que una subida cancelada igualmente completaba el viaje a la base.
+            User? uploader = await _userRepository.GetUserByIdIncludingStoreAndRoles(
+                _httpContextService.UserExternalId.ToGuid(), cancellationToken);
             if (uploader is null || string.IsNullOrWhiteSpace(uploader.FullName))
                 throw new ApiException(_localizer["StoreSyncFileUploadFailed"], HttpStatusCode.BadRequest);
+
+            // El nombre se sanea UNA sola vez y es el mismo que va al almacenamiento y a la fila
+            // (R3-5): dos versiones distintas del mismo dato es cómo una acaba en un sitio que la
+            // otra no validó.
+            string fileName = ResolveFileName(request.FileName);
+            string contentType = ResolveContentType(request.ContentType);
 
             // El id nace ANTES de la fila porque la clave del blob lo lleva: la composición de la
             // clave es del almacenamiento, y el almacenamiento necesita saber de qué fichero habla.
             Guid fileId = Guid.NewGuid();
-            string key = await _storage.SaveAsync(
-                new StoreSyncFileUpload(request.Content, request.FileName, request.ContentType, request.Length),
+            string key = await SaveBlobAsync(
+                new StoreSyncFileUpload(request.Content, fileName, contentType, request.Length),
                 tenantId,
                 store.Id,
                 fileId,
@@ -110,8 +119,8 @@ namespace Application.Features.StoreSync.Commands.UploadStoreSyncFile
                     fileId,
                     store.Id,
                     tenantId,
-                    ResolveFileName(request.FileName),
-                    ResolveContentType(request.ContentType),
+                    fileName,
+                    contentType,
                     request.Length,
                     key,
                     uploader.Id,
@@ -154,19 +163,48 @@ namespace Application.Features.StoreSync.Commands.UploadStoreSyncFile
         }
 
         /// <summary>
-        /// Se queda con el NOMBRE, nunca con una ruta: el nombre viaja en la cabecera de descarga y
-        /// una barra invertida o un `..` no tienen nada que hacer ahí. Vacío → nombre de reserva, y
-        /// se recorta al ancho de la columna en vez de dejar que PostgreSQL reviente por longitud.
+        /// Se queda con el NOMBRE, nunca con una ruta, y quita los caracteres de CONTROL (R1):
+        /// un CR, un LF o un NUL sobreviven a <c>Path.GetFileName</c>, se guardan en la fila y luego
+        /// viajan en la cabecera <c>Content-Disposition</c>, donde invalidan la respuesta y dejan el
+        /// fichero INDESCARGABLE para todos los usuarios que lo ven, no solo para quien lo subió.
+        /// Vacío tras limpiar → nombre de reserva, y se recorta al ancho de la columna en vez de
+        /// dejar que PostgreSQL reviente por longitud.
         /// </summary>
         private static string ResolveFileName(string? fileName)
         {
-            string name = Path.GetFileName((fileName ?? string.Empty).Trim().Replace('\\', '/')).Trim();
+            string normalized = (fileName ?? string.Empty).Replace('\\', '/');
+            string withoutControlCharacters = new(
+                normalized.Where(character => !char.IsControl(character) && character != '\u007F').ToArray());
+
+            string name = Path.GetFileName(withoutControlCharacters).Trim();
             if (string.IsNullOrWhiteSpace(name))
                 return FallbackFileName;
 
             return name.Length > StoreSyncFileLimits.FileNameMaxLength
                 ? name[..StoreSyncFileLimits.FileNameMaxLength]
                 : name;
+        }
+
+        /// <summary>
+        /// Guarda el blob y traduce cualquier fallo del almacenamiento al 500 localizado (R3-4).
+        /// Antes la llamada quedaba FUERA del bloque de compensación, así que un disco lleno o un
+        /// permiso denegado escapaban como excepción sin localizar. El almacenamiento escribe a un
+        /// temporal y renombra, así que un fallo a mitad no deja bytes sueltos que compensar.
+        /// </summary>
+        private async Task<string> SaveBlobAsync(StoreSyncFileUpload upload, Guid tenantId, Guid storeId,
+            Guid fileId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await _storage.SaveAsync(upload, tenantId, storeId, fileId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogError(exception,
+                    "No se pudo guardar el blob del fichero de sincronización {FileId} de la tienda {StoreId}.",
+                    fileId, storeId);
+                throw new ApiException(_localizer["StoreSyncFileUploadFailed"], HttpStatusCode.InternalServerError);
+            }
         }
 
         private static string ResolveContentType(string? contentType)

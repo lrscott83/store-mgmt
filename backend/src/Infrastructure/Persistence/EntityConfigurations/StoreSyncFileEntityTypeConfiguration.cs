@@ -29,6 +29,12 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
             builder.HasKey(x => x.Id);
 
+            // Clave ALTERNA (Id, TenantId) para que la marca de descarga pueda atar su TenantId al
+            // del fichero por FK compuesta (R1 de la revisión). Sin esto, la integridad del tenant
+            // en la tabla hija depende de que cada handler copie la columna bien, y la base no
+            // impide que una fila quede con el tenant equivocado del padre.
+            builder.HasAlternateKey(x => new { x.Id, x.TenantId });
+
             builder.Property(x => x.FileName)
                 .HasMaxLength(StoreSyncFileLimits.FileNameMaxLength)
                 .IsRequired();

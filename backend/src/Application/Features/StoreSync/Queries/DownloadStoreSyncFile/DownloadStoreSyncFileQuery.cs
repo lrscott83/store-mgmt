@@ -93,12 +93,11 @@ namespace Application.Features.StoreSync.Queries.DownloadStoreSyncFile
             {
                 await using var transaction = await _applicationUnitOfWork.BeginTransactionAsync(cancellationToken);
 
-                bool alreadyMarked = await _fileRepository.GetDownloadAsync(file.Id, userId, cancellationToken) is not null;
-                if (!alreadyMarked)
-                {
-                    await _fileRepository.AddDownloadAsync(StoreSyncFileDownload.Create(
-                        file.Id, userId, file.TenantId, DateTimeOffset.UtcNow));
-                }
+                // Idempotente: la base ignora la marca si ya existía (R3-2). Ya no se lee antes de
+                // escribir, así que dos descargas simultáneas del mismo usuario no se pisan.
+                await _fileRepository.MarkDownloadAsync(
+                    StoreSyncFileDownload.Create(file.Id, userId, file.TenantId, DateTimeOffset.UtcNow),
+                    cancellationToken);
 
                 // El contador sube SIEMPRE, marcado o no: cuenta descargas, no usuarios.
                 await _fileRepository.IncrementDownloadCountAsync(file.Id, userId, cancellationToken);

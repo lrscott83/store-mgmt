@@ -48,12 +48,46 @@ namespace Infrastructure.Storage
             string fullPath = ResolveFullPath(key);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
-            await using (FileStream target = File.Create(fullPath))
+            // Escritura ATÓMICA (R3-4): se escribe a un temporal en la MISMA carpeta y se renombra.
+            // Escribir directo al destino deja, si la copia falla a mitad (disco lleno, permiso,
+            // cliente que corta), un ZIP TRUNCADO en la ruta final — indistinguible de uno bueno
+            // para cualquiera que lo descargue después. `File.Move` sobre el mismo volumen es un
+            // rename: o no hay fichero, o está completo.
+            string temporaryPath = fullPath + ".tmp-" + Guid.NewGuid().ToString("N");
+
+            try
             {
-                await upload.Content.CopyToAsync(target, cancellationToken);
+                await using (FileStream target = File.Create(temporaryPath))
+                {
+                    await upload.Content.CopyToAsync(target, cancellationToken);
+                }
+
+                File.Move(temporaryPath, fullPath, overwrite: true);
+            }
+            catch
+            {
+                TryDeleteTemporaryFile(temporaryPath);
+                throw;
             }
 
             return key;
+        }
+
+        /// <summary>
+        /// Limpia el temporal sin dejar que un fallo de limpieza reemplace el error real que se va a
+        /// reportar. Un temporal huérfano es basura en disco; una excepción distinta, una pista falsa.
+        /// </summary>
+        private static void TryDeleteTemporaryFile(string temporaryPath)
+        {
+            try
+            {
+                if (File.Exists(temporaryPath))
+                    File.Delete(temporaryPath);
+            }
+            catch
+            {
+                // Basura en disco, nunca un error distinto del original.
+            }
         }
 
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
