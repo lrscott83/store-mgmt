@@ -36,10 +36,12 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 
 | ID | Tarea | Specs | Ruta | Estado |
 |---|---|---|---|---|
-| T1 | Dominio y cálculo puro: `ExpenseType` ampliado, taxonomía ONAT, escala y cierre anual, storage de config/overrides | S3,S4,S6,S7,S8,S11 | delegated | pending |
-| T2 | Agregación mensual multi-tienda en CUP (ingresos, gastos, tributos, salarios) | S5,S6,S9,S10 | delegated | pending |
-| T3 | Pantallas: menú, i18n, rutas, guard, Configuraciones y Vector Fiscal | S1,S2,S3,S4,S5,S11 | delegated | pending |
-| T4 | Verificación: typecheck, lint y tests del feature | todas | inline | pending |
+| T1 | Dominio y cálculo puro: `ExpenseType` ampliado, taxonomía ONAT, escala y cierre anual, storage de config/overrides | S3,S4,S6,S7,S8,S11 | delegated | done — `ac393f68` |
+| T2 | Agregación mensual multi-tienda en CUP (ingresos, gastos, tributos, salarios) | S5,S6,S9,S10 | delegated | done — `52040c4e` |
+| T3a | Menú Onat, i18n, ruta, `ownerOnlyLoader` y pantalla Configuraciones | S1,S2,S11 | delegated | done — `d9204273` |
+| T3b | Pantalla Vector Fiscal, overrides congelados, cierre anual y predicado `isOwnerOnly` compartido | S3,S4,S5,S6,S8 | delegated | done — `3e09334b` |
+| T4 | Verificación: typecheck, lint y tests del feature | todas | inline | done — typecheck 5/5, `app/onat` 68 tests, `app/shared` 1508 tests |
+| T5 | Corrección de hallazgos no bloqueantes de la review | S6,S8 | pending | pending |
 
 ## Log
 
@@ -70,3 +72,10 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 - No existe ningún guard "OwnerAdmin y no SuperAdmin": se crea `ownerOnlyLoader`.
 - No existe persistencia frontend por Owner cifrada; solo hay precedente de JSON plano por usuario (`store-usage-tracker`). Se usa JSON plano con clave por `userId` y se documenta como decisión.
 - No existe conversor `Order`/`Expense` → CUP; se implementa sobre `resolveCurrencyRate` (cents, redondeo HALF-UP).
+
+**L10** — Cierre de la primera pasada (2026-10-27). Review nativa de Gentle AI sobre los cuatro commits: `approved` y autoridad consumida. Hallazgos no bloqueantes que quedan en T5:
+- **R3-double-deduction (el más importante):** el cierre anual resta dos veces los mismos gastos fiscales, porque `gastos` ya los incluye y además se pasan como `tributosDeducibles`/`contribucionZonas`/`arrendamientos`/`exoneraciones`.
+- **R3-paid-tributes-surface:** la columna Tributos solo muestra lo calculado; los tributos pagados por gasto no tienen superficie en pantalla.
+- **R2-dup-expense-type-keys:** el mapa `EXPENSE_TYPE_KEYS` sigue duplicado en cuatro componentes.
+- **R2-cuota-label-contradiction:** la etiqueta de `CuotaMensual` nombra un impuesto distinto al de la taxonomía.
+- **R1-EXPENSE-ENUM-DRIFT:** los valores 11–20 del enum compartido no existen en el backend; hoy no hay endpoint que los reciba.
