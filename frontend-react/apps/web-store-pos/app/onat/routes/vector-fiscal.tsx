@@ -269,7 +269,10 @@ export function VectorFiscalPage() {
     return aggregation.months.map((month) => {
       const overridesMes = monthOverridesFor(overrides, year, month.month);
       const income = overridesMes?.ingresos?.value ?? month.income;
-      const expenses = overridesMes?.gastos?.value ?? month.expenses;
+      // S4/S8: la columna Gastos muestra solo el gasto deducible del período
+      // (sin los tributos fiscales, que se restan por sus propias líneas del
+      // cierre). Así el override sustituye exactamente la misma magnitud.
+      const expenses = overridesMes?.gastos?.value ?? month.nonTaxExpenses;
 
       return {
         month,
@@ -290,8 +293,9 @@ export function VectorFiscalPage() {
       ingresos: rows.reduce((total, row) => total + row.income, 0),
       // S8: solo los gastos no fiscales. Los tributos, zonas, arrendamientos,
       // exoneraciones y la cuota se restan por sus propias líneas del cierre.
-      // S4: si el Owner sobrescribió el gasto de un mes, esa cifra manda; el
-      // override es el gasto del mes que el Owner ve en la tabla.
+      // S4: si el Owner sobrescribió el gasto de un mes, esa cifra manda — y es
+      // la MISMA magnitud que muestra la columna (gasto deducible del mes), así
+      // que nunca se descuenta dos veces el mismo importe.
       gastos: months.reduce((total, month) => {
         const override = monthOverridesFor(overrides, year, month.month)?.gastos;
         return total + (override?.value ?? month.nonTaxExpenses);
@@ -338,7 +342,7 @@ export function VectorFiscalPage() {
   const saveOverride = (month: OnatMonth, field: OverrideField, value: number): boolean => {
     if (!ownerId) return false;
     // S3/S4: `original` es el agregado de ESTE instante, no un valor recalculado.
-    const aggregated = field === 'ingresos' ? month.income : month.expenses;
+    const aggregated = field === 'ingresos' ? month.income : month.nonTaxExpenses;
     const result = setOnatOverride({
       ownerId,
       year,

@@ -276,6 +276,35 @@ describe('Vector Fiscal (S3, S4, S5, S6, S8)', () => {
     expect(screen.getByText('59.380')).toBeInTheDocument();
   });
 
+  it('no descuenta dos veces cuando hay override de gasto en un mes con tributos', async () => {
+    session.user = makeUser();
+    fixture.months = fixture.makeMonths().map((month) =>
+      month.month === 0
+        ? {
+            ...month,
+            income: 100_000,
+            expenses: 1_500,
+            nonTaxExpenses: 500,
+            taxesByType: { [ExpenseType.ImpuestoVentas]: 1_000 },
+          }
+        : { ...month, income: 0, expenses: 0, nonTaxExpenses: 0 },
+    );
+    fixture.overrides = {
+      [String(CURRENT_YEAR)]: {
+        '0': { gastos: { original: 500, value: 800, editedAt: '2026-10-27T00:00:00.000Z' } },
+      },
+    };
+
+    renderPage();
+
+    await screen.findAllByRole('row');
+
+    // La celda muestra el gasto deducible sobrescrito, no el total con tributos.
+    expect(screen.getByText('800 (antes 500)')).toBeInTheDocument();
+    // 100.000 − 39.120 − 800 (override) − 1.000 (tributo) = 59.080.
+    expect(screen.getByText('59.080')).toBeInTheDocument();
+  });
+
   it('muestra los tributos pagados del año con su código ONAT y su importe', async () => {
     session.user = makeUser();
     fixture.months = fixture.makeMonths().map((month) =>
