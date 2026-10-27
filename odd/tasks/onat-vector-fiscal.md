@@ -41,7 +41,7 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 | T3a | Menú Onat, i18n, ruta, `ownerOnlyLoader` y pantalla Configuraciones | S1,S2,S11 | delegated | done — `d9204273` |
 | T3b | Pantalla Vector Fiscal, overrides congelados, cierre anual y predicado `isOwnerOnly` compartido | S3,S4,S5,S6,S8 | delegated | done — `3e09334b` |
 | T4 | Verificación: typecheck, lint y tests del feature | todas | inline | done — typecheck 5/5, `app/onat` 68 tests, `app/shared` 1508 tests |
-| T5 | Corrección de hallazgos no bloqueantes de la review | S6,S8 | pending | pending |
+| T5 | Corrección de hallazgos de la review: doble descuento, tributos pagados, escrituras protegidas, etiquetas únicas y harness | S6,S8 | delegated | done — `c632bacf` |
 
 ## Log
 
@@ -79,3 +79,15 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 - **R2-dup-expense-type-keys:** el mapa `EXPENSE_TYPE_KEYS` sigue duplicado en cuatro componentes.
 - **R2-cuota-label-contradiction:** la etiqueta de `CuotaMensual` nombra un impuesto distinto al de la taxonomía.
 - **R1-EXPENSE-ENUM-DRIFT:** los valores 11–20 del enum compartido no existen en el backend; hoy no hay endpoint que los reciba.
+
+**L11** — Segunda pasada (2026-10-27). Correcciones aplicadas en `fix(onat): correct double deduction...` y `fix(onat): keep the expenses column on the deductible amount`. Review nativa final: **approved** y autoridad consumida (`lineage review-7d95134a0460da89`).
+- La columna **Gastos** ahora muestra y edita el **gasto deducible del mes** (sin los tributos fiscales), la misma magnitud que usa el cierre: un override ya no puede descontar dos veces.
+- Se añadió la superficie de **tributos pagados** con su código ONAT; se protegió la escritura a localStorage; se unificó la tabla de etiquetas de gasto en `app/expenses/lib/expense-type-labels.ts`; se compartió el harness de tests de rutas.
+- Incidencia de herramienta: un `review status` negociado quedó en `operation_timeout` y hubo que liberar esa transacción con `review abandon` antes de repetir la revisión.
+
+**L12** — Advisories que quedan abiertos (ninguno bloqueante):
+- **R1-001 (bloqueado por alcance):** los valores 11–20 de `ExpenseType` no existen en el enum del backend. No se toca backend, así que cualquier sincronización futura de gastos fiscales requiere alinear ambos lados.
+- **R1-002:** la configuración fiscal (NIT, domicilios) se guarda en JSON plano en localStorage, sin cifrar.
+- **R1-003:** el límite "solo Owner" es de cliente; no hay endpoint que lo respalde hoy.
+- **R2:** dos implementaciones de redondeo, `EXPENSE_TYPE_ORDER` no exhaustivo por tipo, `skipped` mezcla dos motivos distintos, campos muertos en `CierreAnualInput`, forma de config repetida en tres sitios.
+- **R3:** sin tests de cambio de año, de rechazo de la agregación, de fallo de guardado en Configuraciones, del orden de etiquetas de gasto ni del fallback `selectedStoreId`.
