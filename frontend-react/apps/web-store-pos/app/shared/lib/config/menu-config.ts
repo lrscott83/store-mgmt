@@ -1,5 +1,6 @@
 import { EFeatures, EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
+import { isOwnerOnly } from '~/shared/lib/auth/authorization-service';
 
 export interface MenuItem {
   label: string;
@@ -536,6 +537,32 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Statistics,
         helpContent:
           'Cuadre por fechas. Selecciona un rango de fechas (inicio y fin, ambos días incluidos) y genera un resumen de las operaciones del período: ventas, gastos, ganancias bruta y ganancias, más el detalle del cuadre.',
+      },
+    ],
+  },
+  {
+    // Grupo Onat (S1): Vector Fiscal y su configuración, inmediatamente antes de
+    // Gestión. Solo el dueño; sin iconos, como el resto del menú. Exige el módulo
+    // ONAT (22) y su feature (126): el módulo nace inactivo, así que el grupo no
+    // aparece hasta que el dueño lo active y `/me` lo devuelva.
+    groupLabel: 'MENU.ONAT',
+    moduleId: EModules.Onat,
+    items: [
+      {
+        label: 'MENU.VECTOR_FISCAL',
+        path: '/onat/vector-fiscal',
+        featureIds: [EFeatures.Onat],
+        moduleId: EModules.Onat,
+        moduleIds: [EModules.Onat],
+        rolesOnly: isOwnerOnly,
+      },
+      {
+        label: 'MENU.ONAT_CONFIGURATIONS',
+        path: '/onat/configurations',
+        featureIds: [EFeatures.Onat],
+        moduleId: EModules.Onat,
+        moduleIds: [EModules.Onat],
+        rolesOnly: isOwnerOnly,
       },
     ],
   },

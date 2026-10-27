@@ -224,6 +224,8 @@ const messages: Record<string, string> = {
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
   'MENU.REPORTS': 'REPORTES',
   'MENU.STATISTICS': 'ESTADÍSTICAS',
+  // Grupo Onat (Vector Fiscal): grupo propio, inmediatamente antes de Gestión.
+  'MENU.ONAT': 'Onat',
   'MENU.MANAGEMENT': 'GESTIÓN',
   // Módulo Elaboración (17): grupo propio con recetas y elaboraciones.
   'MENU.ELABORATION': 'ELABORACIÓN',
@@ -858,6 +860,10 @@ const messages: Record<string, string> = {
   // Menu items — Synchronization (Angular MENU.SYNCHRONIZATION.*)
   'MENU.EXPORT': 'Exportar',
   'MENU.IMPORT': 'Importar',
+
+  // Menu items — Onat (grupo propio antes de Gestión; solo el dueño).
+  'MENU.VECTOR_FISCAL': 'Vector Fiscal',
+  'MENU.ONAT_CONFIGURATIONS': 'Configuraciones',
 
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
@@ -1549,6 +1555,20 @@ const messages: Record<string, string> = {
   'EXPENSES.TYPE.DIVISA': 'Divisa',
   'EXPENSES.TYPE.IMPUESTO': 'Impuesto',
   'EXPENSES.TYPE.OTRO': 'Otro',
+  'EXPENSES.TYPE.IMPUESTO_VENTAS': 'Impuesto sobre Ventas o Servicios',
+  'EXPENSES.TYPE.FUERZA_TRABAJO': 'Impuesto por la Utilización de la Fuerza de Trabajo',
+  'EXPENSES.TYPE.IMPUESTO_SELLOS': 'Impuesto sobre Documentos / sellos del timbre',
+  'EXPENSES.TYPE.ANUNCIOS': 'Tasa por Radicación de Anuncios y Propaganda Comercial',
+  'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL':
+    'Contribución Especial a la Seguridad Social',
+  'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL': 'Contribución a la Seguridad Social',
+  'EXPENSES.TYPE.CUOTA_MENSUAL':
+    'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales',
+  'EXPENSES.TYPE.CONTRIBUCION_ZONAS':
+    'Contribución para la restauración y preservación de zonas',
+  'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES': 'Arrendamiento de bienes a entidades estatales',
+  'EXPENSES.TYPE.EXONERACION_REPARACIONES':
+    'Importes exonerados por asumir gastos de reparaciones',
 
   // Reports — Today
   'REPORTS.TODAY.TITLE': 'Reportes de hoy',
@@ -2211,6 +2231,70 @@ const messages: Record<string, string> = {
   'NOTIFICATIONS.PERMISSION_RESTORED': 'Se activaron las notificaciones del navegador.',
   'NOTIFICATIONS.PERMISSION_STILL_DENIED':
     'El navegador sigue bloqueando las notificaciones. Habilítelas en los ajustes del sitio.',
+
+  // Vector Fiscal — Configuraciones (S11): datos fiscales del Owner y sus
+  // actividades. Los textos visibles son exactamente estos (los fija el test).
+  'ONAT.CONFIGURATIONS_TITLE': 'Configuraciones del Vector Fiscal',
+  'ONAT.CONFIGURATIONS_SUBTITLE':
+    'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
+  'ONAT.NAME': 'Nombre',
+  'ONAT.NIT': 'NIT',
+  'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
+  'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
+  'ONAT.MUNICIPALITY': 'Municipio',
+  'ONAT.PROVINCE': 'Provincia',
+  'ONAT.ACTIVITIES': 'Actividades',
+  'ONAT.ACTIVITIES_EMPTY': 'Todavía no has agregado actividades.',
+  'ONAT.ACTIVITY_NAME': 'Nombre de la actividad',
+  'ONAT.ACTIVITY_CODE': 'Código de la actividad',
+  'ONAT.ADD_ACTIVITY': 'Adicionar actividad',
+  'ONAT.REMOVE_ACTIVITY': 'Eliminar',
+  'ONAT.SAVE': 'Guardar',
+  'ONAT.SAVED': 'Configuración guardada.',
+  'ONAT.SAVE_ERROR':
+    'No se pudo guardar. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+
+  // Vector Fiscal — pantalla principal (S3, S4, S5, S6, S8): un vector por Owner
+  // con los meses del año, las sobrescrituras del Owner y el cierre anual.
+  'ONAT.VECTOR_TITLE': 'Vector Fiscal',
+  'ONAT.VECTOR_SUBTITLE':
+    'Ingresos, gastos y tributos de tu negocio mes a mes, con el cierre anual calculado sobre los totales del año.',
+  'ONAT.CUP_NOTE': 'Todos los importes están en CUP.',
+  'ONAT.YEAR': 'Año',
+  'ONAT.MONTH': 'Mes',
+  'ONAT.INCOME': 'Ingresos',
+  'ONAT.EXPENSES': 'Gastos',
+  'ONAT.TAXES': 'Tributos',
+  'ONAT.BEFORE': 'antes {value}',
+  'ONAT.EDIT_INCOME': 'Editar ingresos de {month}',
+  'ONAT.EDIT_EXPENSES': 'Editar gastos de {month}',
+  'ONAT.INPUT_INCOME': 'Ingresos de {month}',
+  'ONAT.INPUT_EXPENSES': 'Gastos de {month}',
+  'ONAT.SAVE_ROW': 'Guardar',
+  'ONAT.CANCEL_ROW': 'Cancelar',
+  'ONAT.SAVE_INCOME': 'Guardar ingresos de {month}',
+  'ONAT.SAVE_EXPENSES': 'Guardar gastos de {month}',
+  'ONAT.CANCEL_EDIT': 'Cancelar la edición de {month}',
+  'ONAT.INVALID_AMOUNT': 'Escribe un importe válido mayor o igual a 0.',
+  'ONAT.ANNUAL_CLOSE': 'Cierre anual',
+  'ONAT.ANNUAL_CLOSE_HINT':
+    'Se calcula con los totales del año y los tributos deducibles que hayas registrado.',
+  'ONAT.CLOSE_BASE': 'Base imponible',
+  'ONAT.CLOSE_TAX': 'Impuesto',
+  'ONAT.CLOSE_TAX_DUE': 'Impuesto a pagar',
+  'ONAT.CLOSE_EARLY_BONUS': 'Bonificación por pronto pago',
+  'ONAT.CLOSE_TOTAL': 'Total a pagar',
+  'ONAT.CLOSE_PAY_BEFORE': 'Paga antes del 28 de febrero',
+  'ONAT.PAID_TAXES': 'Tributos pagados',
+  'ONAT.NO_CODE': 'Sin código',
+  'ONAT.WARNINGS': 'Avisos',
+  'ONAT.SKIPPED_RATES':
+    '{count, plural, one {1 importe sin tasa de cambio disponible} other {# importes sin tasa de cambio disponible}}',
+  'ONAT.SKIPPED_UNDATED':
+    '{count, plural, one {1 registro sin fecha válida} other {# registros sin fecha válida}}',
+  'ONAT.LOAD_ERROR':
+    'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+  'ONAT.RETRY': 'Reintentar',
 };
 
 export default messages;

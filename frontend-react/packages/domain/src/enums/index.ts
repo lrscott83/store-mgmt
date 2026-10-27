@@ -73,6 +73,8 @@ export enum EFeatures {
   OnlineOrders = 123,
   /** Gestores de ventas — espejo de FeatureType.GestoresVentas=125 (módulo 21, Owner-only). */
   GestoresVentas = 125,
+  /** Feature Vector Fiscal — espejo de FeatureType.Onat=126 (módulo 22, Owner-only). */
+  Onat = 126,
 }
 
 export enum EModules {
@@ -114,6 +116,12 @@ export enum EModules {
   GestionPedidos = 20,
   /** Módulo Gestores de ventas — espejo de ModuleType.GestoresVentas=21 (Superior/VIP, opt-in). */
   GestoresVentas = 21,
+  /**
+   * Módulo ONAT (Vector Fiscal) — espejo de ModuleType.Onat=22 (backend). Nace con
+   * `Module.IsActive = false`, así que `/me` no lo devuelve en `storeModuleIds` hasta que
+   * el dueño lo active: con este módulo se encienden a la vez el menú y las dos rutas.
+   */
+  Onat = 22,
 }
 
 export enum PaymentType {
@@ -142,6 +150,22 @@ export enum ExpenseType {
   Divisa = 9,
   Impuesto = 10,
   Otro = 100,
+  /**
+   * Nomencladores fiscales de la ONAT (Ley 181/2025). Se agregan al final para no
+   * tocar los valores existentes: la serialización histórica es el número.
+   * `Impuesto = 10` sigue siendo el cajón de "otro tributo" y `Otro = 100` un gasto
+   * no fiscal.
+   */
+  ContribucionZonas = 11,
+  ArrendamientoEntidades = 12,
+  ExoneracionReparaciones = 13,
+  ContribucionSeguridadSocial = 14,
+  ContribucionEspecialSeguridadSocial = 15,
+  ImpuestoVentas = 16,
+  CuotaMensual = 17,
+  FuerzaTrabajo = 18,
+  ImpuestoSellos = 19,
+  Anuncios = 20,
 }
 
 /**

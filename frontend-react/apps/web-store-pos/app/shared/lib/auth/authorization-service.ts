@@ -13,6 +13,17 @@ export function isReSeller(user: UserModel): boolean {
   return user.isReSeller;
 }
 
+/**
+ * Regla única de "solo el Owner" (S2): `isOwnerAdmin` y NO `isSuperAdmin`.
+ * El SuperAdmin conserva el resto de sus capacidades, pero el Vector Fiscal es
+ * del dueño del negocio. La comparten `ownerOnlyLoader` y los `rolesOnly` del
+ * menú ONAT para que la guarda de la ruta y la visibilidad del enlace no puedan
+ * divergir.
+ */
+export function isOwnerOnly(user: Pick<UserModel, 'isOwnerAdmin' | 'isSuperAdmin'>): boolean {
+  return user.isOwnerAdmin && !user.isSuperAdmin;
+}
+
 export function isUserAuthorized(
   user: UserModel,
   featureIds: number[],
