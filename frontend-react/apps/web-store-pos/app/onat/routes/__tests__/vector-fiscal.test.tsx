@@ -65,6 +65,13 @@ beforeEach(() => {
   fixture.warnings = [];
   fixture.skipped = { withoutRate: 0, undated: 0 };
   fixture.overrides = {};
+  // `clearAllMocks` limpia las llamadas pero no la implementación: cada prueba
+  // reinstala la agregación por defecto para no heredar la de una anterior.
+  vi.mocked(aggregateOnatMonths).mockImplementation(async () => ({
+    months: fixture.months,
+    warnings: fixture.warnings,
+    skipped: fixture.skipped,
+  }));
 });
 
 describeOwnerOnlyLoader('clientLoader de Vector Fiscal (solo el Owner)', clientLoader);
@@ -105,6 +112,62 @@ describe('Vector Fiscal (S3, S4, S5, S6, S8)', () => {
       storeIds: ['s1', 's3'],
       year: CURRENT_YEAR,
     });
+  });
+
+  it('usa la tienda seleccionada cuando la sesión no trae lista de tiendas', async () => {
+    session.user = makeUser({ storeList: undefined, selectedStoreId: 's9' });
+
+    renderPage();
+
+    await screen.findAllByRole('row');
+
+    expect(aggregateOnatMonths).toHaveBeenCalledWith({
+      storeIds: ['s9'],
+      year: CURRENT_YEAR,
+    });
+  });
+
+  it('vuelve a agregar al cambiar el año y muestra las filas y el cierre del año elegido', async () => {
+    session.user = makeUser();
+    const previousYear = CURRENT_YEAR - 1;
+    const previousMonths = Array.from({ length: 12 }, (_, month) => ({
+      month,
+      income: 10_000,
+      expenses: 0,
+      nonTaxExpenses: 0,
+      salaries: 0,
+      taxesByType: {},
+    }));
+    vi.mocked(aggregateOnatMonths).mockImplementation(async ({ year }) => ({
+      months: year === previousYear ? previousMonths : fixture.months,
+      warnings: [],
+      skipped: { withoutRate: 0, undated: 0 },
+    }));
+
+    renderPage();
+
+    await screen.findAllByRole('row');
+    expect(aggregateOnatMonths).toHaveBeenLastCalledWith({
+      storeIds: ['s1'],
+      year: CURRENT_YEAR,
+    });
+
+    fireEvent.change(screen.getByLabelText('Año'), {
+      target: { value: String(previousYear) },
+    });
+
+    // La agregación se vuelve a invocar con el año elegido, no reutiliza la del año actual.
+    expect(aggregateOnatMonths).toHaveBeenCalledTimes(2);
+    expect(aggregateOnatMonths).toHaveBeenLastCalledWith({
+      storeIds: ['s1'],
+      year: previousYear,
+    });
+    expect(screen.getByLabelText('Año')).toHaveValue(String(previousYear));
+
+    // Año anterior: 12 × 10.000 de ingreso − 39.120 de mínimo exento = 80.880.
+    expect(await screen.findByText('80.880')).toBeInTheDocument();
+    const rows = screen.getAllByRole('row');
+    expect(within(rows[1]).getAllByRole('cell')[1]).toHaveTextContent('10.000');
   });
 
   it('muestra el override con el original congelado entre paréntesis', async () => {

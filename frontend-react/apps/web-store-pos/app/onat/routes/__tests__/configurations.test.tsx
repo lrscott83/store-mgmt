@@ -90,6 +90,45 @@ describe('Configuraciones del Vector Fiscal (S11)', () => {
     });
   });
 
+  it('muestra un error y ningún éxito cuando el almacenamiento rechaza la escritura', () => {
+    session.user = makeUser();
+    saveOnatConfig({
+      ownerId: 'u1',
+      nombre: 'Panadería La Esquina',
+      nit: '1234567890123',
+      domicilioFiscal: 'Calle 1 # 2',
+      domicilioLegal: 'Calle 3 # 4',
+      municipio: 'Centro Habana',
+      provincia: 'La Habana',
+      actividades: [{ nombre: 'Elaboración de pan', codigo: '1071' }],
+    });
+
+    // El almacenamiento rechaza toda escritura: `saveOnatConfig` lo traduce a
+    // `{ succeeded: false }` y la pantalla debe mostrar el error, nunca el éxito.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    try {
+      renderPage();
+
+      fireEvent.change(screen.getByLabelText('Nombre'), {
+        target: { value: 'Panadería El Vedado' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No se pudo guardar. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+      );
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      // Nada se persistió: lo escrito sigue en el formulario y el almacén conserva lo anterior.
+      expect(screen.getByLabelText('Nombre')).toHaveValue('Panadería El Vedado');
+      expect(getOnatConfig('u1').nombre).toBe('Panadería La Esquina');
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
   it('permite quitar una actividad agregada', () => {
     session.user = makeUser();
 
