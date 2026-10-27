@@ -186,16 +186,16 @@ test.describe.serial('FC-A1 — Egreso de inventario (venta mayorista)', () => {
     expect(page.url()).toContain('/inventory/today-quantities');
   });
 
-  test('cambiar tipo de orden a Normal funciona igual', async ({ signedInPage }) => {
+  test('cambiar tipo de orden a Ajuste funciona igual', async ({ signedInPage }) => {
     const { page, selectedStoreId } = signedInPage;
 
     await page.goto('/inventory/egress');
     await expect(page.getByText(EGRESS_HEADER)).toBeVisible();
 
-    // Change type to Normal
+    // Change type to Ajuste (OrderType.Ajuste = 4); Normal no longer exists in Salida
     const typeSelector = page.getByRole('combobox', { name: 'Tipo' });
-    await typeSelector.selectOption('1');
-    await expect(typeSelector).toHaveValue('1');
+    await typeSelector.selectOption('4');
+    await expect(typeSelector).toHaveValue('4');
 
     // Seed inventory and add product
     await seedInventoryEntry(page, selectedStoreId);
@@ -204,8 +204,8 @@ test.describe.serial('FC-A1 — Egreso de inventario (venta mayorista)', () => {
     await page.goto('/inventory/egress');
     await page.waitForLoadState('networkidle');
 
-    // Re-select Normal (reload resets to Mayorista default)
-    await typeSelector.selectOption('1');
+    // Re-select Ajuste (reload resets to Merma default)
+    await typeSelector.selectOption('4');
 
     // Click first category button
     const catBtn = page.locator('.no-scrollbar button').first();

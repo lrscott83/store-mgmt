@@ -162,6 +162,19 @@ namespace Infrastructure.Persistence.Repositories
                     && o.Date <= toUtc);
 
         /// <summary>
+        /// Pedidos ONLINE (OrderType.WhatsApp) de TODAS las tiendas en un rango: el numerador de la
+        /// conversión del panel general. Sin filtro por tienda. El filtro global por tenant queda
+        /// ACTIVO: el endpoint es SuperAdmin y lo deja pasar, así que desactivar todos los filtros
+        /// con `IgnoreQueryFilters` sería más de lo que hace falta.
+        /// </summary>
+        public async Task<int> CountOnlineOrdersAsync(DateTime fromUtc, DateTime toUtc,
+            CancellationToken cancellationToken = default)
+            => await _orders
+                .CountAsync(o => o.OrderType == OrderType.WhatsApp
+                    && o.Date >= fromUtc
+                    && o.Date <= toUtc, cancellationToken);
+
+        /// <summary>
         /// Agregado de los pedidos de UNA tienda en un rango (F6, T1). TODO el agregado ocurre en la
         /// BASE: cuatro consultas contadas y agrupadas, ninguna que devuelva filas de pedido.
         ///

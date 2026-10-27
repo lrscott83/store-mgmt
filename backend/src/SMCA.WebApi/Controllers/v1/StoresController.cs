@@ -3,6 +3,7 @@ using Application.Dtos.StoreManagement;
 using Application.Dtos.WebCatalog;
 using Application.Features.ApplicationManagement.Tenants.Queries.GetTenantById;
 using Application.Features.WebCatalog.Queries.GetCatalogStats;
+using Application.Features.WebCatalog.Queries.GetCatalogStatsOverview;
 using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
 using Application.Features.StoreManagement.Stores.Commands.ToggleStorePlan;
 using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
@@ -371,6 +372,19 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreCatalogTemplateAsync(Guid storeId)
             => Ok(await Sender.Send(new GetStoreCatalogTemplateQuery(storeId)));
+
+        /// <summary>
+        /// Estadísticas del catálogo de TODAS las tiendas (SuperAdmin): agregado general del periodo
+        /// más la lista de tiendas con visitas en ese mismo periodo, que alimenta el selector.
+        /// Va antes de las rutas per-tienda porque es el panel por defecto.
+        /// </summary>
+        [HttpGet("catalog-stats")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<CatalogStatsOverviewDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetCatalogStatsOverviewAsync(
+            [FromQuery] int days = GetCatalogStatsOverviewQuery.DefaultDays)
+            => Ok(await Sender.Send(new GetCatalogStatsOverviewQuery(days)));
 
         /// <summary>
         /// Estadísticas del catálogo de UNA tienda (SuperAdmin): visitas, visitantes únicos,

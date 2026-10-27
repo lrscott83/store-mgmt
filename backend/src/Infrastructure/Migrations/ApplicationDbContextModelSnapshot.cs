@@ -128,6 +128,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("OccurredAt", "SessionHash");
+
                     b.HasIndex("StoreId", "OccurredAt");
 
                     b.HasIndex("StoreId", "SessionHash");
@@ -2455,6 +2457,69 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SalesManager", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.SiteTelemetry.SiteEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReferrerHost")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SessionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VisitorHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("Kind", "OccurredAt");
+
+                    b.HasIndex("Path", "OccurredAt");
+
+                    b.ToTable("SiteEvent");
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreCatalogImages.StoreCatalogImage", b =>

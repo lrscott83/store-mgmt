@@ -7,7 +7,6 @@ using Domain.Entities.Products;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 
@@ -25,7 +24,6 @@ namespace Application.Tests.Features.WebCatalog.Public
         private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
         private readonly Mock<IHttpContextService> _httpContextService = new();
         private readonly Guid _tenantId = Guid.NewGuid();
-        private readonly IConfiguration _configuration;
         private Store _store = null!;
 
         public RecordCatalogEventsCommandHandlerTests()
@@ -35,12 +33,6 @@ namespace Application.Tests.Features.WebCatalog.Public
             _productRepository
                 .Setup(x => x.GetPublishedByIdsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>()))
                 .ReturnsAsync([]);
-            _configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["CatalogTelemetry:Salt"] = "test-salt",
-                })
-                .Build();
 
             _store = Store.Create("Tienda", Guid.NewGuid(), true, _tenantId);
             _store.CatalogSlug = StoreSlug;
@@ -54,8 +46,7 @@ namespace Application.Tests.Features.WebCatalog.Public
             _catalogEventRepository.Object,
             _productRepository.Object,
             _unitOfWork.Object,
-            _httpContextService.Object,
-            _configuration);
+            _httpContextService.Object);
 
         private static CatalogEventRequest PageView(string path = "/catalog/mi-tienda") => new()
         {

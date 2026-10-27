@@ -69,6 +69,15 @@ vi.mock('~/shared/lib/usage/use-store-usage-tracker', () => ({
   useStoreUsageTracker: vi.fn(),
 }));
 
+// root.tsx mounta también el beacon anónimo de páginas públicas. Estos tests solo
+// afirman el cableado del root; el comportamiento del beacon se prueba en
+// shared/lib/telemetry/__tests__. Sin este stub, montar App() hace un POST real y el
+// guard de HTTP sin mockear de la suite lo marca como fallo.
+vi.mock('~/shared/lib/telemetry/use-site-page-view', () => ({
+  useSitePageView: vi.fn(),
+}));
+
+
 // client-error-log: root.tsx must install the global hooks (Layout boot) and
 // the ErrorBoundary must write every route error into the diagnostic buffer.
 // The module graph is stubbed here — behavior is unit-tested in

@@ -1,6 +1,6 @@
 # Manual de usuario — VendeDTo
 
-**Versión:** 1.1 · **Fecha:** 2026-10-16
+**Versión:** 1.2 · **Fecha:** 2026-10-27
 **Dirigido a:** el **Dueño** (Administrador de tienda) y sus **Empleados** (Usuario de tienda).
 
 **Cómo leerlo.** La **Parte 1** es la puesta en marcha: se hace una vez, cuando montas la
@@ -305,6 +305,12 @@ filtrar por rango de fechas y por estado (**Todos / Por Pagar / Pagados**).
 
 ![Pagar un crédito: la forma de pago y la nota](img/38-pagar-credito.png)
 
+**Historial de créditos** (para días anteriores):
+
+![Créditos: el historial con el filtro Por Pagar y el acordeón del día desplegado](img/57-creditos-historial-1.png)
+
+![Créditos: continuación del historial](img/57-creditos-historial-2.png)
+
 
 
 ## 12. Cierre de caja
@@ -351,6 +357,45 @@ es la sección 12.
 ![Ventas del día: las ventas de hoy con sus filtros por método de pago, estado y moneda](img/15-ventas-del-dia.png)
 
 ![Cuadre del día: paneles de Resumen Efectivo, transferencias, gastos, créditos y ventas](img/14-cuadre-dia.png)
+
+
+## 13.1 Historial de ventas
+
+**Qué es.** Consultar **todas** las ventas guardadas (no solo las de hoy), con filtros y el
+detalle agrupado por día; y, si tienes varias tiendas, verlas juntas en una sola pantalla.
+
+**Cómo se hace.**
+1. Ve a **Ventas → Ventas**. El encabezado muestra cuántas ventas entran en el filtro y su
+   importe total.
+2. Filtra por **rango de fechas**, por **método de pago** (Todas / Efectivo / …) y por estado
+   (**Todas / Pagadas / Créditos**). Si tienes varias monedas aparece también el filtro de
+   **moneda**.
+3. Pulsa un **día** para desplegar sus ventas. Cada venta muestra su hora, su método de pago y
+   su total; con la flecha de la venta ves su detalle.
+4. Con el **engranaje del día** puedes **generar el reporte** de ese día o abrir el **Resumen
+   de ventas** del día.
+
+**Con varias tiendas.** Si eres **Dueño** y tienes el módulo **MultiStores** con **dos o más
+tiendas activas**, la misma pantalla cambia a paneles por tienda:
+- Arriba eliges **Todas las tiendas** o una tienda concreta.
+- Cada tienda es un **panel colapsable** con su contador y su total; dentro va el acordeón por
+  día con las ventas de **esa** tienda.
+- Los filtros de **fechas**, **método de pago**, **Pagadas/Créditos** y **moneda** son
+  **globales**: se aplican a todas las tiendas a la vez.
+
+**A tener en cuenta.** El historial es **solo lectura**: aquí no se editan ni se eliminan
+ventas. Para editar o cancelar una venta de hoy usa **Ventas del día**. Una venta cancelada no
+aparece en el historial.
+
+![Historial de ventas: filtros de fecha, método de pago y estado, y el acordeón del día desplegado](img/55-historial-ventas-1.png)
+
+![Historial de ventas: continuación del día desplegado](img/55-historial-ventas-2.png)
+
+**Con varias tiendas**, el historial se reparte en un panel por tienda:
+
+![Historial de ventas multi-tienda: selector Todas las tiendas, totales y un panel por tienda con su día desplegado](img/56-historial-ventas-multitienda-1.png)
+
+![Historial de ventas multi-tienda: el segundo panel por tienda](img/56-historial-ventas-multitienda-2.png)
 
 
 ---
@@ -415,6 +460,12 @@ que ya se vendió no se puede anular. La fecha siempre es la del día.
 
 ![Entradas del día: las compras registradas hoy](img/11-entradas-dia.png)
 
+**Historial de entradas** (todos los días, agrupado por día):
+
+![Entradas: el historial con el acordeón del día desplegado](img/59-entradas-historial-1.png)
+
+![Entradas: continuación del historial](img/59-entradas-historial-2.png)
+
 
 ## 16. Cantidades del día
 
@@ -451,21 +502,24 @@ recalcula). La ganancia total se pinta en verde si es positiva y en rojo si es n
 
 ## 18. Salida
 
-**Qué es.** La pantalla **Salida** abre la venta con un **selector de tipo de pedido** (por defecto
-Mayorista) sobre las categorías de productos. Comparte el carrito de la venta.
+**Qué es.** Registrar una **salida de inventario que no es una venta**: una **merma** (producto
+dañado, vencido o perdido), un **ajuste** de existencias o **otro** detalle que saca mercancía
+del almacén.
 
 **Cómo se hace.**
 1. Ve a **Inventario → Salida**.
-2. Elige el **tipo** en el selector de la esquina superior, navega por categorías y añade lo que
-   corresponda.
-3. Confirma desde el carrito, igual que cualquier venta.
+2. En **Tipo** elige **Merma**, **Ajuste** u **Otro**. El selector **no ofrece Normal ni
+   Mayorista**: la venta normal se registra en **Vender** y la venta al por mayor en **Vender
+   Mayorista**.
+3. Navega por las categorías, añade los productos y sus cantidades y confirma desde el carrito,
+   igual que en una venta.
 
-**A tener en cuenta.** La etiqueta del menú invita a pensar en *mermas o salidas no de venta*, pero
-la pantalla funciona como una **venta** con tipo de pedido seleccionable. **Confirmar con el
-Dueño** si el uso previsto es ese antes de documentarlo con más detalle.
+**A tener en cuenta.** La salida comparte el carrito de la venta y el **tipo elegido queda
+guardado en la orden**, para que puedas distinguir después una merma de un ajuste. El
+inventario se descuenta según la casilla **Descuenta del Inventario** de cada producto, igual
+que en una venta.
 
-**📷 Imagen sugerida.** La pantalla **Salida** con el selector de **tipo** arriba y una categoría con
-sus productos.
+![Salida: el selector Tipo con Merma (solo Merma, Ajuste y Otro) y las categorías de productos](img/58-salida.png)
 
 ---
 
@@ -581,6 +635,12 @@ alimentan el **Cuadre del día** y las **Estadísticas**.
 ![Gastos del día: botón Gasto y la lista de gastos del día](img/10-gastos.png)
 
 ![Nuevo gasto: tipo, total, moneda, tipo de pago y nota](img/36-nuevo-gasto.png)
+
+**Historial de gastos** (todos los días, agrupado por día):
+
+![Gastos: el historial con el acordeón del día desplegado](img/60-gastos-historial-1.png)
+
+![Gastos: continuación del historial](img/60-gastos-historial-2.png)
 
 
 ## 23. Reportes
@@ -760,8 +820,214 @@ falla, para enviar el detalle.
 
 ## Anexo — Qué NO cubre este manual
 
-Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp** y
-las **configuraciones**. Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
+Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp**,
+las **configuraciones** y el **modo multi-tienda del historial de ventas** (cuando el módulo
+MultiStores está activo). Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
 Superior), las pantallas de **Gestión de pedidos** (atender los pedidos, repartidores y ventas de
 pedidos) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).
+
+
+---
+
+# Tutorial: agregar categorías y productos al catálogo del POS
+
+Este tutorial es **independiente del resto del manual**: empieza desde cero y termina con un
+producto listo para venderse en el POS. No necesitas leer ninguna otra sección.
+
+**Qué vas a lograr.** Crear una **categoría** y, dentro de ella, un **producto** con su precio y su
+existencia inicial, de modo que aparezca en **Vender** y pueda cobrarse.
+
+**Cómo leer las imágenes.** Cada control que debes tocar está marcado con un **círculo rojo** y un
+**número rojo**. Ese número es el **número de paso** de este tutorial y se repite en el texto. En
+cada imagen verás solo los números que corresponden a esa pantalla.
+
+> **No confundas las marcas con botones.** Las marcas del tutorial son **círculos rojos finos con un
+> número**. Los botones de la aplicación (por ejemplo **Limpiar**, **Importar Productos** o
+> **Categoría**) son formas rellenas con texto; si no llevan número, **no son un paso** de este
+> tutorial.
+
+**Antes de empezar.** Necesitas iniciar sesión como **Dueño de tienda** (o como un empleado con
+permiso sobre **Productos**) y tener la tienda seleccionada. En el menú, el catálogo vive en el
+grupo **VENTA**.
+
+> **Categoría y producto, en una frase:** la **categoría** es el grupo (por ejemplo, *Alimentos*) y
+> el **producto** es cada artículo que se vende dentro de ese grupo (por ejemplo, *Arroz Bolsa 1 kg*).
+> **No se puede crear un producto sin una categoría.**
+
+## 1. Abrir el catálogo de productos
+
+**Paso 1.** Toca el botón de la esquina superior izquierda para **abrir el menú lateral**. Es el
+botón con la flecha doble (**»**).
+
+![Paso 1: abrir el menú lateral](img/46-tutorial-01-abrir-menu.png)
+
+**Paso 2.** En el menú, dentro del grupo **VENTA**, toca **Catálogo Productos**. Se abre la pantalla
+**Productos**.
+
+![Paso 2: VENTA → Catálogo Productos](img/47-tutorial-02-catalogo-productos.png)
+
+## 2. Crear la categoría
+
+**Paso 3.** En la pantalla **Productos**, toca el botón **Categoría** (con el signo **+**) que está
+en la cabecera de la tarjeta.
+
+Si el catálogo está vacío verás el aviso *«Para adicionar un producto debe primero adicionar una
+categoría»*: es normal y desaparece en cuanto crees la primera.
+
+![Paso 3: botón Categoría](img/48-tutorial-03-boton-categoria.png)
+
+Se abre la ventana **Crear categoría**, con tres campos y dos botones:
+
+**Paso 4. Nombre.** Escribe el nombre del grupo. Es el texto que verás en la lista del catálogo y en
+la pantalla de venta. Ejemplo: **Alimentos**. Es obligatorio.
+
+**Paso 5. Orden.** Es la **posición** de la categoría en la lista: el número menor aparece primero.
+Al abrir la ventana viene rellenado con el siguiente número libre, así que **normalmente no hay que
+tocarlo**. Si escribes `1`, la categoría se coloca al principio. Es obligatorio.
+
+**Paso 6. Activo.** Debe quedar **marcado**. Si lo desmarcas, la categoría se guarda pero queda
+atenuada en la lista con la etiqueta **Inactivo**; no se borra y puedes volver a activarla editándola.
+
+**Paso 7. Salvar.** Toca **Salvar** para guardar. El botón **Cerrar** (con la **×**) cierra la ventana
+sin guardar.
+
+![Pasos 4 a 7: Nombre, Orden, Activo y Salvar en Crear categoría](img/49-tutorial-04-modal-categoria.png)
+
+Al guardar, la ventana se cierra y la categoría aparece en la lista **Productos** con un **0** a la
+derecha: ese número es la **cantidad de productos** que contiene (todavía ninguno).
+
+## 3. Abrir el menú de la categoría
+
+**Paso 8.** Toca el **engranaje** que está a la derecha del nombre de la categoría (justo antes de la
+flecha que abre y cierra el grupo). Ese engranaje son las **opciones de la categoría** y **no**
+expande la lista.
+
+![Paso 8: engranaje de opciones de la categoría](img/50-tutorial-05-categoria-creada.png)
+
+Se abre un **menú contextual** con tres opciones. Esta es la parte que no es evidente: **dos de las
+tres opciones sirven para agregar productos**.
+
+**Paso 9. Categoría** (icono de lápiz). **Edita** la categoría: vuelve a abrir la ventana del paso 4
+para cambiar **Nombre**, **Orden** o **Activo**. No agrega productos.
+
+**Paso 10. Productos** (icono **+**). **Alta rápida de varios productos** a la vez: escribes una lista
+de nombres y precios y se crean todos dentro de la categoría. Útil para cargar un catálogo largo.
+
+**Paso 11. Producto** (icono **+**). **Alta individual**: abre el formulario completo con todos los
+campos del producto. Es la opción que usaremos en este tutorial.
+
+![Pasos 9 a 11: el menú de la categoría (Categoría, Productos, Producto)](img/51-tutorial-06-menu-categoria.png)
+
+## 4. Crear el producto
+
+**Paso 11 (continuación).** Toca **Producto** en el menú contextual. Se abre la ventana **Producto**.
+El formulario es largo, así que se muestra en dos imágenes: primero los datos generales y después las
+casillas y los botones finales.
+
+**Paso 12. Nombre.** El nombre del artículo tal como lo verás en la lista y en la pantalla de venta.
+Ejemplo: **Arroz Bolsa 1 kg**. Es obligatorio.
+
+**Paso 13. Precio de costo.** Lo que te cuesta a ti una unidad. Es **opcional**. Si lo rellenas junto
+con **Cantidad**, el sistema registra una **entrada de inventario del día** con ese costo y esa
+cantidad. Si lo dejas vacío, **no** se crea ninguna entrada. El costo **no cambia** el precio de
+venta. Este campo solo aparece para el **Dueño** y con el módulo **Inventario** activo.
+
+**Paso 14. Precio.** El precio al que vendes una unidad. Es **obligatorio** y debe ser un número mayor
+o igual que cero. Es el precio que verás en la lista del catálogo y el que se cobra en el POS.
+
+**Paso 15. Moneda del costo.** La moneda en la que expresas el **Precio de costo**. Solo aparece con
+el módulo **MultiMonedas**; por defecto trae la moneda de compra configurada en la tienda.
+
+**Paso 16. Moneda del precio.** La moneda en la que expresas el **Precio** de venta. Solo aparece con
+el módulo **MultiMonedas**. Si cambias primero la moneda del costo, la del precio se ajusta sola la
+primera vez; después puedes fijarla por separado.
+
+![Pasos 12 a 20: datos generales del producto](img/52-tutorial-07-modal-producto-1.png)
+
+**Paso 17. Cantidad.** La **existencia inicial** que tienes de ese producto. Es **opcional** y admite
+decimales (por ejemplo `1.5`). Solo crea la entrada de inventario del día si **también** rellenaste el
+**Precio de costo** y la cantidad es mayor que cero.
+
+**Paso 18. Código de barras.** El código del producto, si tiene. Es **opcional**. Puedes escribirlo o
+tocarlo con el botón del **escáner** (icono de código de barras) para capturarlo con la cámara.
+
+**Paso 19. Orden.** La **posición** del producto dentro de la categoría: el número menor aparece
+primero. Viene rellenado con el siguiente número libre, así que **normalmente no hay que tocarlo**.
+
+**Paso 20. Venta Mayorista.** Es un **interruptor opcional**, apagado por defecto. Si lo enciendes,
+aparecen **Unidades por paquete/caja**, **Unidad de medida** y los **Rangos de precio mayorista**
+(mínimo de paquetes y precio por unidad). Si no vendes al mayor, déjalo apagado.
+
+**Paso 21. Activo.** Debe quedar **marcado**. Si lo desmarcas, el producto se guarda pero queda
+atenuado en la lista con la etiqueta **Inactivo** y **no se puede vender**.
+
+**Paso 22. Disponible para Vender.** Debe quedar **marcado**. Si lo desmarcas, el producto existe en el
+catálogo pero **no aparece en la pantalla Vender**, así que no se puede cobrar.
+
+**Paso 23. Descuenta del Inventario.** Debe quedar **marcado** para un producto normal: el POS controla
+la existencia y la descuenta al vender. Desmárcalo solo para artículos que **no llevan inventario**
+(servicios, combos): en ese caso se vende aunque no haya existencia y no descuenta stock.
+
+**Paso 24. Salvar.** Toca **Salvar** para guardar el producto. El botón **Cerrar** (con la **×**)
+cierra sin guardar.
+
+![Pasos 21 a 24: casillas Activo, Disponible para Vender, Descuenta del Inventario y Salvar](img/53-tutorial-08-modal-producto-2.png)
+
+## 5. Comprobar que quedó listo
+
+**Paso 25.** La ventana se cierra y el producto aparece **dentro de la categoría**. Toca el nombre de
+la categoría (o la flecha de la derecha) para **abrir el grupo** si está cerrado. Verás el producto
+con su **precio** y su **engranaje** de opciones (para **Editar** o **Desactivar** el producto más
+adelante). El número a la derecha del nombre de la categoría pasa de **0** a **1** (o al total de
+productos que tenga).
+
+![Paso 25: el producto creado dentro de la categoría](img/54-tutorial-09-producto-creado.png)
+
+**Listo.** El producto ya existe en el catálogo del POS: aparece en **Vender**, se puede agregar al
+carrito y cobrar, y si marcaste **Descuenta del Inventario** su existencia se irá descontando con cada
+venta.
+
+## Resumen de los campos
+
+### Ventana Crear categoría
+
+| Campo | Qué significa | ¿Obligatorio? |
+| --- | --- | --- |
+| **Nombre** | Nombre del grupo que verás en el catálogo y en la venta. | Sí |
+| **Orden** | Posición en la lista; el número menor aparece primero. Viene con el siguiente libre. | Sí |
+| **Activo** | Marcado: la categoría se usa normalmente. Desmarcado: queda atenuada como **Inactivo**, sin borrarse. | No (marcado por defecto) |
+
+### Ventana Producto
+
+| Campo | Qué significa | ¿Obligatorio? |
+| --- | --- | --- |
+| **Nombre** | Nombre del artículo en el catálogo y en la venta. | Sí |
+| **Precio de costo** | Lo que te cuesta una unidad. Con **Cantidad**, genera la entrada de inventario del día. No cambia el precio de venta. | No |
+| **Precio** | Precio de venta por unidad. Es el que se cobra en el POS. | Sí |
+| **Moneda del costo** | Moneda del costo (solo con MultiMonedas). | No |
+| **Moneda del precio** | Moneda del precio de venta (solo con MultiMonedas). | No |
+| **Cantidad** | Existencia inicial; admite decimales. Solo genera entrada si hay costo y es mayor que cero. | No |
+| **Código de barras** | Código del producto; se puede escribir o escanear. | No |
+| **Orden** | Posición dentro de la categoría; el número menor aparece primero. | No |
+| **Venta Mayorista** | Interruptor para configurar paquete/caja, unidad de medida y rangos de precio al mayor. | No (apagado por defecto) |
+| **Activo** | Marcado: el producto se usa normalmente. Desmarcado: queda **Inactivo** y no se vende. | No (marcado por defecto) |
+| **Disponible para Vender** | Marcado: aparece en **Vender**. Desmarcado: no se puede cobrar. | No (marcado por defecto) |
+| **Descuenta del Inventario** | Marcado: controla y descuenta existencia al vender. Desmarcado: no controla stock (servicios, combos). | No (marcado por defecto) |
+
+### Botones de la pantalla Productos
+
+| Botón | Qué hace |
+| --- | --- |
+| **Categoría** | Crea una categoría nueva (paso 3). |
+| **Importar Productos** | Carga masiva desde un archivo CSV: descarga el ejemplo, rellénalo y súbelo. |
+| **Importar desde Catálogo Web** | Trae al catálogo del POS los productos publicados en el Catálogo Web (solo Dueño y con el módulo activo). |
+| **Limpiar** | **Borra** los datos del catálogo de este dispositivo (solo Dueño). **No lo uses** en este tutorial. |
+
+### Botones de la ventana Producto
+
+| Botón | Qué hace |
+| --- | --- |
+| **Cerrar** (**×**) | Cierra la ventana sin guardar nada. |
+| **Salvar** (icono de disquete) | Guarda el producto con los datos escritos. |
+

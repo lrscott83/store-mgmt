@@ -992,16 +992,15 @@ function mockEntries(entries: InventoryEntryView[]) {
         // exercised against a faithful double.
         filterInventoryEntries: vi
           .fn()
-          .mockImplementation(
-            (_productId?: string, start?: Date, end?: Date) =>
-              Promise.resolve({
-                succeeded: true,
-                data: entries.filter((v) => {
-                  if (start && new Date(v.date) < start) return false;
-                  if (end && new Date(v.date) >= end) return false;
-                  return true;
-                }),
+          .mockImplementation((_productId?: string, start?: Date, end?: Date) =>
+            Promise.resolve({
+              succeeded: true,
+              data: entries.filter((v) => {
+                if (start && new Date(v.date) < start) return false;
+                if (end && new Date(v.date) >= end) return false;
+                return true;
               }),
+            }),
           ),
       }) as unknown as InstanceType<typeof InventoryOfflineService>,
   );
@@ -1490,11 +1489,12 @@ describe('InventoryTodaySalesProfitPage — getInventoryEntriesInDay succeeded:f
   });
 });
 
-// ─── EgressPage — Mayorista wholesale-sale screen (Angular egress.component parity) ────────
+// ─── EgressPage — Salida stock-outflow screen (merma / ajuste / otro) ──────────────────────
 //
-// Angular's EgressComponent (egress.component.ts:20) is NOT a waste/CRUD tracker — it is a
-// wholesale (Mayorista) SALE screen: `orderType = OrderType.Mayorista` (default), a full
-// `OrderTypeUtils.getOrderTypes()` selector, and the reused `SaleCategoryProductsComponent`.
+// Salida registers stock outflows that are NOT sales: `orderType = OrderType.Merma` (default),
+// a selector limited to Merma/Ajuste/Otro, and the reused `SaleCategoryProductsComponent`.
+// Normal and Mayorista are deliberately absent (owner decision, 2026-10-27): the normal sale
+// lives in /sales/new and the wholesale sale in /sales/wholesale.
 // These tests supersede the old fabricated waste-CRUD "EgressPage — smoke render" suite
 // (deleted, not duplicated — see Stage 2.1 tasks 2.1/3.5).
 
@@ -1890,7 +1890,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
 
 import { EgressPage } from '../egress';
 
-describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.component parity)', () => {
+describe('EgressPage — Salida stock-outflow screen (merma / ajuste / otro)', () => {
   beforeEach(() => {
     mockEgressProducts = [];
     mockEgressCategories = [];
@@ -1908,7 +1908,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     expect(screen.getByText('Salida')).toBeInTheDocument();
   });
 
-  it('renders the full OrderType selector (Angular getOrderTypes(): all 5 types) defaulting to Mayorista', async () => {
+  it('renders only the stock-outflow types (Merma, Ajuste, Otro) defaulting to Merma', async () => {
     await act(async () => {
       render(
         <Wrapper>
@@ -1917,10 +1917,12 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
       );
     });
     const select = screen.getByLabelText('Tipo') as HTMLSelectElement;
-    expect(select.value).toBe(String(OrderType.Mayorista));
-    for (const label of ['Normal', 'Mayorista', 'Merma', 'Ajuste', 'Otro']) {
+    expect(select.value).toBe(String(OrderType.Merma));
+    for (const label of ['Merma', 'Ajuste', 'Otro']) {
       expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole('option', { name: 'Normal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Mayorista' })).not.toBeInTheDocument();
   });
 
   it('renders one category button per active category', async () => {
@@ -1937,7 +1939,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
   });
 
-  it('renders an editable price input by default (Mayorista is non-Normal, SaleProductRow parity)', async () => {
+  it('renders an editable price input by default (Merma is non-Normal, SaleProductRow parity)', async () => {
     mockEgressCategories = [makeCategory()];
     mockEgressProducts = [makeEgressProduct()];
     render(
@@ -1948,7 +1950,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     expect(await screen.findByLabelText('Precio')).toBeInTheDocument();
   });
 
-  it('threads productId, quantity, orderType (Mayorista) and the edited price into cart-store.addItem', async () => {
+  it('threads productId, quantity, orderType (Merma default) and the edited price into cart-store.addItem', async () => {
     mockEgressCategories = [makeCategory()];
     mockEgressProducts = [makeEgressProduct({ id: 'p1', price: 10 })];
     render(
@@ -1961,7 +1963,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     expect(addItemMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'p1' }),
       1,
-      OrderType.Mayorista,
+      OrderType.Merma,
       12,
     );
   });
@@ -2094,7 +2096,9 @@ describe('TodayEntriesPage — editing keeps the stored cost currency (csv-impor
       updatedByName: 'test',
       currency: Currency.USD,
     };
-    const updateMock = vi.fn().mockReturnValue({ succeeded: true, errors: [], data: todayEntries[0] });
+    const updateMock = vi
+      .fn()
+      .mockReturnValue({ succeeded: true, errors: [], data: todayEntries[0] });
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
         ({

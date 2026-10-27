@@ -33,6 +33,14 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasIndex(x => new { x.StoreId, x.SessionHash });
             builder.HasIndex(x => new { x.StoreId, x.ProductId, x.OccurredAt });
 
+            // La lectura GENERAL del panel barre la ventana sin filtro por tienda: necesita un
+            // índice líder por fecha. Lleva `SessionHash` para que el `COUNT(DISTINCT)` diario se
+            // resuelva con un index-only scan. No incluye `StoreId` a propósito: la consulta es
+            // global y el desglose por tienda agrupa sobre esa misma lectura.
+            // Migración: `20261026210157_Add-CatalogEvents-OccurredAt-SessionHash-Index` y script
+            // `backend/scripts/41-...sql` (commit inmediatamente anterior a este cambio).
+            builder.HasIndex(x => new { x.OccurredAt, x.SessionHash });
+
             builder.HasKey(x => x.Id);
 
             builder.Property(x => x.VisitorHash).HasMaxLength(CatalogEvent.HashMaxLength).IsRequired();

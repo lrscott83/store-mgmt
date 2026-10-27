@@ -1,6 +1,5 @@
-import type { BaseResponseModel, Store } from '@store-mgmt/domain';
+import type { BaseResponseModel } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
-import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 
 /** Espejo de `CatalogSource` del backend, por VALOR. */
 export enum CatalogSourceKind {
@@ -44,9 +43,29 @@ export interface CatalogStats {
   daily: CatalogStatsDay[];
 }
 
+/** Espejo de `CatalogStoreStatsDto`: una tienda con visitas en el periodo. */
+export interface CatalogStoreStats {
+  storeId: string;
+  name: string;
+  visits: number;
+}
+
+/**
+ * Espejo de `CatalogStatsOverviewDto` (GET /v1/stores/catalog-stats): el agregado de todas las
+ * tiendas (`totals`) y SOLO las tiendas con visitas en el periodo (`stores`).
+ */
+export interface CatalogStatsOverview {
+  totals: CatalogStats;
+  stores: CatalogStoreStats[];
+}
+
 export const catalogStatsHttpService = {
-  async listStores(): Promise<BaseResponseModel<Store[]>> {
-    return storeHttpService.listStores();
+  async getOverview(days: number): Promise<BaseResponseModel<CatalogStatsOverview>> {
+    const response = await apiClient.get<BaseResponseModel<CatalogStatsOverview>>(
+      '/v1/stores/catalog-stats',
+      { params: { days } },
+    );
+    return response.data;
   },
 
   async getStats(storeId: string, days: number): Promise<BaseResponseModel<CatalogStats>> {
