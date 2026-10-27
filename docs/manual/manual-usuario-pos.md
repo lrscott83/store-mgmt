@@ -184,18 +184,24 @@ de ese producto.
 ![Nueva entrada de inventario: producto, cantidad y costo](img/35-nueva-entrada.png)
 
 
-## 6. Crear los empleados y sus roles
+## 6. Crear los empleados
 
-**Qué es.** Dar de alta a la gente que usará el POS y decidir qué puede hacer cada uno.
+**Qué es.** Dar de alta a las personas que usarán el POS, cada una con su propio usuario y
+contraseña.
 
 **Cómo se hace.**
-1. Ve a **Gestión → Usuarios** (título: **Empleados**).
-2. Pulsa **Crear** y rellena los datos del empleado.
-3. Asígnale su rol y las funcionalidades que puede usar.
-4. Con las tarjetas de cada empleado puedes **Editar**, **Activar** o **Desactivar**.
+1. Ve a **Gestión → Empleados** (título: **Empleados**).
+2. Pulsa **+ Empleado** y rellena **Nombre Completo**, **Usuario**, **Contraseña**,
+   **Confirmar Contraseña** y **Teléfono**. El **Correo** es opcional.
+3. Pulsa **Adicionar**. El empleado queda creado con el rol de **Usuario de tienda**.
+4. En la tarjeta de cada empleado, el engranaje abre **Editar**, y **Activar** o **Desactivar**
+   según su estado.
 
-**A tener en cuenta.** Esta pantalla necesita **conexión**. Los datos del empleado pertenecen a
-la tienda que tengas seleccionada.
+**A tener en cuenta.** Esta pantalla necesita **conexión**. La **Contraseña** debe tener entre
+8 y 30 caracteres e incluir al menos una mayúscula, una minúscula y un número. El **Usuario** no
+se puede cambiar después de crear la cuenta. Los datos del empleado pertenecen a la tienda que
+tengas seleccionada. Un empleado **desactivado** aparece con la tarjeta en rojo y no puede
+iniciar sesión.
 
 **📷 Imagen sugerida.**
 
@@ -208,15 +214,17 @@ la tienda que tengas seleccionada.
 Esto se hace con el **roster** (la lista de empleados con contraseña).
 
 **Cómo se hace.**
-1. En el equipo del Dueño, ve a **Gestión → Usuarios** y pulsa **Exportar roster**; ponle una
-   contraseña maestra y confirma. Obtienes un **archivo de activación**.
-2. Lleva ese archivo al equipo del empleado (por ejemplo con **Compartir** por hotspot).
+1. En el equipo del Dueño, ve a **Gestión → Empleados** y pulsa **Exportar roster sin conexión**;
+   escribe la **Contraseña maestra** y pulsa **Confirmar**. Se descarga un **archivo de roster**
+   con extensión `.smcabundle`.
+2. Lleva ese archivo al equipo del empleado (por ejemplo con **Compartir por hotspot**).
 3. En el equipo de destino, abre el **Acceso sin conexión** en la pantalla de acceso, elige el
-   **Archivo de activación** y escribe la **Contraseña de activación**, y pulsa **Activar**.
+   **Archivo de roster (.smcabundle)**, escribe la **Contraseña maestra** y pulsa **Activar**.
 4. Desde entonces, ese equipo puede iniciar sesión aunque no haya internet.
 
-**A tener en cuenta.** Para **desactivar** el acceso sin conexión se pide confirmación; si el
-dispositivo tiene datos cifrados y no hay otra copia de la clave, se te avisa del riesgo de
+**A tener en cuenta.** Solo se incluyen en el roster los empleados **activos**: si desactivas a
+alguien, vuelve a exportarlo. Para **desactivar** el acceso sin conexión se pide confirmación; si
+el dispositivo tiene datos cifrados y no hay otra copia de la clave, se te avisa del riesgo de
 pérdida.
 
 **📷 Imagen sugerida.** El panel de **Acceso sin conexión** abierto con sus dos opciones

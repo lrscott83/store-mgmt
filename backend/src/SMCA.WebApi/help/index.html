@@ -283,17 +283,23 @@ entrada con fecha pasada. Corregir el costo de una entrada <strong>se propaga</s
 de ese producto.</p>
 <p><strong>📷 Imagen sugerida.</strong></p>
 <p><img src="images/35-nueva-entrada.webp" alt="Nueva entrada de inventario: producto, cantidad y costo" width="1170" height="1992" loading="lazy" decoding="async"></p>
-<h2>6. Crear los empleados y sus roles</h2>
-<p><strong>Qué es.</strong> Dar de alta a la gente que usará el POS y decidir qué puede hacer cada uno.</p>
+<h2>6. Crear los empleados</h2>
+<p><strong>Qué es.</strong> Dar de alta a las personas que usarán el POS, cada una con su propio usuario y
+contraseña.</p>
 <p><strong>Cómo se hace.</strong></p>
 <ol>
-<li>Ve a <strong>Gestión → Usuarios</strong> (título: <strong>Empleados</strong>).</li>
-<li>Pulsa <strong>Crear</strong> y rellena los datos del empleado.</li>
-<li>Asígnale su rol y las funcionalidades que puede usar.</li>
-<li>Con las tarjetas de cada empleado puedes <strong>Editar</strong>, <strong>Activar</strong> o <strong>Desactivar</strong>.</li>
+<li>Ve a <strong>Gestión → Empleados</strong> (título: <strong>Empleados</strong>).</li>
+<li>Pulsa <strong>+ Empleado</strong> y rellena <strong>Nombre Completo</strong>, <strong>Usuario</strong>, <strong>Contraseña</strong>,
+<strong>Confirmar Contraseña</strong> y <strong>Teléfono</strong>. El <strong>Correo</strong> es opcional.</li>
+<li>Pulsa <strong>Adicionar</strong>. El empleado queda creado con el rol de <strong>Usuario de tienda</strong>.</li>
+<li>En la tarjeta de cada empleado, el engranaje abre <strong>Editar</strong>, y <strong>Activar</strong> o <strong>Desactivar</strong>
+según su estado.</li>
 </ol>
-<p><strong>A tener en cuenta.</strong> Esta pantalla necesita <strong>conexión</strong>. Los datos del empleado pertenecen a
-la tienda que tengas seleccionada.</p>
+<p><strong>A tener en cuenta.</strong> Esta pantalla necesita <strong>conexión</strong>. La <strong>Contraseña</strong> debe tener entre
+8 y 30 caracteres e incluir al menos una mayúscula, una minúscula y un número. El <strong>Usuario</strong> no
+se puede cambiar después de crear la cuenta. Los datos del empleado pertenecen a la tienda que
+tengas seleccionada. Un empleado <strong>desactivado</strong> aparece con la tarjeta en rojo y no puede
+iniciar sesión.</p>
 <p><strong>📷 Imagen sugerida.</strong></p>
 <p><img src="images/21-empleados.webp" alt="Empleados: la lista de los empleados de la tienda y sus acciones" width="1170" height="1216" loading="lazy" decoding="async"></p>
 <h2>7. Activar el acceso sin conexión en los equipos</h2>
@@ -301,15 +307,17 @@ la tienda que tengas seleccionada.</p>
 Esto se hace con el <strong>roster</strong> (la lista de empleados con contraseña).</p>
 <p><strong>Cómo se hace.</strong></p>
 <ol>
-<li>En el equipo del Dueño, ve a <strong>Gestión → Usuarios</strong> y pulsa <strong>Exportar roster</strong>; ponle una
-contraseña maestra y confirma. Obtienes un <strong>archivo de activación</strong>.</li>
-<li>Lleva ese archivo al equipo del empleado (por ejemplo con <strong>Compartir</strong> por hotspot).</li>
+<li>En el equipo del Dueño, ve a <strong>Gestión → Empleados</strong> y pulsa <strong>Exportar roster sin conexión</strong>;
+escribe la <strong>Contraseña maestra</strong> y pulsa <strong>Confirmar</strong>. Se descarga un <strong>archivo de roster</strong>
+con extensión <code>.smcabundle</code>.</li>
+<li>Lleva ese archivo al equipo del empleado (por ejemplo con <strong>Compartir por hotspot</strong>).</li>
 <li>En el equipo de destino, abre el <strong>Acceso sin conexión</strong> en la pantalla de acceso, elige el
-<strong>Archivo de activación</strong> y escribe la <strong>Contraseña de activación</strong>, y pulsa <strong>Activar</strong>.</li>
+<strong>Archivo de roster (.smcabundle)</strong>, escribe la <strong>Contraseña maestra</strong> y pulsa <strong>Activar</strong>.</li>
 <li>Desde entonces, ese equipo puede iniciar sesión aunque no haya internet.</li>
 </ol>
-<p><strong>A tener en cuenta.</strong> Para <strong>desactivar</strong> el acceso sin conexión se pide confirmación; si el
-dispositivo tiene datos cifrados y no hay otra copia de la clave, se te avisa del riesgo de
+<p><strong>A tener en cuenta.</strong> Solo se incluyen en el roster los empleados <strong>activos</strong>: si desactivas a
+alguien, vuelve a exportarlo. Para <strong>desactivar</strong> el acceso sin conexión se pide confirmación; si
+el dispositivo tiene datos cifrados y no hay otra copia de la clave, se te avisa del riesgo de
 pérdida.</p>
 <p><strong>📷 Imagen sugerida.</strong> El panel de <strong>Acceso sin conexión</strong> abierto con sus dos opciones
 (<em>Activar</em> / <em>Desactivar</em>) y, si se puede, el modal de activación con el archivo y la contraseña.</p>
