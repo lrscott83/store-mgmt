@@ -39,9 +39,11 @@
 //   imágenes o que han crecido con los datos nuevos y no caben en una sola.
 //
 // Uso:
-//   node scripts/capture-manual.mjs
+//   node scripts/capture-manual.mjs                    # corrida completa (regenera todo el set)
+//   CAPTURE_ONLY=new node scripts/capture-manual.mjs   # SOLO las imágenes nuevas (2026-10-27)
 //
 // Variables opcionales:
+//   CAPTURE_ONLY      `new` captura solo las imágenes nuevas y no reescribe las existentes
 //   CAPTURE_BASE_URL  (default http://localhost:3333)
 //   CAPTURE_OUT       (default ../docs/manual/img)
 
@@ -50,8 +52,15 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const BASE = process.env.CAPTURE_BASE_URL ?? 'http://localhost:3333';
-const OUT_DIR =
-  process.env.CAPTURE_OUT ?? resolve(process.cwd(), '..', 'docs', 'manual', 'img');
+const OUT_DIR = process.env.CAPTURE_OUT ?? resolve(process.cwd(), '..', 'docs', 'manual', 'img');
+
+/**
+ * `CAPTURE_ONLY=new` captura SOLO las imágenes nuevas (2026-10-27) y NO reescribe las
+ * existentes: las cuatro vistas de historial que no tenían imagen, Salida con el selector
+ * Merma/Ajuste/Otro y el historial de ventas en modo multi-tienda. Sin la variable, la
+ * corrida completa regenera todo el set como siempre.
+ */
+const NEW_ONLY = (process.env.CAPTURE_ONLY ?? '').toLowerCase() === 'new';
 
 const MOBILE = devices['iPhone 13'];
 
@@ -157,6 +166,36 @@ const CHANNEL_RATES = [
   { currency: '0', method: '0', value: 690, effectiveFrom: '2026-10-14' },
   { currency: '0', method: '0', value: 700, effectiveFrom: '2026-10-15' },
 ];
+
+/**
+ * Segunda tienda para la captura multi-tienda del historial de ventas (decisión del owner,
+ * 2026-10-27). El owner del manual nace en el plan Superior, que incluye el módulo MultiStores
+ * (14), así que puede crear una segunda tienda y ver el historial con paneles por tienda.
+ */
+const SECOND_STORE = { name: 'Minimarket El Puente' };
+
+/** Catálogo mínimo de la segunda tienda (solo lo necesario para una venta). */
+const SECOND_STORE_CATALOG = [
+  [
+    'Abarrotes',
+    [
+      { name: 'Aceite Girasol 1 L', cost: 1500, price: 1800, qty: 20 },
+      { name: 'Sal Bolsa 1 kg', cost: 200, price: 300, qty: 25 },
+    ],
+  ],
+];
+
+/** Entrada de inventario de la segunda tienda, para que su panel no salga vacío. */
+const SECOND_STORE_ENTRY = { product: 'Aceite Girasol 1 L', quantity: 12, cost: 1500 };
+
+/** Venta de contado de la segunda tienda (paga con 5000). */
+const SECOND_STORE_SALE = {
+  lines: [
+    { name: 'Aceite Girasol 1 L', qty: 2 },
+    { name: 'Sal Bolsa 1 kg', qty: 3 },
+  ],
+  tender: 5000,
+};
 
 /** Datos de EJEMPLO para las capturas (login `e2e-` para que la suite los limpie). */
 function makeExampleIdentity() {
@@ -451,14 +490,19 @@ async function waitForCartEmpty(page, timeoutMs = 45_000) {
     if (seen === '0') return;
     await page.waitForTimeout(400);
   }
-  throw new Error(`El carrito no se vació tras registrar la venta (badge "${seen}") tras ${timeoutMs} ms.`);
+  throw new Error(
+    `El carrito no se vació tras registrar la venta (badge "${seen}") tras ${timeoutMs} ms.`,
+  );
 }
 
 /** Siembra el catálogo (categorías + productos con costo, precio y stock) por la UI real. */
-async function seedCatalog(page) {
+async function seedCatalog(page, catalog = CATALOG) {
   await goto(page, '/sales/products');
+  // El botón flotante "Instalar app" (fixed, z-[9999]) se dibuja sobre el menú de acciones de
+  // la categoría y bloquea el clic; en el sembrado no aporta nada.
+  await hideInstallButton(page);
 
-  for (const [categoryName, products] of CATALOG) {
+  for (const [categoryName, products] of catalog) {
     await page.getByTestId('add-category-button').click();
     await page.getByTestId('category-name-input').fill(categoryName);
     await page.getByTestId('category-save-button').click();
@@ -482,9 +526,7 @@ async function seedCatalog(page) {
       const quantity = page.getByTestId('product-quantity-input');
       if (await quantity.count()) await quantity.fill(String(product.qty));
       await page.getByTestId('create-product-submit').click();
-      await page
-        .getByTestId('product-name-input')
-        .waitFor({ state: 'hidden', timeout: 20_000 });
+      await page.getByTestId('product-name-input').waitFor({ state: 'hidden', timeout: 20_000 });
       console.log(`  producto listo: ${product.name}`);
     }
   }
@@ -498,12 +540,19 @@ async function fillEntryModal(page, entry) {
   await mustSee(page, option, `la opción "${entry.product}" del combobox`);
   await option.click();
   await fillRequired(page, page.locator('#entry-quantity'), entry.quantity, 'el campo Cantidad');
-  await fillRequired(page, page.locator('#entry-cost-price'), entry.cost, 'el campo Precio de costo');
+  await fillRequired(
+    page,
+    page.locator('#entry-cost-price'),
+    entry.cost,
+    'el campo Precio de costo',
+  );
 }
 
 /** Guarda el modal de entrada de inventario abierto y espera a que se cierre. */
 async function saveEntryModal(page) {
-  const dialog = page.locator('div[role="dialog"]').filter({ has: page.locator('#entry-quantity') });
+  const dialog = page
+    .locator('div[role="dialog"]')
+    .filter({ has: page.locator('#entry-quantity') });
   await dialog.getByRole('button', { name: 'Adicionar' }).click();
   await dialog.waitFor({ state: 'hidden', timeout: 20_000 });
 }
@@ -514,11 +563,15 @@ async function saveEntryModal(page) {
  * select en vez de por índice fijo.
  */
 async function fillExpenseModal(page, expense) {
-  const dialog = page.locator('div[role="dialog"]').filter({ has: page.locator('#expense-form-total') });
+  const dialog = page
+    .locator('div[role="dialog"]')
+    .filter({ has: page.locator('#expense-form-total') });
   const selects = dialog.locator('select');
   const count = await selects.count();
   if (count < 2) {
-    throw new Error(`El modal de gastos cambió: se esperaban 2 selects (tipo y pago) y hay ${count}.`);
+    throw new Error(
+      `El modal de gastos cambió: se esperaban 2 selects (tipo y pago) y hay ${count}.`,
+    );
   }
   await selects.nth(0).selectOption(String(expense.typeValue));
   await selects.nth(count - 1).selectOption(String(expense.paymentMethod));
@@ -527,17 +580,19 @@ async function fillExpenseModal(page, expense) {
 }
 
 /** Siembra la entrada de inventario extra (para que "Entradas del día" no salga vacía). */
-async function seedExtraEntry(page) {
+async function seedExtraEntry(page, entry = EXTRA_ENTRY) {
   await goto(page, '/inventory/today-entries');
+  await hideInstallButton(page);
   await page.getByRole('button', { name: 'Entrada', exact: true }).click();
-  await fillEntryModal(page, EXTRA_ENTRY);
+  await fillEntryModal(page, entry);
   await saveEntryModal(page);
-  console.log(`  entrada lista: ${EXTRA_ENTRY.quantity} × ${EXTRA_ENTRY.product}`);
+  console.log(`  entrada lista: ${entry.quantity} × ${entry.product}`);
 }
 
 /** Siembra los tres gastos del día. */
 async function seedExpenses(page) {
   await goto(page, '/expenses/today');
+  await hideInstallButton(page);
   for (const expense of EXPENSES) {
     await page.getByRole('button', { name: 'Gasto', exact: true }).click();
     await fillExpenseModal(page, expense);
@@ -627,18 +682,28 @@ async function filterCuadrePorFechas(page) {
 }
 
 /**
+ * Deja el carrito de una venta de contado listo (productos, efectivo y pago), SIN registrar.
+ * Compartido por la venta de la tienda del manual (captura 37 antes de Registrar) y por la
+ * venta de la segunda tienda para el historial multi-tienda.
+ */
+async function fillCashSaleCart(page, sale) {
+  await goto(page, '/sales/new');
+  await hideInstallButton(page);
+  await page.getByRole('button', { name: 'Todos', exact: true }).click();
+  for (const line of sale.lines) await addProductToCart(page, line.name, line.qty);
+
+  await openCart(page);
+  await page.getByTestId('payment-method-0').check(); // Efectivo
+  await page.getByRole('spinbutton', { name: 'Pago' }).fill(String(sale.tender));
+  await dismissSwal(page, 500);
+}
+
+/**
  * Siembra la venta de contado. La captura 37 sale del panel del CARRITO abierto y con
  * productos dentro, justo antes de pulsar "Registrar".
  */
 async function seedCashSale(page, captureView) {
-  await goto(page, '/sales/new');
-  await page.getByRole('button', { name: 'Todos', exact: true }).click();
-  for (const line of CASH_SALE.lines) await addProductToCart(page, line.name, line.qty);
-
-  await openCart(page);
-  await page.getByTestId('payment-method-0').check(); // Efectivo
-  await page.getByRole('spinbutton', { name: 'Pago' }).fill(String(CASH_SALE.tender));
-  await dismissSwal(page, 500);
+  await fillCashSaleCart(page, CASH_SALE);
   await captureView(page, '37-carrito', { fullPage: false });
 
   await page.getByRole('button', { name: 'Registrar' }).click();
@@ -667,7 +732,10 @@ async function seedCreditSales(page) {
 /** Paga el crédito de `client`; la captura 38 sale del modal de pago ya abierto. */
 async function payCredit(page, client, captureModal) {
   await goto(page, '/sales/today-credits');
-  const row = page.locator('tr').filter({ has: page.getByText(client, { exact: true }) }).first();
+  const row = page
+    .locator('tr')
+    .filter({ has: page.getByText(client, { exact: true }) })
+    .first();
   await mustSee(page, row, `el crédito de "${client}" en Créditos del día`);
   await row.locator('[data-testid^="sale-credit-actions-toggle-"]').click();
   await page.getByRole('menuitem', { name: 'Pagar' }).click();
@@ -740,6 +808,118 @@ async function captureCreationModals(page, captureModal) {
     .filter({ has: page.locator('#expense-form-total') })
     .waitFor({ state: 'hidden', timeout: 20_000 });
   console.log(`  gasto del modal guardado: ${EXPENSES[2].note}`);
+}
+
+/** Crea una segunda tienda desde Mis tiendas (owner con MultiStores). */
+async function createStore(page, name) {
+  await goto(page, '/management/my-stores');
+  await hideInstallButton(page);
+  await page.getByTestId('my-stores-create-button').click();
+  await mustSee(page, page.getByTestId('owner-store-name-input'), 'el modal de nueva tienda');
+  await page.getByTestId('owner-store-name-input').fill(name);
+  await page.getByTestId('owner-store-create-save').click();
+  await page.getByTestId('owner-store-create-modal').waitFor({ state: 'hidden', timeout: 30_000 });
+  // softRefreshSession + load(): la tarjeta nueva y el storeList del selector tardan un poco.
+  await page.waitForTimeout(1_500);
+  console.log(`  tienda creada: ${name}`);
+}
+
+/** Cambia la tienda activa desde el selector del encabezado (recarga la app). */
+async function switchStore(page, storeName) {
+  const trigger = page.getByRole('button', { name: 'Cambiar tienda' }).first();
+  await mustSee(page, trigger, 'el botón Cambiar tienda');
+  await trigger.click();
+  // La tienda actual lleva la insignia "Actual" en su nombre accesible; la destino no.
+  const option = page.getByRole('button', { name: storeName, exact: true }).first();
+  await mustSee(page, option, `la tienda "${storeName}" en el selector`);
+  await option.click({ noWaitAfter: true }).catch(() => {});
+  await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(1_200);
+  console.log(`  tienda activa: ${storeName}`);
+}
+
+/** Despliega el primer acordeón de día de una vista de historial (si está colapsado). */
+async function expandFirstDay(page, testIdPrefix) {
+  const toggle = page.locator(`[data-testid^="${testIdPrefix}"]`).first();
+  if (!(await toggle.count())) return;
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+    await page.waitForTimeout(500);
+  }
+}
+
+/**
+ * Capturas NUEVAS del 2026-10-27 (modo `CAPTURE_ONLY=new`): las cuatro vistas de historial
+ * que no tenían imagen, Salida (con el selector Merma/Ajuste/Otro) y el historial de ventas
+ * en modo multi-tienda. No reescribe ninguna imagen existente.
+ */
+async function captureNewImages(page, capture, storeName) {
+  // 55 — Historial de ventas, una tienda (antes de crear la segunda).
+  await goto(page, '/sales/orders');
+  await expandFirstDay(page, 'date-panel-toggle-');
+  await capture(page, '55-historial-ventas', { parts: 2 });
+
+  // 57 — Historial de créditos.
+  await goto(page, '/sales/credits');
+  await expandFirstDay(page, 'credit-date-panel-toggle-');
+  await capture(page, '57-creditos-historial', { parts: 2 });
+
+  // 59 — Historial de entradas.
+  await goto(page, '/inventory/entries');
+  await expandFirstDay(page, 'entry-day-panel-toggle-');
+  await capture(page, '59-entradas-historial', { parts: 2 });
+
+  // 60 — Historial de gastos.
+  await goto(page, '/expenses/expenses');
+  await expandFirstDay(page, 'expense-day-panel-toggle-');
+  await capture(page, '60-gastos-historial', { parts: 2 });
+
+  // 58 — Salida: el selector ya solo ofrece Merma / Ajuste / Otro.
+  await goto(page, '/inventory/egress');
+  await capture(page, '58-salida');
+
+  // 56 — Historial de ventas multi-tienda: crear la segunda tienda, sembrar su venta y
+  // volver a la primera para que ambas aparezcan con datos.
+  console.log(`Sembrando la segunda tienda (${SECOND_STORE.name}) ...`);
+  await createStore(page, SECOND_STORE.name);
+  await switchStore(page, SECOND_STORE.name);
+  await seedCatalog(page, SECOND_STORE_CATALOG);
+  await seedExtraEntry(page, SECOND_STORE_ENTRY);
+  await fillCashSaleCart(page, SECOND_STORE_SALE);
+  await page.getByRole('button', { name: 'Registrar' }).click();
+  await waitForCartEmpty(page);
+  await dismissSwal(page);
+  console.log(`  venta registrada en ${SECOND_STORE.name}`);
+
+  await switchStore(page, storeName);
+
+  await goto(page, '/sales/orders');
+  await mustSee(
+    page,
+    page.getByTestId('multistore-select'),
+    'el selector de tiendas del historial multi-tienda',
+  );
+  // Abre TODOS los paneles de tienda y su primer día, para que la captura enseñe las ventas.
+  const panelToggles = page.locator('[data-testid^="multistore-panel-toggle-"]');
+  const panelCount = await panelToggles.count();
+  for (let index = 0; index < panelCount; index += 1) {
+    const panel = panelToggles.nth(index);
+    if ((await panel.getAttribute('aria-expanded')) !== 'true') {
+      await panel.click();
+      await page.waitForTimeout(400);
+    }
+  }
+  const dayToggles = page.locator('[data-testid^="multistore-date-panel-toggle-"]');
+  const dayCount = await dayToggles.count();
+  for (let index = 0; index < dayCount; index += 1) {
+    const day = dayToggles.nth(index);
+    if ((await day.getAttribute('aria-expanded')) !== 'true') {
+      await day.click();
+      await page.waitForTimeout(400);
+    }
+  }
+  await capture(page, '56-historial-ventas-multitienda', { parts: true });
 }
 
 async function main() {
@@ -824,12 +1004,14 @@ async function main() {
   };
 
   // ── Sección 2: pantalla de acceso (contexto público, SIN sesión) ───────
-  const publicCtx = await browser.newContext({ ...MOBILE });
-  const publicPage = await publicCtx.newPage();
-  await goto(publicPage, '/login');
-  await publicPage.locator('#login').waitFor({ state: 'visible', timeout: 30_000 });
-  await capture(publicPage, '03-iniciar-sesion');
-  await publicCtx.close();
+  if (!NEW_ONLY) {
+    const publicCtx = await browser.newContext({ ...MOBILE });
+    const publicPage = await publicCtx.newPage();
+    await goto(publicPage, '/login');
+    await publicPage.locator('#login').waitFor({ state: 'visible', timeout: 30_000 });
+    await capture(publicPage, '03-iniciar-sesion');
+    await publicCtx.close();
+  }
 
   // ── Sección 1: registro → inicio (contexto con sesión) ─────────────────
   const ctx = await browser.newContext({ ...MOBILE });
@@ -850,21 +1032,29 @@ async function main() {
   // Los términos se marcan ANTES de capturar: la captura tiene que enseñar el formulario tal
   // como se envía, con la casilla aceptada.
   await page.check('#acceptTerms');
-  await capture(page, '01-crear-cuenta', { keepFixed: true });
+  if (!NEW_ONLY) await capture(page, '01-crear-cuenta', { keepFixed: true });
 
   // Solo ahora se cambia al login único y se envía.
   await page.fill('#login', identity.login);
   await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await waitForPathChange(page, (url) => !url.pathname.startsWith('/register'));
   // El botón flotante INSTALAR APP se MANTIENE: el paso de instalación vive aquí.
-  await capture(page, '02-inicio', { keepFixed: true });
+  if (!NEW_ONLY) await capture(page, '02-inicio', { keepFixed: true });
 
   // ── Encabezado y pie (íconos y contacto) — capturas de ELEMENTO ────────
-  await settle(page);
-  await hidePingDots(page);
-  await page.locator('header').first().screenshot({ path: resolve(OUT_DIR, '04-encabezado.png') });
-  await page.locator('footer').first().screenshot({ path: resolve(OUT_DIR, '05-pie.png') });
-  console.log('guardadas 04-encabezado.png / 05-pie.png');
+  if (!NEW_ONLY) {
+    await settle(page);
+    await hidePingDots(page);
+    await page
+      .locator('header')
+      .first()
+      .screenshot({ path: resolve(OUT_DIR, '04-encabezado.png') });
+    await page
+      .locator('footer')
+      .first()
+      .screenshot({ path: resolve(OUT_DIR, '05-pie.png') });
+    console.log('guardadas 04-encabezado.png / 05-pie.png');
+  }
 
   // ── Sembrado: primero TODOS los datos, para que las vistas salgan llenas ──
   console.log('Sembrando el catálogo ...');
@@ -877,11 +1067,21 @@ async function main() {
   await seedExpenses(page);
 
   console.log('Sembrando las ventas ...');
-  await seedCashSale(page, capture);
+  await seedCashSale(page, NEW_ONLY ? async () => {} : capture);
   await seedCreditSales(page);
 
   console.log('Pagando un crédito ...');
-  await payCredit(page, CREDIT_TO_PAY, captureModal);
+  await payCredit(page, CREDIT_TO_PAY, NEW_ONLY ? async () => {} : captureModal);
+
+  if (NEW_ONLY) {
+    console.log('Modo CAPTURE_ONLY=new: solo las imágenes nuevas.');
+    await captureNewImages(page, capture, identity.storeName);
+    await ctx.close();
+    await browser.close();
+    printHeightTable();
+    console.log(`\nListo. Imágenes nuevas en ${OUT_DIR}`);
+    return;
+  }
 
   // ── 06: Catálogo, con una categoría expandida ──────────────────────────
   await goto(page, '/sales/products');
@@ -973,10 +1173,7 @@ async function main() {
 
   // ── 40: Conteo de productos (vista PROPIA, solo conteo) ────────────────
   await goto(page, '/inventory/count');
-  await page
-    .locator('[data-testid^="product-count-category-toggle-"]')
-    .first()
-    .click();
+  await page.locator('[data-testid^="product-count-category-toggle-"]').first().click();
   const firstCountInput = page.locator('[data-testid^="inventory-count-input-"]').first();
   await firstCountInput.waitFor({ state: 'visible', timeout: 20_000 });
   // Sistema 40 (Arroz) → contada 35 → diferencia −5, en rojo.
@@ -1002,7 +1199,9 @@ async function main() {
         return { found: true, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight };
       });
     const info = await panelInfo();
-    console.log(`menú: encontrado=${info.found} alto=${info.scrollHeight} visible=${info.clientHeight}`);
+    console.log(
+      `menú: encontrado=${info.found} alto=${info.scrollHeight} visible=${info.clientHeight}`,
+    );
     const per = Math.max(1, info.clientHeight || 584);
     const count = Math.max(1, Math.ceil((info.scrollHeight || per) / per));
     console.log(`menú: ${count} tramo(s)`);
