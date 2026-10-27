@@ -1592,6 +1592,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("OrderType")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 

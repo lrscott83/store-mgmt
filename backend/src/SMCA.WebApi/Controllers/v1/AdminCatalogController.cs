@@ -1,4 +1,7 @@
 using Application.Dtos.WebCatalog;
+using Application.Features.WebCatalog.Admin.Commands.CreateCatalogCategory;
+using Application.Features.WebCatalog.Admin.Commands.CreateCatalogProduct;
+using Application.Features.WebCatalog.Admin.Queries.GetCatalogCategories;
 using Application.Features.WebCatalog.Commands.UpdateProductCatalogFields;
 using Application.Features.WebCatalog.Images.Commands.AddProductImage;
 using Application.Features.WebCatalog.Images.Commands.RemoveProductImage;
@@ -53,6 +56,39 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetStatusAsync()
         {
             return Ok(await Sender.Send(new GetCatalogStatusQuery()));
+        }
+
+        /// <summary>Categorías de la tienda, en el orden en que la vista arma sus paneles.</summary>
+        [HttpGet("~/api/v1/stores/{storeId:guid}/catalog/categories")]
+        [ProducesResponseType(typeof(ResponseResult<IEnumerable<CatalogCategoryDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetCategoriesAsync()
+        {
+            return Ok(await Sender.Send(new GetCatalogCategoriesQuery()));
+        }
+
+        /// <summary>Crea una categoría del catálogo de la tienda de la ruta (orden al final por defecto).</summary>
+        [HttpPost("~/api/v1/stores/{storeId:guid}/catalog/categories")]
+        [ProducesResponseType(typeof(ResponseResult<CatalogCategoryDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> CreateCategoryAsync([FromBody] CreateCatalogCategoryCommand request)
+        {
+            return Ok(await Sender.Send(request));
+        }
+
+        /// <summary>
+        /// Crea un producto del catálogo en una categoría de la tienda de la ruta. Es un producto
+        /// real de la tienda (en venta), sin depender de una sincronización.
+        /// </summary>
+        [HttpPost("~/api/v1/stores/{storeId:guid}/catalog/products")]
+        [ProducesResponseType(typeof(ResponseResult<CreatedCatalogProductDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> CreateProductAsync([FromBody] CreateCatalogProductCommand request)
+        {
+            return Ok(await Sender.Send(request));
         }
 
         /// <summary>Productos de la tienda con sus campos de catálogo (lista editable).</summary>

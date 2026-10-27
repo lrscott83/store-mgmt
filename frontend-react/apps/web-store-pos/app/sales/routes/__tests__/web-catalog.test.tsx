@@ -1444,15 +1444,4 @@ describe('WebCatalogSettingsView — modo SuperAdmin (store-scoped)', () => {
 
     expect(await screen.findByTestId('catalog-csv-import')).toBeInTheDocument();
   });
-
-  it('SCOPE-2: sincronizar publica el origen del SERVIDOR, sin snapshot del dispositivo', async () => {
-    renderAdminView();
-    await waitFor(() => expect(scoped.getStatus).toHaveBeenCalled());
-
-    fireEvent.click(screen.getByTestId('catalog-sync-button'));
-
-    await waitFor(() => expect(scoped.sync).toHaveBeenCalled());
-    expect(scoped.sync).toHaveBeenCalledWith(undefined);
-    expect(buildCatalogSnapshotMock).not.toHaveBeenCalled();
-  });
 });

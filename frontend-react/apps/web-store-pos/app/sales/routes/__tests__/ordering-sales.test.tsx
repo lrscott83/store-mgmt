@@ -75,6 +75,7 @@ function makeOrder(overrides: Partial<OnlineOrderListItem> = {}): OnlineOrderLis
     currency: Currency.USD,
     status: OnlineOrderStatus.Entregado,
     paymentStatus: OnlineOrderPaymentStatus.Paid,
+    paidAt: '2026-10-07T10:05:00Z',
     driverId: 'd1',
     driverName: 'Juan',
     date: '2026-10-07T10:00:00Z',
@@ -92,6 +93,7 @@ const SECOND_ORDER = makeOrder({
   total: 800,
   status: OnlineOrderStatus.Cancelado,
   paymentStatus: OnlineOrderPaymentStatus.Pending,
+  paidAt: null,
   driverId: null,
   driverName: null,
 });
