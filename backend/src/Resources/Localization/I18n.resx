@@ -448,4 +448,22 @@
   <data name="OnlineOrderStatusNotFound" xml:space="preserve">
     <value>No hay ningún pedido con ese código y ese teléfono</value>
   </data>
+  <data name="StoreSyncFileNotFound" xml:space="preserve">
+    <value>El fichero de sincronización no existe o no pertenece a esta tienda.</value>
+  </data>
+  <data name="StoreSyncFileEmpty" xml:space="preserve">
+    <value>El fichero está vacío: no se puede guardar un fichero de 0 bytes.</value>
+  </data>
+  <data name="StoreSyncFileTooLarge" xml:space="preserve">
+    <value>El fichero no puede superar {0} MB</value>
+  </data>
+  <data name="StoreSyncFileStoreNotAllowed" xml:space="preserve">
+    <value>La tienda no existe o no pertenece al usuario.</value>
+  </data>
+  <data name="StoreSyncFileUploadFailed" xml:space="preserve">
+    <value>No se pudo guardar el fichero en el servidor. Inténtalo de nuevo.</value>
+  </data>
+  <data name="StoreSyncFileDeleteFailed" xml:space="preserve">
+    <value>No se pudo borrar el fichero del servidor. Inténtalo de nuevo.</value>
+  </data>
 </root>

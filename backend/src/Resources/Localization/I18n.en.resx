@@ -718,4 +718,22 @@
   <data name="DeliveryDriverNotFound" xml:space="preserve">
     <value>The driver does not exist or does not belong to this store.</value>
   </data>
+  <data name="StoreSyncFileNotFound" xml:space="preserve">
+    <value>The sync file does not exist or does not belong to this store.</value>
+  </data>
+  <data name="StoreSyncFileEmpty" xml:space="preserve">
+    <value>The file is empty: a 0-byte file cannot be stored.</value>
+  </data>
+  <data name="StoreSyncFileTooLarge" xml:space="preserve">
+    <value>The file cannot be larger than {0} MB</value>
+  </data>
+  <data name="StoreSyncFileStoreNotAllowed" xml:space="preserve">
+    <value>The store does not exist or does not belong to the user.</value>
+  </data>
+  <data name="StoreSyncFileUploadFailed" xml:space="preserve">
+    <value>The file could not be stored on the server. Please try again.</value>
+  </data>
+  <data name="StoreSyncFileDeleteFailed" xml:space="preserve">
+    <value>The file could not be deleted from the server. Please try again.</value>
+  </data>
 </root>
