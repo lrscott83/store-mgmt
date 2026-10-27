@@ -74,7 +74,12 @@ El backend ya lee las cabeceras `Gf-Device` / `Gf-DeviceId` / `Gf-SessionId` (`H
 - **`GenericRepository.SoftDeleteAsync` no marca `IsActive` para entidades derivadas de `AuditableEntity<TId>`**: su comprobación de tipo no casa con el genérico. El handler de borrado pone `IsActive = false` explícitamente antes de guardar.
 - **`StoreRoleFeature` es por (tienda, rol), no por usuario**: dos StoreUsers de la misma tienda comparten features. El test E2E de gate tuvo que sembrar dos tiendas (A solo Send, B solo Receive) para probar el OR de verdad.
 - **Corregido (L6)**: `SMCA.WebApi.E2ETests/Infrastructure/DbTestHelpers.cs` `ResetDataAsync` borraba `Store` sin borrar antes `StoreSyncFileDownload`/`StoreSyncFile`. FK `Restrict`, así que una corrida E2E abortada habría roto el arranque del fixture en la SIGUIENTE corrida completa. Se añadieron los dos `ExecuteDeleteAsync` (download → file) antes del borrado de `Store`. Probado dejando filas huérfanas a propósito y arrancando otra clase E2E encima: 6/6 verde.
-- **Riesgo abierto**: `[RequestFormLimits]` se verificó contra el TestServer. Un proxy inverso con un límite de cuerpo menor rechazaría los 50 MB antes de Kestrel; no verificado.
+- **Corregido (L7)**: `frontend-react/deploy/nginx.conf` no declaraba `client_max_body_size`, así que nginx usaba su default de **1 MB** y habría respondido 413 antes de Kestrel para cualquier ZIP real. Se añadió `client_max_body_size 52m` dentro de `location /api`; el límite real por acción lo sigue imponiendo la API.
+
+### L7 — Cierre de los riesgos
+- **Riesgo 5 (migración/script)**: verificado, no supuesto. Regenerado el script con `dotnet ef migrations script 20261026210157_Add-CatalogEvents-OccurredAt-SessionHash-Index` y comparado con `42-20261027-Add-StoreSyncFiles.sql`: el cuerpo DDL es **idéntico**; la única diferencia es el `ON CONFLICT ("MigrationId") DO NOTHING` que exige la convención del repo.
+- **Riesgo 2 (autorización)**: añadido E2E `Another_tenant_cannot_see_download_delete_or_write_over_a_file`, que cubre la fuga entre tenants (el filtro global `IsSuperAdmin || TenantId == _context.TenantId`). Junto al existente `StoreUser_is_confined_to_its_own_store` (mismo tenant, otra tienda) y al test de gate por feature, las tres dimensiones quedan pinneadas. `StoreSyncFilesTests` → 6/6.
+- **Riesgo del proxy**: cerrado en `nginx.conf`, ver L6.
 
 ### L6 — Cierre
 - Decisión del usuario tras el segundo `lens_context_budget_exceeded`: **dejar el feature verificado por sus tests** y no reescribir la historia para forzar la revisión nativa. La cobertura observada es 48 tests de aplicación, 5 E2E y 325 de frontend, más lint y typecheck limpios.

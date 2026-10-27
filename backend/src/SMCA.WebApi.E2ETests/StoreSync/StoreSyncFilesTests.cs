@@ -11,6 +11,7 @@ using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreSyncFiles;
 using Domain.Entities.StoreUsers;
+using Domain.Entities.Tenants;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using FluentAssertions;
@@ -90,35 +91,35 @@ public sealed class StoreSyncFilesTests
     /// Owner con una o dos tiendas y el módulo de Sincronización contratado en cada una. El nombre
     /// de la tienda lleva un guid para que las aserciones no dependan de lo que haya en la base.
     /// </summary>
-    private async Task<SyncFixture> SeedOwnerAsync(bool withSecondStore)
+    private async Task<SyncFixture> SeedOwnerAsync(bool withSecondStore, Guid? tenantId = null)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var tenantId = DataUtils.DefaultTenant.Id;
+        Guid tenant = tenantId ?? DataUtils.DefaultTenant.Id;
 
         string login = $"sync-{Guid.NewGuid():N}@test.com";
-        var user = User.Create(login, DbTestHelpers.HashPassword(Password), "E2E Sync Owner", "0000000000", login, tenantId);
+        var user = User.Create(login, DbTestHelpers.HashPassword(Password), "E2E Sync Owner", "0000000000", login, tenant);
         user.OfflinePasswordPreHash = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>()
             .Protect(Password, user.Id);
         db.Set<User>().Add(user);
-        var owner = Owner.Create(user.Id, false, tenantId, "E2E Sync owner");
+        var owner = Owner.Create(user.Id, false, tenant, "E2E Sync owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
 
         string storeAName = $"Sync-A-{Guid.NewGuid():N}";
-        Store storeA = await CreateStoreAsync(db, owner.Id, tenantId, storeAName);
+        Store storeA = await CreateStoreAsync(db, owner.Id, tenant, storeAName);
 
         Store? storeB = withSecondStore
-            ? await CreateStoreAsync(db, owner.Id, tenantId, $"Sync-B-{Guid.NewGuid():N}")
+            ? await CreateStoreAsync(db, owner.Id, tenant, $"Sync-B-{Guid.NewGuid():N}")
             : null;
 
-        db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenantId));
+        db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenant));
         user.SelectedStoreId = storeA.Id;
         await db.SaveChangesAsync();
 
         var fixture = new SyncFixture
         {
-            TenantId = tenantId,
+            TenantId = tenant,
             OwnerUserId = user.Id,
             OwnerLogin = login,
             OwnerId = owner.Id,
@@ -432,6 +433,83 @@ public sealed class StoreSyncFilesTests
         {
             await CleanupAsync(fixture);
         }
+    }
+
+    #endregion
+
+    #region Tenant isolation
+
+    /// <summary>
+    /// Otro tenant no ve, no descarga, no borra y no puede subir sobre un fichero ajeno. Es el
+    /// riesgo más caro del feature: el filtro global del DbContext es
+    /// <c>IsSuperAdmin || TenantId == _context.TenantId</c>, así que un fallo aquí filtra backups
+    /// de otra instalación y no se nota en ninguna otra prueba.
+    /// </summary>
+    [Fact]
+    public async Task Another_tenant_cannot_see_download_delete_or_write_over_a_file()
+    {
+        var ownerA = await SeedOwnerAsync(withSecondStore: false);
+        try
+        {
+            Guid tenantBId = Guid.NewGuid();
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                db.Set<Tenant>().Add(Tenant.Create(tenantBId, $"XT-{tenantBId:N}", "e2e", DateTimeOffset.UtcNow));
+                await db.SaveChangesAsync();
+            }
+
+            var ownerB = await SeedOwnerAsync(withSecondStore: false, tenantId: tenantBId);
+            try
+            {
+                var clientA = ClientFor(ownerA.OwnerUserId, ownerA.OwnerLogin);
+                var clientB = ClientFor(ownerB.OwnerUserId, ownerB.OwnerLogin);
+
+                var fileA = await UploadAsync(clientA, ownerA.StoreAId, BackupBytes("a"), "de-a.zip");
+                var fileB = await UploadAsync(clientB, ownerB.StoreAId, BackupBytes("b"), "de-b.zip");
+
+                // S5: cada lista ve SOLO su instalación.
+                (await ListAsync(clientA)).Select(file => file.Id).Should().Equal(fileA.Id);
+                (await ListAsync(clientB)).Select(file => file.Id).Should().Equal(fileB.Id);
+
+                // S6/S7/S8: lo ajeno responde igual que lo inexistente, nunca 403.
+                (await clientB.GetAsync($"/api/v1/sync/files/{fileA.Id}/content")).StatusCode
+                    .Should().Be(HttpStatusCode.NotFound);
+                (await clientB.DeleteAsync($"/api/v1/sync/files/{fileA.Id}")).StatusCode
+                    .Should().Be(HttpStatusCode.NotFound);
+
+                using (var crossTenantUpload = BuildUpload(ownerA.StoreAId, BackupBytes("x"), "intruso.zip"))
+                    (await clientB.PostAsync("/api/v1/sync/files", crossTenantUpload)).StatusCode
+                        .Should().Be(HttpStatusCode.NotFound);
+
+                // Nada de lo intentado dejó huella: el fichero de A sigue con contador 0.
+                var stillThere = (await ListAsync(clientA)).Single();
+                stillThere.Id.Should().Be(fileA.Id);
+                stillThere.DownloadCount.Should().Be(0);
+            }
+            finally
+            {
+                await CleanupAsync(ownerB);
+                await DeleteTenantAsync(tenantBId);
+            }
+        }
+        finally
+        {
+            await CleanupAsync(ownerA);
+        }
+    }
+
+    /// <summary>
+    /// Borra el tenant de prueba. <see cref="CleanupAsync"/> no lo toca a propósito: el tenant por
+    /// defecto lo comparten todas las demás pruebas de la suite.
+    /// </summary>
+    private async Task DeleteTenantAsync(Guid tenantId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Set<Tenant>().IgnoreQueryFilters()
+            .Where(tenant => tenant.Id == tenantId)
+            .ExecuteDeleteAsync();
     }
 
     #endregion
