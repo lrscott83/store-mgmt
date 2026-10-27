@@ -91,3 +91,8 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 - **R1-003:** el límite "solo Owner" es de cliente; no hay endpoint que lo respalde hoy.
 - **R2:** dos implementaciones de redondeo, `EXPENSE_TYPE_ORDER` no exhaustivo por tipo, `skipped` mezcla dos motivos distintos, campos muertos en `CierreAnualInput`, forma de config repetida en tres sitios.
 - **R3:** sin tests de cambio de año, de rechazo de la agregación, de fallo de guardado en Configuraciones, del orden de etiquetas de gasto ni del fallback `selectedStoreId`.
+
+**L13** — Tercera pasada (2026-10-27): advisories R2/R3 cerrados.
+- `refactor(onat)` (`51b025a2`): un solo redondeo (`round2` compartido), `CENTAVOS_POR_PESO` en la conversión, `skipped` separado en `withoutRate` y `undated` con mensajes distintos, entradas muertas del cierre opcionales, orden de gastos exhaustivo por tipo, totales anuales desde una sola fuente, forma del formulario derivada de `OnatConfig` y estado de error con reintento si la agregación rechaza.
+- `test(onat)` (`0b0b9f1c`): cobertura de cambio de año, fallback a `selectedStoreId`, fallo de guardado en Configuraciones y tabla de etiquetas de gasto. Ese último test **encontró un defecto real**: `Otro` quedaba entre los nomencladores fiscales porque el mapa de orden le daba la posición 10; corregido moviendo los fiscales a 10–19 y `Otro` al final.
+- Siguen abiertos solo los tres que exigen backend o decisión de producto: enum 11–20 sin contraparte en backend, NIT en JSON plano y guard de cliente sin respaldo de servidor.
