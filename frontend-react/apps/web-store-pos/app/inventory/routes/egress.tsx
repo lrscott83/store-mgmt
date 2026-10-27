@@ -19,13 +19,14 @@ import { getOrderTypes } from '~/sales/lib/order-type-utils';
 
 export const clientLoader = featureLoader([EFeatures.Egress]);
 
-// Angular's EgressComponent (egress.component.ts:20) is a WHOLESALE (Mayorista) SALE screen,
-// NOT a waste/return/transfer/adjustment tracker — it reuses SaleCategoryProductsComponent
-// with `orderType = OrderType.Mayorista` as the default plus a full OrderType selector
-// (OrderTypeUtils.getOrderTypes()). This mirrors sales/routes/sale.tsx, differing only in the
-// default orderType and the presence of the selector (Angular's sale.component.ts hard-codes
-// Normal with no selector at all).
-const ORDER_TYPE_OPTIONS = getOrderTypes();
+// Salida is NOT a sale. It records stock outflows that are not a normal sale nor a wholesale
+// sale: merma (waste), ajuste (adjustment) and otro (any other detail). Normal and Mayorista
+// are deliberately excluded from the selector (owner decision, 2026-10-27) — the wholesale
+// sale lives in its own screen (/sales/wholesale) and the normal sale in /sales/new.
+const EGRESS_ORDER_TYPE_VALUES: OrderType[] = [OrderType.Merma, OrderType.Ajuste, OrderType.Otro];
+const ORDER_TYPE_OPTIONS = getOrderTypes().filter((option) =>
+  EGRESS_ORDER_TYPE_VALUES.includes(option.value),
+);
 
 export function EgressPage() {
   const intl = useIntl();
@@ -37,7 +38,7 @@ export function EgressPage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
-  const [orderType, setOrderType] = useState<OrderType>(OrderType.Mayorista);
+  const [orderType, setOrderType] = useState<OrderType>(OrderType.Merma);
 
   // Angular parity (egress.component.ts / sale.component.ts:39-40): getAvailableProductCategories()
   // already returns active-only categories sorted by order (ProductCategoryRepository.
@@ -82,7 +83,7 @@ export function EgressPage() {
 
   // 1:1 port of Angular's addProductToCart's inventory check (sale-product-row.component.ts
   // :58-104 -> InventoryOfflineService.hasAvailableProductToSale), identical to sale.tsx —
-  // Mayorista sales still deduct inventory through the standard pipeline.
+  // merma/ajuste/otro outflows still deduct inventory through the standard pipeline.
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
     const inventoryService = new InventoryOfflineService(
@@ -98,9 +99,9 @@ export function EgressPage() {
     });
   }
 
-  // Angular: mat-form-field with hardcoded (non-translated) "Tipo" label +
-  // OrderTypeUtils.getOrderTypes() options, rendered in the card-toolbar / top-right
-  // (egress.component.html:6-17).
+  // Angular: mat-form-field with hardcoded (non-translated) "Tipo" label, rendered in the
+  // card-toolbar / top-right (egress.component.html:6-17). Here the options are only the
+  // outflow kinds (merma/ajuste/otro), never a sale type.
   const typeSelector = (
     <label className="flex items-center gap-2 text-xs text-text-muted">
       Tipo
