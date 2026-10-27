@@ -81,6 +81,31 @@ El backend ya lee las cabeceras `Gf-Device` / `Gf-DeviceId` / `Gf-SessionId` (`H
 - **Riesgo 2 (autorización)**: añadido E2E `Another_tenant_cannot_see_download_delete_or_write_over_a_file`, que cubre la fuga entre tenants (el filtro global `IsSuperAdmin || TenantId == _context.TenantId`). Junto al existente `StoreUser_is_confined_to_its_own_store` (mismo tenant, otra tienda) y al test de gate por feature, las tres dimensiones quedan pinneadas. `StoreSyncFilesTests` → 6/6.
 - **Riesgo del proxy**: cerrado en `nginx.conf`, ver L6.
 
-### L6 — Cierre
-- Decisión del usuario tras el segundo `lens_context_budget_exceeded`: **dejar el feature verificado por sus tests** y no reescribir la historia para forzar la revisión nativa. La cobertura observada es 48 tests de aplicación, 5 E2E y 325 de frontend, más lint y typecheck limpios.
-- Queda pendiente de autorización explícita el arreglo de `DbTestHelpers.ResetDataAsync` descrito en L5.
+### L8 — RDD sobre item 2 e item 5
+Ambos revisados como candidatos propios en worktrees aislados, y **ambos APROBADOS y con su autoridad quemada** (`gentle-ai.review-acknowledged/v1`).
+
+- **Item 2 — autorización** (`a7ca8c9c`: handlers + controlador + i18n, 10 archivos / 798 líneas, worktree `store-mgmt-wt-auth`).
+  - Lentes: `review-risk`, `review-reliability`. Lineage `review-2fb374b6d6edc7a5`.
+  - Veredicto: **approved**. Hallazgos no bloqueantes, disposición `informational`:
+    - `R1-FILENAME-CONTROL-CHARS` (risk, WARNING): el nombre persistido se sanea solo en forma de ruta; CR/LF/NUL sobreviven y se emiten en `Content-Disposition`, lo que haría ese fichero indescargable.
+    - `R3-1` (reliability, WARNING): sin tests dentro del candidato — artefacto del alcance recortado; los tests viven en `6d89edab`.
+    - `R3-2` (reliability, WARNING): el mark de descarga se inserta con lectura previa; dos descargas concurrentes del mismo usuario podrían chocar con el índice único y devolver 500.
+    - `R3-3` (reliability, WARNING): `ReSeller` es tenant-wide para listar pero se resuelve por tiendas propias al actuar; lista y acción pueden discrepar.
+    - `R3-4` (reliability, WARNING): `SaveAsync` queda fuera del bloque de compensación; un fallo de disco escapa sin el 500 localizado.
+    - `R3-5`, `R3-6` (SUGGESTION): normalizar el nombre una sola vez antes de storage; pasar el token de cancelación al lookup del usuario.
+
+- **Item 5 — migración y esquema** (`32d83009`, recortado a migración + script + las dos configuraciones EF: 4 archivos / 321 líneas, worktree `store-mgmt-wt-mig`; el `Designer` y el snapshot son generados y se excluyeron).
+  - Lentes: `review-risk`, `review-reliability`. Lineage `review-a361f9fae735124f`.
+  - Veredicto: **approved**. Hallazgos no bloqueantes:
+    - `R1-tenant-integrity-download-mark` (risk, SUGGESTION): `StoreSyncFileDownload.TenantId` no está atado por FK al tenant del padre; la integridad depende de que cada handler estampe ambos desde el mismo contexto.
+    - `R3-uniqueness-contract-unproved` (reliability, WARNING): el índice único `(StoreSyncFileId, UserId)` no se prueba en este candidato — artefacto del alcance; el E2E sí ejercita la segunda descarga.
+    - `R3-script-migration-parity` (reliability, SUGGESTION): no hay check automático script↔`dotnet ef migrations script`; hoy se verificó a mano (cuerpo DDL idéntico).
+  - El primer intento sobre el commit completo (5067 líneas) devolvió `lens_context_budget_exceeded` sin crear autoridad; el recorte es la respuesta que exige el contrato.
+
+Ninguno de los hallazgos abrió corrección ni reabre la revisión. Quedan como trabajo posterior, no como motivo para repetirla.
+
+### L9 — Cierre
+- Cobertura final observada: 48 tests de aplicación, 6 E2E, 325 de frontend, más lint y typecheck limpios.
+- El arreglo de `DbTestHelpers.ResetDataAsync` (L5) quedó autorizado, aplicado y probado con filas huérfanas reales.
+- Los dos riesgos de alto valor (item 2 e item 5) pasaron revisión nativa y quedaron aprobados con su autoridad quemada (L8). Los hallazgos restantes son no bloqueantes y quedan como trabajo posterior.
+- El primer intento de revisión del feature completo quedó sin autoridad por `lens_context_budget_exceeded`; la decisión de no reescribir la historia se mantiene, y la cobertura de los dos riesgos se obtuvo con candidatos recortados.
