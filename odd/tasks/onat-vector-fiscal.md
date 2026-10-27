@@ -8,7 +8,7 @@ Feature branch: `dev` · Delivery: work units with RDD per commit · Test runner
 - `Vector Fiscal` → `/onat/vector-fiscal`
 - `Configuraciones` → `/onat/configurations`
 
-Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y **no** llevan `featureIds` ni `moduleId` (no se toca backend).
+Los items usan `rolesOnly: isOwnerOnly` y exigen el módulo 22 y la feature 126: `featureIds: [EFeatures.Onat]`, `moduleId: EModules.Onat`, `moduleIds: [EModules.Onat]`. Las dos rutas encadenan `ownerOnlyLoader` + `ownerModuleLoader(EModules.Onat)`.
 
 **S2 — Solo el Owner.** Las dos rutas usan un loader nuevo `ownerOnlyLoader` que admite únicamente `isOwnerAdmin && !isSuperAdmin`. Cualquier otro rol es denegado como el resto de loaders (logout + `/login`).
 
@@ -97,3 +97,11 @@ Los items usan `rolesOnly: (user) => user.isOwnerAdmin && !user.isSuperAdmin` y 
 - `test(onat)` (`0b0b9f1c`): cobertura de cambio de año, fallback a `selectedStoreId`, fallo de guardado en Configuraciones y tabla de etiquetas de gasto. Ese último test **encontró un defecto real**: `Otro` quedaba entre los nomencladores fiscales porque el mapa de orden le daba la posición 10; corregido moviendo los fiscales a 10–19 y `Otro` al final.
 - **Corrección (2026-10-27):** el advisory del enum 11–20 **no aplica**. Verificado con codegraph: los gastos no viajan al backend, viven en `localStorage` (`lizoft.store-expenses-`) y solo se mueven por el export/import ZIP, que usa el mismo enum del paquete `domain`. No hay sincronización con el servidor que pueda desalinearse.
 - Quedan abiertos solo dos, y ambos son decisión de producto: NIT/domicilios en JSON plano y guard de cliente sin respaldo de servidor.
+
+**L14** — Módulo propio (2026-10-27). El Owner pidió que Onat sea un módulo real y no un simple gate por rol.
+- Backend: `ModuleType.Onat = 22`, `FeatureType.Onat = 126`, `StoreRoleFeatures.OnatAdmin` (OwnerAdmin), migración `20261027162947_AddOnatModule` y script `42-20261027-Add-Onat-Module.sql` generado desde ella.
+- Datos: `Module` 22 nace con **`IsActive = false`** (envío apagado), asignado a Superior (3) y VIP (4), y con fila `StoreModule` **activa** en cada tienda de esos planes para que una sola bandera lo encienda en todas.
+- **Para activarlo:** `UPDATE "Module" SET "IsActive" = TRUE WHERE "Id" = 22;` — `/me` exige `Module.IsActive` en `GetAvailableModulesByStoreIdAsync`, así que hoy no llega al cliente aunque la fila por tienda esté activa.
+- Frontend: `EModules.Onat = 22`, `EFeatures.Onat = 126`, menú con `moduleIds` + `featureIds`, y ambas rutas con `ownerOnlyLoader` + `ownerModuleLoader(EModules.Onat)`.
+- E2E: con autorización explícita del Owner se actualizaron `StorePlanCatalogTests` y `PlanChangeMatrixTests`; la expectativa de `/me` ahora se deriva del catálogo activo, así que el módulo apagado sigue oculto y el test seguirá siendo válido al encenderlo. Suite E2E completa: 811/811.
+- **Incidente:** al recrear `smca_test` se perdió un backfill manual previo y faltaban las features 33 (Egress) y 91 (StorePayment). Se restauraron a mano (91 con `AvailableToStore = false`). La BD de E2E **no es reproducible solo desde migraciones**; ese hueco es previo a este cambio.
