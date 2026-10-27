@@ -858,6 +858,7 @@ const messages: Record<string, string> = {
   // Menu items — Synchronization (Angular MENU.SYNCHRONIZATION.*)
   'MENU.EXPORT': 'Exportar',
   'MENU.IMPORT': 'Importar',
+  'MENU.SYNC_SERVER': 'Servidor',
 
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
@@ -2096,6 +2097,49 @@ const messages: Record<string, string> = {
     'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
+
+  // Sync — repositorio de respaldos en el servidor (sync/server). Un fichero por
+  // tienda: el ZIP cifrado que el POS ya exporta, alojado en el backend.
+  'SYNC_SERVER.TITLE': 'Respaldos en el servidor',
+  'SYNC_SERVER.UPLOAD_TITLE': 'Subir respaldo al servidor',
+  'SYNC_SERVER.UPLOAD_HELP':
+    'Se genera un archivo cifrado por cada tienda de este dispositivo y se sube al servidor. Nada se guarda en el disco de este equipo.',
+  'SYNC_SERVER.UPLOAD_BUTTON': 'Subir al servidor',
+  'SYNC_SERVER.UPLOADING': 'Subiendo respaldos...',
+  'SYNC_SERVER.UPLOAD_RESULTS_TITLE': 'Resultado de la subida',
+  'SYNC_SERVER.UPLOADED': 'Subido',
+  'SYNC_SERVER.SKIPPED': 'Omitido: este dispositivo no tiene la clave de esta tienda.',
+  'SYNC_SERVER.FAILED': 'No se pudo subir el respaldo de esta tienda.',
+  'SYNC_SERVER.NO_STORES': 'No hay tiendas para respaldar en este dispositivo.',
+  'SYNC_SERVER.LIST_TITLE': 'Archivos disponibles',
+  'SYNC_SERVER.REFRESH': 'Actualizar',
+  'SYNC_SERVER.LOAD_ERROR': 'No se pudieron cargar los archivos del servidor.',
+  'SYNC_SERVER.EMPTY': 'Todavía no hay respaldos en el servidor.',
+  'SYNC_SERVER.COLUMN_STORE': 'Tienda',
+  'SYNC_SERVER.COLUMN_DATE': 'Fecha',
+  'SYNC_SERVER.COLUMN_UPLOADED_BY': 'Subido por',
+  'SYNC_SERVER.COLUMN_DOWNLOADS': 'Descargas',
+  'SYNC_SERVER.COLUMN_ACTIONS': 'Acciones',
+  'SYNC_SERVER.DOWNLOAD': 'Descargar e importar',
+  'SYNC_SERVER.DOWNLOAD_TITLE': 'Descargar e importar respaldo',
+  'SYNC_SERVER.DOWNLOAD_HELP':
+    'El archivo se descarga del servidor y se importa en la tienda a la que pertenece. La contraseña solo se usa en este dispositivo; no se envía al servidor.',
+  'SYNC_SERVER.IMPORT_BUTTON': 'Importar',
+  'SYNC_SERVER.IMPORTING': 'Importando...',
+  'SYNC_SERVER.IMPORT_SUCCESS': 'El respaldo se importó correctamente.',
+  'SYNC_SERVER.IMPORT_ERROR':
+    'No se pudo importar el respaldo. Verifique la contraseña e intente de nuevo.',
+  'SYNC_SERVER.ERROR_WRONG_PASSWORD': 'La contraseña del respaldo no es correcta.',
+  'SYNC_SERVER.ERROR_CORRUPT':
+    'El archivo del servidor está dañado y no se pudo leer. No se importó nada.',
+  'SYNC_SERVER.DOWNLOADED_AT': 'Descargado el',
+  'SYNC_SERVER.DELETE': 'Borrar del servidor',
+  'SYNC_SERVER.DELETE_TITLE': 'Borrar archivo del servidor',
+  'SYNC_SERVER.DELETE_MESSAGE':
+    'El archivo se borrará del servidor de forma permanente. Esta acción no se puede deshacer.',
+  'SYNC_SERVER.DELETE_ERROR': 'No se pudo borrar el archivo del servidor.',
+  'SYNC_SERVER.DELETED': 'Archivo borrado del servidor.',
+  'SYNC_SERVER.DOWNLOAD_ERROR': 'No se pudo descargar el archivo del servidor.',
 
   // Hotspot device-to-device transfer (odd/tasks/hotspot-device-transfer.md).
   // Both devices run the same PWA; the transfer never leaves the hotspot LAN.

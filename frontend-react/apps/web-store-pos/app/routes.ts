@@ -110,6 +110,8 @@ export default [
     // Sync â€” Export / Import
     route('sync/export', 'sync/routes/export.tsx'),
     route('sync/import', 'sync/routes/import.tsx'),
+    // Sync â€” repositorio de respaldos en el servidor (un fichero por tienda)
+    route('sync/server', 'sync/routes/sync-server.tsx'),
 
     // Management â€” Stores
     // Plan split: the store-DATA form never touches the plan. The PLAN view

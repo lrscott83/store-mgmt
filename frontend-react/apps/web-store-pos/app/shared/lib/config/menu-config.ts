@@ -501,6 +501,14 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Importar datos. Carga un archivo de exportación para restaurar información en tu tienda. Los datos se fusionan de forma segura sin duplicar registros.',
       },
+      {
+        label: 'MENU.SYNC_SERVER',
+        path: '/sync/server',
+        featureIds: [EFeatures.Send, EFeatures.Receive],
+        moduleId: EModules.Synchronization,
+        helpContent:
+          'Respaldos en el servidor. Sube un archivo cifrado por cada tienda y descárgalo en otro dispositivo: al descargar, el respaldo se importa directamente en la tienda a la que pertenece. También puedes borrar los archivos que ya no necesites.',
+      },
     ],
   },
   {
