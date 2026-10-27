@@ -110,13 +110,31 @@
       main strong {
         color: #111827;
       }
+      main table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.9rem 0 1.2rem;
+        font-size: 0.92rem;
+        background: var(--surface);
+      }
+      main th,
+      main td {
+        border: 1px solid var(--border);
+        padding: 0.45rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      main th {
+        background: var(--code-bg);
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
     <div class="doc">
       <header class="doc__header">
         <h1>Manual de usuario — VendeDTo</h1>
-        <p>Generado el 2026-10-17 · documento público de ayuda</p>
+        <p>Generado el 2026-10-27 · documento público de ayuda</p>
       </header>
       <main><h1>Manual de usuario — VendeDTo</h1>
 <p><strong>Versión:</strong> 1.1 · <strong>Fecha:</strong> 2026-10-16
@@ -690,6 +708,255 @@ las <strong>configuraciones</strong>. Quedan <strong>fuera</strong>: los módulo
 Superior), las pantallas de <strong>Gestión de pedidos</strong> (atender los pedidos, repartidores y ventas de
 pedidos) y todas las pantallas de <strong>Administración de la plataforma</strong> (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).</p>
+<hr>
+<h1>Tutorial: agregar categorías y productos al catálogo del POS</h1>
+<p>Este tutorial es <strong>independiente del resto del manual</strong>: empieza desde cero y termina con un
+producto listo para venderse en el POS. No necesitas leer ninguna otra sección.</p>
+<p><strong>Qué vas a lograr.</strong> Crear una <strong>categoría</strong> y, dentro de ella, un <strong>producto</strong> con su precio y su
+existencia inicial, de modo que aparezca en <strong>Vender</strong> y pueda cobrarse.</p>
+<p><strong>Cómo leer las imágenes.</strong> Cada control que debes tocar está marcado con un <strong>círculo rojo</strong> y un
+<strong>número rojo</strong>. Ese número es el <strong>número de paso</strong> de este tutorial y se repite en el texto. En
+cada imagen verás solo los números que corresponden a esa pantalla.</p>
+<blockquote>
+<p><strong>No confundas las marcas con botones.</strong> Las marcas del tutorial son <strong>círculos rojos finos con un
+número</strong>. Los botones de la aplicación (por ejemplo <strong>Limpiar</strong>, <strong>Importar Productos</strong> o
+<strong>Categoría</strong>) son formas rellenas con texto; si no llevan número, <strong>no son un paso</strong> de este
+tutorial.</p>
+</blockquote>
+<p><strong>Antes de empezar.</strong> Necesitas iniciar sesión como <strong>Dueño de tienda</strong> (o como un empleado con
+permiso sobre <strong>Productos</strong>) y tener la tienda seleccionada. En el menú, el catálogo vive en el
+grupo <strong>VENTA</strong>.</p>
+<blockquote>
+<p><strong>Categoría y producto, en una frase:</strong> la <strong>categoría</strong> es el grupo (por ejemplo, <em>Alimentos</em>) y
+el <strong>producto</strong> es cada artículo que se vende dentro de ese grupo (por ejemplo, <em>Arroz Bolsa 1 kg</em>).
+<strong>No se puede crear un producto sin una categoría.</strong></p>
+</blockquote>
+<h2>1. Abrir el catálogo de productos</h2>
+<p><strong>Paso 1.</strong> Toca el botón de la esquina superior izquierda para <strong>abrir el menú lateral</strong>. Es el
+botón con la flecha doble (<strong>»</strong>).</p>
+<p><img src="images/46-tutorial-01-abrir-menu.png" alt="Paso 1: abrir el menú lateral"></p>
+<p><strong>Paso 2.</strong> En el menú, dentro del grupo <strong>VENTA</strong>, toca <strong>Catálogo Productos</strong>. Se abre la pantalla
+<strong>Productos</strong>.</p>
+<p><img src="images/47-tutorial-02-catalogo-productos.png" alt="Paso 2: VENTA → Catálogo Productos"></p>
+<h2>2. Crear la categoría</h2>
+<p><strong>Paso 3.</strong> En la pantalla <strong>Productos</strong>, toca el botón <strong>Categoría</strong> (con el signo <strong>+</strong>) que está
+en la cabecera de la tarjeta.</p>
+<p>Si el catálogo está vacío verás el aviso <em>«Para adicionar un producto debe primero adicionar una
+categoría»</em>: es normal y desaparece en cuanto crees la primera.</p>
+<p><img src="images/48-tutorial-03-boton-categoria.png" alt="Paso 3: botón Categoría"></p>
+<p>Se abre la ventana <strong>Crear categoría</strong>, con tres campos y dos botones:</p>
+<p><strong>Paso 4. Nombre.</strong> Escribe el nombre del grupo. Es el texto que verás en la lista del catálogo y en
+la pantalla de venta. Ejemplo: <strong>Alimentos</strong>. Es obligatorio.</p>
+<p><strong>Paso 5. Orden.</strong> Es la <strong>posición</strong> de la categoría en la lista: el número menor aparece primero.
+Al abrir la ventana viene rellenado con el siguiente número libre, así que <strong>normalmente no hay que
+tocarlo</strong>. Si escribes <code>1</code>, la categoría se coloca al principio. Es obligatorio.</p>
+<p><strong>Paso 6. Activo.</strong> Debe quedar <strong>marcado</strong>. Si lo desmarcas, la categoría se guarda pero queda
+atenuada en la lista con la etiqueta <strong>Inactivo</strong>; no se borra y puedes volver a activarla editándola.</p>
+<p><strong>Paso 7. Salvar.</strong> Toca <strong>Salvar</strong> para guardar. El botón <strong>Cerrar</strong> (con la <strong>×</strong>) cierra la ventana
+sin guardar.</p>
+<p><img src="images/49-tutorial-04-modal-categoria.png" alt="Pasos 4 a 7: Nombre, Orden, Activo y Salvar en Crear categoría"></p>
+<p>Al guardar, la ventana se cierra y la categoría aparece en la lista <strong>Productos</strong> con un <strong>0</strong> a la
+derecha: ese número es la <strong>cantidad de productos</strong> que contiene (todavía ninguno).</p>
+<h2>3. Abrir el menú de la categoría</h2>
+<p><strong>Paso 8.</strong> Toca el <strong>engranaje</strong> que está a la derecha del nombre de la categoría (justo antes de la
+flecha que abre y cierra el grupo). Ese engranaje son las <strong>opciones de la categoría</strong> y <strong>no</strong>
+expande la lista.</p>
+<p><img src="images/50-tutorial-05-categoria-creada.png" alt="Paso 8: engranaje de opciones de la categoría"></p>
+<p>Se abre un <strong>menú contextual</strong> con tres opciones. Esta es la parte que no es evidente: <strong>dos de las
+tres opciones sirven para agregar productos</strong>.</p>
+<p><strong>Paso 9. Categoría</strong> (icono de lápiz). <strong>Edita</strong> la categoría: vuelve a abrir la ventana del paso 4
+para cambiar <strong>Nombre</strong>, <strong>Orden</strong> o <strong>Activo</strong>. No agrega productos.</p>
+<p><strong>Paso 10. Productos</strong> (icono <strong>+</strong>). <strong>Alta rápida de varios productos</strong> a la vez: escribes una lista
+de nombres y precios y se crean todos dentro de la categoría. Útil para cargar un catálogo largo.</p>
+<p><strong>Paso 11. Producto</strong> (icono <strong>+</strong>). <strong>Alta individual</strong>: abre el formulario completo con todos los
+campos del producto. Es la opción que usaremos en este tutorial.</p>
+<p><img src="images/51-tutorial-06-menu-categoria.png" alt="Pasos 9 a 11: el menú de la categoría (Categoría, Productos, Producto)"></p>
+<h2>4. Crear el producto</h2>
+<p><strong>Paso 11 (continuación).</strong> Toca <strong>Producto</strong> en el menú contextual. Se abre la ventana <strong>Producto</strong>.
+El formulario es largo, así que se muestra en dos imágenes: primero los datos generales y después las
+casillas y los botones finales.</p>
+<p><strong>Paso 12. Nombre.</strong> El nombre del artículo tal como lo verás en la lista y en la pantalla de venta.
+Ejemplo: <strong>Arroz Bolsa 1 kg</strong>. Es obligatorio.</p>
+<p><strong>Paso 13. Precio de costo.</strong> Lo que te cuesta a ti una unidad. Es <strong>opcional</strong>. Si lo rellenas junto
+con <strong>Cantidad</strong>, el sistema registra una <strong>entrada de inventario del día</strong> con ese costo y esa
+cantidad. Si lo dejas vacío, <strong>no</strong> se crea ninguna entrada. El costo <strong>no cambia</strong> el precio de
+venta. Este campo solo aparece para el <strong>Dueño</strong> y con el módulo <strong>Inventario</strong> activo.</p>
+<p><strong>Paso 14. Precio.</strong> El precio al que vendes una unidad. Es <strong>obligatorio</strong> y debe ser un número mayor
+o igual que cero. Es el precio que verás en la lista del catálogo y el que se cobra en el POS.</p>
+<p><strong>Paso 15. Moneda del costo.</strong> La moneda en la que expresas el <strong>Precio de costo</strong>. Solo aparece con
+el módulo <strong>MultiMonedas</strong>; por defecto trae la moneda de compra configurada en la tienda.</p>
+<p><strong>Paso 16. Moneda del precio.</strong> La moneda en la que expresas el <strong>Precio</strong> de venta. Solo aparece con
+el módulo <strong>MultiMonedas</strong>. Si cambias primero la moneda del costo, la del precio se ajusta sola la
+primera vez; después puedes fijarla por separado.</p>
+<p><img src="images/52-tutorial-07-modal-producto-1.png" alt="Pasos 12 a 20: datos generales del producto"></p>
+<p><strong>Paso 17. Cantidad.</strong> La <strong>existencia inicial</strong> que tienes de ese producto. Es <strong>opcional</strong> y admite
+decimales (por ejemplo <code>1.5</code>). Solo crea la entrada de inventario del día si <strong>también</strong> rellenaste el
+<strong>Precio de costo</strong> y la cantidad es mayor que cero.</p>
+<p><strong>Paso 18. Código de barras.</strong> El código del producto, si tiene. Es <strong>opcional</strong>. Puedes escribirlo o
+tocarlo con el botón del <strong>escáner</strong> (icono de código de barras) para capturarlo con la cámara.</p>
+<p><strong>Paso 19. Orden.</strong> La <strong>posición</strong> del producto dentro de la categoría: el número menor aparece
+primero. Viene rellenado con el siguiente número libre, así que <strong>normalmente no hay que tocarlo</strong>.</p>
+<p><strong>Paso 20. Venta Mayorista.</strong> Es un <strong>interruptor opcional</strong>, apagado por defecto. Si lo enciendes,
+aparecen <strong>Unidades por paquete/caja</strong>, <strong>Unidad de medida</strong> y los <strong>Rangos de precio mayorista</strong>
+(mínimo de paquetes y precio por unidad). Si no vendes al mayor, déjalo apagado.</p>
+<p><strong>Paso 21. Activo.</strong> Debe quedar <strong>marcado</strong>. Si lo desmarcas, el producto se guarda pero queda
+atenuado en la lista con la etiqueta <strong>Inactivo</strong> y <strong>no se puede vender</strong>.</p>
+<p><strong>Paso 22. Disponible para Vender.</strong> Debe quedar <strong>marcado</strong>. Si lo desmarcas, el producto existe en el
+catálogo pero <strong>no aparece en la pantalla Vender</strong>, así que no se puede cobrar.</p>
+<p><strong>Paso 23. Descuenta del Inventario.</strong> Debe quedar <strong>marcado</strong> para un producto normal: el POS controla
+la existencia y la descuenta al vender. Desmárcalo solo para artículos que <strong>no llevan inventario</strong>
+(servicios, combos): en ese caso se vende aunque no haya existencia y no descuenta stock.</p>
+<p><strong>Paso 24. Salvar.</strong> Toca <strong>Salvar</strong> para guardar el producto. El botón <strong>Cerrar</strong> (con la <strong>×</strong>)
+cierra sin guardar.</p>
+<p><img src="images/53-tutorial-08-modal-producto-2.png" alt="Pasos 21 a 24: casillas Activo, Disponible para Vender, Descuenta del Inventario y Salvar"></p>
+<h2>5. Comprobar que quedó listo</h2>
+<p><strong>Paso 25.</strong> La ventana se cierra y el producto aparece <strong>dentro de la categoría</strong>. Toca el nombre de
+la categoría (o la flecha de la derecha) para <strong>abrir el grupo</strong> si está cerrado. Verás el producto
+con su <strong>precio</strong> y su <strong>engranaje</strong> de opciones (para <strong>Editar</strong> o <strong>Desactivar</strong> el producto más
+adelante). El número a la derecha del nombre de la categoría pasa de <strong>0</strong> a <strong>1</strong> (o al total de
+productos que tenga).</p>
+<p><img src="images/54-tutorial-09-producto-creado.png" alt="Paso 25: el producto creado dentro de la categoría"></p>
+<p><strong>Listo.</strong> El producto ya existe en el catálogo del POS: aparece en <strong>Vender</strong>, se puede agregar al
+carrito y cobrar, y si marcaste <strong>Descuenta del Inventario</strong> su existencia se irá descontando con cada
+venta.</p>
+<h2>Resumen de los campos</h2>
+<h3>Ventana Crear categoría</h3>
+<table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Qué significa</th>
+<th>¿Obligatorio?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Nombre</strong></td>
+<td>Nombre del grupo que verás en el catálogo y en la venta.</td>
+<td>Sí</td>
+</tr>
+<tr>
+<td><strong>Orden</strong></td>
+<td>Posición en la lista; el número menor aparece primero. Viene con el siguiente libre.</td>
+<td>Sí</td>
+</tr>
+<tr>
+<td><strong>Activo</strong></td>
+<td>Marcado: la categoría se usa normalmente. Desmarcado: queda atenuada como <strong>Inactivo</strong>, sin borrarse.</td>
+<td>No (marcado por defecto)</td>
+</tr>
+</tbody></table>
+<h3>Ventana Producto</h3>
+<table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Qué significa</th>
+<th>¿Obligatorio?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Nombre</strong></td>
+<td>Nombre del artículo en el catálogo y en la venta.</td>
+<td>Sí</td>
+</tr>
+<tr>
+<td><strong>Precio de costo</strong></td>
+<td>Lo que te cuesta una unidad. Con <strong>Cantidad</strong>, genera la entrada de inventario del día. No cambia el precio de venta.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Precio</strong></td>
+<td>Precio de venta por unidad. Es el que se cobra en el POS.</td>
+<td>Sí</td>
+</tr>
+<tr>
+<td><strong>Moneda del costo</strong></td>
+<td>Moneda del costo (solo con MultiMonedas).</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Moneda del precio</strong></td>
+<td>Moneda del precio de venta (solo con MultiMonedas).</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Cantidad</strong></td>
+<td>Existencia inicial; admite decimales. Solo genera entrada si hay costo y es mayor que cero.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Código de barras</strong></td>
+<td>Código del producto; se puede escribir o escanear.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Orden</strong></td>
+<td>Posición dentro de la categoría; el número menor aparece primero.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Venta Mayorista</strong></td>
+<td>Interruptor para configurar paquete/caja, unidad de medida y rangos de precio al mayor.</td>
+<td>No (apagado por defecto)</td>
+</tr>
+<tr>
+<td><strong>Activo</strong></td>
+<td>Marcado: el producto se usa normalmente. Desmarcado: queda <strong>Inactivo</strong> y no se vende.</td>
+<td>No (marcado por defecto)</td>
+</tr>
+<tr>
+<td><strong>Disponible para Vender</strong></td>
+<td>Marcado: aparece en <strong>Vender</strong>. Desmarcado: no se puede cobrar.</td>
+<td>No (marcado por defecto)</td>
+</tr>
+<tr>
+<td><strong>Descuenta del Inventario</strong></td>
+<td>Marcado: controla y descuenta existencia al vender. Desmarcado: no controla stock (servicios, combos).</td>
+<td>No (marcado por defecto)</td>
+</tr>
+</tbody></table>
+<h3>Botones de la pantalla Productos</h3>
+<table>
+<thead>
+<tr>
+<th>Botón</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Categoría</strong></td>
+<td>Crea una categoría nueva (paso 3).</td>
+</tr>
+<tr>
+<td><strong>Importar Productos</strong></td>
+<td>Carga masiva desde un archivo CSV: descarga el ejemplo, rellénalo y súbelo.</td>
+</tr>
+<tr>
+<td><strong>Importar desde Catálogo Web</strong></td>
+<td>Trae al catálogo del POS los productos publicados en el Catálogo Web (solo Dueño y con el módulo activo).</td>
+</tr>
+<tr>
+<td><strong>Limpiar</strong></td>
+<td><strong>Borra</strong> los datos del catálogo de este dispositivo (solo Dueño). <strong>No lo uses</strong> en este tutorial.</td>
+</tr>
+</tbody></table>
+<h3>Botones de la ventana Producto</h3>
+<table>
+<thead>
+<tr>
+<th>Botón</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Cerrar</strong> (<strong>×</strong>)</td>
+<td>Cierra la ventana sin guardar nada.</td>
+</tr>
+<tr>
+<td><strong>Salvar</strong> (icono de disquete)</td>
+<td>Guarda el producto con los datos escritos.</td>
+</tr>
+</tbody></table>
 </main>
     </div>
   </body>
