@@ -324,5 +324,21 @@ namespace Domain.Common.Enums
         GestoresVentasAdmin,
 
         #endregion
+
+        #region ONAT features
+
+        // ONAT (feature 126, módulo 22): Vector Fiscal y Configuraciones fiscales. Las dos vistas son
+        // del Owner (ownerOnlyLoader en el frontend: isOwnerAdmin && !isSuperAdmin), así que la
+        // entrada replica WebCatalogAdmin — OwnerAdmin y nada más. El módulo 22 está en Superior (3)
+        // y VIP (4) y nace con IsActive = FALSE (se enciende con un flag), pero las tiendas ya tienen
+        // su StoreModule activo. Sin esta entrada el módulo 22 quedaría invisible para
+        // AllowedFeaturesService y para StoreRoleFeatureGenerator (gotcha AGENTS.md 2026-09-20) y la
+        // feature nunca llegaría al /me ni al roster offline.
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.Onat)]
+        [HasModule(ModuleType.Onat)]
+        OnatAdmin,
+
+        #endregion
     }
 }

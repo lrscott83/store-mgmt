@@ -3,7 +3,11 @@ import type { LoaderFunctionArgs } from 'react-router';
 import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import {
+  isModuleAvailable,
+  isOwnerOnly,
+  isUserAuthorized,
+} from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import { clearDek } from '~/shared/lib/storage/data-key-store';
@@ -156,6 +160,27 @@ export async function adminLoader(): Promise<Response | null> {
     return denyAccess();
   }
   if (!user.isSuperAdmin && !user.isOwnerAdmin) {
+    return denyAccess();
+  }
+  return null;
+}
+
+/**
+ * Guard de "solo el Owner" (S2): admite ÚNICAMENTE una sesión autenticada con
+ * `isOwnerAdmin === true` Y `isSuperAdmin !== true`. Cualquier otro rol —
+ * SuperAdmin, ReSeller o usuario de tienda — se deniega exactamente como el
+ * resto de loaders (`denyAccess`: logout + redirección a /login).
+ *
+ * Existe como loader propio porque ningún guard anterior expresa esta
+ * combinación: `adminLoader` deja pasar al SuperAdmin y `featureLoader` le da
+ * bypass junto al OwnerAdmin.
+ */
+export async function ownerOnlyLoader(): Promise<Response | null> {
+  const { user, isAuthenticated } = getAuthState();
+  if (!user || !isAuthenticated) {
+    return denyAccess();
+  }
+  if (!isOwnerOnly(user)) {
     return denyAccess();
   }
   return null;

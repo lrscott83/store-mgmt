@@ -1,25 +1,11 @@
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { ExpenseType } from '@store-mgmt/domain';
 import { resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-
-const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
-  [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
-  [ExpenseType.Transporte]: 'EXPENSES.TYPE.TRANSPORTE',
-  [ExpenseType.Alquiler]: 'EXPENSES.TYPE.ALQUILER',
-  [ExpenseType.Corriente]: 'EXPENSES.TYPE.CORRIENTE',
-  [ExpenseType.Agua]: 'EXPENSES.TYPE.AGUA',
-  [ExpenseType.Comida]: 'EXPENSES.TYPE.COMIDA',
-  [ExpenseType.Operaciones]: 'EXPENSES.TYPE.OPERACIONES',
-  [ExpenseType.Viaje]: 'EXPENSES.TYPE.VIAJE',
-  [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
-  [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
-  [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
-};
+import { EXPENSE_TYPE_LABEL_KEYS } from '../lib/expense-type-labels';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -59,7 +45,7 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
           >
             {/* Columna 1 — motivo, alineado a la izquierda. */}
             <span className="truncate text-left text-xs text-text-muted">
-              {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+              {intl.formatMessage({ id: EXPENSE_TYPE_LABEL_KEYS[expense.type] })}
             </span>
             {/* Columna 2 — modo de pago, centro y alineado a la izquierda. */}
             <span className="text-left text-xs font-semibold text-success">

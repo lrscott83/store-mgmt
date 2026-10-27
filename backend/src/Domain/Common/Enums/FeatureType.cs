@@ -163,5 +163,11 @@ namespace Domain.Common.Enums
         // Owner (coordinador). El gestor es Owner-level y no consume esta feature por tienda.
         [Description("Gestores de ventas")]
         GestoresVentas = 125,
+
+        // ONAT (módulo 22): Vector Fiscal y configuraciones fiscales del Owner. El módulo
+        // nace con IsActive = FALSE; esta feature sí se siembra activa para que el único flip
+        // del módulo sea el interruptor que enciende la vista.
+        [Description("ONAT")]
+        Onat = 126,
     }
 }

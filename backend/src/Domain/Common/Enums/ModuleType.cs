@@ -74,5 +74,12 @@ namespace Domain.Common.Enums
         // Solo se incluye en Superior (3) y VIP (4); no se asigna a ninguna tienda por defecto.
         [Description("Gestores de ventas")]
         GestoresVentas = 21,
+
+        // ONAT = Vector Fiscal y sus configuraciones, del Owner. Se incluye en Superior (3) y VIP (4)
+        // y se siembra con IsActive = FALSE a propósito: la feature se entrega APAGADA y el owner
+        // levanta ese único flag cuando esté lista. Las tiendas de esos planes SÍ reciben su
+        // StoreModule activo para que el flip las encienda de golpe.
+        [Description("ONAT")]
+        Onat = 22,
     }
 }
