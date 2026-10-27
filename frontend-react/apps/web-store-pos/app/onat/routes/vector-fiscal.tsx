@@ -239,6 +239,8 @@ export function VectorFiscalPage() {
 
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [aggregation, setAggregation] = useState<OnatAggregationResult | null>(null);
+  const [aggregationFailed, setAggregationFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [overrides, setOverrides] = useState<OnatOverrides>({});
   const [pagaAntesDel28Febrero, setPagaAntesDel28Febrero] = useState(false);
 
@@ -255,13 +257,20 @@ export function VectorFiscalPage() {
   useEffect(() => {
     let cancelled = false;
     setAggregation(null);
-    void aggregateOnatMonths({ storeIds, year }).then((result) => {
-      if (!cancelled) setAggregation(result);
-    });
+    setAggregationFailed(false);
+    void aggregateOnatMonths({ storeIds, year })
+      .then((result) => {
+        if (!cancelled) setAggregation(result);
+      })
+      .catch(() => {
+        // Un rechazo (por ejemplo, el almacenamiento no se puede leer) no puede
+        // dejar la pantalla en "cargando" para siempre: se ofrece reintentar.
+        if (!cancelled) setAggregationFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [storeIds, year]);
+  }, [storeIds, year, retryToken]);
 
   const rows = useMemo<VectorRow[]>(() => {
     if (!aggregation) return [];
@@ -290,16 +299,12 @@ export function VectorFiscalPage() {
     const months = aggregation?.months ?? [];
 
     return {
+      // S8: ingresos y gastos salen de la MISMA fila que pinta la tabla, así que
+      // un override tiene una sola precedencia y no hay dos fuentes que puedan
+      // discrepar. El gasto de la fila es el deducible: los tributos, zonas,
+      // arrendamientos, exoneraciones y la cuota se restan por sus propias líneas.
       ingresos: rows.reduce((total, row) => total + row.income, 0),
-      // S8: solo los gastos no fiscales. Los tributos, zonas, arrendamientos,
-      // exoneraciones y la cuota se restan por sus propias líneas del cierre.
-      // S4: si el Owner sobrescribió el gasto de un mes, esa cifra manda — y es
-      // la MISMA magnitud que muestra la columna (gasto deducible del mes), así
-      // que nunca se descuenta dos veces el mismo importe.
-      gastos: months.reduce((total, month) => {
-        const override = monthOverridesFor(overrides, year, month.month)?.gastos;
-        return total + (override?.value ?? month.nonTaxExpenses);
-      }, 0),
+      gastos: rows.reduce((total, row) => total + row.expenses, 0),
       tributosDeducibles: TRIBUTOS_DEDUCIBLES.reduce(
         (total, entry) => total + sumTaxBucket(months, entry.tipo),
         0,
@@ -309,7 +314,7 @@ export function VectorFiscalPage() {
       exoneraciones: sumTaxBucket(months, ExpenseType.ExoneracionReparaciones),
       cuotasPagadas: sumTaxBucket(months, ExpenseType.CuotaMensual),
     };
-  }, [aggregation, overrides, rows, year]);
+  }, [aggregation, rows]);
 
   /** S6 — tributos pagados del año, con el código ONAT de la taxonomía. */
   const paidTaxes = useMemo(() => {
@@ -330,10 +335,7 @@ export function VectorFiscalPage() {
         contribucionZonas: annualTotals.contribucionZonas,
         arrendamientos: annualTotals.arrendamientos,
         exoneraciones: annualTotals.exoneraciones,
-        otrasBonificaciones: 0,
         cuotasPagadas: annualTotals.cuotasPagadas,
-        retenciones: 0,
-        bonificaciones: 0,
         pagaAntesDel28Febrero,
       }),
     [annualTotals, pagaAntesDel28Febrero],
@@ -389,7 +391,23 @@ export function VectorFiscalPage() {
         </select>
       </div>
 
-      {aggregation === null ? (
+      {aggregationFailed ? (
+        <div
+          role="alert"
+          className="space-y-2 rounded-lg border border-border bg-surface p-3"
+        >
+          <p className="text-sm font-medium text-danger">
+            {intl.formatMessage({ id: 'ONAT.LOAD_ERROR' })}
+          </p>
+          <button
+            type="button"
+            onClick={() => setRetryToken((token) => token + 1)}
+            className="text-sm font-medium text-primary"
+          >
+            {intl.formatMessage({ id: 'ONAT.RETRY' })}
+          </button>
+        </div>
+      ) : aggregation === null ? (
         <p className="text-sm text-text-muted">{intl.formatMessage({ id: 'GENERAL.LOADING' })}</p>
       ) : (
         <>
@@ -496,17 +514,27 @@ export function VectorFiscalPage() {
             </dl>
           </section>
 
-          {(aggregation.warnings.length > 0 || aggregation.skipped > 0) && (
+          {(aggregation.warnings.length > 0 ||
+            aggregation.skipped.withoutRate > 0 ||
+            aggregation.skipped.undated > 0) && (
             <section className="rounded-lg border border-border bg-surface p-3">
               <h2 className="text-sm font-semibold text-text">
                 {intl.formatMessage({ id: 'ONAT.WARNINGS' })}
               </h2>
               <ul className="mt-1 list-inside list-disc space-y-1 text-xs text-text-muted">
-                {aggregation.skipped > 0 && (
+                {aggregation.skipped.withoutRate > 0 && (
                   <li>
                     {intl.formatMessage(
                       { id: 'ONAT.SKIPPED_RATES' },
-                      { count: aggregation.skipped },
+                      { count: aggregation.skipped.withoutRate },
+                    )}
+                  </li>
+                )}
+                {aggregation.skipped.undated > 0 && (
+                  <li>
+                    {intl.formatMessage(
+                      { id: 'ONAT.SKIPPED_UNDATED' },
+                      { count: aggregation.skipped.undated },
                     )}
                   </li>
                 )}

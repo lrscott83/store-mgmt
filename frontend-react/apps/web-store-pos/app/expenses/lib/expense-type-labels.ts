@@ -40,30 +40,34 @@ export const EXPENSE_TYPE_LABEL_KEYS: Record<ExpenseType, string> = {
  * 1-10 y `Otro = 100`) tal como estaban, y después los nomencladores fiscales
  * en el orden de la taxonomía ONAT. No se deriva de `Object.keys` del mapa
  * porque los valores numéricos del enum no reproducen este orden.
+ *
+ * Es un `Record<ExpenseType, number>` y no un arreglo: el compilador exige una
+ * posición para cada valor del enum, así que un nomenclador nuevo no puede
+ * desaparecer del selector en silencio.
  */
-const EXPENSE_TYPE_ORDER: readonly ExpenseType[] = [
-  ExpenseType.Salario,
-  ExpenseType.Transporte,
-  ExpenseType.Alquiler,
-  ExpenseType.Corriente,
-  ExpenseType.Agua,
-  ExpenseType.Comida,
-  ExpenseType.Operaciones,
-  ExpenseType.Viaje,
-  ExpenseType.Divisa,
-  ExpenseType.Impuesto,
-  ExpenseType.Otro,
-  ExpenseType.ImpuestoVentas,
-  ExpenseType.FuerzaTrabajo,
-  ExpenseType.ImpuestoSellos,
-  ExpenseType.Anuncios,
-  ExpenseType.ContribucionEspecialSeguridadSocial,
-  ExpenseType.ContribucionSeguridadSocial,
-  ExpenseType.CuotaMensual,
-  ExpenseType.ContribucionZonas,
-  ExpenseType.ArrendamientoEntidades,
-  ExpenseType.ExoneracionReparaciones,
-];
+const EXPENSE_TYPE_ORDER: Record<ExpenseType, number> = {
+  [ExpenseType.Salario]: 0,
+  [ExpenseType.Transporte]: 1,
+  [ExpenseType.Alquiler]: 2,
+  [ExpenseType.Corriente]: 3,
+  [ExpenseType.Agua]: 4,
+  [ExpenseType.Comida]: 5,
+  [ExpenseType.Operaciones]: 6,
+  [ExpenseType.Viaje]: 7,
+  [ExpenseType.Divisa]: 8,
+  [ExpenseType.Impuesto]: 9,
+  [ExpenseType.Otro]: 10,
+  [ExpenseType.ImpuestoVentas]: 11,
+  [ExpenseType.FuerzaTrabajo]: 12,
+  [ExpenseType.ImpuestoSellos]: 13,
+  [ExpenseType.Anuncios]: 14,
+  [ExpenseType.ContribucionEspecialSeguridadSocial]: 15,
+  [ExpenseType.ContribucionSeguridadSocial]: 16,
+  [ExpenseType.CuotaMensual]: 17,
+  [ExpenseType.ContribucionZonas]: 18,
+  [ExpenseType.ArrendamientoEntidades]: 19,
+  [ExpenseType.ExoneracionReparaciones]: 20,
+};
 
 /** Opción del selector de tipo: el valor del enum y su id de mensaje. */
 export interface ExpenseTypeOption {
@@ -75,6 +79,9 @@ export interface ExpenseTypeOption {
  * Opciones del selector en su orden visible, derivadas del mapa: la etiqueta de
  * cada opción sale de `EXPENSE_TYPE_LABEL_KEYS`, nunca de otra copia.
  */
-export const EXPENSE_TYPE_OPTIONS: readonly ExpenseTypeOption[] = EXPENSE_TYPE_ORDER.map(
-  (value) => ({ value, labelKey: EXPENSE_TYPE_LABEL_KEYS[value] }),
-);
+export const EXPENSE_TYPE_OPTIONS: readonly ExpenseTypeOption[] = Object.keys(
+  EXPENSE_TYPE_LABEL_KEYS,
+)
+  .map((key) => Number(key) as ExpenseType)
+  .sort((left, right) => EXPENSE_TYPE_ORDER[left] - EXPENSE_TYPE_ORDER[right])
+  .map((value) => ({ value, labelKey: EXPENSE_TYPE_LABEL_KEYS[value] }));

@@ -6,6 +6,8 @@
  * la Ley 181/2025.
  */
 
+import { round2 } from '~/shared/lib/money';
+
 export const MINIMO_EXENTO_ANUAL = 39120;
 export const UMBRAL_CUOTA_MENSUAL = 3260;
 export const TASA_VENTAS = 0.1;
@@ -13,11 +15,8 @@ export const TASA_CUOTA = 0.05;
 export const TASA_FUERZA_TRABAJO = 0.05;
 export const BONIFICACION_PRONTO_PAGO = 0.05;
 
-const CENTAVOS_POR_PESO = 100;
-
-function redondearImporte(valor: number): number {
-  return Math.round((valor + Number.EPSILON) * CENTAVOS_POR_PESO) / CENTAVOS_POR_PESO;
-}
+/** Centavos que tiene un peso: la unidad en la que convierte el dominio. */
+export const CENTAVOS_POR_PESO = 100;
 
 interface TramoEscala {
   readonly hasta: number;
@@ -40,17 +39,17 @@ const TRAMOS_ESCALA: readonly TramoEscala[] = [
 
 /** Impuesto sobre Ventas o Servicios: 10 % del ingreso del mes, nunca negativo. */
 export function impuestoVentas(ingresoMes: number): number {
-  return redondearImporte(Math.max(0, ingresoMes) * TASA_VENTAS);
+  return round2(Math.max(0, ingresoMes) * TASA_VENTAS);
 }
 
 /** Cuota mensual a cuenta: 5 % del ingreso que exceda 3.260 CUP. */
 export function cuotaMensual(ingresoMes: number): number {
-  return redondearImporte(Math.max(0, ingresoMes - UMBRAL_CUOTA_MENSUAL) * TASA_CUOTA);
+  return round2(Math.max(0, ingresoMes - UMBRAL_CUOTA_MENSUAL) * TASA_CUOTA);
 }
 
 /** Impuesto por la Utilización de la Fuerza de Trabajo: 5 % de los salarios del mes. */
 export function fuerzaTrabajo(salariosMes: number): number {
-  return redondearImporte(Math.max(0, salariosMes) * TASA_FUERZA_TRABAJO);
+  return round2(Math.max(0, salariosMes) * TASA_FUERZA_TRABAJO);
 }
 
 /**
@@ -76,7 +75,7 @@ export function impuestoEscala(baseImponible: number): number {
     limiteInferior = tramo.hasta;
   }
 
-  return redondearImporte(impuesto);
+  return round2(impuesto);
 }
 
 export interface CierreAnualInput {
@@ -86,10 +85,13 @@ export interface CierreAnualInput {
   readonly contribucionZonas: number;
   readonly arrendamientos: number;
   readonly exoneraciones: number;
-  readonly otrasBonificaciones: number;
+  /** Opcional: 0 cuando no se informa. */
+  readonly otrasBonificaciones?: number;
   readonly cuotasPagadas: number;
-  readonly retenciones: number;
-  readonly bonificaciones: number;
+  /** Opcional: 0 cuando no se informa. */
+  readonly retenciones?: number;
+  /** Opcional: 0 cuando no se informa. */
+  readonly bonificaciones?: number;
   readonly pagaAntesDel28Febrero: boolean;
 }
 
@@ -106,7 +108,13 @@ export interface CierreAnualResultado {
  * por pronto pago. Ningún importe resultante puede quedar negativo.
  */
 export function cierreAnual(input: CierreAnualInput): CierreAnualResultado {
-  const baseImponible = redondearImporte(
+  // S8: bonificaciones y retenciones forman parte del modelo aunque hoy la
+  // pantalla no tenga una fuente para ellas; omitirlas equivale a cero.
+  const otrasBonificaciones = input.otrasBonificaciones ?? 0;
+  const retenciones = input.retenciones ?? 0;
+  const bonificaciones = input.bonificaciones ?? 0;
+
+  const baseImponible = round2(
     Math.max(
       0,
       input.ingresos -
@@ -116,21 +124,21 @@ export function cierreAnual(input: CierreAnualInput): CierreAnualResultado {
         input.contribucionZonas -
         input.arrendamientos -
         input.exoneraciones -
-        input.otrasBonificaciones,
+        otrasBonificaciones,
     ),
   );
 
   const impuesto = impuestoEscala(baseImponible);
 
-  const impuestoAPagar = redondearImporte(
-    Math.max(0, impuesto - input.cuotasPagadas - input.retenciones - input.bonificaciones),
+  const impuestoAPagar = round2(
+    Math.max(0, impuesto - input.cuotasPagadas - retenciones - bonificaciones),
   );
 
   const bonificacionProntoPago = input.pagaAntesDel28Febrero
-    ? redondearImporte(impuestoAPagar * BONIFICACION_PRONTO_PAGO)
+    ? round2(impuestoAPagar * BONIFICACION_PRONTO_PAGO)
     : 0;
 
-  const totalAPagar = redondearImporte(Math.max(0, impuestoAPagar - bonificacionProntoPago));
+  const totalAPagar = round2(Math.max(0, impuestoAPagar - bonificacionProntoPago));
 
   return {
     baseImponible,

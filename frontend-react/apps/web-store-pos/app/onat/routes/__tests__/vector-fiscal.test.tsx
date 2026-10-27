@@ -29,7 +29,7 @@ const fixture = vi.hoisted(() => {
     makeMonths,
     months: makeMonths(),
     warnings: [] as string[],
-    skipped: 0,
+    skipped: { withoutRate: 0, undated: 0 },
     overrides: {} as Record<string, Record<string, unknown>>,
   };
 });
@@ -63,7 +63,7 @@ beforeEach(() => {
   resetOnatRouteSession();
   fixture.months = fixture.makeMonths();
   fixture.warnings = [];
-  fixture.skipped = 0;
+  fixture.skipped = { withoutRate: 0, undated: 0 };
   fixture.overrides = {};
 });
 
@@ -346,12 +346,37 @@ describe('Vector Fiscal (S3, S4, S5, S6, S8)', () => {
   it('incluye en los avisos los importes sin tasa de cambio disponible', async () => {
     session.user = makeUser();
     fixture.warnings = ['Tienda s2 omitida: no se pudieron leer sus datos.'];
-    fixture.skipped = 3;
+    fixture.skipped = { withoutRate: 3, undated: 0 };
 
     renderPage();
 
     expect(
       await screen.findByText('3 importes sin tasa de cambio disponible'),
     ).toBeInTheDocument();
+  });
+
+  it('informa por separado los registros sin fecha válida', async () => {
+    session.user = makeUser();
+    fixture.skipped = { withoutRate: 0, undated: 2 };
+
+    renderPage();
+
+    expect(await screen.findByText('2 registros sin fecha válida')).toBeInTheDocument();
+    expect(screen.queryByText(/sin tasa de cambio disponible/)).not.toBeInTheDocument();
+  });
+
+  it('muestra un error en español y permite reintentar cuando la agregación falla', async () => {
+    session.user = makeUser();
+    vi.mocked(aggregateOnatMonths).mockRejectedValueOnce(new Error('storage failure'));
+
+    renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findAllByRole('row')).toHaveLength(13);
   });
 });

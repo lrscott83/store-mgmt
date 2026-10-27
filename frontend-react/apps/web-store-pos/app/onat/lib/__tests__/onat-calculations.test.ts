@@ -98,6 +98,10 @@ describe('impuestoVentas', () => {
     expect(impuestoVentas(-500)).toBe(0);
     expect(impuestoVentas(0)).toBe(0);
   });
+
+  it('redondea a dos decimales el medio centavo hacia arriba', () => {
+    expect(impuestoVentas(10.05)).toBe(1.01);
+  });
 });
 
 describe('cuotaMensual', () => {
@@ -180,6 +184,35 @@ describe('cierreAnual', () => {
   it('aplica el mínimo exento antes de la escala', () => {
     expect(cierreAnual(makeCierre({ ingresos: 39_120 })).baseImponible).toBe(0);
     expect(cierreAnual(makeCierre({ ingresos: 39_121 })).baseImponible).toBe(1);
+  });
+
+  it('trata como cero las bonificaciones y retenciones que no se informan', () => {
+    const completo = cierreAnual(
+      makeCierre({
+        ingresos: 100_000,
+        gastos: 20_000,
+        tributosDeducibles: 5_000,
+        contribucionZonas: 2_000,
+        arrendamientos: 3_000,
+        exoneraciones: 1_000,
+        otrasBonificaciones: 0,
+        cuotasPagadas: 100,
+        retenciones: 0,
+        bonificaciones: 0,
+      }),
+    );
+    const omitido = cierreAnual({
+      ingresos: 100_000,
+      gastos: 20_000,
+      tributosDeducibles: 5_000,
+      contribucionZonas: 2_000,
+      arrendamientos: 3_000,
+      exoneraciones: 1_000,
+      cuotasPagadas: 100,
+      pagaAntesDel28Febrero: false,
+    });
+
+    expect(omitido).toEqual(completo);
   });
 });
 

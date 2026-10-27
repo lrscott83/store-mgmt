@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ownerOnlyLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { getOnatConfig, saveOnatConfig, type OnatActivity } from '~/onat/lib/onat-storage';
+import {
+  getOnatConfig,
+  saveOnatConfig,
+  type OnatActivity,
+  type OnatConfig,
+} from '~/onat/lib/onat-storage';
 
 /**
  * S2: la configuración fiscal es del Owner — `isOwnerAdmin` y NO `isSuperAdmin`.
@@ -12,15 +17,11 @@ export async function clientLoader() {
   return ownerOnlyLoader();
 }
 
-interface OnatConfigForm {
-  nombre: string;
-  nit: string;
-  domicilioFiscal: string;
-  domicilioLegal: string;
-  municipio: string;
-  provincia: string;
-  actividades: OnatActivity[];
-}
+/**
+ * La forma del formulario es la configuración guardada sin el Owner: se deriva
+ * del tipo persistido para no repetir la lista de campos fiscales.
+ */
+type OnatConfigForm = Omit<OnatConfig, 'ownerId'>;
 
 type TextField = Exclude<keyof OnatConfigForm, 'actividades'>;
 
@@ -82,16 +83,7 @@ export function OnatConfigurationsPage() {
     if (!ownerId) {
       return;
     }
-    const config = getOnatConfig(ownerId);
-    setForm({
-      nombre: config.nombre,
-      nit: config.nit,
-      domicilioFiscal: config.domicilioFiscal,
-      domicilioLegal: config.domicilioLegal,
-      municipio: config.municipio,
-      provincia: config.provincia,
-      actividades: config.actividades,
-    });
+    setForm((current) => ({ ...current, ...getOnatConfig(ownerId) }));
   }, [ownerId]);
 
   const clearStatus = () => {
@@ -131,7 +123,7 @@ export function OnatConfigurationsPage() {
   };
 
   const save = () => {
-    const result = saveOnatConfig({ ownerId, ...form });
+    const result = saveOnatConfig({ ...form, ownerId });
     if (!result.succeeded) {
       // Nunca un éxito falso: el almacenamiento rechazó la escritura.
       setSavedMessage('');

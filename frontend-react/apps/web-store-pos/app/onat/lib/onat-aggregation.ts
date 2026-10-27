@@ -10,10 +10,10 @@
  * - Ingresos: órdenes no-crédito por su propia fecha + créditos cobrados por
  *   `paidDate` (S9). Una orden a crédito nunca suma por su fecha de venta.
  * - Moneda: cada importe se convierte a CUP con las tasas de la tienda de
- *   origen y la fecha del registro (S10). Sin tasa, el importe vale 0, se
- *   acumula en `skipped` y se reporta en `warnings`; nunca se inventa una tasa.
- * - Fechas: un registro sin fecha utilizable se descarta, suma a `skipped` y se
- *   reporta con su propio aviso; nunca aborta la tienda que lo contiene.
+ *   origen y la fecha del registro (S10). Sin tasa, el importe vale 0, suma a
+ *   `skipped.withoutRate` y se reporta en `warnings`; nunca se inventa una tasa.
+ * - Fechas: un registro sin fecha utilizable se descarta, suma a `skipped.undated`
+ *   y se reporta con su propio aviso; nunca aborta la tienda que lo contiene.
  * - Multi-tienda: las tiendas del selector se suman. Una tienda ilegible se
  *   omite con un warning en vez de romper el vector (S5).
  */
@@ -33,6 +33,7 @@ import {
   unwrapStoreDek,
 } from '~/shared/lib/multistore/multi-store-aggregator';
 import { isFiscalExpenseType } from './onat-taxonomy';
+import { CENTAVOS_POR_PESO } from './onat-calculations';
 
 export interface OnatAggregationInput {
   /** Tiendas visibles en el selector; sin MultiStores contiene una sola. */
@@ -64,8 +65,16 @@ export interface OnatAggregationResult {
   months: OnatMonth[];
   /** Una línea por tienda omitida, moneda sin tasa o registro sin fecha válida. */
   warnings: string[];
-  /** Importes descartados por no tener tasa de cambio o fecha utilizables. */
-  skipped: number;
+  /** Pérdidas por motivo: no se mezclan en un solo contador. */
+  skipped: OnatSkippedCounts;
+}
+
+/** Desglose de los registros que la agregación no pudo contar. */
+export interface OnatSkippedCounts {
+  /** Importes descartados porque su moneda no tiene tasa de cambio resoluble. */
+  readonly withoutRate: number;
+  /** Registros descartados porque no tienen una fecha utilizable. */
+  readonly undated: number;
 }
 
 type UndatedRecordKind = 'orden' | 'crédito' | 'gasto';
@@ -117,12 +126,18 @@ function amountInCup(
   rates: readonly ChannelRate[],
 ): number | null {
   const from = currency ?? DEFAULT_CURRENCY;
-  if (Number(from) === Number(Currency.CUP)) return round2(amount);
+  if (from === Currency.CUP) return round2(amount);
 
   // El dominio convierte en CENTAVOS enteros con un único redondeo HALF-UP.
-  const converted = convertLineAmount(Math.round(amount * 100), from, Currency.CUP, rates, at);
+  const converted = convertLineAmount(
+    Math.round(amount * CENTAVOS_POR_PESO),
+    from,
+    Currency.CUP,
+    rates,
+    at,
+  );
   if (!converted.succeeded || converted.data === undefined) return null;
-  return converted.data / 100;
+  return converted.data / CENTAVOS_POR_PESO;
 }
 
 /** Una fecha leída de almacenamiento puede no ser `Date` o ser `Invalid Date`. */
@@ -168,10 +183,10 @@ export async function aggregateOnatMonths(
   const warnings: string[] = [];
   const warnedCurrencies = new Set<string>();
   const warnedUndated = new Set<string>();
-  let skipped = 0;
+  const skipped = { withoutRate: 0, undated: 0 };
 
   const reportUndatedRecord = (storeId: string, kind: UndatedRecordKind): void => {
-    skipped += 1;
+    skipped.undated += 1;
     const key = `${storeId}:${kind}`;
     if (warnedUndated.has(key)) return;
     warnedUndated.add(key);
@@ -183,7 +198,7 @@ export async function aggregateOnatMonths(
     currency: Currency | undefined,
     at: Date,
   ): void => {
-    skipped += 1;
+    skipped.withoutRate += 1;
     const from = currency ?? DEFAULT_CURRENCY;
     const key = `${storeId}:${from}`;
     if (warnedCurrencies.has(key)) return;

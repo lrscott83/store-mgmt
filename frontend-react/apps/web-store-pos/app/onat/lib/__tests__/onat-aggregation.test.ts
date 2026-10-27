@@ -250,8 +250,16 @@ describe('aggregateOnatMonths — moneda', () => {
 
     expect(result.months[1].income).toBe(7_000);
     expect(result.months[1].expenses).toBe(1_400);
-    expect(result.skipped).toBe(0);
+    expect(result.skipped).toEqual({ withoutRate: 0, undated: 0 });
     expect(result.warnings).toEqual([]);
+  });
+
+  it('redondea a dos decimales el importe que ya está en CUP sin pedir tasa', async () => {
+    fixture.orders.s1 = [makeOrder('o-cup', { date: localDate(9, 1), total: 123.456 })];
+
+    const result = await aggregateOnatMonths({ storeIds: ['s1'], year: YEAR });
+
+    expect(result.months[9].income).toBe(123.46);
   });
 
   it('cuenta como cero la moneda sin tasa, la acumula en skipped y emite un warning', async () => {
@@ -263,10 +271,26 @@ describe('aggregateOnatMonths — moneda', () => {
     const result = await aggregateOnatMonths({ storeIds: ['s1'], year: YEAR });
 
     expect(result.months[2].income).toBe(0);
-    expect(result.skipped).toBe(2);
+    expect(result.skipped).toEqual({ withoutRate: 2, undated: 0 });
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toContain('s1');
     expect(result.warnings[0]).toContain('EUR');
+  });
+
+  it('separa los importes sin tasa de los registros sin fecha en dos contadores', async () => {
+    fixture.orders.s1 = [
+      makeOrder('o-eur', { date: localDate(8, 1), total: 10, currency: Currency.EUR }),
+    ];
+    fixture.expenses.s1 = [
+      makeExpense('e-sin-fecha', {
+        total: 500,
+        date: 'no-es-una-fecha' as unknown as Date,
+      }),
+    ];
+
+    const result = await aggregateOnatMonths({ storeIds: ['s1'], year: YEAR });
+
+    expect(result.skipped).toEqual({ withoutRate: 1, undated: 1 });
   });
 });
 
@@ -308,7 +332,7 @@ describe('aggregateOnatMonths — registros sin fecha válida', () => {
 
     // La orden y el crédito válido siguen contando: la lectura no se abortó.
     expect(result.months[7].income).toBe(150);
-    expect(result.skipped).toBe(1);
+    expect(result.skipped).toEqual({ withoutRate: 0, undated: 1 });
     expect(result.warnings).toEqual([
       'Tienda s1: crédito sin fecha de cobro válida; importe omitido.',
     ]);

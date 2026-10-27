@@ -2290,6 +2290,11 @@ const messages: Record<string, string> = {
   'ONAT.WARNINGS': 'Avisos',
   'ONAT.SKIPPED_RATES':
     '{count, plural, one {1 importe sin tasa de cambio disponible} other {# importes sin tasa de cambio disponible}}',
+  'ONAT.SKIPPED_UNDATED':
+    '{count, plural, one {1 registro sin fecha válida} other {# registros sin fecha válida}}',
+  'ONAT.LOAD_ERROR':
+    'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+  'ONAT.RETRY': 'Reintentar',
 };
 
 export default messages;
