@@ -514,6 +514,41 @@ public sealed class StoreSyncFilesTests
 
     #endregion
 
+    #region Schema integrity
+
+    /// <summary>
+    /// La FK COMPUESTA (StoreSyncFileId, TenantId) impide que una marca quede en un tenant distinto
+    /// al de su fichero (hallazgo R1 del review del esquema). Antes la integridad dependía de que cada
+    /// handler copiara bien la columna; ahora la base lo rechaza. Se prueba contra PostgreSQL real
+    /// porque es la base quien tiene que decir que no.
+    /// </summary>
+    [Fact]
+    public async Task Download_mark_cannot_belong_to_a_different_tenant_than_its_file()
+    {
+        var fixture = await SeedOwnerAsync(withSecondStore: false);
+        try
+        {
+            var client = ClientFor(fixture.OwnerUserId, fixture.OwnerLogin);
+            var file = await UploadAsync(client, fixture.StoreAId, BackupBytes("a"), "de-a.zip");
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Set<StoreSyncFileDownload>().Add(StoreSyncFileDownload.Create(
+                file.Id, fixture.OwnerUserId, Guid.NewGuid(), DateTimeOffset.UtcNow));
+
+            Func<Task> act = () => db.SaveChangesAsync();
+
+            await act.Should().ThrowAsync<DbUpdateException>(
+                "el tenant de la marca no puede diferir del tenant de su fichero");
+        }
+        finally
+        {
+            await CleanupAsync(fixture);
+        }
+    }
+
+    #endregion
+
     #region Upload limits (S10)
 
     /// <summary>0 bytes es lo que deja un multipart sin archivo: 400 y ninguna fila.</summary>
