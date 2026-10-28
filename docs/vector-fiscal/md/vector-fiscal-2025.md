@@ -1,6 +1,7 @@
 # Vector fiscal — RC-04A, año 2025
 
-> **Origen:** `pdf/Vector fiscal 2025.pdf` — 3 páginas, con capa de texto.
+> **Origen:** `Vector fiscal 2025.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
+> contiene datos personales y vive fuera del repositorio.
 > **PII enmascarado:** NIT y carné de identidad. El nombre se conserva porque el documento lo trae.
 > Si se prefiere anonimizar también el nombre, se cambia en un minuto.
 

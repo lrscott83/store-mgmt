@@ -62,9 +62,10 @@ genérica: se genera por NIT y lista, obligación por obligación:
 2. **Oficina municipal de la ONAT** del domicilio fiscal.
 3. En papel, como **RC-04A**, para pagar en agencia bancaria o por Transfermóvil.
 
-> **Actualización (2026-10-28):** el repositorio **sí contiene tres ejemplares reales**, transcritos en
+> **Actualización (2026-10-28):** existen tres ejemplares reales y están **transcritos** en
 > `md/ejemplo-vector-fiscal.md` (2021), `md/vector-fiscal-2025.md` y `md/vector-fiscal-2026.md`.
-> Los tres tienen capa de texto. Con ellos queda fijada la forma de la tabla: 5 columnas
+> **Los PDF originales no se versionan**: contienen datos personales y se conservan fuera del repositorio.
+> Con las transcripciones queda fijada la forma de la tabla: 5 columnas
 > (período, vencimiento, código de tributo, importe, código RC-04A), con el importe vacío en los
 > tributos variables y el código RC-04A de 5 dígitos como referencia de pago.
 
