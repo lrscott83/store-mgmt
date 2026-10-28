@@ -88,6 +88,7 @@ function makeOrder(overrides: Partial<OnlineOrderListItem> = {}): OnlineOrderLis
     currency: 1,
     status: OnlineOrderStatus.Creado,
     paymentStatus: OnlineOrderPaymentStatus.Pending,
+    paidAt: null,
     driverId: null,
     driverName: null,
     date: '2026-10-07T10:00:00Z',

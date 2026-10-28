@@ -179,6 +179,26 @@ function parseOptionalCurrency(raw: string): Currency | undefined {
 }
 
 /**
+ * Moneda de la columna `moneda`: por el número del enum SIEMPRE, y por NOMBRE solo cuando el
+ * llamador lo autoriza (`allowNames`).
+ *
+ * El número se resuelve primero con `parseOptionalCurrency`: `parseCurrencyByName` mira
+ * `Currency[raw]`, y en un enum numérico TypeScript eso devuelve el NOMBRE del miembro (mapeo
+ * inverso: `Currency['1'] === 'USD'`), no el valor.
+ *
+ * Por defecto NO se aceptan nombres: la columna `moneda` es parte del contrato del import del POS
+ * del dueño, donde un valor no numérico siempre cayó a CUP. Aceptar códigos ahí cambiaría la
+ * moneda de un CSV existente sin que nadie lo pidiera; el import de catálogo del SuperAdmin pide
+ * el modo por nombre explícitamente.
+ */
+function parseCurrencyCell(raw: string, allowNames: boolean): Currency | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (!isNaN(Number(trimmed))) return parseOptionalCurrency(trimmed);
+  return allowNames ? parseCurrencyByName(trimmed) : undefined;
+}
+
+/**
  * MultiMonedas CSV (2026-09-22): columnas de moneda por NOMBRE
  * (`precio_moneda`/`precio_costo`), validadas SIN distinción de mayúsculas:
  * "usd" -> Currency.USD. Acepta el código exacto (usd/Usd/USD) o el nombre
@@ -199,7 +219,18 @@ export function parseCurrencyByName(raw: string): Currency | undefined {
   return undefined;
 }
 
-export function parseCsvProducts(csvText: string): CsvParseResult {
+/** Opciones del parser. Sin opciones, el contrato es el del import del POS del dueño. */
+export interface CsvParseOptions {
+  /**
+   * `true` = la columna `moneda`/`currency` acepta también el CÓDIGO (`USD`) además del número del
+   * enum. Lo pide el import de catálogo del SuperAdmin (su columna se documenta como moneda de
+   * venta). Por defecto `false`: un valor no numérico sigue resolviendo a `undefined` (CUP), que es
+   * lo que un CSV existente del POS ya hacía.
+   */
+  allowCurrencyNames?: boolean;
+}
+
+export function parseCsvProducts(csvText: string, options: CsvParseOptions = {}): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
 
@@ -215,12 +246,15 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
 
   const headers = rows[headerIndex].map((h) => h.trim().toLowerCase());
 
-  const nameIdx = indexOfHeader(headers, 'nombre', 'name');
-  const priceIdx = indexOfHeader(headers, 'precio', 'price');
+  // `producto`/`precio_venta`/`moneda_venta` (2026-10-22): alias naturales del import de catálogo
+  // del SuperAdmin. Son ADITIVOS — las cabeceras del POS siguen resolviendo primero por sus
+  // nombres canónicos, así que un CSV existente no cambia de significado.
+  const nameIdx = indexOfHeader(headers, 'nombre', 'name', 'producto', 'product');
+  const priceIdx = indexOfHeader(headers, 'precio', 'price', 'precio_venta', 'sale_price');
   const categoryIdx = indexOfHeader(headers, 'categoria', 'category');
   const costIdx = indexOfHeader(headers, 'costo', 'cost');
   const quantityIdx = indexOfHeader(headers, 'cantidad', 'quantity');
-  const currencyIdx = indexOfHeader(headers, 'moneda', 'currency');
+  const currencyIdx = indexOfHeader(headers, 'moneda', 'currency', 'moneda_venta', 'sale_currency');
   // MultiMonedas CSV (2026-09-22): las DOS columnas nuevas viven "al lado de
   // cantidad" — `precio_moneda` (moneda del precio) y `precio_costo` (moneda
   // del costo). El alias `moneda` legacy sigue resolviendo `currency` (compat
@@ -272,16 +306,34 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
     const quantity = parseOptionalQuantity(quantityIdx >= 0 ? (fields[quantityIdx] ?? '') : '');
 
     // --- Optional currency (React-only, currency-in-costs-and-prices plan 2026-09-16) ---
-    const currency = parseOptionalCurrency(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
+    // Número del enum (`1`) SIEMPRE; NOMBRE (`USD`) solo con `allowCurrencyNames`. El import del
+    // POS del dueño no pasa la opción y conserva su contrato: un valor no numérico sigue siendo
+    // `undefined` (CUP). Solo el import de catálogo del SuperAdmin la activa.
+    const currency = parseCurrencyCell(
+      currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '',
+      options.allowCurrencyNames === true,
+    );
 
     // --- MultiMonedas CSV (2026-09-22): monedas por NOMBRE, case-insensitive ---
-    const priceCurrency = parseCurrencyByName(priceCurrencyIdx >= 0 ? (fields[priceCurrencyIdx] ?? '') : '');
-    const costCurrency = parseCurrencyByName(costCurrencyIdx >= 0 ? (fields[costCurrencyIdx] ?? '') : '');
+    const priceCurrency = parseCurrencyByName(
+      priceCurrencyIdx >= 0 ? (fields[priceCurrencyIdx] ?? '') : '',
+    );
+    const costCurrency = parseCurrencyByName(
+      costCurrencyIdx >= 0 ? (fields[costCurrencyIdx] ?? '') : '',
+    );
     // La columna legacy `moneda` alimenta el precio SOLO si la nueva
     // `precio_moneda` no vino — ambas describen el precio.
     const resolvedCurrency = priceCurrency ?? currency;
 
-    products.push({ name, price, category, cost, quantity, currency: resolvedCurrency, costCurrency });
+    products.push({
+      name,
+      price,
+      category,
+      cost,
+      quantity,
+      currency: resolvedCurrency,
+      costCurrency,
+    });
   }
 
   return { products, errors };

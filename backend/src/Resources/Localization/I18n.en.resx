@@ -697,6 +697,15 @@
   <data name="StoreNotSelected" xml:space="preserve">
     <value>User {0} has no store selected</value>
   </data>
+  <data name="CatalogCsvInvalidRow" xml:space="preserve">
+    <value>CSV row {0} is invalid: check the category, the product and the price.</value>
+  </data>
+  <data name="CatalogCsvEmpty" xml:space="preserve">
+    <value>The CSV has no rows to import.</value>
+  </data>
+  <data name="CatalogCsvTooManyRows" xml:space="preserve">
+    <value>The CSV exceeds the maximum of {0} rows per import.</value>
+  </data>
   <data name="ApiRequestInvalid" xml:space="preserve">
     <value>The request is not valid</value>
   </data>
@@ -708,5 +717,23 @@
   </data>
   <data name="DeliveryDriverNotFound" xml:space="preserve">
     <value>The driver does not exist or does not belong to this store.</value>
+  </data>
+  <data name="StoreSyncFileNotFound" xml:space="preserve">
+    <value>The sync file does not exist or does not belong to this store.</value>
+  </data>
+  <data name="StoreSyncFileEmpty" xml:space="preserve">
+    <value>The file is empty: a 0-byte file cannot be stored.</value>
+  </data>
+  <data name="StoreSyncFileTooLarge" xml:space="preserve">
+    <value>The file cannot be larger than {0} MB</value>
+  </data>
+  <data name="StoreSyncFileStoreNotAllowed" xml:space="preserve">
+    <value>The store does not exist or does not belong to the user.</value>
+  </data>
+  <data name="StoreSyncFileUploadFailed" xml:space="preserve">
+    <value>The file could not be stored on the server. Please try again.</value>
+  </data>
+  <data name="StoreSyncFileDeleteFailed" xml:space="preserve">
+    <value>The file could not be deleted from the server. Please try again.</value>
   </data>
 </root>

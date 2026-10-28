@@ -623,8 +623,8 @@ public class GetOnlineOrderStatsQueryHandlerTests
             1,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc),
             tenantId ?? Guid.NewGuid());
+        order.ChangePaymentStatus(paymentStatus);
         order.Status = status;
-        order.PaymentStatus = paymentStatus;
         return order;
     }
 

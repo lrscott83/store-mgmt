@@ -50,6 +50,26 @@ describe('resolveUserHomePath', () => {
     hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(false));
   });
 
+  it('sends a sales manager to /gestor (no product lookup)', async () => {
+    await expect(
+      resolveUserHomePath(makeUser({ isGestorVentas: true, selectedStoreId: '' })),
+    ).resolves.toBe('/gestor');
+    expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
+  });
+
+  it('gestor wins over a platform role (combined-role precedence is pinned)', async () => {
+    await expect(
+      resolveUserHomePath(
+        makeUser({ isGestorVentas: true, isSuperAdmin: true, selectedStoreId: '' }),
+      ),
+    ).resolves.toBe('/gestor');
+    await expect(
+      resolveUserHomePath(
+        makeUser({ isGestorVentas: true, isReSeller: true, selectedStoreId: '' }),
+      ),
+    ).resolves.toBe('/gestor');
+  });
+
   it('sends a reseller to /admin/owners (no product lookup)', async () => {
     await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe(
       '/admin/owners',

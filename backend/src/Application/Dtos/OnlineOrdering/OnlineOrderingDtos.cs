@@ -286,6 +286,12 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Pago manual (D3/D12). Independiente de <see cref="Status"/>.</summary>
         public OrderPaymentStatus PaymentStatus { get; set; }
 
+        /// <summary>
+        /// Momento (UTC) en que el pedido quedó pagado. null mientras siga pendiente. Es la
+        /// constancia del cobro; se pinta como fecha, no como la fila de <see cref="PaymentStatus"/>.
+        /// </summary>
+        public DateTime? PaidAt { get; set; }
+
         /// <summary>Repartidor asignado. null mientras nadie lo asigne (F7).</summary>
         public Guid? DriverId { get; set; }
 
@@ -353,6 +359,9 @@ namespace Application.Dtos.OnlineOrdering
         public OrderStatus Status { get; set; }
 
         public OrderPaymentStatus PaymentStatus { get; set; }
+
+        /// <summary>Momento (UTC) en que el pedido quedó pagado. null mientras siga pendiente.</summary>
+        public DateTime? PaidAt { get; set; }
 
         public Guid? DriverId { get; set; }
 

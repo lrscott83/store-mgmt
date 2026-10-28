@@ -378,8 +378,26 @@ describe('parseCsvProducts', () => {
       expect(result.products[0].currency).toBeUndefined();
     });
 
-    it('never fails a row and resolves undefined for a non-numeric cell ("USD")', () => {
+    it('sin opciones, una celda no numérica ("USD") sigue resolviendo undefined — contrato del POS', () => {
+      // Este es el contrato del import del dueño y NO se toca: la moneda por código existe solo
+      // para el import de catálogo del SuperAdmin, que la pide explícitamente.
       const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('con allowCurrencyNames, la columna moneda resuelve el código ("USD")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
+      const result = parseCsvProducts(csv, { allowCurrencyNames: true });
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBe(Currency.USD);
+    });
+
+    it('never fails a row and resolves undefined for an UNKNOWN currency name ("XXX")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,XXX'].join('\n');
       const result = parseCsvProducts(csv);
       expect(result.products).toHaveLength(1);
       expect(result.errors).toHaveLength(0);
@@ -495,5 +513,63 @@ describe('parseCsvProducts — columnas precio_moneda / precio_costo (MultiMoned
     const result = parseCsvProducts(csv);
     expect(result.products[0].currency).toBe(Currency.USD);
     expect(result.products[0].costCurrency).toBe(Currency.CUP);
+  });
+});
+
+/**
+ * Alias del import de catálogo del SuperAdmin (2026-10-22): el CSV del owner usa
+ * `categoria,nombre,precio,moneda`; el del admin puede decir `producto`, `precio_venta` y
+ * `moneda_venta`, y escribir la moneda por CÓDIGO. Todo aditivo: los CSV existentes no cambian.
+ */
+describe('parseCsvProducts — alias del import de catálogo (SuperAdmin)', () => {
+  it('acepta producto, precio_venta y moneda_venta como cabeceras', () => {
+    const csv = [
+      'categoria,producto,precio_venta,moneda_venta',
+      'Bebidas,Café,2.50,USD',
+      'Postres,Flan,3,CUP',
+    ].join('\n');
+
+    // El import de catálogo pide la moneda por código: `allowCurrencyNames`.
+    const result = parseCsvProducts(csv, { allowCurrencyNames: true });
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.products).toHaveLength(2);
+    expect(result.products[0]).toMatchObject({
+      category: 'Bebidas',
+      name: 'Café',
+      price: 2.5,
+      currency: Currency.USD,
+    });
+    expect(result.products[1]).toMatchObject({
+      category: 'Postres',
+      name: 'Flan',
+      price: 3,
+      currency: Currency.CUP,
+    });
+  });
+
+  it('la columna moneda acepta el código y el número del enum con allowCurrencyNames', () => {
+    const byName = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,USD'].join('\n'),
+      { allowCurrencyNames: true },
+    );
+    const byNumber = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,1'].join('\n'),
+      { allowCurrencyNames: true },
+    );
+
+    expect(byName.products[0].currency).toBe(Currency.USD);
+    expect(byNumber.products[0].currency).toBe(Currency.USD);
+  });
+
+  it('una moneda desconocida no descarta la fila: queda sin moneda (CUP por defecto)', () => {
+    const result = parseCsvProducts(
+      ['categoria,nombre,precio,moneda', 'Bebidas,Café,2.5,XXX'].join('\n'),
+      { allowCurrencyNames: true },
+    );
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].currency).toBeUndefined();
   });
 });

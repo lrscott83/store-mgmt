@@ -52,12 +52,12 @@ describe('TutorialPage — S-HELP-CONTENT-1: title renders from TUTORIAL.TITLE',
 // 4-independent-collapsibles structure is removed.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('TutorialPage — bucket-b WU1: single grouped panel (no 4 independent panels)', () => {
+describe('TutorialPage — bucket-b WU1: grouped panels, one per task', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders exactly ONE collapsible toggle, titled "Pasos para realizar una venta"', async () => {
+  it('renders exactly TWO collapsible toggles: sales and user management', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
@@ -65,23 +65,26 @@ describe('TutorialPage — bucket-b WU1: single grouped panel (no 4 independent 
       </Wrapper>,
     );
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(1);
+    expect(buttons).toHaveLength(2);
     expect(buttons[0]).toHaveTextContent('Pasos para realizar una venta');
+    expect(buttons[1]).toHaveTextContent('Pasos para gestionar los usuarios del POS');
   });
 
-  it('defaults to collapsed', async () => {
+  it('defaults both panels to collapsed', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
         <TutorialPage />
       </Wrapper>,
     );
-    const [panelButton] = screen.getAllByRole('button');
-    expect(panelButton).toHaveAttribute('aria-expanded', 'false');
+    for (const panelButton of screen.getAllByRole('button')) {
+      expect(panelButton).toHaveAttribute('aria-expanded', 'false');
+    }
     expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Lista de empleados')).not.toBeInTheDocument();
   });
 
-  it('expanding the single panel reveals all 4 numbered steps', async () => {
+  it('expanding the sales panel reveals all 4 numbered steps', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
@@ -98,7 +101,29 @@ describe('TutorialPage — bucket-b WU1: single grouped panel (no 4 independent 
     expect(screen.getByText(/4\. Registrar la venta\./i)).toBeInTheDocument();
   });
 
-  it('collapsing the panel again hides the steps', async () => {
+  it('expanding the user management panel reveals its 4 numbered steps', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const [, usersPanelButton] = screen.getAllByRole('button');
+    fireEvent.click(usersPanelButton);
+
+    expect(usersPanelButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/1\. Adicionar un empleado\./i)).toBeInTheDocument();
+    expect(screen.getByText(/2\. Editar un empleado\./i)).toBeInTheDocument();
+    expect(screen.getByText(/3\. Activar o desactivar un empleado\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/4\. Exportar el roster para el acceso sin conexión\./i),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText('Lista de empleados')).toBeInTheDocument();
+    // The sales panel stays collapsed and independent.
+    expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
+  });
+
+  it('collapsing the sales panel again hides the steps', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
@@ -114,21 +139,23 @@ describe('TutorialPage — bucket-b WU1: single grouped panel (no 4 independent 
     expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
   });
 
-  it('renders a chevron on the panel header that rotates when expanded', async () => {
+  it('renders a chevron on each panel header that rotates when expanded', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
         <TutorialPage />
       </Wrapper>,
     );
-    const [panelButton] = screen.getAllByRole('button');
-    const svgClass = () => panelButton.querySelector('svg')?.getAttribute('class') ?? '';
+    const buttons = screen.getAllByRole('button');
+    for (const panelButton of buttons) {
+      const svgClass = () => panelButton.querySelector('svg')?.getAttribute('class') ?? '';
 
-    expect(panelButton.querySelector('svg')).toBeInTheDocument();
-    expect(svgClass()).not.toContain('rotate-180');
+      expect(panelButton.querySelector('svg')).toBeInTheDocument();
+      expect(svgClass()).not.toContain('rotate-180');
 
-    fireEvent.click(panelButton);
-    expect(svgClass()).toContain('rotate-180');
+      fireEvent.click(panelButton);
+      expect(svgClass()).toContain('rotate-180');
+    }
   });
 });
 
@@ -189,6 +216,39 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
     expect(srcs).toContain('/images/help/add-product-dialog.png');
     expect(srcs).toContain('/images/help/add-entry-dialog.png');
     expect(srcs).toContain('/images/help/register.png');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tutorial de gestión de usuarios — 6 imágenes propias del panel de empleados
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('TutorialPage — user management panel images', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the exact 6 user management image filenames', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    const { container } = render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getAllByRole('button')[1]);
+
+    const srcs = Array.from(container.querySelectorAll('img')).map((img) =>
+      img.getAttribute('src'),
+    );
+    expect(srcs).toHaveLength(6);
+    expect(srcs).toEqual([
+      '/images/help/users-menu.png',
+      '/images/help/users-list.png',
+      '/images/help/users-create-form.png',
+      '/images/help/users-card-actions.png',
+      '/images/help/users-edit-form.png',
+      '/images/help/users-roster-export.png',
+    ]);
   });
 });
 

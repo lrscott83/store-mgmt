@@ -25,6 +25,14 @@ import { createProductService } from '~/sales/lib/services/product-service.facto
  * when the store has no sellable products.
  */
 export async function resolveUserHomePath(user: UserModel): Promise<string> {
+  // Un gestor de ventas no tiene tienda (selectedStoreId = EMPTY_GUID): su vista es el panel
+  // de sus pedidos/comisiones, nunca el POS. Debe ir ANTES del lookup de productos por tienda.
+  // El rol 5 es exclusivo (el alta crea el User solo con ese rol): si además trae un rol de
+  // plataforma, la vista de gestor manda. El caso combinado está pineado en el test.
+  if (user.isGestorVentas) {
+    return '/gestor';
+  }
+
   if (user.isReSeller || user.isSuperAdmin) {
     return '/admin/owners';
   }

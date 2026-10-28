@@ -1,8 +1,9 @@
 import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
-import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import type { ExpenseFundSource, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import {
   DataResult,
   DEFAULT_CURRENCY,
+  DEFAULT_EXPENSE_FUND_SOURCE,
   DEFAULT_SALE_PAYMENT_METHOD,
   ExpenseErrors,
   Result,
@@ -33,6 +34,11 @@ interface CreateExpenseInput {
   note?: string | null;
   /** MultiMonedas: moneda del gasto (ausente = CUP). */
   currency?: number;
+  /**
+   * Origen del dinero (expense-fund-source, 2026-10-24): `Caja` descuenta el
+   * efectivo del POS; ausente = `Externo` (no toca la caja).
+   */
+  fundSource?: ExpenseFundSource;
 }
 
 /**
@@ -199,6 +205,9 @@ export class ExpenseOfflineService {
       isActive: true,
       // MultiMonedas: el gasto nace con la moneda elegida (ausente = CUP).
       currency: input.currency ?? DEFAULT_CURRENCY,
+      // Origen del dinero (2026-10-24): default Externo — solo un gasto marcado
+      // Caja descuenta el efectivo del POS.
+      fundSource: input.fundSource ?? DEFAULT_EXPENSE_FUND_SOURCE,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -226,6 +235,7 @@ export class ExpenseOfflineService {
         | 'salePaymentMethod'
         | 'note'
         | 'currency'
+        | 'fundSource'
       >
     >,
   ): DataResult<Expense> {
@@ -240,6 +250,7 @@ export class ExpenseOfflineService {
     if (patch.salePaymentMethod !== undefined) existing.salePaymentMethod = patch.salePaymentMethod;
     if (patch.note !== undefined) existing.note = patch.note || '';
     if (patch.currency !== undefined) existing.currency = patch.currency;
+    if (patch.fundSource !== undefined) existing.fundSource = patch.fundSource;
     existing.updatedDate = new Date();
     existing.updatedByName = getCurrentUserLogin();
     this.setExpensesLocalStorage(this.expenses!);
@@ -269,9 +280,17 @@ export class ExpenseOfflineService {
    * WU2 (category D, NEW method): 1:1 port of Angular's `addImportedExpense`
    * (expense-offline.service.ts:176-182) — normalizes `date` to a Date, appends the expense,
    * always returns Result.Success().
+   *
+   * expense-fund-source (2026-10-24): un import SIN `fundSource` entra como
+   * `Externo`, nunca como `Caja` — un gasto importado jamás descuenta la caja
+   * de este dispositivo por omisión.
    */
   addImportedExpense(expense: Expense): Result {
-    const imported: Expense = { ...expense, date: new Date(expense.date) };
+    const imported: Expense = {
+      ...expense,
+      date: new Date(expense.date),
+      fundSource: expense.fundSource ?? DEFAULT_EXPENSE_FUND_SOURCE,
+    };
     this.getStorageExpenses().push(imported);
     this.setExpensesLocalStorage(this.expenses!);
     return Result.Success();
@@ -291,6 +310,13 @@ export class ExpenseOfflineService {
       existing.total = importedExpense.total;
       existing.note = importedExpense.note;
       existing.type = importedExpense.type;
+      // expense-fund-source (2026-10-24, RDD R1-001): un import que NO trae el
+      // campo no tiene opinión sobre el origen. Pisar la clasificación local con
+      // el default degradaba silenciosamente un gasto `Caja` local a `Externo` y
+      // lo sacaba del arqueo. Solo un valor explícito del payload la cambia.
+      if (importedExpense.fundSource !== undefined) {
+        existing.fundSource = importedExpense.fundSource;
+      }
       existing.updatedDate = importedExpense.updatedDate;
       existing.updatedByName = importedExpense.updatedByName;
       this.setExpensesLocalStorage(this.expenses!);
@@ -367,6 +393,12 @@ export class ExpenseOfflineService {
     for (const field of ['date', 'createdDate', 'updatedDate']) {
       const value = revived[field];
       if (typeof value === 'string') revived[field] = new Date(value);
+    }
+    // expense-fund-source (2026-10-24): todo gasto histórico (sin el campo) se
+    // lee como `Externo`. Al normalizarlo aquí, la próxima escritura del array
+    // lo persiste tal cual — "guardado bien en localStorage" sin migración.
+    if (revived.fundSource === undefined || revived.fundSource === null) {
+      revived.fundSource = DEFAULT_EXPENSE_FUND_SOURCE;
     }
     return revived as unknown as Expense;
   }

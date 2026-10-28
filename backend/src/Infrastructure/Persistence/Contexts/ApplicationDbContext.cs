@@ -35,6 +35,12 @@ using Domain.Entities.Authentication;
 using Domain.Entities.StoreUsages;
 using Domain.Entities.Plans;
 using Domain.Entities.CatalogEvents;
+using Domain.Entities.SalesManagers;
+using Domain.Entities.SiteTelemetry;
+using Domain.Entities.ProductSalesCommissions;
+using Domain.Entities.OrderSalesCommissions;
+using Domain.Entities.OrderSalesManagers;
+using Domain.Entities.StoreSyncFiles;
 
 namespace Infrastructure.Persistence.Contexts
 {
@@ -154,8 +160,16 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new NotificationEntityTypeConfiguration());
             builder.ApplyConfiguration(new StoreCatalogSettingsEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreCatalogImageEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new SiteEventEntityTypeConfiguration());
             builder.ApplyConfiguration(new DeliveryDriverEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new CatalogEventEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new SalesManagerEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new ProductSalesCommissionEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new OrderSalesCommissionEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new OrderSalesManagerEntityTypeConfiguration(this));
+            // Repositorio de backups del POS: fichero (bytes opacos en disco) + marcas de descarga.
+            builder.ApplyConfiguration(new StoreSyncFileEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new StoreSyncFileDownloadEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -179,7 +193,13 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StoreCatalogSettings> StoreCatalogSettings { get; set; }
         internal DbSet<StoreCatalogImage> StoreCatalogImage { get; set; }
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
+
+        internal DbSet<SiteEvent> SiteEvent { get; set; }
         internal DbSet<CatalogEvent> CatalogEvent { get; set; }
+        internal DbSet<SalesManager> SalesManager { get; set; }
+        internal DbSet<ProductSalesCommission> ProductSalesCommission { get; set; }
+        internal DbSet<OrderSalesCommission> OrderSalesCommission { get; set; }
+        internal DbSet<OrderSalesManager> OrderSalesManager { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
         internal DbSet<ProductImage> ProductImage { get; set; }
@@ -193,5 +213,7 @@ namespace Infrastructure.Persistence.Contexts
         public DbSet<Message> Messages { get; set; }
         public DbSet<Conversation> Conversations { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<StoreSyncFile> StoreSyncFile { get; set; }
+        public DbSet<StoreSyncFileDownload> StoreSyncFileDownload { get; set; }
     }
 }

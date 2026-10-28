@@ -7,22 +7,30 @@ import type {
   ProductCategoryView,
   WholesaleConfig,
 } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PlusIcon, PaperclipIcon, ChevronDownIcon, TrashIcon } from '~/shared/components/ui/icons';
+import {
+  PlusIcon,
+  PaperclipIcon,
+  ChevronDownIcon,
+  TrashIcon,
+  DownloadIcon,
+} from '~/shared/components/ui/icons';
 import { showBlockingError, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
-import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { isModuleAvailable, isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
+import { catalogHttpService } from '../lib/services/catalog-http-service';
+import { importCatalogProducts } from '../lib/catalog/catalog-import';
 import { ProductRepository } from '../lib/repositories/product-repository';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
@@ -53,12 +61,23 @@ export function ProductsPage() {
   // MultiMonedas CSV (2026-09-22): el import acepta monedas de precio y costo
   // SOLO con el módulo activo (mismo gate que los selectores del dominio).
   const multiMonedas = hasMultiMonedasAvailable(useAuthStore((s) => s.user));
+  // Mismo gate que la vista Catálogo Web (`ownerModuleLoader(EModules.WebCatalog)`,
+  // web-catalog.tsx:34 / loaders.ts:199-210): GET /v1/catalog/products exige
+  // WebCatalogAdmin, así que sin OwnerAdmin o sin el módulo contratado el botón
+  // solo llevaría a un error. No se inventa un permiso nuevo: se reutiliza la
+  // misma señal de sesión que usa esa vista.
+  const canImportFromWebCatalog = useAuthStore((s) =>
+    s.user && Array.isArray(s.user.storeModuleIds)
+      ? isOwnerAdmin(s.user) && isModuleAvailable(s.user, EModules.WebCatalog)
+      : false,
+  );
   const clearCart = useCartStore((s) => s.clear);
 
   const [categories, setCategories] = useState<ProductCategoryView[]>([]);
   const [productsByCategory, setProductsByCategory] = useState<Record<string, Product[]>>({});
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<Modal | null>(null);
+  const [isImportingWebCatalog, setIsImportingWebCatalog] = useState(false);
 
   const productService = createProductService(storeId);
   const categoryService = createProductCategoryService(storeId);
@@ -451,6 +470,84 @@ export function ProductsPage() {
     void loadData();
   }
 
+  // --- Import from the web catalog (web-catalog-to-pos-import) ---
+  // El servidor publica el catálogo web; aquí se trae al catálogo LOCAL de este dispositivo.
+  // La identidad es el id y solo el id: lo que ya existe no se toca. El importador reporta
+  // exactamente lo que no pudo insertar y esta vista lo muestra sin resumir.
+  async function handleImportWebCatalog() {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    setIsImportingWebCatalog(true);
+    try {
+      const result = await catalogHttpService.getProducts();
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.LOAD_FAILED' }),
+        );
+        return;
+      }
+
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const summary = importCatalogProducts(result.data ?? [], {
+        categoryRepository,
+        productRepository: new ProductRepository(storeId, categoryRepository),
+      });
+
+      const failureLines = [
+        ...summary.failedCategories.map((category) =>
+          category.skippedProductsCount === 1
+            ? intl.formatMessage(
+                { id: 'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED_ONE' },
+                { name: category.name },
+              )
+            : intl.formatMessage(
+                { id: 'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED' },
+                { name: category.name, count: category.skippedProductsCount },
+              ),
+        ),
+        ...summary.failedProducts.map((product) =>
+          intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.PRODUCT_FAILED' }, { name: product.name }),
+        ),
+      ];
+
+      if (failureLines.length > 0) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          [
+            intl.formatMessage(
+              { id: 'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY' },
+              { imported: summary.importedCount, existing: summary.existingCount },
+            ),
+            ...failureLines,
+          ].join('\n'),
+        );
+      } else {
+        showToastSuccess(
+          intl.formatMessage(
+            { id: 'PRODUCTS.WEB_IMPORT.SUCCESS' },
+            { imported: summary.importedCount, existing: summary.existingCount },
+          ),
+        );
+      }
+
+      void loadData();
+    } catch {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: 'PRODUCTS.WEB_IMPORT.LOAD_FAILED' }),
+      );
+    } finally {
+      setIsImportingWebCatalog(false);
+    }
+  }
+
   // --- Clear all data ---
   // catalog-show-all-and-clear-data §D5/D6/D9, revised by §Finding 1. Wipes the business
   // entities of the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so
@@ -551,23 +648,44 @@ export function ProductsPage() {
           </InfoBox>
         )}
 
-        <div className="flex justify-end gap-3 mb-4">
-          {isOwner && (
-            <Button variant="fab-danger" onClick={handleClearData} data-testid="clear-data-button">
-              <TrashIcon />
-              Limpiar
+        <div className="flex flex-col items-end gap-3 mb-4">
+          <div className="flex justify-end gap-3">
+            {isOwner && (
+              <Button
+                variant="fab-danger"
+                onClick={handleClearData}
+                data-testid="clear-data-button"
+              >
+                <TrashIcon />
+                Limpiar
+              </Button>
+            )}
+            <Button
+              variant="fab"
+              onClick={() => setModal({ type: 'csv' })}
+              data-testid="import-csv-button"
+            >
+              {/* Angular: <mat-icon>attach_file</mat-icon> */}
+              <PaperclipIcon />
+              {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
+              {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
+            </Button>
+          </div>
+          {canImportFromWebCatalog && (
+            <Button
+              variant="fab"
+              onClick={handleImportWebCatalog}
+              disabled={isImportingWebCatalog}
+              data-testid="import-web-catalog-button"
+            >
+              <DownloadIcon />
+              {intl.formatMessage({
+                id: isImportingWebCatalog
+                  ? 'PRODUCTS.WEB_IMPORT.IMPORTING'
+                  : 'PRODUCTS.WEB_IMPORT.BUTTON',
+              })}
             </Button>
           )}
-          <Button
-            variant="fab"
-            onClick={() => setModal({ type: 'csv' })}
-            data-testid="import-csv-button"
-          >
-            {/* Angular: <mat-icon>attach_file</mat-icon> */}
-            <PaperclipIcon />
-            {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
-            {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
-          </Button>
         </div>
 
         {/* Accordion: one panel per category, collapsed by default */}

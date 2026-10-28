@@ -48,7 +48,20 @@ namespace Domain.Entities.Orders
         /// <summary>Estado del pedido online (D11). El POS nunca lo mueve.</summary>
         public OrderStatus Status { get; set; } = OrderStatus.Creado;
         /// <summary>Pago manual Pendiente/Paid (D3/D12), independiente de <see cref="Status"/>.</summary>
-        public OrderPaymentStatus PaymentStatus { get; set; } = OrderPaymentStatus.Pending;
+        /// <remarks>
+        /// Setter privado a propósito: el pago solo se mueve por <see cref="ChangePaymentStatus"/>,
+        /// que es la puerta que además sella o borra <see cref="PaidAt"/>. Con un setter público,
+        /// una asignación directa dejaría la fecha mintiendo sin que nada fallara.
+        /// </remarks>
+        public OrderPaymentStatus PaymentStatus { get; private set; } = OrderPaymentStatus.Pending;
+        /// <summary>
+        /// Momento (UTC) en que el pedido quedó pagado, o null si sigue pendiente. Es la constancia
+        /// del pago: la escribe SOLO <see cref="ChangePaymentStatus"/>, que además la borra al
+        /// volver a <see cref="OrderPaymentStatus.Pending"/> —un pedido pendiente no puede
+        /// conservar la fecha de un pago que ya no tiene— y NO la mueve si el pedido ya estaba
+        /// pagado, para que la fecha sea la del primer cobro y no la de un segundo clic.
+        /// </summary>
+        public DateTime? PaidAt { get; private set; }
         /// <summary>Nombre de quien pide. null en las ventas del POS.</summary>
         public string? CustomerName { get; set; }
         /// <summary>Teléfono de quien pide. null en las ventas del POS.</summary>
@@ -140,7 +153,8 @@ namespace Domain.Entities.Orders
             foreach (OrderLine line in lines)
             {
                 OrderItem item = OrderItem.Create(
-                    order.Id, line.ProductId, line.Name, line.Quantity, line.Price, orderIndex++, tenantId);
+                    order.Id, line.ProductId, line.Name, line.Quantity, line.Price, orderIndex++, tenantId,
+                    line.BasePrice, line.PercentDiscountPrice, line.DiscountPrice);
                 item.Currency = line.Currency;
                 order.OrderItems.Add(item);
             }
@@ -173,10 +187,15 @@ namespace Domain.Entities.Orders
         /// <param name="next">Estado de destino.</param>
         /// <param name="driverId">Repartidor. Obligatorio con <see cref="OrderStatus.Transportando"/>.</param>
         /// <param name="cancellationReason">Razón. Obligatoria con <see cref="OrderStatus.Cancelado"/>.</param>
+        /// <param name="clock">
+        /// Reloj con el que se sella <see cref="PaidAt"/> al entregar. null = reloj del sistema; los
+        /// tests pasan uno fijo para que la fecha sea afirmable sin ventanas de tiempo real.
+        /// </param>
         public void ChangeStatus(
             OrderStatus next,
             Guid? driverId = null,
-            string? cancellationReason = null)
+            string? cancellationReason = null,
+            TimeProvider? clock = null)
         {
             if (!AllowedTransitionsFrom(Status, DeliveryType).Contains(next))
                 throw new InvalidOrderStatusTransitionException(Status, next);
@@ -207,9 +226,10 @@ namespace Domain.Entities.Orders
             Status = next;
 
             // Entregar equivale a haber cobrado: el pago deja de ser un eje que alguien pueda
-            // dejar en Pending por descuido.
+            // dejar en Pending por descuido. Pasa por la MISMA puerta que el pago manual, así que
+            // el cobro deja también su constancia (`PaidAt`).
             if (next == OrderStatus.Entregado)
-                PaymentStatus = OrderPaymentStatus.Paid;
+                ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
         }
 
         /// <summary>
@@ -237,11 +257,30 @@ namespace Domain.Entities.Orders
         /// <see cref="OrderStatus.Creado"/> puede estar pagado por adelantado—, con UNA excepción:
         /// un pedido <see cref="OrderStatus.Entregado"/> ya está pagado por definición, así que
         /// devolverlo a <see cref="OrderPaymentStatus.Pending"/> sería contradecir la entrega.
+        ///
+        /// Es también la ÚNICA puerta de <see cref="PaidAt"/>: sellar al entrar en
+        /// <see cref="OrderPaymentStatus.Paid"/> y borrar al volver a
+        /// <see cref="OrderPaymentStatus.Pending"/>. Un segundo "pagado" sobre un pedido que ya lo
+        /// estaba conserva la fecha (la del primer cobro) en vez de moverla.
         /// </summary>
-        public void ChangePaymentStatus(OrderPaymentStatus next)
+        /// <param name="next">Pago de destino.</param>
+        /// <param name="clock">
+        /// Reloj con el que se sella la fecha. null = reloj del sistema; los tests pasan uno fijo.
+        /// </param>
+        public void ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
         {
             if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
                 throw new DeliveredOrderCannotBeUnpaidException();
+
+            if (next == OrderPaymentStatus.Paid)
+            {
+                if (PaymentStatus != OrderPaymentStatus.Paid)
+                    PaidAt = (clock ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+            }
+            else if (next == OrderPaymentStatus.Pending)
+            {
+                PaidAt = null;
+            }
 
             PaymentStatus = next;
         }
@@ -253,7 +292,20 @@ namespace Domain.Entities.Orders
     /// Línea de pedido YA resuelta por el servidor: lo que el catálogo dice del producto, no lo que
     /// envió el cliente. Es el snapshot que se persiste en <c>OrderItem</c> (D6).
     /// </summary>
-    public sealed record OrderLine(Guid ProductId, string Name, int Quantity, decimal Price, Currency Currency);
+    /// <summary>
+    /// Línea ya resuelta por el servidor. `Price` es el precio final cobrado; los tres campos
+    /// opcionales son el snapshot del precio del producto en ese momento (base, % de descuento
+    /// escalado y descuento fijo escalado), que permite recalcularlo desde la línea.
+    /// </summary>
+    public sealed record OrderLine(
+        Guid ProductId,
+        string Name,
+        int Quantity,
+        decimal Price,
+        Currency Currency,
+        decimal? BasePrice = null,
+        int? PercentDiscountPrice = null,
+        int? DiscountPrice = null);
 
     /// <summary>
     /// Transición de estado no permitida por la tabla de <see cref="Order.AllowedTransitionsFrom"/>.

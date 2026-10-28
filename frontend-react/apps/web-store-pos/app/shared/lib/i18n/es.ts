@@ -218,11 +218,14 @@ const messages: Record<string, string> = {
   'MENU.ADMIN': 'ADMINISTRACIÓN',
   'MENU.SALES': 'VENTA',
   'MENU.WEB_CATALOG_GROUP': 'CATÁLOGO WEB',
+  'MENU.GESTORES_VENTAS': 'GESTORES DE VENTAS',
   'MENU.INVENTORY': 'INVENTARIO',
   'MENU.EXPENSES': 'GASTOS',
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
   'MENU.REPORTS': 'REPORTES',
   'MENU.STATISTICS': 'ESTADÍSTICAS',
+  // Grupo Onat (Vector Fiscal): grupo propio, inmediatamente antes de Gestión.
+  'MENU.ONAT': 'Onat',
   'MENU.MANAGEMENT': 'GESTIÓN',
   // Módulo Elaboración (17): grupo propio con recetas y elaboraciones.
   'MENU.ELABORATION': 'ELABORACIÓN',
@@ -241,6 +244,8 @@ const messages: Record<string, string> = {
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
+  'MENU.GESTORES_COMMISSIONS': 'Comisiones por producto',
+  'MENU.GESTORES_COMMISSIONS_LIST': 'Comisiones',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
   // cierre-efectivo: ítem justo debajo de "Vender" (S5).
@@ -251,6 +256,75 @@ const messages: Record<string, string> = {
   'MENU.TODAY_STATS': 'Cuadre del día',
   'MENU.CREDITS_HISTORY': 'Créditos',
   'MENU.ORDERS_HISTORY': 'Ventas',
+
+  // Gestores de ventas (módulo 21, feature 125): configuración de comisión del Owner.
+  'GESTORES.TITLE': 'Comisiones por producto',
+  'GESTORES.SUBTITLE':
+    'Define cuánto gana el gestor por unidad vendida de cada producto: un porcentaje sobre el precio o un monto fijo, y en qué moneda se le paga. Un producto sin comisión no genera ganancia para el gestor.',
+  'GESTORES.LOAD_ERROR': 'No se pudieron cargar los productos y las comisiones.',
+  'GESTORES.EMPTY': 'Todavía no hay productos para configurar.',
+  'GESTORES.TYPE': 'Comisión',
+  'GESTORES.NONE': 'Sin comisión',
+  'GESTORES.PERCENTAGE': 'Porcentaje',
+  'GESTORES.FIXED': 'Monto fijo',
+  'GESTORES.PERCENT_VALUE': '% por unidad',
+  'GESTORES.FIXED_VALUE': 'Monto por unidad',
+  'GESTORES.CURRENCY': 'Moneda',
+  'GESTORES.SAVE': 'Guardar',
+  'GESTORES.REMOVE': 'Quitar',
+  'GESTORES.SAVED': 'Comisión guardada.',
+  'GESTORES.REMOVED': 'Comisión eliminada.',
+  'GESTORES.INVALID_VALUE': 'Escribe un monto válido mayor o igual a 0.',
+  'GESTORES.SAVE_ERROR': 'No se pudo guardar la comisión. Revisa tu conexión e inténtalo de nuevo.',
+
+  // Vista del gestor de ventas (módulo 21, T9).
+  'GESTOR.TITLE': 'Mis pedidos y comisiones',
+  'GESTOR.SUBTITLE': 'Hola, {name}. Aquí ves tus pedidos, lo que has ganado y los catálogos de las tiendas.',
+  'GESTOR.LOGOUT': 'Salir',
+  'GESTOR.LOAD_ERROR': 'No se pudieron cargar tus pedidos y comisiones.',
+  'GESTOR.SECTION_ERROR': 'No se pudo cargar esta sección. Recarga la página o inténtalo de nuevo.',
+  'GESTOR.CATALOGS': 'Catálogos de las tiendas',
+  'GESTOR.CATALOGS_EMPTY': 'Tu Owner todavía no tiene catálogos publicados disponibles.',
+  'GESTOR.ORDERS': 'Mis pedidos',
+  'GESTOR.ORDERS_EMPTY': 'Todavía no tienes pedidos.',
+  'GESTOR.COMMISSIONS': 'Mis comisiones',
+  'GESTOR.COMMISSIONS_EMPTY': 'Todavía no tienes comisiones. Se generan cuando el pedido se entrega.',
+  'GESTOR.CODE': 'Pedido',
+  'GESTOR.STORE': 'Tienda',
+  'GESTOR.DATE': 'Fecha',
+  'GESTOR.STATUS': 'Estado',
+  'GESTOR.TOTAL': 'Total',
+  'GESTOR.PRODUCT': 'Producto',
+  'GESTOR.AMOUNT': 'Comisión',
+  'GESTOR.PAID': 'Pagada',
+  'GESTOR.PENDING': 'Pendiente',
+  'GESTOR.PAID_AT': 'Pagada el {date}',
+
+  // Comisiones de los gestores (T10).
+  'OWNER_COMMISSIONS.TITLE': 'Comisiones de los gestores',
+  'OWNER_COMMISSIONS.SUBTITLE':
+    'Lo que debes a cada gestor. Filtra por estado o por gestor y marca el pago completo cuando le pagues; no hay pagos parciales.',
+  'OWNER_COMMISSIONS.STATUS_FILTER': 'Estado',
+  'OWNER_COMMISSIONS.MANAGER_FILTER': 'Gestor',
+  'OWNER_COMMISSIONS.ALL': 'Todas',
+  'OWNER_COMMISSIONS.ALL_MANAGERS': 'Todos los gestores',
+  'OWNER_COMMISSIONS.PENDING': 'Pendiente',
+  'OWNER_COMMISSIONS.PAID': 'Pagada',
+  'OWNER_COMMISSIONS.EMPTY': 'No hay comisiones con ese filtro.',
+  'OWNER_COMMISSIONS.LOAD_ERROR': 'No se pudieron cargar las comisiones.',
+  'OWNER_COMMISSIONS.DATE': 'Fecha',
+  'OWNER_COMMISSIONS.MANAGER': 'Gestor',
+  'OWNER_COMMISSIONS.ORDER': 'Pedido',
+  'OWNER_COMMISSIONS.PRODUCT': 'Producto',
+  'OWNER_COMMISSIONS.STORE': 'Tienda',
+  'OWNER_COMMISSIONS.STATUS': 'Estado',
+  'OWNER_COMMISSIONS.AMOUNT': 'Comisión',
+  'OWNER_COMMISSIONS.PAY': 'Marcar pagada',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TITLE': 'Registrar el pago',
+  'OWNER_COMMISSIONS.PAY_CONFIRM_TEXT':
+    '¿Registrar el pago completo de {amount} a {manager}? Esta acción no se puede deshacer.',
+  'OWNER_COMMISSIONS.PAID_OK': 'Pago registrado.',
+  'OWNER_COMMISSIONS.PAY_ERROR': 'No se pudo registrar el pago. Revisa tu conexión e inténtalo de nuevo.',
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
@@ -263,6 +337,8 @@ const messages: Record<string, string> = {
     'Completa la descripción, los descuentos y las imágenes de tus productos y publica el catálogo de tu tienda.',
   'WEB_CATALOG.PUBLIC_URL': 'Dirección pública',
   'WEB_CATALOG.NOT_PUBLISHED': 'El catálogo aún no está publicado. Pulsa Sincronizar Catálogo.',
+  'WEB_CATALOG.NOT_PUBLISHED_ADMIN':
+    'El catálogo aún no tiene una dirección pública. Crea una categoría y su primer producto.',
   'WEB_CATALOG.COPY_URL': 'Copiar',
   'WEB_CATALOG.COPIED': 'Dirección copiada',
   'WEB_CATALOG.OPEN': 'Ver catálogo',
@@ -279,6 +355,21 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.STATS_WITHOUT_IMAGE': 'Sin imagen',
   'WEB_CATALOG.NO_PRODUCTS':
     'Esta tienda aún no tiene catálogo aquí. Pulsa Sincronizar Catálogo para subir los productos y categorías que ya tienes en el dispositivo; si la tienda está vacía, créalos antes en Catálogo Productos.',
+  // Alta directa del SuperAdmin (2026-10-26): categorías y productos se crean en la MISMA vista
+  // store-scoped y sobre las MISMAS tablas del catálogo. El dueño no ve estas acciones.
+  'WEB_CATALOG.NEW_CATEGORY': 'Nueva categoría',
+  'WEB_CATALOG.NEW_CATEGORY_ORDER_HINT': 'Déjalo vacío para añadirla al final.',
+  'WEB_CATALOG.NEW_CATEGORY_ORDER_INVALID': 'El orden debe ser un número entero mayor o igual que 0.',
+  'WEB_CATALOG.CATEGORY_CREATED': 'Categoría creada',
+  'WEB_CATALOG.CATEGORY_CREATE_ERROR': 'No se pudo crear la categoría',
+  'WEB_CATALOG.ADMIN_EMPTY':
+    'Esta tienda aún no tiene categorías en el catálogo. Crea la primera con "Nueva categoría".',
+  'WEB_CATALOG.NEW_PRODUCT': 'Nuevo producto',
+  'WEB_CATALOG.CATEGORY': 'Categoría',
+  'WEB_CATALOG.PRODUCT_CREATED': 'Producto creado en el catálogo',
+  'WEB_CATALOG.PRODUCT_CREATE_ERROR': 'No se pudo crear el producto',
+  'WEB_CATALOG.PRODUCT_IMAGE_ERROR':
+    'El producto se creó, pero no se pudo subir la imagen principal',
   'WEB_CATALOG.DESCRIPTION': 'Descripción',
   'WEB_CATALOG.DESCRIPTION_PLACEHOLDER': 'Escribe una descripción para el catálogo (texto simple)',
   'WEB_CATALOG.DESCRIPTION_COUNTER': '{count}/{max} caracteres',
@@ -512,6 +603,7 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.COL_TOTAL': 'Total',
   'ORDERING_ORDERS.COL_STATUS': 'Estado',
   'ORDERING_ORDERS.COL_PAYMENT': 'Pago',
+  'ORDERING_ORDERS.COL_PAID_AT': 'Fecha de pago',
   'ORDERING_ORDERS.COL_DRIVER': 'Repartidor',
   'ORDERING_ORDERS.COL_DATE': 'Fecha',
   'ORDERING_ORDERS.STATUS_CREADO': 'Creado',
@@ -552,6 +644,8 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.DRIVERS_UNAVAILABLE':
     'No se pudo cargar el catálogo de repartidores: no puedes asignarlos a un pedido.',
   'ORDERING_ORDERS.STATUS_CHANGED': 'Estado del pedido actualizado',
+  'ORDERING_ORDERS.SALES_REGISTERED': 'Ventas registradas desde pedidos web: {count}',
+  'ORDERING_ORDERS.SALES_REGISTER_FAILED': 'Pedidos pagados que no se pudieron registrar en el POS: {count}',
   'ORDERING_ORDERS.STATUS_FAILED': 'No se pudo cambiar el estado del pedido',
   'ORDERING_ORDERS.DRIVER_CHANGED': 'Repartidor del pedido actualizado',
   'ORDERING_ORDERS.DRIVER_FAILED': 'No se pudo asignar el repartidor',
@@ -766,6 +860,11 @@ const messages: Record<string, string> = {
   // Menu items — Synchronization (Angular MENU.SYNCHRONIZATION.*)
   'MENU.EXPORT': 'Exportar',
   'MENU.IMPORT': 'Importar',
+  'MENU.SYNC_SERVER': 'Servidor',
+
+  // Menu items — Onat (grupo propio antes de Gestión; solo el dueño).
+  'MENU.VECTOR_FISCAL': 'Vector Fiscal',
+  'MENU.ONAT_CONFIGURATIONS': 'Configuraciones',
 
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
@@ -891,6 +990,23 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.COL_ROW': 'Fila',
   'PRODUCTS.CSV.COL_STATUS': 'Estado',
   'PRODUCTS.CSV.STATUS_VALID': 'Válido',
+  // Importación Catálogo Web → POS (plan web-catalog-to-pos-import): trae al catálogo local los
+  // productos publicados que aún no existan aquí. Los fallos se nombran uno a uno.
+  'PRODUCTS.WEB_IMPORT.BUTTON': 'Importar desde Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.IMPORTING': 'Importando...',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_TITLE': 'Importar desde el Catálogo Web',
+  'PRODUCTS.WEB_IMPORT.CONFIRM_MESSAGE':
+    'Se añadirán al catálogo del POS los productos del catálogo web que todavía no existan. La importación puede reordenar los productos que ya están en la misma categoría. ¿Desea continuar?',
+  'PRODUCTS.WEB_IMPORT.SUCCESS':
+    'Importación completada: {imported} productos importados y {existing} ya existentes.',
+  'PRODUCTS.WEB_IMPORT.PARTIAL_SUMMARY':
+    'Se importaron {imported} productos y {existing} ya existían. No se pudieron importar:',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED':
+    'La categoría "{name}" no se pudo insertar; sus {count} productos no fueron importados.',
+  'PRODUCTS.WEB_IMPORT.CATEGORY_FAILED_ONE':
+    'La categoría "{name}" no se pudo insertar; su producto no fue importado.',
+  'PRODUCTS.WEB_IMPORT.PRODUCT_FAILED': 'El producto "{name}" no se pudo insertar.',
+  'PRODUCTS.WEB_IMPORT.LOAD_FAILED': 'No se pudo leer el catálogo web.',
   'PRODUCTS.CATEGORY.CREATE': 'Crear categoría',
   'PRODUCTS.CATEGORY.EDIT': 'Editar categoría',
   // Angular PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY — header FAB label (also reused, per
@@ -1101,6 +1217,8 @@ const messages: Record<string, string> = {
   'CASH_CLOSING.COUNTED': 'Contado',
   'CASH_CLOSING.DIFFERENCE': 'Diferencia',
   'CASH_CLOSING.OPENING': 'Apertura',
+  // expense-fund-source (2026-10-24): gastos del día pagados con dinero de la caja.
+  'CASH_CLOSING.CASH_EXPENSES': 'Gastos de caja restados del Esperado: {amount}',
   'CASH_CLOSING.COUNT_TITLE': 'Conteo',
   'CASH_CLOSING.DENOMINATION': 'Denominación',
   'CASH_CLOSING.QUANTITY': 'Cantidad',
@@ -1415,6 +1533,13 @@ const messages: Record<string, string> = {
   'EXPENSES.FORM.PAYMENT_TYPE': 'Tipo de pago',
   'EXPENSES.FORM.NOTE': 'Nota',
   'EXPENSES.FORM.TOTAL_REQUIRED': 'El total debe ser mayor a 0',
+  // expense-fund-source (2026-10-24): DE QUÉ dinero salió el gasto.
+  'EXPENSES.FORM.FUND_SOURCE': 'Origen',
+  'EXPENSES.FUND_SOURCE.CAJA': 'Caja',
+  'EXPENSES.FUND_SOURCE.EXTERNO': 'Externo',
+
+  // Expenses — Fund source filter (history)
+  'EXPENSES.FILTER.ALL_ORIGINS': 'Todos los orígenes',
 
   // Expenses — Expense types
   'EXPENSES.TYPE.SALARIO': 'Salario',
@@ -1431,6 +1556,20 @@ const messages: Record<string, string> = {
   'EXPENSES.TYPE.DIVISA': 'Divisa',
   'EXPENSES.TYPE.IMPUESTO': 'Impuesto',
   'EXPENSES.TYPE.OTRO': 'Otro',
+  'EXPENSES.TYPE.IMPUESTO_VENTAS': 'Impuesto sobre Ventas o Servicios',
+  'EXPENSES.TYPE.FUERZA_TRABAJO': 'Impuesto por la Utilización de la Fuerza de Trabajo',
+  'EXPENSES.TYPE.IMPUESTO_SELLOS': 'Impuesto sobre Documentos / sellos del timbre',
+  'EXPENSES.TYPE.ANUNCIOS': 'Tasa por Radicación de Anuncios y Propaganda Comercial',
+  'EXPENSES.TYPE.CONTRIBUCION_ESPECIAL_SEGURIDAD_SOCIAL':
+    'Contribución Especial a la Seguridad Social',
+  'EXPENSES.TYPE.CONTRIBUCION_SEGURIDAD_SOCIAL': 'Contribución a la Seguridad Social',
+  'EXPENSES.TYPE.CUOTA_MENSUAL':
+    'Cuota mensual a cuenta del Impuesto sobre Ingresos Personales',
+  'EXPENSES.TYPE.CONTRIBUCION_ZONAS':
+    'Contribución para la restauración y preservación de zonas',
+  'EXPENSES.TYPE.ARRENDAMIENTO_ENTIDADES': 'Arrendamiento de bienes a entidades estatales',
+  'EXPENSES.TYPE.EXONERACION_REPARACIONES':
+    'Importes exonerados por asumir gastos de reparaciones',
 
   // Reports — Today
   'REPORTS.TODAY.TITLE': 'Reportes de hoy',
@@ -1577,6 +1716,25 @@ const messages: Record<string, string> = {
   'STORES.CATALOG_SLUG.HINT':
     'La dirección pública de la tienda. Se normaliza al escribir: minúsculas, sin tildes y con guiones en vez de espacios. Cambiarla cambia la URL que usan los clientes.',
   'STORES.CATALOG_SLUG.PREVIEW': 'URL pública',
+  // Configuración COMPLETA del catálogo web de una tienda desde /admin/stores (SuperAdmin,
+  // 2026-10-22): la misma vista del dueño, pero store-scoped. No exige el módulo 18 — la
+  // publicación sí lo exige.
+  'STORES.WEB_CATALOG.MENU_LABEL': 'Configurar catálogo web',
+  'STORES.WEB_CATALOG.BACK': 'Volver a tiendas',
+  // Import CSV del catálogo desde la vista store-scoped del SuperAdmin (2026-10-22): las columnas
+  // del CSV y su validación por fila reutilizan los mensajes PRODUCTS.CSV.* del import del POS.
+  'WEB_CATALOG.IMPORT.TITLE': 'Importar productos desde CSV',
+  'WEB_CATALOG.IMPORT.SUBTITLE':
+    'Columnas: categoria, producto, precio_venta y moneda_venta (también valen nombre, precio y moneda). Moneda por código: CUP, USD, EUR… Si la categoría y el producto ya existen, se actualizan el precio y la moneda.',
+  'WEB_CATALOG.IMPORT.IMPORT': 'Importar {count} productos',
+  'WEB_CATALOG.IMPORT.IMPORTING': 'Importando…',
+  'WEB_CATALOG.IMPORT.DONE': 'CSV importado',
+  'WEB_CATALOG.IMPORT.FAILED': 'No se pudo importar el CSV',
+  'WEB_CATALOG.IMPORT.SUMMARY':
+    'Categorías creadas: {categories}. Productos creados: {created}. Actualizados: {updated}.',
+  'WEB_CATALOG.IMPORT.ROW_ERROR': 'Fila {row}: {reason}',
+  'WEB_CATALOG.IMPORT.REAL_PRODUCTS_NOTE':
+    'Los productos importados son productos reales de la tienda: también aparecen en el POS y en inventario.',
   'STORES.CATALOG_SLUG.REQUIRED': 'El enlace del catálogo no puede quedar vacío',
   'STORES.CATALOG_SLUG.IN_USE': 'Ese enlace ya está en uso por otra tienda',
   'STORES.CATALOG_SLUG.SAVE_ERROR': 'No se pudo guardar el catálogo. Intente de nuevo.',
@@ -1825,6 +1983,7 @@ const messages: Record<string, string> = {
   'ADMIN_CATALOG_STATS.HEADER': 'Estadísticas del catálogo',
   'ADMIN_CATALOG_STATS.FILTERS': 'Tienda y periodo',
   'ADMIN_CATALOG_STATS.STORE': 'Tienda',
+  'ADMIN_CATALOG_STATS.ALL_STORES': 'Todas las tiendas',
   'ADMIN_CATALOG_STATS.LAST_DAYS': 'Últimos {days} días',
   'ADMIN_CATALOG_STATS.SUMMARY_TITLE': '{store} · últimos {days} días',
   'ADMIN_CATALOG_STATS.VISITS': 'Visitas',
@@ -1836,7 +1995,7 @@ const messages: Record<string, string> = {
   'ADMIN_CATALOG_STATS.TOP_PRODUCTS': 'Productos más vistos',
   'ADMIN_CATALOG_STATS.NO_PRODUCTS': 'Todavía no hay productos vistos.',
   'ADMIN_CATALOG_STATS.DAILY': 'Visitas por día',
-  'ADMIN_CATALOG_STATS.NO_STORES': 'No hay tiendas para mostrar.',
+  'ADMIN_CATALOG_STATS.NO_STORES_WITH_VISITS': 'Ninguna tienda tuvo visitas en este periodo.',
   'ADMIN_CATALOG_STATS.ERROR': 'No se pudieron cargar las estadísticas.',
   'ADMIN_CATALOG_STATS.SOURCE_DIRECT': 'Directo',
   'ADMIN_CATALOG_STATS.SOURCE_WHATSAPP': 'WhatsApp',
@@ -1959,6 +2118,49 @@ const messages: Record<string, string> = {
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
 
+  // Sync — repositorio de respaldos en el servidor (sync/server). Un fichero por
+  // tienda: el ZIP cifrado que el POS ya exporta, alojado en el backend.
+  'SYNC_SERVER.TITLE': 'Respaldos en el servidor',
+  'SYNC_SERVER.UPLOAD_TITLE': 'Subir respaldo al servidor',
+  'SYNC_SERVER.UPLOAD_HELP':
+    'Se genera un archivo cifrado por cada tienda de este dispositivo y se sube al servidor. Nada se guarda en el disco de este equipo.',
+  'SYNC_SERVER.UPLOAD_BUTTON': 'Subir al servidor',
+  'SYNC_SERVER.UPLOADING': 'Subiendo respaldos...',
+  'SYNC_SERVER.UPLOAD_RESULTS_TITLE': 'Resultado de la subida',
+  'SYNC_SERVER.UPLOADED': 'Subido',
+  'SYNC_SERVER.SKIPPED': 'Omitido: este dispositivo no tiene la clave de esta tienda.',
+  'SYNC_SERVER.FAILED': 'No se pudo subir el respaldo de esta tienda.',
+  'SYNC_SERVER.NO_STORES': 'No hay tiendas para respaldar en este dispositivo.',
+  'SYNC_SERVER.LIST_TITLE': 'Archivos disponibles',
+  'SYNC_SERVER.REFRESH': 'Actualizar',
+  'SYNC_SERVER.LOAD_ERROR': 'No se pudieron cargar los archivos del servidor.',
+  'SYNC_SERVER.EMPTY': 'Todavía no hay respaldos en el servidor.',
+  'SYNC_SERVER.COLUMN_STORE': 'Tienda',
+  'SYNC_SERVER.COLUMN_DATE': 'Fecha',
+  'SYNC_SERVER.COLUMN_UPLOADED_BY': 'Subido por',
+  'SYNC_SERVER.COLUMN_DOWNLOADS': 'Descargas',
+  'SYNC_SERVER.COLUMN_ACTIONS': 'Acciones',
+  'SYNC_SERVER.DOWNLOAD': 'Descargar e importar',
+  'SYNC_SERVER.DOWNLOAD_TITLE': 'Descargar e importar respaldo',
+  'SYNC_SERVER.DOWNLOAD_HELP':
+    'El archivo se descarga del servidor y se importa en la tienda a la que pertenece. La contraseña solo se usa en este dispositivo; no se envía al servidor.',
+  'SYNC_SERVER.IMPORT_BUTTON': 'Importar',
+  'SYNC_SERVER.IMPORTING': 'Importando...',
+  'SYNC_SERVER.IMPORT_SUCCESS': 'El respaldo se importó correctamente.',
+  'SYNC_SERVER.IMPORT_ERROR':
+    'No se pudo importar el respaldo. Verifique la contraseña e intente de nuevo.',
+  'SYNC_SERVER.ERROR_WRONG_PASSWORD': 'La contraseña del respaldo no es correcta.',
+  'SYNC_SERVER.ERROR_CORRUPT':
+    'El archivo del servidor está dañado y no se pudo leer. No se importó nada.',
+  'SYNC_SERVER.DOWNLOADED_AT': 'Descargado el',
+  'SYNC_SERVER.DELETE': 'Borrar del servidor',
+  'SYNC_SERVER.DELETE_TITLE': 'Borrar archivo del servidor',
+  'SYNC_SERVER.DELETE_MESSAGE':
+    'El archivo se borrará del servidor de forma permanente. Esta acción no se puede deshacer.',
+  'SYNC_SERVER.DELETE_ERROR': 'No se pudo borrar el archivo del servidor.',
+  'SYNC_SERVER.DELETED': 'Archivo borrado del servidor.',
+  'SYNC_SERVER.DOWNLOAD_ERROR': 'No se pudo descargar el archivo del servidor.',
+
   // Hotspot device-to-device transfer (odd/tasks/hotspot-device-transfer.md).
   // Both devices run the same PWA; the transfer never leaves the hotspot LAN.
   'HOTSPOT.SHARE_TITLE': 'Compartir por hotspot',
@@ -2074,6 +2276,70 @@ const messages: Record<string, string> = {
   'NOTIFICATIONS.PERMISSION_RESTORED': 'Se activaron las notificaciones del navegador.',
   'NOTIFICATIONS.PERMISSION_STILL_DENIED':
     'El navegador sigue bloqueando las notificaciones. Habilítelas en los ajustes del sitio.',
+
+  // Vector Fiscal — Configuraciones (S11): datos fiscales del Owner y sus
+  // actividades. Los textos visibles son exactamente estos (los fija el test).
+  'ONAT.CONFIGURATIONS_TITLE': 'Configuraciones del Vector Fiscal',
+  'ONAT.CONFIGURATIONS_SUBTITLE':
+    'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
+  'ONAT.NAME': 'Nombre',
+  'ONAT.NIT': 'NIT',
+  'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
+  'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
+  'ONAT.MUNICIPALITY': 'Municipio',
+  'ONAT.PROVINCE': 'Provincia',
+  'ONAT.ACTIVITIES': 'Actividades',
+  'ONAT.ACTIVITIES_EMPTY': 'Todavía no has agregado actividades.',
+  'ONAT.ACTIVITY_NAME': 'Nombre de la actividad',
+  'ONAT.ACTIVITY_CODE': 'Código de la actividad',
+  'ONAT.ADD_ACTIVITY': 'Adicionar actividad',
+  'ONAT.REMOVE_ACTIVITY': 'Eliminar',
+  'ONAT.SAVE': 'Guardar',
+  'ONAT.SAVED': 'Configuración guardada.',
+  'ONAT.SAVE_ERROR':
+    'No se pudo guardar. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+
+  // Vector Fiscal — pantalla principal (S3, S4, S5, S6, S8): un vector por Owner
+  // con los meses del año, las sobrescrituras del Owner y el cierre anual.
+  'ONAT.VECTOR_TITLE': 'Vector Fiscal',
+  'ONAT.VECTOR_SUBTITLE':
+    'Ingresos, gastos y tributos de tu negocio mes a mes, con el cierre anual calculado sobre los totales del año.',
+  'ONAT.CUP_NOTE': 'Todos los importes están en CUP.',
+  'ONAT.YEAR': 'Año',
+  'ONAT.MONTH': 'Mes',
+  'ONAT.INCOME': 'Ingresos',
+  'ONAT.EXPENSES': 'Gastos',
+  'ONAT.TAXES': 'Tributos',
+  'ONAT.BEFORE': 'antes {value}',
+  'ONAT.EDIT_INCOME': 'Editar ingresos de {month}',
+  'ONAT.EDIT_EXPENSES': 'Editar gastos de {month}',
+  'ONAT.INPUT_INCOME': 'Ingresos de {month}',
+  'ONAT.INPUT_EXPENSES': 'Gastos de {month}',
+  'ONAT.SAVE_ROW': 'Guardar',
+  'ONAT.CANCEL_ROW': 'Cancelar',
+  'ONAT.SAVE_INCOME': 'Guardar ingresos de {month}',
+  'ONAT.SAVE_EXPENSES': 'Guardar gastos de {month}',
+  'ONAT.CANCEL_EDIT': 'Cancelar la edición de {month}',
+  'ONAT.INVALID_AMOUNT': 'Escribe un importe válido mayor o igual a 0.',
+  'ONAT.ANNUAL_CLOSE': 'Cierre anual',
+  'ONAT.ANNUAL_CLOSE_HINT':
+    'Se calcula con los totales del año y los tributos deducibles que hayas registrado.',
+  'ONAT.CLOSE_BASE': 'Base imponible',
+  'ONAT.CLOSE_TAX': 'Impuesto',
+  'ONAT.CLOSE_TAX_DUE': 'Impuesto a pagar',
+  'ONAT.CLOSE_EARLY_BONUS': 'Bonificación por pronto pago',
+  'ONAT.CLOSE_TOTAL': 'Total a pagar',
+  'ONAT.CLOSE_PAY_BEFORE': 'Paga antes del 28 de febrero',
+  'ONAT.PAID_TAXES': 'Tributos pagados',
+  'ONAT.NO_CODE': 'Sin código',
+  'ONAT.WARNINGS': 'Avisos',
+  'ONAT.SKIPPED_RATES':
+    '{count, plural, one {1 importe sin tasa de cambio disponible} other {# importes sin tasa de cambio disponible}}',
+  'ONAT.SKIPPED_UNDATED':
+    '{count, plural, one {1 registro sin fecha válida} other {# registros sin fecha válida}}',
+  'ONAT.LOAD_ERROR':
+    'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
+  'ONAT.RETRY': 'Reintentar',
 };
 
 export default messages;

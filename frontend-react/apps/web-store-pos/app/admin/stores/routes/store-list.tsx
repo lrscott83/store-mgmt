@@ -418,6 +418,9 @@ export function AdminStoreListPage() {
         onChangePlan={openPlanModal}
         onEditModulePricing={isSuperAdmin ? openPricingModal : undefined}
         onEditCatalogTemplate={isSuperAdmin ? openTemplateModal : undefined}
+        onConfigureWebCatalog={
+          isSuperAdmin ? (id) => navigate(`/admin/stores/${id}/web-catalog`) : undefined
+        }
       />
 
       <EditPlanModal

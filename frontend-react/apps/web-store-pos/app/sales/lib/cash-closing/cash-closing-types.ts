@@ -35,8 +35,14 @@ export interface CashClosing {
   readonly status: CashClosingStatus;
   /** Suma de `valor × cantidad` del conteo (S10). */
   readonly countedTotal: number;
-  /** Esperado = efectivo de la venta del día en esa moneda + apertura (S7). */
+  /** Esperado = efectivo de la venta del día + apertura − gastos de caja (S7). */
   readonly expectedTotal: number;
+  /**
+   * Gastos del día pagados con dinero de la caja, ya restados del Esperado
+   * (expense-fund-source, 2026-10-24). Ausente en cierres anteriores a ese
+   * cambio: sus snapshots siguen siendo válidos, solo no lo registraban.
+   */
+  readonly cashExpensesTotal?: number;
   /** `countedTotal − expectedTotal` (S7/S8). */
   readonly difference: number;
   readonly createdDate: string;

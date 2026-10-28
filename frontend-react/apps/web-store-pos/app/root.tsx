@@ -17,6 +17,7 @@ import { isPublicCatalogPath } from '~/shared/lib/pwa/public-catalog-route';
 import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
+import { useSitePageView } from '~/shared/lib/telemetry/use-site-page-view';
 import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 import {
@@ -148,6 +149,11 @@ export default function App() {
   // Angular's `StoreUsageTrackerService` nav hook (see
   // `~/shared/lib/usage/store-usage-tracker.ts`).
   useStoreUsageTracker();
+
+  // Telemetría de páginas públicas del sitio (landing, /login, /register y legales): beacon
+  // anónimo fire-and-forget, con la misma política de privacidad que el catálogo. La lista
+  // cerrada vive en `~/shared/lib/telemetry/public-page-paths.ts` y el servidor la revalida.
+  useSitePageView();
 
   return (
     <>

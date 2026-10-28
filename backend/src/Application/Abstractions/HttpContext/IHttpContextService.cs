@@ -11,6 +11,7 @@
         public bool IsSuperAdmin { get; }
         public bool IsOwnerAdmin { get; }
         public bool IsReSeller { get; }
+        public bool IsGestorVentas { get; }
         public bool IsSuperAdminOrOwnerAdmin { get; }
         public string TenantId { get; }
         public string StoreId { get; }

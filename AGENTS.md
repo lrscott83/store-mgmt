@@ -148,6 +148,34 @@ one nobody tested. That exact mistake shipped here — a hand-written script was
 PostgreSQL while the C# migration it was supposed to mirror contained invalid SQL and had never
 been executed.
 
+### Environments — agents use LOCAL PostgreSQL, never Docker (user-mandated 2026-10-28)
+
+**There is no Docker or Podman in the agent environment. The root `README.md` commands
+(`podman exec smca_postgres_db ...`) are for the VPS operator, not for agents — do not run them,
+do not probe for Docker, and do not treat their absence as a blocker.**
+
+Agents run migrations against the two LOCAL databases on `localhost:5432`
+(`postgres`/`postgres`):
+
+- `smca` — development database.
+- `smca_test` — test database used by the backend E2E suite (`WebAppFixture` applies migrations
+  itself, so it is normally already current).
+
+```bash
+# Dev database
+dotnet ef database update --project src/Infrastructure --startup-project src/SMCA.WebApi \
+  --connection "Host=localhost;Database=smca;Username=postgres;Password=postgres"
+
+# Test database
+dotnet ef database update --project src/Infrastructure --startup-project src/SMCA.WebApi \
+  --connection "Host=localhost;Database=smca_test;Username=postgres;Password=postgres"
+```
+
+To check what is applied locally, query `__EFMigrationsHistory` through the local PostgreSQL
+client (e.g. `psql -h localhost -p 5432 -U postgres -d <db>`) or with `dotnet ef migrations list
+--project src/Infrastructure --startup-project src/SMCA.WebApi --connection "..."`. If no client
+is installed locally, report that and ask — never substitute a container command from `README.md`.
+
 ### The steps, in order
 
 ```bash

@@ -238,6 +238,13 @@ public static class DbTestHelpers
         await db.Set<Domain.Entities.StoreCatalogSettings.StoreCatalogSettings>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.StoreCatalogImages.StoreCatalogImage>().IgnoreQueryFilters().ExecuteDeleteAsync();
 
+        //   - StoreSyncFileDownload / StoreSyncFile: the POS backup repository (2026-10-27). The
+        //     download marks Restrict the file, and the file Restricts Store, so the order is
+        //     download → file. Same 23503 trap as the catalog rows above: one aborted StoreSync E2E
+        //     run would otherwise fail every later run of the whole suite at fixture start.
+        await db.Set<Domain.Entities.StoreSyncFiles.StoreSyncFileDownload>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.StoreSyncFiles.StoreSyncFile>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
         // Owner subtree (before Owner/User).
         await db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Store>().IgnoreQueryFilters().ExecuteDeleteAsync();

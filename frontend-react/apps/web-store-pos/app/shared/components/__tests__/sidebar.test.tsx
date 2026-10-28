@@ -548,7 +548,10 @@ describe('Sidebar — channel-rates entry requires the MultiMonedas module (D11)
   it('leaves the other Management entries unaffected without module 15', () => {
     renderSidebar(makeOwnerWithConfigurations([]));
     // Configurations (74) also carries no module gate.
-    expect(screen.getByText('Configuraciones')).toBeInTheDocument();
+    const configurationsLink = screen
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('href') === '/management/configurations');
+    expect(configurationsLink).not.toBeUndefined();
   });
 
   it('no longer offers the retired daily exchange-rate entry', () => {

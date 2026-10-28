@@ -12,6 +12,7 @@
         public const string SuperAdminClaim = "super_admin";
         public const string AdminClaim = "admin";
         public const string ReSellerClaim = "reseller";
+        public const string GestorVentasClaim = "gestor_ventas";
         public const string TenantIdClaim = "tenant_id";
         public const string OwnerIdClaim = "owner_id";
         public const string StoreIdClaim = "store_id";

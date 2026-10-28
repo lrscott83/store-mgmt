@@ -128,6 +128,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("OccurredAt", "SessionHash");
+
                     b.HasIndex("StoreId", "OccurredAt");
 
                     b.HasIndex("StoreId", "SessionHash");
@@ -1272,6 +1274,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BasePrice")
+                        .HasColumnType("decimal(18,6)");
+
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
 
@@ -1279,6 +1284,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DiscountPrice")
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
@@ -1292,6 +1300,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("OrderIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PercentDiscountPrice")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("Price")
@@ -1383,6 +1394,150 @@ namespace Infrastructure.Migrations
                     b.ToTable("OrderPayment");
                 });
 
+            modelBuilder.Entity("Domain.Entities.OrderSalesCommissions.OrderSalesCommission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaidByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SalesManagerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("OrderItemId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("PaidByUserId");
+
+                    b.HasIndex("SalesManagerId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("OrderSalesCommission", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.OrderSalesManagers.OrderSalesManager", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SalesManagerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("SalesManagerId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("OrderSalesManager", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Orders.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1438,6 +1593,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("OrderType")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
@@ -1909,6 +2067,57 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProductCategory");
                 });
 
+            modelBuilder.Entity("Domain.Entities.ProductSalesCommissions.ProductSalesCommission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("ProductSalesCommission", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Products.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2206,6 +2415,111 @@ namespace Infrastructure.Migrations
                             IsActive = true,
                             Name = "Comercializador del servicio"
                         });
+                });
+
+            modelBuilder.Entity("Domain.Entities.SalesManagers.SalesManager", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("SalesManager", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.SiteTelemetry.SiteEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReferrerHost")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SessionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VisitorHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("Kind", "OccurredAt");
+
+                    b.HasIndex("Path", "OccurredAt");
+
+                    b.ToTable("SiteEvent");
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreCatalogImages.StoreCatalogImage", b =>
@@ -2570,6 +2884,127 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("StoreRoleFeature");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DownloadCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StoreName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UploadedByFullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("StoreSyncFile");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFileDownload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("DownloadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("StoreSyncFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("StoreSyncFileId", "TenantId");
+
+                    b.HasIndex("StoreSyncFileId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("StoreSyncFileDownload");
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreUsages.StoreUsage", b =>
@@ -3111,6 +3546,91 @@ namespace Infrastructure.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("Domain.Entities.OrderSalesCommissions.OrderSalesCommission", b =>
+                {
+                    b.HasOne("Domain.Entities.Orders.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.OrderItems.OrderItem", "OrderItem")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Owners.Owner", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.User", "PaidByUser")
+                        .WithMany()
+                        .HasForeignKey("PaidByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.SalesManagers.SalesManager", "SalesManager")
+                        .WithMany()
+                        .HasForeignKey("SalesManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("OrderItem");
+
+                    b.Navigation("Owner");
+
+                    b.Navigation("PaidByUser");
+
+                    b.Navigation("SalesManager");
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Entities.OrderSalesManagers.OrderSalesManager", b =>
+                {
+                    b.HasOne("Domain.Entities.Orders.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Owners.Owner", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.SalesManagers.SalesManager", "SalesManager")
+                        .WithMany()
+                        .HasForeignKey("SalesManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Owner");
+
+                    b.Navigation("SalesManager");
+
+                    b.Navigation("Store");
+                });
+
             modelBuilder.Entity("Domain.Entities.Orders.Order", b =>
                 {
                     b.HasOne("Domain.Entities.DeliveryDrivers.DeliveryDriver", "Driver")
@@ -3170,6 +3690,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("Domain.Entities.ProductSalesCommissions.ProductSalesCommission", b =>
+                {
+                    b.HasOne("Domain.Entities.Products.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Store");
+                });
+
             modelBuilder.Entity("Domain.Entities.Products.Product", b =>
                 {
                     b.HasOne("Domain.Entities.ProductCategories.ProductCategory", "Category")
@@ -3218,6 +3757,25 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("Domain.Entities.ReSellers.ReSeller", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Domain.Entities.SalesManagers.SalesManager", b =>
+                {
+                    b.HasOne("Domain.Entities.Owners.Owner", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
 
                     b.Navigation("User");
                 });
@@ -3312,6 +3870,29 @@ namespace Infrastructure.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFileDownload", b =>
+                {
+                    b.HasOne("Domain.Entities.StoreSyncFiles.StoreSyncFile", "StoreSyncFile")
+                        .WithMany("Downloads")
+                        .HasForeignKey("StoreSyncFileId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("StoreSyncFile");
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreUsages.StoreUsage", b =>
@@ -3463,6 +4044,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.StorePaymentStatuses.StorePaymentStatus", b =>
                 {
                     b.Navigation("StorePayments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.StoreSyncFiles.StoreSyncFile", b =>
+                {
+                    b.Navigation("Downloads");
                 });
 
             modelBuilder.Entity("Domain.Entities.Stores.Store", b =>

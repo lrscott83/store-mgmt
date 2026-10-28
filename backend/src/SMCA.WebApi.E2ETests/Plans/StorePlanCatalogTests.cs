@@ -83,7 +83,12 @@ public sealed class StorePlanCatalogTests
             // Pedidos WhatsApp (2026-10-08, M6 modulos-pedidos-whatsapp-gestion): los dos módulos
             // nuevos van a Superior y VIP, igual que Catálogo web.
             (int)ModuleType.PedidosWhatsApp,
-            (int)ModuleType.GestionPedidos
+            (int)ModuleType.GestionPedidos,
+            // Gestores de ventas (2026-10-21): módulo opt-in de Superior y VIP.
+            (int)ModuleType.GestoresVentas,
+            // ONAT (2026-10-27): módulo 22 en Superior y VIP. Entra con el catálogo
+            // inactivo (IsActive=false) y se activa después con una sola bandera.
+            (int)ModuleType.Onat
         };
         superior.Should().BeEquivalentTo(superiorCatalog);
 
@@ -105,7 +110,11 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.WebCatalog,
             // ...y los dos módulos nuevos también a VIP (planes autocontenidos).
             (int)ModuleType.PedidosWhatsApp,
-            (int)ModuleType.GestionPedidos
+            (int)ModuleType.GestionPedidos,
+            // Gestores de ventas (2026-10-21): también en VIP (planes autocontenidos).
+            (int)ModuleType.GestoresVentas,
+            // ONAT (2026-10-27): también en VIP (planes autocontenidos).
+            (int)ModuleType.Onat
         };
         vip.Should().BeEquivalentTo(vipCatalog);
 

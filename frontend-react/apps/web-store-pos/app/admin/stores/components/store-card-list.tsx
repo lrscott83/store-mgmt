@@ -19,6 +19,10 @@ interface StoreCardListProps {
   /** Optional, same gating: opens the per-store catalog-template editor (SuperAdmin-only
    * capability, same as module pricing). */
   onEditCatalogTemplate?: (id: string) => void;
+  /** Optional, same gating: opens the per-store WEB catalog configuration
+   * (SuperAdmin-only, 2026-10-22). No module gate: configuring is allowed before the store
+   * contracts module 18 — publishing still requires it. */
+  onConfigureWebCatalog?: (id: string) => void;
 }
 
 /**
@@ -153,6 +157,7 @@ export function StoreCardList({
   onChangePlan,
   onEditModulePricing,
   onEditCatalogTemplate,
+  onConfigureWebCatalog,
 }: StoreCardListProps) {
   const intl = useIntl();
 
@@ -204,6 +209,15 @@ export function StoreCardList({
                   data-testid={`store-catalog-template-action-${store.id}`}
                 >
                   {intl.formatMessage({ id: 'STORES.CATALOG_TEMPLATE.MENU_LABEL' })}
+                </ActionMenuItem>
+              )}
+              {store.isActive && onConfigureWebCatalog && (
+                <ActionMenuItem
+                  intent="edit"
+                  onClick={() => onConfigureWebCatalog(store.id)}
+                  data-testid={`store-web-catalog-action-${store.id}`}
+                >
+                  {intl.formatMessage({ id: 'STORES.WEB_CATALOG.MENU_LABEL' })}
                 </ActionMenuItem>
               )}
             </ActionMenu>

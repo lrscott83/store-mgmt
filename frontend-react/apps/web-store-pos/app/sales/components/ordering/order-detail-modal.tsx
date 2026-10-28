@@ -98,6 +98,15 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             </dt>
             <dd>{paymentLabel(intl, order.paymentStatus)}</dd>
 
+            {order.paidAt && (
+              <>
+                <dt className="text-text-muted">
+                  {intl.formatMessage({ id: 'ORDERING_ORDERS.COL_PAID_AT' })}
+                </dt>
+                <dd>{formatOrderDate(order.paidAt)}</dd>
+              </>
+            )}
+
             <dt className="text-text-muted">
               {intl.formatMessage({ id: 'ORDERING_ORDERS.COL_DELIVERY_TYPE' })}
             </dt>

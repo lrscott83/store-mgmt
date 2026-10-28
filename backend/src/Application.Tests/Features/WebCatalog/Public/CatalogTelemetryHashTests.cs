@@ -32,14 +32,12 @@ namespace Application.Tests.Features.WebCatalog.Public
         }
 
         [Fact]
-        public void Visitor_ChangesWithTheSaltAndTheVisitorInputs()
+        public void Visitor_ChangesWithTheVisitorInputs()
         {
-            string baseline = CatalogTelemetryHash.Visitor(StoreId, "1.2.3.4", "Mozilla/5.0", Noon, "salt-a");
-            string otherSalt = CatalogTelemetryHash.Visitor(StoreId, "1.2.3.4", "Mozilla/5.0", Noon, "salt-b");
-            string otherIp = CatalogTelemetryHash.Visitor(StoreId, "5.6.7.8", "Mozilla/5.0", Noon, "salt-a");
-            string otherUa = CatalogTelemetryHash.Visitor(StoreId, "1.2.3.4", "Other/1.0", Noon, "salt-a");
+            string baseline = CatalogTelemetryHash.Visitor(StoreId, "1.2.3.4", "Mozilla/5.0", Noon);
+            string otherIp = CatalogTelemetryHash.Visitor(StoreId, "5.6.7.8", "Mozilla/5.0", Noon);
+            string otherUa = CatalogTelemetryHash.Visitor(StoreId, "1.2.3.4", "Other/1.0", Noon);
 
-            baseline.Should().NotBe(otherSalt);
             baseline.Should().NotBe(otherIp);
             baseline.Should().NotBe(otherUa);
         }

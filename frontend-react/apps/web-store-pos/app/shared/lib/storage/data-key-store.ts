@@ -32,3 +32,37 @@ export function clearDek(): void {
   dek = null;
   dekStoreId = null;
 }
+
+/**
+ * multi-store-backup — runs `run` with the ACTIVE (storeId, DEK) pair scoped to
+ * `storeId`, restoring the previous pair afterwards (also on throw).
+ *
+ * Why this exists and why it is NOT `encryptEntityWithDek`: the backup must WRITE
+ * in stores other than the selected one, and every store-scoped repository /
+ * offline service already knows how to write correctly — with whatever key the
+ * active pair holds. Swapping the PAIR atomically means a store's data is never
+ * encrypted while another store's identity is active (the silent cross-store
+ * corruption the DEK code exists to prevent), and no write path gains the
+ * ability to encrypt with a bare key.
+ *
+ * NOT reentrant: the backup runs one store at a time and awaits each store's
+ * work to completion, so no two calls overlap.
+ */
+export async function withStoreDek<T>(
+  storeId: string,
+  storeDek: Uint8Array,
+  run: () => Promise<T> | T,
+): Promise<T> {
+  const previousDek = dek;
+  const previousStoreId = dekStoreId;
+  setDek(storeDek, storeId);
+  try {
+    return await run();
+  } finally {
+    if (previousDek !== null && previousStoreId !== null) {
+      setDek(previousDek, previousStoreId);
+    } else {
+      clearDek();
+    }
+  }
+}

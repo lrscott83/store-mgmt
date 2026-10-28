@@ -3,7 +3,10 @@ using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderStatus;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
+using Domain.Entities.OrderSalesCommissions;
+using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
+using Domain.Entities.ProductSalesCommissions;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -34,6 +37,10 @@ public class UpdateOrderStatusCommandHandlerTests
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IOrderRepository> _orderRepository = new();
+    private readonly Mock<IStoreModuleRepository> _storeModuleRepository = new();
+    private readonly Mock<IOrderSalesManagerRepository> _orderSalesManagerRepository = new();
+    private readonly Mock<IProductSalesCommissionRepository> _productSalesCommissionRepository = new();
+    private readonly Mock<IOrderSalesCommissionRepository> _orderSalesCommissionRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -52,13 +59,32 @@ public class UpdateOrderStatusCommandHandlerTests
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+
+        // T6 defaults: sin módulo 21 activo y sin atribución no se genera ninguna comisión.
+        // Los tests de comisión sobreescriben estos setups.
+        _storeModuleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync([]);
+        _orderSalesManagerRepository
+            .Setup(x => x.GetByOrderIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((OrderSalesManager?)null);
+        _productSalesCommissionRepository
+            .Setup(x => x.GetByProductIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((ProductSalesCommission?)null);
+        _orderSalesCommissionRepository
+            .Setup(x => x.GetByOrderItemIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((OrderSalesCommission?)null);
     }
 
     private UpdateOrderStatusCommandHandler Handler() => new(
         _unitOfWork.Object,
         _httpContextService.Object,
         _orderRepository.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _storeModuleRepository.Object,
+        _orderSalesManagerRepository.Object,
+        _productSalesCommissionRepository.Object,
+        _orderSalesCommissionRepository.Object);
 
     /// <summary>
     /// Pedido online de la tienda en un estado concreto. El estado se fija directo a propósito: es
@@ -160,6 +186,25 @@ public class UpdateOrderStatusCommandHandlerTests
         order.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
     }
 
+    /// <summary>
+    /// Entregar paga el pedido, y ese pago es el que deja la constancia: la fecha de cobro se
+    /// escribe por la MISMA puerta que el pago manual, no por una rama paralela del estado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ToEntregado_ShouldStampThePaidMoment()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Pickup);
+        Returns(order);
+        DateTime before = DateTime.UtcNow;
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado),
+            CancellationToken.None);
+
+        order.PaidAt.Should().NotBeNull();
+        order.PaidAt!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
     [Fact]
     public async Task Handle_WithAValidTransition_ShouldReturnSuccess()
     {
@@ -216,7 +261,7 @@ public class UpdateOrderStatusCommandHandlerTests
     public async Task Handle_WithANonDeliveringTransition_ShouldNotTouchThePaymentStatus()
     {
         Order order = OrderIn(OrderStatus.Creado);
-        order.PaymentStatus = OrderPaymentStatus.Pending;
+        order.ChangePaymentStatus(OrderPaymentStatus.Pending);
         Returns(order);
 
         await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);

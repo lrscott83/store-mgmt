@@ -4,21 +4,9 @@ import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Button } from '~/shared/components/ui/button';
-import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
-import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
-import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
-import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
-import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
-import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
-import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
-import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
-import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
-import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
-import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
-import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
-import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
-import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
+import { getStoresWithLocalDek, unwrapStoreDekForStore } from '~/shared/lib/storage/read-store-entities';
+import { importBackupFile } from '~/sync/lib/services/multi-store-backup-service';
+import { createStoreSyncServices } from '~/sync/lib/services/store-sync-services-factory';
 import { ImportForm } from '~/sync/components/import-form';
 import { HotspotReceiveModal } from '~/sync/components/hotspot-receive-modal';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
@@ -27,6 +15,7 @@ export const clientLoader = featureLoader([EFeatures.Receive]);
 
 export function ImportPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
   const intl = useIntl();
   // Payload received over the hotspot: shown pre-selected in the form so the
   // user only types the bundle password. `key` remounts the form when a NEW
@@ -35,119 +24,30 @@ export function ImportPage() {
   const [receiving, setReceiving] = useState(false);
 
   /**
-   * Reads the file bytes, decrypts+parses the envelope, then runs the
-   * synchronizer. Throws WrongPasswordError or CorruptFileError upstream
-   * so ImportForm can display the correct error message.
-   * The synchronizer is NOT invoked if serializer.import throws.
+   * Reads the file bytes and imports them:
+   *
+   * - v3 (multi-store): every store in the file that this user may write, each
+   *   under its own DEK — an Owner gets all of theirs, a StoreUser only theirs.
+   * - v2 and legacy v1 (one store): the unchanged single-store path, so backups
+   *   exported before this change still import into their one store.
+   *
+   * Throws WrongPasswordError / CorruptFileError / WrongStoreError upstream so
+   * ImportForm can display the correct error message. No merge runs if the
+   * archive cannot be read.
    */
   async function handleImport(file: File, password: string): Promise<SyncResult> {
-    // Build serializer (read-only side) AND the category/product write side off the
-    // SAME repository instances (product-sync-import-validation-parity, T1.5): product
-    // category-exists validation during the merge below must observe categories written
-    // by the SAME run's category merge — one `ProductCategoryRepository` instance = one
-    // cache = guaranteed read-after-write consistency, mirroring Angular's singleton DI
-    // (`ProductRepository`/`ProductCategoryRepository` are both `providedIn: 'root'`).
-    // Inventory's read side reuses the same InventoryOfflineService instance the write
-    // side constructs below (rule 12 — InventoryRepository has no Angular correlate,
-    // deleted; serializer.import() never actually calls getInventoryEntriesJson(), only
-    // serializer.export() does, so any valid instance satisfies the constructor — no
-    // second instance needed).
-    const categoryRepoForSerializer = new ProductCategoryRepository(storeId);
-    const productRepoForSerializer = new ProductRepository(storeId, categoryRepoForSerializer);
-    const inventorySvc = new InventoryOfflineService(
-      storeId,
-      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-    );
-    const orderSvc = new OrderOfflineService(storeId);
-    const expenseSvc = new ExpenseOfflineService(storeId);
-    const creditSvc = new SaleCreditOfflineService(storeId);
-    const channelRateSvc = new ChannelRateOfflineService(storeId);
-    const warehouseSvc = new WarehouseOfflineService(
-      storeId,
-      productRepoForSerializer,
-      inventorySvc,
-    );
-    const recipeSvc = new RecipeOfflineService(storeId, productRepoForSerializer);
-    const elaborationSvc = new ElaborationOfflineService(
-      storeId,
-      productRepoForSerializer,
-      recipeSvc,
-      warehouseSvc,
-      inventorySvc,
-    );
-    // store-payment-methods-backup: serves BOTH the serializer's read seam
-    // (getStoredConfig, exported only when the store has a config) and the
-    // synchronizer's write seam (setConfigFromBackup, wholesale overwrite).
-    const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
-    // messaging-background-offline: serves BOTH the serializer's read seam
-    // (getStorageMessagesQueueJson, always exported) and the synchronizer's
-    // write seam (addImportedQueuedMessage, append/skip-on-duplicate).
-    const messagesQueueSvc = new MessagesOfflineService(storeId);
-    // cierre-efectivo: serves BOTH the serializer's read seam
-    // (getStorageCashClosingsJson, always exported) and the synchronizer's write
-    // seam (setImportedCashClosings, store-level fusion).
-    const cashClosingSvc = new CashClosingOfflineService(storeId);
-
-    const serializer = new DataSerializerService(
-      storeId,
-      categoryRepoForSerializer,
-      productRepoForSerializer,
-      inventorySvc,
-      orderSvc,
-      expenseSvc,
-      creditSvc,
-      warehouseSvc,
-      channelRateSvc,
-      recipeSvc,
-      elaborationSvc,
-      storePaymentMethodsSvc,
-      messagesQueueSvc,
-      cashClosingSvc,
-    );
-
-    // Read file bytes
     const arrayBuffer = await file.arrayBuffer();
     const payload = new Uint8Array(arrayBuffer);
 
-    // Decrypt + parse — throws WrongPasswordError or CorruptFileError before any write
-    const parsedData = await serializer.import(payload, password);
-
-    // Build synchronizer (write side). Categories/Products route through the REAL
-    // `ProductCategoryRepository`/`ProductRepository` — the SAME instances built above
-    // for the serializer's read side (product-sync-import-validation-parity supersedes
-    // the prior sync-local shim seam: the shim's generic name-uniqueness-only guard is
-    // replaced by the repositories' full validation — category-exists, barcode-
-    // uniqueness, per-category name-uniqueness, order-shift for products; name-
-    // uniqueness + order-shift for categories).
-    const categoryRepo = categoryRepoForSerializer;
-    const productRepo = productRepoForSerializer;
-    // Inventory + Orders + Expenses + SaleCredits route through their offline SERVICES
-    // (Angular parity: the synchronizer calls inventorySvc.addImportedEntries/
-    // updateImportedEntries, orderSvc.addImportedOrder/updateImportedOrder,
-    // expenseSvc.addImportedExpense/updateImportedExpense, and
-    // creditSvc.addImportedSaleCredit/updateImportedSaleCredit — never raw repos/shims;
-    // order-sync-import-parity retires the last shim, `makeOrderRepoShim`). `inventorySvc`/
-    // `orderSvc`/`creditSvc` are the SAME instances constructed above for the serializer's
-    // read side (mirrors Angular's singleton DI; no second instance).
-
-    const synchronizer = new DataSynchronizerService(
-      storeId,
-      categoryRepo,
-      productRepo,
-      inventorySvc,
-      orderSvc,
-      expenseSvc,
-      creditSvc,
-      warehouseSvc,
-      channelRateSvc,
-      recipeSvc,
-      elaborationSvc,
-      storePaymentMethodsSvc,
-      messagesQueueSvc,
-      cashClosingSvc,
-    );
-
-    return synchronizer.sync(parsedData);
+    return importBackupFile({
+      payload,
+      password,
+      user,
+      selectedStoreId: storeId,
+      createServices: createStoreSyncServices,
+      unwrapDek: unwrapStoreDekForStore,
+      storesWithLocalDek: getStoresWithLocalDek(),
+    });
   }
 
   return (

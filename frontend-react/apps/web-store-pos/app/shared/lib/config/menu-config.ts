@@ -1,5 +1,6 @@
 import { EFeatures, EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
+import { isOwnerOnly } from '~/shared/lib/auth/authorization-service';
 
 export interface MenuItem {
   label: string;
@@ -312,6 +313,36 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    // Gestores de ventas (módulo 21, feature 125): grupo propio, solo para el dueño. El gestor
+    // NO ve este menú; su vista vive fuera del layout de caja (T9).
+    groupLabel: 'MENU.GESTORES_VENTAS',
+    moduleId: EModules.GestoresVentas,
+    items: [
+      {
+        label: 'MENU.GESTORES_COMMISSIONS',
+        path: '/sales/gestores',
+        featureIds: [EFeatures.GestoresVentas],
+        moduleId: EModules.GestoresVentas,
+        rolesOnly: (user) => user.isOwnerAdmin,
+        isNew: true,
+        helpContent:
+          'Comisiones de gestores. Define cuánto gana el gestor de ventas por cada producto: un porcentaje sobre el precio o un monto fijo por unidad, y en qué moneda se le paga. Sin configuración, ese producto no genera comisión.' +
+          BETA_NOTICE,
+      },
+      {
+        label: 'MENU.GESTORES_COMMISSIONS_LIST',
+        path: '/sales/gestores/commissions',
+        featureIds: [EFeatures.GestoresVentas],
+        moduleId: EModules.GestoresVentas,
+        rolesOnly: (user) => user.isOwnerAdmin,
+        isNew: true,
+        helpContent:
+          'Comisiones. Revisa lo que debes a cada gestor, pendiente y pagado, con el pedido y el producto que la originaron. Filtra por estado o por gestor y marca el pago completo cuando le pagues.' +
+          BETA_NOTICE,
+      },
+    ],
+  },
+  {
     groupLabel: 'MENU.INVENTORY',
     moduleId: EModules.Inventory,
     items: [
@@ -471,6 +502,14 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Importar datos. Carga un archivo de exportación para restaurar información en tu tienda. Los datos se fusionan de forma segura sin duplicar registros.',
       },
+      {
+        label: 'MENU.SYNC_SERVER',
+        path: '/sync/server',
+        featureIds: [EFeatures.Send, EFeatures.Receive],
+        moduleId: EModules.Synchronization,
+        helpContent:
+          'Respaldos en el servidor. Sube un archivo cifrado por cada tienda y descárgalo en otro dispositivo: al descargar, el respaldo se importa directamente en la tienda a la que pertenece. También puedes borrar los archivos que ya no necesites.',
+      },
     ],
   },
   {
@@ -506,6 +545,32 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Statistics,
         helpContent:
           'Cuadre por fechas. Selecciona un rango de fechas (inicio y fin, ambos días incluidos) y genera un resumen de las operaciones del período: ventas, gastos, ganancias bruta y ganancias, más el detalle del cuadre.',
+      },
+    ],
+  },
+  {
+    // Grupo Onat (S1): Vector Fiscal y su configuración, inmediatamente antes de
+    // Gestión. Solo el dueño; sin iconos, como el resto del menú. Exige el módulo
+    // ONAT (22) y su feature (126): el módulo nace inactivo, así que el grupo no
+    // aparece hasta que el dueño lo active y `/me` lo devuelva.
+    groupLabel: 'MENU.ONAT',
+    moduleId: EModules.Onat,
+    items: [
+      {
+        label: 'MENU.VECTOR_FISCAL',
+        path: '/onat/vector-fiscal',
+        featureIds: [EFeatures.Onat],
+        moduleId: EModules.Onat,
+        moduleIds: [EModules.Onat],
+        rolesOnly: isOwnerOnly,
+      },
+      {
+        label: 'MENU.ONAT_CONFIGURATIONS',
+        path: '/onat/configurations',
+        featureIds: [EFeatures.Onat],
+        moduleId: EModules.Onat,
+        moduleIds: [EModules.Onat],
+        rolesOnly: isOwnerOnly,
       },
     ],
   },

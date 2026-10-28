@@ -35,10 +35,18 @@ export default [
   // cliente final, y el backend lo sirve de forma anónima (PublicCatalogController).
   route('catalog/:storeSlug', 'catalog/routes/public-catalog.tsx'),
 
+  // Vista del GESTOR de ventas (módulo 21, T9): SIN layout del POS — el gestor no tiene tienda.
+  // `authLoader` es el único guard; el backend autoriza cada GET por el rol Owner-level.
+  route('gestor', 'gestor/routes/dashboard.tsx'),
+
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
     // Sales â€” Products
     route('sales/products', 'sales/routes/products.tsx'),
+    // Gestores de ventas (módulo 21): configuración de comisión por producto del Owner.
+    route('sales/gestores', 'sales/gestores/routes/gestores-commissions.tsx'),
+    // Comisiones de los gestores (T10): pendientes/pagadas, filtros y pago completo.
+    route('sales/gestores/commissions', 'sales/gestores/routes/owner-commissions.tsx'),
     // Catálogo Web (módulo 18, plan 2026-09-27): publica la tienda en /catalog/<slug>.
     route('sales/web-catalog', 'sales/routes/web-catalog.tsx'),
     // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Mismo gate que el
@@ -102,6 +110,8 @@ export default [
     // Sync â€” Export / Import
     route('sync/export', 'sync/routes/export.tsx'),
     route('sync/import', 'sync/routes/import.tsx'),
+    // Sync â€” repositorio de respaldos en el servidor (un fichero por tienda)
+    route('sync/server', 'sync/routes/sync-server.tsx'),
 
     // Management â€” Stores
     // Plan split: the store-DATA form never touches the plan. The PLAN view
@@ -146,11 +156,19 @@ export default [
     // Management â€” Configurations
     route('management/configurations', 'management/configurations/routes/configurations.tsx'),
 
+    // Onat — Vector Fiscal (S1, S2): vista fiscal del Owner, sin backend nuevo.
+    route('onat/vector-fiscal', 'onat/routes/vector-fiscal.tsx'),
+    // Onat — Configuraciones del Vector Fiscal (S11): solo el Owner (ownerOnlyLoader).
+    route('onat/configurations', 'onat/routes/configurations.tsx'),
+
     // Admin â€” Features
     route('admin/features', 'admin/features/routes/features.tsx'),
 
     // Admin â€” Stores
     route('admin/stores', 'admin/stores/routes/store-list.tsx'),
+    // Catálogo web de UNA tienda (SuperAdmin, 2026-10-22): misma vista del dueño, store-scoped,
+    // sin cambiar la tienda seleccionada del SuperAdmin.
+    route('admin/stores/:storeId/web-catalog', 'admin/stores/routes/store-web-catalog.tsx'),
 
     // Admin â€” Global module catalog pricing (SuperAdmin only, superAdminLoader in the
     // route module; the menu item gates the same role). Distinct from the per-STORE module

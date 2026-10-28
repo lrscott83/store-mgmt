@@ -3,6 +3,8 @@ export enum ERoles {
   OwnerAdmin = 2,
   StoreUser = 3,
   ReSeller = 4,
+  /** Gestor de ventas: rol Owner-level (no por tienda), espejo de RoleType.GestorVentas=5. */
+  GestorVentas = 5,
 }
 
 export enum EFeatures {
@@ -69,6 +71,10 @@ export enum EFeatures {
    * `StoreUser` (`OnlineOrdersAdmin`).
    */
   OnlineOrders = 123,
+  /** Gestores de ventas — espejo de FeatureType.GestoresVentas=125 (módulo 21, Owner-only). */
+  GestoresVentas = 125,
+  /** Feature Vector Fiscal — espejo de FeatureType.Onat=126 (módulo 22, Owner-only). */
+  Onat = 126,
 }
 
 export enum EModules {
@@ -108,6 +114,14 @@ export enum EModules {
    * `OnlineOrders` (123), que está en este módulo y no en `WebCatalog`.
    */
   GestionPedidos = 20,
+  /** Módulo Gestores de ventas — espejo de ModuleType.GestoresVentas=21 (Superior/VIP, opt-in). */
+  GestoresVentas = 21,
+  /**
+   * Módulo ONAT (Vector Fiscal) — espejo de ModuleType.Onat=22 (backend). Nace con
+   * `Module.IsActive = false`, así que `/me` no lo devuelve en `storeModuleIds` hasta que
+   * el dueño lo active: con este módulo se encienden a la vez el menú y las dos rutas.
+   */
+  Onat = 22,
 }
 
 export enum PaymentType {
@@ -136,7 +150,47 @@ export enum ExpenseType {
   Divisa = 9,
   Impuesto = 10,
   Otro = 100,
+  /**
+   * Nomencladores fiscales de la ONAT (Ley 181/2025). Se agregan al final para no
+   * tocar los valores existentes: la serialización histórica es el número.
+   * `Impuesto = 10` sigue siendo el cajón de "otro tributo" y `Otro = 100` un gasto
+   * no fiscal.
+   */
+  ContribucionZonas = 11,
+  ArrendamientoEntidades = 12,
+  ExoneracionReparaciones = 13,
+  ContribucionSeguridadSocial = 14,
+  ContribucionEspecialSeguridadSocial = 15,
+  ImpuestoVentas = 16,
+  CuotaMensual = 17,
+  FuerzaTrabajo = 18,
+  ImpuestoSellos = 19,
+  Anuncios = 20,
 }
+
+/**
+ * expense-fund-source (2026-10-24): DE DÓNDE salió el dinero de un gasto.
+ *
+ * Es una dimensión ORTOGONAL al método de pago: `paymentType` /
+ * `salePaymentMethod` dicen CÓMO se pagó (efectivo, transferencia, Zelle);
+ * esto dice DE QUÉ dinero salió. Pagar en efectivo con dinero del dueño no es
+ * lo mismo que pagar en efectivo con lo recaudado en el POS — confundirlos es
+ * lo que descuadraba el arqueo.
+ *
+ * Enum CONGELADO por valor desde el día 1 (misma regla que `Currency` y
+ * `SalePaymentMethod`): la serialización es el número. `Caja = 0` es el valor
+ * "activo" (descuenta la caja), por eso el default es `Externo = 1` y no al
+ * revés: un gasto histórico sin el campo NUNCA debe descontar la caja.
+ */
+export enum ExpenseFundSource {
+  /** Salió del efectivo recaudado en el POS (caja del día). */
+  Caja = 0,
+  /** Salió de fuera del POS: bolsillo del dueño, banco, capital. */
+  Externo = 1,
+}
+
+/** Default de todo gasto con origen ausente: no toca la caja. */
+export const DEFAULT_EXPENSE_FUND_SOURCE: ExpenseFundSource = ExpenseFundSource.Externo;
 
 /**
  * currency-in-costs-and-prices (plan 2026-09-16): moneda de los precios y
@@ -145,6 +199,18 @@ export enum ExpenseType {
  * — la serialización es el número, así que este orden queda CONGELADO desde
  * el día 1: reordenar/insertar valores rompería datos históricos.
  */
+/** Tipo de comisión de un producto para los gestores de ventas (espejo de C# SalesCommissionType). */
+export enum SalesCommissionType {
+  Percentage = 1,
+  Fixed = 2,
+}
+
+/** Estado del pago de una comisión (espejo de C# SalesCommissionStatus). */
+export enum SalesCommissionStatus {
+  Pending = 0,
+  Paid = 1,
+}
+
 export enum Currency {
   CUP = 0,
   USD = 1,

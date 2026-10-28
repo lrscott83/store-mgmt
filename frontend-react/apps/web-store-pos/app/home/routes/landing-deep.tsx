@@ -887,7 +887,7 @@ export default function LandingDeep() {
               </svg>
             </Link>
             <p className="mt-5 text-sm tracking-wide text-text-muted/60">
-              2 meses de prueba gratis · Pago mensual post-uso
+              1 mes de prueba gratis · Pago mensual post-uso
             </p>
           </div>
         </div>

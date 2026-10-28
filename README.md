@@ -213,6 +213,82 @@ podman exec -it smca_postgres_db psql -U postgres -d smca
 
 ---
 
+## Manual de usuario (`docs/manual`)
+
+El manual del POS vive en `docs/manual/manual-usuario-pos.md`. Las imágenes que referencia están
+en `docs/manual/img/` y se generan con `frontend-react/scripts/capture-manual.mjs` (Playwright,
+viewport móvil iPhone 13). El script **registra un owner de ejemplo** (login `e2e-…`), siembra el
+catálogo y los datos por la UI real y captura las pantallas.
+
+### Requisitos
+
+1. Backend de pruebas (`http-e2e`, puerto 5019, base `smca_test`):
+
+   ```bash
+   dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
+   ```
+
+2. Dev server en `http://localhost:3333` apuntando a ese backend. Playwright lo levanta solo con
+   la configuración de E2E; si lo levantas a mano:
+
+   ```bash
+   cd frontend-react/apps/web-store-pos
+   API_URL=http://localhost:5019/api pnpm dev
+   ```
+
+### Corridas
+
+```bash
+cd frontend-react
+
+# Corrida COMPLETA: siembra los datos y REGENERA TODO el set de imágenes.
+node scripts/capture-manual.mjs
+
+# SOLO las imágenes nuevas (no reescribe ninguna existente).
+CAPTURE_ONLY=new node scripts/capture-manual.mjs
+```
+
+En PowerShell:
+
+```powershell
+$env:CAPTURE_ONLY='new'; node scripts/capture-manual.mjs
+```
+
+El modo `CAPTURE_ONLY=new` hace el mismo sembrado (lo necesitan las vistas) pero **solo escribe**
+las imágenes nuevas de la tabla siguiente; no toca `01`…`54`.
+
+### Optimización al generar (2026-10-27)
+
+`pnpm generate:manual` **no copia las imágenes tal cual**: recorta el espacio muerto inferior,
+convierte los PNG a **WebP sin pérdida** y elige siempre el archivo más pequeño (si el WebP de un
+JPG pesa más, conserva el JPG). Las fuentes de `docs/manual/img/` **no se modifican**. Además el
+HTML generado añade `loading="lazy"`, `decoding="async"` y `width`/`height` a cada `<img>`.
+
+Resultado medido: imágenes servidas **10,62 MB → 5,17 MB**. El PDF se queda en ~9 MB porque
+Chromium imprime a resolución completa y no reutiliza el WebP; se descarga aparte y no afecta a la
+carga de la página. Análisis completo en `docs/plans/2026-10-27-manual-image-optimization.md`.
+
+### Imágenes nuevas (2026-10-27)
+
+| Archivo | Sección | Qué muestra |
+| --- | --- | --- |
+| `55-historial-ventas-1.png`, `-2.png` | 13.1 | Historial de ventas de una tienda, con un día desplegado |
+| `56-historial-ventas-multitienda-1.png`, `-2.png` | 13.1 | Historial de ventas con paneles por tienda (MultiStores) |
+| `57-creditos-historial-1.png`, `-2.png` | 11 | Historial de créditos con el filtro Por Pagar |
+| `58-salida.png` | 18 | Salida con el selector Tipo en Merma (solo Merma / Ajuste / Otro) |
+| `59-entradas-historial-1.png`, `-2.png` | 15 | Historial de entradas |
+| `60-gastos-historial-1.png`, `-2.png` | 22 | Historial de gastos |
+
+### Contrato de la pantalla Salida
+
+`/inventory/egress` registra **salidas de inventario que no son ventas**. Desde el 2026-10-27 su
+selector **Tipo** ofrece únicamente **Merma**, **Ajuste** y **Otro**, con **Merma** por defecto.
+**Normal** y **Mayorista** no aparecen: la venta normal vive en `/sales/new` y la venta al por
+mayor en `/sales/wholesale`. Los E2E que fijan este contrato son `e2e/wholesale-sale.spec.ts` y
+`e2e/inventory-egress.spec.ts`.
+
+---
+
 ## Suite de tests — ejecución manual
 
 Pasos verificados (2026-09-03) para correr a mano toda la suite, en orden: checks y tests del backend, E2E del backend, checks y tests del frontend, E2E del frontend. Detalle profundo por suite: `docs/testing/README.md` y `frontend-react/e2e/README.md`.

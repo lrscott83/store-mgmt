@@ -66,11 +66,19 @@ const catalogMock = vi.hoisted(() => ({
 // El módulo se sustituye ENTERO, pero no sus exports que no son el servicio: la vista consume el
 // enum `CatalogShowcaseKind` por VALOR y lo necesita de aquí. Mismo patrón que el resto de pruebas
 // del catálogo (`public-catalog.test.tsx`, `storefront-flow.test.tsx`).
+const storeScopeMock = vi.hoisted(() => ({
+  catalogClientForStore: vi.fn(),
+}));
+
 vi.mock('~/sales/lib/services/catalog-http-service', async () => {
   const actual = await vi.importActual<
     typeof import('~/sales/lib/services/catalog-http-service')
   >('~/sales/lib/services/catalog-http-service');
-  return { ...actual, catalogHttpService: { ...actual.catalogHttpService, ...catalogMock } };
+  return {
+    ...actual,
+    catalogHttpService: { ...actual.catalogHttpService, ...catalogMock },
+    catalogClientForStore: storeScopeMock.catalogClientForStore,
+  };
 });
 
 const showBlockingErrorMock = vi.hoisted(() => vi.fn());
@@ -98,6 +106,7 @@ vi.mock('~/management/stores/lib/services/store-http-service', async () => {
 });
 
 import { buildCatalogSnapshot } from '~/sales/lib/catalog/catalog-snapshot';
+import { WebCatalogSettingsView } from '~/sales/components/web-catalog-settings-view';
 import { WebCatalogPage, clientLoader } from '../web-catalog';
 
 const buildCatalogSnapshotMock = vi.mocked(buildCatalogSnapshot);
@@ -1312,6 +1321,12 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   //   expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
   // });
   // ────────────────────────────────────────────────────────────────────────────────
+
+  it('no muestra la tarjeta de import CSV del SuperAdmin (el dueño usa /sales/products)', async () => {
+    renderPage();
+    await waitFor(() => expect(catalogMock.getStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId('catalog-csv-import')).not.toBeInTheDocument();
+  });
 });
 
 describe('clientLoader del catálogo (módulo 18 + Owner)', () => {
@@ -1350,5 +1365,83 @@ describe('clientLoader del catálogo (módulo 18 + Owner)', () => {
 
     expect(session.logout).toHaveBeenCalled();
     expect(result).toBeInstanceOf(Response);
+  });
+});
+
+/**
+ * Modo SuperAdmin (2026-10-22): la MISMA vista, abierta con `storeId` desde
+ * `/admin/stores/:storeId/web-catalog`. La tienda sale de la RUTA y los endpoints son store-scoped;
+ * la sesión del SuperAdmin no tiene tienda seleccionada y no se toca.
+ */
+describe('WebCatalogSettingsView — modo SuperAdmin (store-scoped)', () => {
+  const scoped = {
+    getStatus: vi.fn(),
+    getProducts: vi.fn(),
+    sync: vi.fn(),
+    saveProductFields: vi.fn(),
+    uploadImage: vi.fn(),
+    removeImage: vi.fn(),
+    reorderImages: vi.fn(),
+    getBranding: vi.fn(),
+    updateBranding: vi.fn(),
+    getShowcaseImages: vi.fn(),
+    uploadShowcaseImage: vi.fn(),
+    removeShowcaseImage: vi.fn(),
+    reorderShowcaseImages: vi.fn(),
+  };
+
+  function renderAdminView() {
+    return render(
+      <IntlProvider locale="es" messages={esMessages}>
+        <WebCatalogSettingsView storeId="store-route" />
+      </IntlProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Un SuperAdmin por definición NO tiene tienda seleccionada; aun así el test le deja una para
+    // probar que la de la ruta manda igualmente.
+    session.user = makeUser({
+      isSuperAdmin: true,
+      isOwnerAdmin: false,
+      selectedStoreId: 'session-store',
+    });
+    scoped.getStatus.mockResolvedValue(envelope(STATUS));
+    scoped.getProducts.mockResolvedValue(envelope([PRODUCT]));
+    scoped.getBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
+    scoped.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE_EMPTY));
+    scoped.sync.mockResolvedValue(
+      envelope({
+        storeSlug: 'mi-tienda',
+        catalogUrl: '/catalog/mi-tienda',
+        syncedAt: '2026-10-22T10:00:00Z',
+        categoriesCreated: 0,
+        categoriesUpdated: 0,
+        productsCreated: 0,
+        productsUpdated: 1,
+        productsDeactivated: 0,
+      }),
+    );
+    storeMock.getStore.mockResolvedValue(envelope(STORE));
+    storeScopeMock.catalogClientForStore.mockReturnValue(scoped);
+  });
+
+  it('SCOPE-1: usa el cliente store-scoped de la tienda de la RUTA, no el de la sesión', async () => {
+    renderAdminView();
+
+    await waitFor(() =>
+      expect(storeScopeMock.catalogClientForStore).toHaveBeenCalledWith('store-route'),
+    );
+    await waitFor(() => expect(scoped.getStatus).toHaveBeenCalled());
+    await waitFor(() => expect(scoped.getBranding).toHaveBeenCalled());
+    expect(catalogMock.getStatus).not.toHaveBeenCalled();
+    expect(catalogMock.getBranding).not.toHaveBeenCalled();
+  });
+
+  it('SCOPE-3: muestra la tarjeta de import CSV (solo existe en la vista del SuperAdmin)', async () => {
+    renderAdminView();
+
+    expect(await screen.findByTestId('catalog-csv-import')).toBeInTheDocument();
   });
 });

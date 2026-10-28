@@ -118,6 +118,8 @@ export interface OnlineOrderListItem {
   currency: number;
   status: OnlineOrderStatus;
   paymentStatus: OnlineOrderPaymentStatus;
+  /** Momento en que el pedido quedó pagado (UTC). null mientras siga pendiente. */
+  paidAt: string | null;
   /** Repartidor asignado. null mientras nadie lo asigne. */
   driverId: string | null;
   /** Nombre YA resuelto por el servidor: la tabla lo pinta sin una segunda consulta por fila. */

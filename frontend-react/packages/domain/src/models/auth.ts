@@ -105,6 +105,8 @@ export interface UserModel extends AuthModel {
   isSuperAdmin: boolean;
   isOwnerAdmin: boolean;
   isReSeller: boolean;
+  /** Gestor de ventas (rol 5, Owner-level). Opcional para perfiles cacheados previos. */
+  isGestorVentas?: boolean;
   /** Tiendas del owner (auth/me, solo OwnerAdmin) — resuelve el nombre destino de sale_out. */
   storeList?: StoreSummary[];
   selectedStoreId: string;

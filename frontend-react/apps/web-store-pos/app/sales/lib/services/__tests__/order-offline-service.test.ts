@@ -2491,4 +2491,47 @@ describe('OrderOfflineService', () => {
       expect(categories[0].total).toBe(50);
     });
   });
+
+  // Web-catalog bridge: `Order.onlineOrderId` is the idempotency key of the sale, so it has
+  // to survive the createOrder round-trip and stay null on hand-registered sales.
+  describe('ORD-WC: createOrder persists the web-catalog onlineOrderId', () => {
+    it('stores the online order id from the snapshot', async () => {
+      const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+
+      const result = await service.createOrder(
+        items,
+        OrderType.Normal,
+        false,
+        PaymentType.Efectivo,
+        undefined,
+        '',
+        SalePaymentMethod.Efectivo,
+        undefined,
+        { storeId, onlineOrderId: 'online-order-1' },
+      );
+
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.onlineOrderId).toBe('online-order-1');
+      expect(findOrder(result.data!.id)?.onlineOrderId).toBe('online-order-1');
+    });
+
+    it('leaves it null when the snapshot does not carry one', async () => {
+      const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 1 }]);
+
+      const result = await service.createOrder(
+        items,
+        OrderType.Normal,
+        false,
+        PaymentType.Efectivo,
+        undefined,
+        '',
+        SalePaymentMethod.Efectivo,
+        undefined,
+        { storeId },
+      );
+
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.onlineOrderId).toBeNull();
+    });
+  });
 });

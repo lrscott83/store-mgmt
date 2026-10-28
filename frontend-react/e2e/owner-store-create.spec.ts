@@ -88,8 +88,15 @@ async function readSuperiorPlanModuleIds(): Promise<number[]> {
   const client = new Client({ connectionString });
   try {
     await client.connect();
+    // Mirrors CreateStoreService.cs:62: only modules that are active and
+    // available to store are copied into a brand-new store, even when the plan
+    // catalog still lists an inactive member (e.g. module 22 ONAT).
     const result = await client.query(
-      'SELECT "ModuleId" FROM "StorePlanModule" WHERE "PlanId" = $1 ORDER BY "ModuleId"',
+      `SELECT spm."ModuleId"
+         FROM "StorePlanModule" spm
+         JOIN "Module" m ON m."Id" = spm."ModuleId"
+        WHERE spm."PlanId" = $1 AND m."IsActive" AND m."AvailableToStore"
+        ORDER BY spm."ModuleId"`,
       [SUPERIOR_PLAN_ID],
     );
     return result.rows.map((r) => r.ModuleId as number);

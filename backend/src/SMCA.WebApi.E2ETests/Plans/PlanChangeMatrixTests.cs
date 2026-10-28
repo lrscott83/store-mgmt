@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Application.Dtos.Authentication;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
+using Domain.Entities.Modules;
 using Domain.Entities.Owners;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
@@ -89,6 +90,10 @@ public sealed class PlanChangeMatrixTests
         // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 en Superior y VIP, igual que
         // Catálogo web (modulos-pedidos-whatsapp-gestion).
         (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
+        // Gestores de ventas (2026-10-21, feature S1): módulo 21 en Superior y VIP.
+        (int)ModuleType.GestoresVentas,
+        // ONAT (2026-10-27): módulo 22 en Superior y VIP.
+        (int)ModuleType.Onat,
     ];
 
     private static readonly int[] VipUniverse =
@@ -101,6 +106,10 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.Elaboration, (int)ModuleType.WebCatalog,
         // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 también en VIP (planes autocontenidos).
         (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
+        // Gestores de ventas (2026-10-21, feature S1): módulo 21 también en VIP.
+        (int)ModuleType.GestoresVentas,
+        // ONAT (2026-10-27): módulo 22 también en VIP.
+        (int)ModuleType.Onat,
     ];
 
     // ── Module → features the LIVE Feature table exposes as AvailableToStore ──
@@ -135,6 +144,10 @@ public sealed class PlanChangeMatrixTests
         [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog],
         [(int)ModuleType.PedidosWhatsApp] = [(int)FeatureType.PedidosWhatsApp],
         [(int)ModuleType.GestionPedidos] = [(int)FeatureType.OnlineOrders],
+        // Gestores de ventas (módulo 21, feature 125): OwnerAdmin-only.
+        [(int)ModuleType.GestoresVentas] = [(int)FeatureType.GestoresVentas],
+        // ONAT (módulo 22, feature 126): OwnerAdmin-only.
+        [(int)ModuleType.Onat] = [(int)FeatureType.Onat],
     };
 
     // ── The 9 real transitions lacking exact target-universe coverage ──────────
@@ -234,14 +247,24 @@ public sealed class PlanChangeMatrixTests
             // ── /me read-back, SAME owner token (no relogin) ──
             var me = await MeAsync(DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login));
 
-            me.StoreModuleIds.Should().BeEquivalentTo(UniverseOf(to));
+            // Un módulo con el catálogo inactivo (ONAT entra así: IsActive=false) tiene sus
+            // filas por tienda, pero /me NO lo entrega — la lectura exige Module.IsActive.
+            // La expectativa de /me se deriva del catálogo para que siga siendo cierta el día
+            // que el Owner active el módulo.
+            var activeCatalogModuleIds = await db.Set<Module>().IgnoreQueryFilters()
+                .Where(m => m.IsActive)
+                .Select(m => m.Id)
+                .ToListAsync();
+            var visibleUniverse = UniverseOf(to).Where(activeCatalogModuleIds.Contains).ToArray();
+
+            me.StoreModuleIds.Should().BeEquivalentTo(visibleUniverse);
             me.PlanType.Should().Be(to == StorePlanType.Gratis ? "Free" : "Paid");
 
             var retiredModuleIds = UniverseOf(from).Except(UniverseOf(to)).ToArray();
             var retiredFeatureIds = MappedFeaturesOf(retiredModuleIds);
 
             me.FeatureIds.Should().Contain(
-                MappedFeaturesOf(UniverseOf(to)),
+                MappedFeaturesOf(visibleUniverse),
                 "the owner sees the target plan's features via /me");
             if (retiredFeatureIds.Length > 0)
             {
@@ -254,13 +277,13 @@ public sealed class PlanChangeMatrixTests
             // row, module repeats) — aggregate with Distinct before comparing.
             var roleModuleIds = me.Roles.Select(r => r.ModuleId).Distinct().ToList();
             roleModuleIds.Should().Contain(
-                UniverseOf(to).Where(m => MappedFeaturesOf([m]).Length > 0),
+                visibleUniverse.Where(m => MappedFeaturesOf([m]).Length > 0),
                 "every target module that carries features appears in roles");
             if (retiredModuleIds.Length > 0)
                 roleModuleIds.Should().NotContain(retiredModuleIds);
 
             var roleFeatureIds = me.Roles.SelectMany(r => r.FeatureIds).Distinct().ToList();
-            roleFeatureIds.Should().Contain(MappedFeaturesOf(UniverseOf(to)));
+            roleFeatureIds.Should().Contain(MappedFeaturesOf(visibleUniverse));
             if (retiredFeatureIds.Length > 0)
                 roleFeatureIds.Should().NotContain(retiredFeatureIds);
         }
