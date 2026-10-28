@@ -2284,6 +2284,8 @@ const messages: Record<string, string> = {
     'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
   'ONAT.NAME': 'Nombre',
   'ONAT.NIT': 'NIT',
+  // S8: código de barras del RC-05, 16 dígitos sin guiones.
+  'ONAT.RC05': 'RC-05',
   'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
   'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
   'ONAT.MUNICIPALITY': 'Municipio',

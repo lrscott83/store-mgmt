@@ -512,16 +512,21 @@ function normalizarCanal(valor: unknown): OnatCanalPago | null {
 
 function normalizarBonificaciones(valor: unknown): OnatBonificacion[] {
   if (!Array.isArray(valor)) return [];
+  type BonificacionCruda = Record<string, unknown> & { valor: number };
+
   return valor
     .filter(esObjeto)
     .filter((bonificacion) => typeof bonificacion.id === 'string' && bonificacion.id !== '')
-    .filter((bonificacion) => typeof bonificacion.valor === 'number' && Number.isFinite(bonificacion.valor))
+    .filter(
+      (bonificacion): bonificacion is BonificacionCruda =>
+        typeof bonificacion.valor === 'number' && Number.isFinite(bonificacion.valor),
+    )
     .filter((bonificacion) => bonificacion.valor > 0)
     .map((bonificacion) => ({
       id: textoDe(bonificacion.id),
       nombre: textoDe(bonificacion.nombre),
       tipo: bonificacion.tipo === 'importe' ? 'importe' : 'porcentaje',
-      valor: bonificacion.valor as number,
+      valor: bonificacion.valor,
       aplica: bonificacion.aplica === 'impuesto' ? 'impuesto' : 'base',
     }));
 }

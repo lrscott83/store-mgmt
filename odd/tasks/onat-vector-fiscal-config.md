@@ -56,8 +56,8 @@ pago electrónico) y la aplicación aplica el porcentaje.
 
 | ID | Tarea | Specs | Estado |
 |---|---|---|---|
-| T1 | Modelo `OnatVector`, parser/serializador CSV, persistencia por año, marcar pagado | S1–S8 | done — verificado |
-| T2 | UI Configuraciones: selector de año, RC-05, tabla de tributos con su % | S1,S3,S8 | pendiente |
+| T1 | Modelo `OnatVector`, parser/serializador CSV, persistencia por año, marcar pagado, bonificaciones propias, gastos sin comprobante y correcciones | S1–S11 | done — verificado |
+| T2 | UI Configuraciones: selector de año, RC-05, identidad y actividades por año | S1,S8,S11 | done — verificado |
 | T3 | UI Vector Fiscal: agenda de obligaciones desde la configuración y marcar pagado | S2,S4,S5 | pendiente |
 | T4 | UI import/export del CSV con informe de errores por línea | S2,S7 | pendiente |
 | T5 | Verificación: typecheck, lint y suite del feature | todas | pendiente |
@@ -110,3 +110,13 @@ errores.
 - Fuera: sector cañero y filas 56–68 (cultura).
 
 **L7** — Verificación: `app/onat` 130 tests, typecheck sin errores.
+
+**L8 (2026-10-28)** — T2 entregado por el worker y verificado por el padre.
+- `configurations.tsx` migrado de `onat-storage` a `onat-vector`: selector de año (año actual + 4 anteriores),
+  campo RC-05, identidad y actividades por año, y guardado que conserva obligaciones, bonificaciones, gastos
+  sin comprobante y correcciones del ejercicio.
+- La tabla de tributos con su % **no va en esta pantalla**: el porcentaje viene en el CSV, así que la fila de
+  la tarea se corrigió.
+- Defecto encontrado por el worker y corregido por el padre: `normalizarBonificaciones` no estrechaba el tipo
+  de `valor` y `tsc` fallaba (`TS18046`). Se resolvió con un predicado de tipo.
+- Verificación: `pnpm typecheck` OK; `pnpm lint` OK; `app/onat` **143 tests**.
