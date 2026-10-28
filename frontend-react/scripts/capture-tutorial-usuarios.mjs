@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 const BASE = process.env.CAPTURE_BASE_URL ?? 'http://localhost:3333';
 const OUT_DIR =
   process.env.CAPTURE_OUT ??
-  resolve(process.cwd(), 'apps', 'web-store-pos', 'public', 'images', 'help');
+  resolve(process.cwd(), 'apps', 'web-store-pos', 'public', 'tutorials', 'usuarios');
 
 const MOBILE = devices['iPhone 13'];
 
