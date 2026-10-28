@@ -62,11 +62,11 @@ genérica: se genera por NIT y lista, obligación por obligación:
 2. **Oficina municipal de la ONAT** del domicilio fiscal.
 3. En papel, como **RC-04A**, para pagar en agencia bancaria o por Transfermóvil.
 
-> **Limitación conocida:** el vector fiscal real **no es público**. El servicio del portal está
-> autenticado, por lo que este repositorio **no contiene un ejemplar oficial**. Lo más cercano
-> disponible son el RC-04/RC-04A, el CR-09 y el Registro de Ingresos y Gastos.
-> Para construir el modelo de datos conviene conseguir un ejemplar real con datos personales
-> tapados.
+> **Actualización (2026-10-28):** el repositorio **sí contiene tres ejemplares reales**, transcritos en
+> `md/ejemplo-vector-fiscal.md` (2021), `md/vector-fiscal-2025.md` y `md/vector-fiscal-2026.md`.
+> Los tres tienen capa de texto. Con ellos queda fijada la forma de la tabla: 5 columnas
+> (período, vencimiento, código de tributo, importe, código RC-04A), con el importe vacío en los
+> tributos variables y el código RC-04A de 5 dígitos como referencia de pago.
 
 ---
 
@@ -315,7 +315,10 @@ docs/vector-fiscal/
 │   ├── decreto-ley-90-tcp-concordado-2026.md       Decreto-Ley 90/2024 TCP, anotado y concordado (ES-12)
 │   ├── resolucion-246-2023-tributos-tcp.md         Res. 246/2023 MFP: ventas 10 %, cuota 5 %, cuenta fiscal
 │   ├── instructivo-dj08-2026.md                    Instructivo oficial de llenado de la DJ-08 (secciones A–I)
-│   ├── bonificaciones-dj08.md                      ⚠ vacío: el PDF original es un escaneo sin capa de texto
+│   ├── bonificaciones-dj08.md                      transcripción manual de la infografía escaneada
+│   ├── ejemplo-vector-fiscal.md                    vector fiscal real 2021 (10 tributos, 7 columnas)
+│   ├── vector-fiscal-2025.md                       vector fiscal real 2025 (4 tributos, 29 obligaciones)
+│   ├── vector-fiscal-2026.md                       vector fiscal real 2026 (4 tributos, 29 obligaciones)
 │   └── contabilidad/
 │       ├── resolucion-494-2016-contabilidad.md
 │       ├── resolucion-498-2016-estados-financieros.md
@@ -335,15 +338,15 @@ docs/vector-fiscal/
 
 - **Res. 345/2021, 346/2021 y 347/2021 (MFP):** conocidas por las cláusulas "POR CUANTO" de la
   Res. 246/2023, que las modifica. No se localizó el PDF en el portal.
-- **Vector fiscal de ejemplo:** no existe ejemplar público; requiere autenticación en el portal.
+- **Vector fiscal de ejemplo:** resuelto. Tres ejemplares reales (2021, 2025, 2026) transcritos en `md/`.
 - **RC-04 / RC-04A / CR-09:** modelos de pago. El CR-09 está en Descargas (páginas 12 del portal).
 
 ---
 
 ## 9. Pendientes / preguntas abiertas
 
-- [ ] Conseguir un **vector fiscal real** de un TCP (datos personales tapados) para fijar el
-      modelo de datos.
+- [x] ~~Conseguir un **vector fiscal real** de un TCP (datos personales tapados) para fijar el
+      modelo de datos.~~ Resuelto: 2021, 2025 y 2026 en `md/`.
 - [ ] Confirmar con la ONAT la vigencia de la **Res. 346/2021** frente al paquete **494/2016**.
 - [ ] Verificar la **escala del ejercicio 2026** (ingresos de 2026, a declarar en 2027) cuando se
       publique la Ley del Presupuesto 2027.
