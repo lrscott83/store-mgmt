@@ -339,6 +339,28 @@ export function tributosDelVector(obligaciones: readonly OnatObligacion[]): Onat
   return [...vistos.values()];
 }
 
+/** Lo que se pierde al importar un CSV: el archivo reemplaza la agenda completa. */
+export interface OnatImportImpacto {
+  /** Obligaciones que hay hoy para ese año. */
+  obligacionesActuales: number;
+  /** De ellas, cuántas están marcadas como pagadas. */
+  pagadas: number;
+  /** De ellas, cuántas tienen importe calculado (porcentaje o cierre). */
+  calculadas: number;
+}
+
+/**
+ * Resumen del estado que se va a destruir al importar. La pantalla lo usa para
+ * avisar antes de reemplazar: el import no conserva marcas de pago ni cálculos.
+ */
+export function impactoDeImportar(vector: OnatVector): OnatImportImpacto {
+  return {
+    obligacionesActuales: vector.obligaciones.length,
+    pagadas: vector.obligaciones.filter((obligacion) => obligacion.pagado).length,
+    calculadas: vector.obligaciones.filter((obligacion) => obligacion.porcentaje !== null).length,
+  };
+}
+
 export function crearVectorVacio(ownerId: string, year: number): OnatVector {
   return {
     ownerId,

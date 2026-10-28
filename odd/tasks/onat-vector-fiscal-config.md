@@ -31,7 +31,14 @@ el caso del `0530222`.
 **S8 — Identidad con RC-05 y ejercicio.** La identidad guarda el código de barras del RC-05 (16 dígitos) y el
 vector vive bajo un año.
 
-**S9 — Solo frontend.** Sin backend, sin endpoints. Persistencia por Owner y año en `localStorage`.
+**S9 — La liquidación adicional anual se calcula.** El importe del `0530222` no viene del CSV: sale del
+**cierre anual vigente** (`cierreAnual`), con la escala progresiva, el mínimo exento y las deducciones. Se usa
+la última versión del cálculo que exista en el repo, no una copia paralela.
+
+**S10 — Reimportar avisa antes de borrar.** El import reemplaza todo, así que la pantalla debe informar
+cuántas obligaciones, cuántas marcas de pago y cuántos importes calculados se van a perder antes de escribir.
+
+**S11 — Solo frontend.** Sin backend, sin endpoints. Persistencia por Owner y año en `localStorage`.
 
 ## Tasks
 
@@ -60,3 +67,17 @@ typecheck sin errores.
 
 **L3** — Decisión de alcance: el porcentaje vive en la configuración del año (junto al tributo), no en el
 CSV. Son dos piezas del mismo vector y el CSV solo representa la tabla.
+
+**L4 (2026-10-28)** — Correcciones del Owner, verbatim:
+
+> 1. Se debe calcular, pero debes usar el calculo de la ultima porque creo que se hizo cambios. 2. Si el
+> usuario va a reimportarlo todo se borra, se debe notificar al usuario que se perderan esos valores y los
+> calculos realizados. 3. Asi esta bien
+
+- `0530222` se calcula con el cierre anual vigente. Verificado: la última versión del cálculo es
+  `51b025a2 refactor(onat)`; hoy contempla el 5 % de pronto pago y no los dos 3 % de la DJ-08.
+- Se añade `impactoDeImportar` para que la UI cuente obligaciones, pagadas y calculadas antes de reemplazar.
+- El porcentaje se escribe en por ciento (`10` = 10 %).
+
+**L5** — Verificación de T1: `onat-vector.test.ts` 32 tests; suite `app/onat` 123 tests; typecheck sin
+errores.

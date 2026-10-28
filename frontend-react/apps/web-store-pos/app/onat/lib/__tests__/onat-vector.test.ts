@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   crearVectorVacio,
   getOnatVector,
+  impactoDeImportar,
   importOnatCsv,
   parseOnatCsv,
   saveOnatVector,
@@ -209,6 +210,28 @@ describe('tributosDelVector', () => {
     expect(tributos).toHaveLength(4);
     expect(tributos[0]).toEqual({ codigo: '0114022', porcentaje: 0.1, base: 'ingresos' });
     expect(tributos[2]).toEqual({ codigo: '0820132', porcentaje: null, base: 'fija' });
+  });
+});
+
+describe('impactoDeImportar', () => {
+  it('cuenta obligaciones, pagadas y calculadas antes de reemplazar', () => {
+    const obligaciones = parseOnatCsv(CSV_VALIDO).obligaciones.map((obligacion) =>
+      obligacion.codigo === '0114022' && obligacion.periodo === '2026-01'
+        ? { ...obligacion, pagado: true }
+        : obligacion,
+    );
+
+    const impacto = impactoDeImportar(vectorConObligaciones(obligaciones));
+
+    expect(impacto).toEqual({ obligacionesActuales: 4, pagadas: 1, calculadas: 2 });
+  });
+
+  it('sin obligaciones el impacto es cero', () => {
+    expect(impactoDeImportar(crearVectorVacio(OWNER_ID, YEAR))).toEqual({
+      obligacionesActuales: 0,
+      pagadas: 0,
+      calculadas: 0,
+    });
   });
 });
 
