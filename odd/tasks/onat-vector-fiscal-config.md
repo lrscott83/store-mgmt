@@ -58,7 +58,7 @@ pago electrónico) y la aplicación aplica el porcentaje.
 |---|---|---|---|
 | T1 | Modelo `OnatVector`, parser/serializador CSV, persistencia por año, marcar pagado, bonificaciones propias, gastos sin comprobante y correcciones | S1–S11 | done — verificado |
 | T2 | UI Configuraciones: selector de año, RC-05, identidad y actividades por año | S1,S8,S11 | done — verificado |
-| T3 | UI Vector Fiscal: agenda de obligaciones desde la configuración y marcar pagado | S2,S4,S5 | pendiente |
+| T3 | UI Vector Fiscal: agenda de obligaciones desde la configuración, cálculo por porcentaje o importe, y marcar pagado con canal | S2,S3,S4,S5 | done — verificado |
 | T4 | UI import/export del CSV con informe de errores por línea | S2,S7 | pendiente |
 | T5 | Verificación: typecheck, lint y suite del feature | todas | pendiente |
 
@@ -120,3 +120,11 @@ errores.
 - Defecto encontrado por el worker y corregido por el padre: `normalizarBonificaciones` no estrechaba el tipo
   de `valor` y `tsc` fallaba (`TS18046`). Se resolvió con un predicado de tipo.
 - Verificación: `pnpm typecheck` OK; `pnpm lint` OK; `app/onat` **143 tests**.
+
+**L9 (2026-10-28)** — T3 entregado por el worker y verificado por el padre.
+- Agenda de obligaciones en `vector-fiscal.tsx`: período, vencimiento, código, importe, RC-04A y estado.
+- Importe: `importe` manda; si no, `base × porcentaje`; sin ninguno de los dos, "pendiente de declarar".
+  Mensual usa su mes, trimestral suma los tres meses del trimestre y anual suma los doce.
+- Marcar pagado y elegir canal (efectivo / electrónico), con el texto que explica el 3 %; desmarcar borra el canal.
+- `cierreAnual` recibe el año para elegir la escala.
+- Verificación del padre: `app/onat` **151 tests**, `pnpm typecheck` OK, solo los tres archivos autorizados cambiados.

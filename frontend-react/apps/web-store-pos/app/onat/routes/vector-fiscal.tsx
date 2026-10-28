@@ -4,6 +4,7 @@ import { ExpenseType, EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import { ownerModuleLoader, ownerOnlyLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { round2 } from '~/shared/lib/money';
 import {
   cierreAnual,
   cuotaMensual,
@@ -16,6 +17,8 @@ import { ONAT_TAXONOMY } from '~/onat/lib/onat-taxonomy';
 import type { OnatTaxonomyEntry } from '~/onat/lib/onat-taxonomy';
 import { getOnatOverrides, setOnatOverride } from '~/onat/lib/onat-storage';
 import type { OnatMonthOverrides, OnatOverride, OnatOverrides } from '~/onat/lib/onat-storage';
+import { getOnatVector, setCanalPago, setObligacionPagada } from '~/onat/lib/onat-vector';
+import type { OnatCanalPago, OnatObligacion } from '~/onat/lib/onat-vector';
 
 /**
  * S2: el Vector Fiscal es del Owner — `isOwnerAdmin` y NO `isSuperAdmin`.
@@ -109,6 +112,77 @@ function monthOverridesFor(
 
 function sumTaxBucket(months: readonly OnatMonth[], tipo: ExpenseType): number {
   return months.reduce((total, month) => total + (month.taxesByType[tipo] ?? 0), 0);
+}
+
+interface AgendaGroup {
+  periodo: string;
+  obligaciones: OnatObligacion[];
+}
+
+const PERIODO_MENSUAL = /^\d{4}-(0[1-9]|1[0-2])$/;
+const PERIODO_TRIMESTRAL = /^\d{4}-Q[1-4]$/;
+const PERIODO_ANUAL = /^\d{4}-A$/;
+
+/** Meses (0-11) que cubre el período; `null` si no es un período reconocible. */
+function monthsOfPeriod(periodo: string): number[] | null {
+  if (PERIODO_MENSUAL.test(periodo)) return [Number(periodo.slice(5)) - 1];
+
+  if (PERIODO_TRIMESTRAL.test(periodo)) {
+    const first = (Number(periodo.slice(6)) - 1) * 3;
+    return [first, first + 1, first + 2];
+  }
+
+  if (PERIODO_ANUAL.test(periodo)) return Array.from({ length: 12 }, (_, month) => month);
+
+  return null;
+}
+
+/**
+ * S6: la base del tributo es el ingreso o el salario del período, ya con las
+ * correcciones del Owner aplicadas (los salarios no se corrigen: solo ingresos
+ * y gastos tienen override).
+ */
+function baseAmount(
+  obligacion: OnatObligacion,
+  rowsByMonth: ReadonlyMap<number, VectorRow>,
+): number | null {
+  const months = monthsOfPeriod(obligacion.periodo);
+  if (months === null) return null;
+
+  if (obligacion.base === 'ingresos') {
+    return months.reduce((total, month) => total + (rowsByMonth.get(month)?.income ?? 0), 0);
+  }
+
+  if (obligacion.base === 'salarios') {
+    return months.reduce(
+      (total, month) => total + (rowsByMonth.get(month)?.month.salaries ?? 0),
+      0,
+    );
+  }
+
+  return null;
+}
+
+/**
+ * S3: el importe del vector manda; sin importe se calcula `base × porcentaje`;
+ * sin ninguno de los dos la obligación queda pendiente de declarar.
+ */
+function obligationAmount(
+  obligacion: OnatObligacion,
+  rowsByMonth: ReadonlyMap<number, VectorRow>,
+): number | null {
+  if (obligacion.importe !== null) return obligacion.importe;
+  if (obligacion.porcentaje === null) return null;
+
+  const base = baseAmount(obligacion, rowsByMonth);
+  return base === null ? null : round2(base * obligacion.porcentaje);
+}
+
+function statusMessageId(obligacion: OnatObligacion): string {
+  if (!obligacion.pagado) return 'ONAT.UNPAID';
+  if (obligacion.canalPago === 'efectivo') return 'ONAT.PAID_CASH';
+  if (obligacion.canalPago === 'electronico') return 'ONAT.PAID_ELECTRONIC';
+  return 'ONAT.PAID';
 }
 
 function AnnualLine({ labelId, value }: { labelId: string; value: number }) {
@@ -253,6 +327,8 @@ export function VectorFiscalPage() {
   const [retryToken, setRetryToken] = useState(0);
   const [overrides, setOverrides] = useState<OnatOverrides>({});
   const [pagaAntesDel28Febrero, setPagaAntesDel28Febrero] = useState(false);
+  const [obligaciones, setObligaciones] = useState<OnatObligacion[]>([]);
+  const [agendaFailed, setAgendaFailed] = useState(false);
 
   const storeIds = useMemo(() => resolveStoreIds(user), [user]);
   const years = useMemo(() => {
@@ -263,6 +339,13 @@ export function VectorFiscalPage() {
   useEffect(() => {
     setOverrides(ownerId ? getOnatOverrides(ownerId) : {});
   }, [ownerId]);
+
+  // S1/S5: la agenda es la del vector de ESTE Owner y ESTE año; se relee al
+  // cambiar de ejercicio porque cada uno tiene sus propias obligaciones.
+  useEffect(() => {
+    setObligaciones(ownerId ? getOnatVector(ownerId, year).obligaciones : []);
+    setAgendaFailed(false);
+  }, [ownerId, year]);
 
   useEffect(() => {
     let cancelled = false;
@@ -305,6 +388,26 @@ export function VectorFiscalPage() {
     });
   }, [aggregation, overrides, year]);
 
+  const rowsByMonth = useMemo(
+    () => new Map(rows.map((row) => [row.month.month, row])),
+    [rows],
+  );
+
+  const agenda = useMemo<AgendaGroup[]>(() => {
+    const groups = new Map<string, OnatObligacion[]>();
+
+    for (const obligacion of obligaciones) {
+      const group = groups.get(obligacion.periodo);
+      if (group === undefined) {
+        groups.set(obligacion.periodo, [obligacion]);
+      } else {
+        group.push(obligacion);
+      }
+    }
+
+    return [...groups].map(([periodo, group]) => ({ periodo, obligaciones: group }));
+  }, [obligaciones]);
+
   const annualTotals = useMemo(() => {
     const months = aggregation?.months ?? [];
 
@@ -339,6 +442,7 @@ export function VectorFiscalPage() {
   const cierre = useMemo(
     () =>
       cierreAnual({
+        year,
         ingresos: annualTotals.ingresos,
         gastos: annualTotals.gastos,
         tributosDeducibles: annualTotals.tributosDeducibles,
@@ -348,7 +452,7 @@ export function VectorFiscalPage() {
         cuotasPagadas: annualTotals.cuotasPagadas,
         pagaAntesDel28Febrero,
       }),
-    [annualTotals, pagaAntesDel28Febrero],
+    [annualTotals, pagaAntesDel28Febrero, year],
   );
 
   const saveOverride = (month: OnatMonth, field: OverrideField, value: number): boolean => {
@@ -367,6 +471,30 @@ export function VectorFiscalPage() {
     // Recargar para que el paréntesis del original salga del dato persistido.
     setOverrides(getOnatOverrides(ownerId));
     return true;
+  };
+
+  const refreshAgenda = () => {
+    setObligaciones(ownerId ? getOnatVector(ownerId, year).obligaciones : []);
+  };
+
+  const toggleObligacionPagada = (obligacion: OnatObligacion) => {
+    if (!ownerId) return;
+    const result = setObligacionPagada(
+      ownerId,
+      year,
+      obligacion.periodo,
+      obligacion.codigo,
+      !obligacion.pagado,
+    );
+    setAgendaFailed(!result.succeeded);
+    if (result.succeeded) refreshAgenda();
+  };
+
+  const chooseChannel = (obligacion: OnatObligacion, canalPago: OnatCanalPago) => {
+    if (!ownerId) return;
+    const result = setCanalPago(ownerId, year, obligacion.periodo, obligacion.codigo, canalPago);
+    setAgendaFailed(!result.succeeded);
+    if (result.succeeded) refreshAgenda();
   };
 
   return (
@@ -466,6 +594,171 @@ export function VectorFiscalPage() {
                 ))}
               </tbody>
             </table>
+          </section>
+
+          <section
+            aria-labelledby="onat-agenda"
+            className="space-y-3 rounded-lg border border-border bg-surface p-4"
+          >
+            <div>
+              <h2 id="onat-agenda" className="text-sm font-semibold text-text">
+                {intl.formatMessage({ id: 'ONAT.AGENDA' })}
+              </h2>
+              <p className="mt-1 text-xs text-text-muted">
+                {intl.formatMessage({ id: 'ONAT.AGENDA_HINT' })}
+              </p>
+            </div>
+
+            {agendaFailed && (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {intl.formatMessage({ id: 'ONAT.SAVE_ERROR' })}
+              </p>
+            )}
+
+            {agenda.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                {intl.formatMessage({ id: 'ONAT.AGENDA_EMPTY' })}
+              </p>
+            ) : (
+              agenda.map((group) => (
+                <section
+                  key={group.periodo}
+                  aria-labelledby={`onat-periodo-${group.periodo}`}
+                  className="space-y-2"
+                >
+                  <h3
+                    id={`onat-periodo-${group.periodo}`}
+                    className="text-sm font-medium text-text"
+                  >
+                    {group.periodo}
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-text-muted">
+                          <th className="px-3 py-2 font-medium">
+                            {intl.formatMessage({ id: 'ONAT.DUE_DATE' })}
+                          </th>
+                          <th className="px-3 py-2 font-medium">
+                            {intl.formatMessage({ id: 'ONAT.CODE' })}
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            {intl.formatMessage({ id: 'ONAT.AMOUNT' })}
+                          </th>
+                          <th className="px-3 py-2 font-medium">
+                            {intl.formatMessage({ id: 'ONAT.RC04A' })}
+                          </th>
+                          <th className="px-3 py-2 font-medium">
+                            {intl.formatMessage({ id: 'ONAT.STATUS' })}
+                          </th>
+                          <th className="px-3 py-2 font-medium">
+                            {intl.formatMessage({ id: 'ONAT.ACTIONS' })}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.obligaciones.map((obligacion, index) => {
+                          const amount = obligationAmount(obligacion, rowsByMonth);
+
+                          return (
+                            <tr
+                              key={`${obligacion.codigo}-${index}`}
+                              className="border-b border-border last:border-b-0"
+                            >
+                              <td className="px-3 py-2 text-text">{obligacion.vence}</td>
+                              <td className="px-3 py-2 text-text">{obligacion.codigo}</td>
+                              <td className="px-3 py-2 text-right text-text">
+                                {amount === null
+                                  ? intl.formatMessage({ id: 'ONAT.PENDING_DECLARATION' })
+                                  : formatCup(amount)}
+                              </td>
+                              <td className="px-3 py-2 text-text">{obligacion.rc04a}</td>
+                              <td className="px-3 py-2 text-text">
+                                {intl.formatMessage({ id: statusMessageId(obligacion) })}
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <div className="space-y-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleObligacionPagada(obligacion)}
+                                    aria-label={intl.formatMessage(
+                                      {
+                                        id: obligacion.pagado
+                                          ? 'ONAT.MARK_UNPAID_FOR'
+                                          : 'ONAT.MARK_PAID_FOR',
+                                      },
+                                      {
+                                        codigo: obligacion.codigo,
+                                        periodo: obligacion.periodo,
+                                      },
+                                    )}
+                                    className="text-xs font-medium text-primary"
+                                  >
+                                    {intl.formatMessage({
+                                      id: obligacion.pagado
+                                        ? 'ONAT.MARK_UNPAID'
+                                        : 'ONAT.MARK_PAID',
+                                    })}
+                                  </button>
+
+                                  {obligacion.pagado && obligacion.canalPago === null && (
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-text">
+                                        {intl.formatMessage({ id: 'ONAT.CHANNEL_QUESTION' })}
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            chooseChannel(obligacion, 'efectivo')
+                                          }
+                                          aria-label={intl.formatMessage(
+                                            { id: 'ONAT.CHANNEL_CASH_FOR' },
+                                            {
+                                              codigo: obligacion.codigo,
+                                              periodo: obligacion.periodo,
+                                            },
+                                          )}
+                                          className="rounded-md border border-border px-2 py-1 text-xs font-medium text-text"
+                                        >
+                                          {intl.formatMessage({ id: 'ONAT.CHANNEL_CASH' })}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            chooseChannel(obligacion, 'electronico')
+                                          }
+                                          aria-label={intl.formatMessage(
+                                            { id: 'ONAT.CHANNEL_ELECTRONIC_FOR' },
+                                            {
+                                              codigo: obligacion.codigo,
+                                              periodo: obligacion.periodo,
+                                            },
+                                          )}
+                                          className="rounded-md border border-border px-2 py-1 text-xs font-medium text-text"
+                                        >
+                                          {intl.formatMessage({
+                                            id: 'ONAT.CHANNEL_ELECTRONIC',
+                                          })}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-text-muted">
+                                        {intl.formatMessage({ id: 'ONAT.CHANNEL_NOTE' })}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))
+            )}
           </section>
 
           {paidTaxes.length > 0 && (
