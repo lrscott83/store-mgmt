@@ -50,7 +50,55 @@ export interface OnatObligacion {
   /** Código de pago de 5 dígitos (RC-04A). */
   rc04a: string;
   pagado: boolean;
+  /**
+   * Por dónde se pagó. Hace falta para el 3 %: el descuento solo aplica al pago
+   * por pasarela. `null` mientras no se haya marcado.
+   */
+  canalPago: OnatCanalPago | null;
 }
+
+/** Canal con el que se pagó una obligación. */
+export type OnatCanalPago = 'efectivo' | 'electronico';
+
+/** Rebaja que el usuario añade a mano; las tres conocidas se calculan solas. */
+export interface OnatBonificacion {
+  id: string;
+  nombre: string;
+  tipo: 'porcentaje' | 'importe';
+  /** `5` con tipo porcentaje es 5 %; con tipo importe son CUP. */
+  valor: number;
+  /** Si resta de la base imponible o del impuesto a pagar. */
+  aplica: 'base' | 'impuesto';
+}
+
+/** Deducción de gastos sin comprobante: casilla y porcentaje, 0 a 20. */
+export interface OnatGastosSinComprobante {
+  activo: boolean;
+  porcentaje: number;
+}
+
+/** Valor recalculado que el Owner corrige; conserva el original congelado. */
+export interface OnatOverride {
+  original: number;
+  value: number;
+  editedAt: string;
+}
+
+/** Alcance de una corrección: un mes concreto (`2026-01`) o el cierre (`anual`). */
+export type OnatAlcance = string;
+
+/** Campos corregibles de la agenda. */
+export type OnatCampoAjustable =
+  | 'ingresos'
+  | 'gastos'
+  | 'tributosPagados'
+  | 'cuotasPagadas'
+  | 'gastosSinComprobante';
+
+export const PORCENTAJE_GASTOS_SIN_COMPROBANTE = 20;
+
+/** alcance → campo → corrección. */
+export type OnatOverrides = Record<OnatAlcance, Partial<Record<OnatCampoAjustable, OnatOverride>>>;
 
 /** Tributo derivado de la agenda: código, porcentaje y base, sin repetir períodos. */
 export interface OnatTributo {
@@ -65,6 +113,10 @@ export interface OnatVector {
   identidad: OnatIdentidad;
   actividades: OnatActividad[];
   obligaciones: OnatObligacion[];
+  /** Rebajas añadidas a mano. Las tres conocidas se calculan, no se guardan aquí. */
+  bonificaciones: OnatBonificacion[];
+  gastosSinComprobante: OnatGastosSinComprobante;
+  overrides: OnatOverrides;
 }
 
 export const ONAT_CSV_COLUMNS = [
@@ -258,6 +310,7 @@ export function parseOnatCsv(texto: string): OnatCsvParseResult {
       base: importe === null && esBaseValida(baseCruda) ? baseCruda : 'fija',
       rc04a,
       pagado,
+      canalPago: null,
     });
   }
 
@@ -376,6 +429,9 @@ export function crearVectorVacio(ownerId: string, year: number): OnatVector {
     },
     actividades: [],
     obligaciones: [],
+    bonificaciones: [],
+    gastosSinComprobante: { activo: false, porcentaje: PORCENTAJE_GASTOS_SIN_COMPROBANTE },
+    overrides: {},
   };
 }
 
@@ -444,9 +500,72 @@ function normalizarObligaciones(valor: unknown): OnatObligacion[] {
         base: importe === null ? base : 'fija',
         rc04a: parseRc04(textoDe(obligacion.rc04a)) ?? '',
         pagado: obligacion.pagado === true,
+        canalPago: normalizarCanal(obligacion.canalPago),
       };
     })
     .filter((obligacion) => obligacion.rc04a !== '');
+}
+
+function normalizarCanal(valor: unknown): OnatCanalPago | null {
+  return valor === 'efectivo' || valor === 'electronico' ? valor : null;
+}
+
+function normalizarBonificaciones(valor: unknown): OnatBonificacion[] {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .filter(esObjeto)
+    .filter((bonificacion) => typeof bonificacion.id === 'string' && bonificacion.id !== '')
+    .filter((bonificacion) => typeof bonificacion.valor === 'number' && Number.isFinite(bonificacion.valor))
+    .filter((bonificacion) => bonificacion.valor > 0)
+    .map((bonificacion) => ({
+      id: textoDe(bonificacion.id),
+      nombre: textoDe(bonificacion.nombre),
+      tipo: bonificacion.tipo === 'importe' ? 'importe' : 'porcentaje',
+      valor: bonificacion.valor as number,
+      aplica: bonificacion.aplica === 'impuesto' ? 'impuesto' : 'base',
+    }));
+}
+
+function normalizarGastosSinComprobante(valor: unknown): OnatGastosSinComprobante {
+  if (!esObjeto(valor)) {
+    return { activo: false, porcentaje: PORCENTAJE_GASTOS_SIN_COMPROBANTE };
+  }
+
+  const porcentaje =
+    typeof valor.porcentaje === 'number' && Number.isFinite(valor.porcentaje)
+      ? Math.min(100, Math.max(0, valor.porcentaje))
+      : PORCENTAJE_GASTOS_SIN_COMPROBANTE;
+
+  return { activo: valor.activo === true, porcentaje };
+}
+
+function normalizarOverrides(valor: unknown): OnatOverrides {
+  if (!esObjeto(valor)) return {};
+  const overrides: OnatOverrides = {};
+
+  for (const [alcance, campos] of Object.entries(valor)) {
+    if (!esObjeto(campos)) continue;
+
+    const normalizados: Partial<Record<OnatCampoAjustable, OnatOverride>> = {};
+    for (const [campo, override] of Object.entries(campos)) {
+      if (!esObjeto(override)) continue;
+      if (typeof override.original !== 'number' || !Number.isFinite(override.original)) continue;
+      if (typeof override.value !== 'number' || !Number.isFinite(override.value)) continue;
+      if (typeof override.editedAt !== 'string') continue;
+
+      normalizados[campo as OnatCampoAjustable] = {
+        original: override.original,
+        value: override.value,
+        editedAt: override.editedAt,
+      };
+    }
+
+    if (Object.keys(normalizados).length > 0) {
+      overrides[alcance] = normalizados;
+    }
+  }
+
+  return overrides;
 }
 
 /** Vector del año; si no existe devuelve uno vacío en vez de `null`. */
@@ -466,6 +585,9 @@ export function getOnatVector(ownerId: string, year: number): OnatVector {
       identidad: normalizarIdentidad(guardado.identidad),
       actividades: normalizarActividades(guardado.actividades),
       obligaciones: normalizarObligaciones(guardado.obligaciones),
+      bonificaciones: normalizarBonificaciones(guardado.bonificaciones),
+      gastosSinComprobante: normalizarGastosSinComprobante(guardado.gastosSinComprobante),
+      overrides: normalizarOverrides(guardado.overrides),
     };
   } catch {
     return vacio;
@@ -517,12 +639,150 @@ export function setObligacionPagada(
   codigo: string,
   pagado: boolean,
 ): OnatWriteResult {
+  return actualizarObligacion(ownerId, year, periodo, codigo, (obligacion) => ({
+    ...obligacion,
+    pagado,
+    canalPago: pagado ? obligacion.canalPago : null,
+  }));
+}
+
+/** Canal con el que se pagó una obligación; lo exige el 3 % electrónico. */
+export function setCanalPago(
+  ownerId: string,
+  year: number,
+  periodo: string,
+  codigo: string,
+  canalPago: OnatCanalPago,
+): OnatWriteResult {
+  return actualizarObligacion(ownerId, year, periodo, codigo, (obligacion) => ({
+    ...obligacion,
+    canalPago,
+  }));
+}
+
+function actualizarObligacion(
+  ownerId: string,
+  year: number,
+  periodo: string,
+  codigo: string,
+  cambio: (obligacion: OnatObligacion) => OnatObligacion,
+): OnatWriteResult {
   const vector = getOnatVector(ownerId, year);
   const obligaciones = vector.obligaciones.map((obligacion) =>
     obligacion.periodo === periodo && obligacion.codigo === codigo
-      ? { ...obligacion, pagado }
+      ? cambio(obligacion)
       : obligacion,
   );
 
   return saveOnatVector({ ...vector, obligaciones });
+}
+
+/** Añade una rebaja propia del contribuyente. El `id` lo genera quien llama. */
+export function addBonificacion(
+  ownerId: string,
+  year: number,
+  bonificacion: OnatBonificacion,
+): OnatWriteResult {
+  const nombre = bonificacion.nombre.trim();
+  if (nombre === '') return { succeeded: false };
+  if (!Number.isFinite(bonificacion.valor) || bonificacion.valor <= 0) return { succeeded: false };
+  if (bonificacion.id === '') return { succeeded: false };
+
+  const vector = getOnatVector(ownerId, year);
+  const existentes = vector.bonificaciones.filter((existente) => existente.id !== bonificacion.id);
+
+  return saveOnatVector({
+    ...vector,
+    bonificaciones: [...existentes, { ...bonificacion, nombre }],
+  });
+}
+
+export function removeBonificacion(
+  ownerId: string,
+  year: number,
+  id: string,
+): OnatWriteResult {
+  const vector = getOnatVector(ownerId, year);
+  return saveOnatVector({
+    ...vector,
+    bonificaciones: vector.bonificaciones.filter((bonificacion) => bonificacion.id !== id),
+  });
+}
+
+/** Activa la deducción de gastos sin comprobante. El porcentaje va de 0 a 20. */
+export function setGastosSinComprobante(
+  ownerId: string,
+  year: number,
+  activo: boolean,
+  porcentaje: number,
+): OnatWriteResult {
+  if (!Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > PORCENTAJE_GASTOS_SIN_COMPROBANTE) {
+    return { succeeded: false };
+  }
+
+  const vector = getOnatVector(ownerId, year);
+  return saveOnatVector({ ...vector, gastosSinComprobante: { activo, porcentaje } });
+}
+
+/**
+ * Corrige un valor calculado. Conserva el `original` de la primera edición: no se
+ * recalcula cuando entran ventas o gastos nuevos.
+ */
+export function setOverride(
+  ownerId: string,
+  year: number,
+  alcance: OnatAlcance,
+  campo: OnatCampoAjustable,
+  original: number,
+  value: number,
+): OnatWriteResult {
+  if (!Number.isFinite(value)) return { succeeded: false };
+
+  const vector = getOnatVector(ownerId, year);
+  const anterior = vector.overrides[alcance]?.[campo];
+
+  return saveOnatVector({
+    ...vector,
+    overrides: {
+      ...vector.overrides,
+      [alcance]: {
+        ...vector.overrides[alcance],
+        [campo]: {
+          original: anterior?.original ?? original,
+          value,
+          editedAt: new Date().toISOString(),
+        },
+      },
+    },
+  });
+}
+
+export function clearOverride(
+  ownerId: string,
+  year: number,
+  alcance: OnatAlcance,
+  campo: OnatCampoAjustable,
+): OnatWriteResult {
+  const vector = getOnatVector(ownerId, year);
+  const campos = { ...vector.overrides[alcance] };
+  delete campos[campo];
+
+  const overrides: OnatOverrides = { ...vector.overrides };
+  if (Object.keys(campos).length > 0) {
+    overrides[alcance] = campos;
+  } else {
+    delete overrides[alcance];
+  }
+
+  return saveOnatVector({ ...vector, overrides });
+}
+
+/** Valor efectivo de un campo: la corrección del Owner si existe, o el calculado. */
+export function valorAjustado(
+  vector: OnatVector,
+  alcance: OnatAlcance,
+  campo: OnatCampoAjustable,
+  calculado: number,
+): number {
+  return vector.overrides[alcance]?.[campo]?.value ?? calculado;
 }

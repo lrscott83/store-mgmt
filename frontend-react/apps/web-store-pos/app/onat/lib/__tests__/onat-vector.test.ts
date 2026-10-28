@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  PORCENTAJE_GASTOS_SIN_COMPROBANTE,
+  addBonificacion,
+  clearOverride,
   crearVectorVacio,
   getOnatVector,
   impactoDeImportar,
   importOnatCsv,
   parseOnatCsv,
+  removeBonificacion,
   saveOnatVector,
   serializeOnatCsv,
+  setCanalPago,
+  setGastosSinComprobante,
   setObligacionPagada,
+  setOverride,
   tributosDelVector,
+  valorAjustado,
 } from '../onat-vector';
 import type { OnatObligacion, OnatVector } from '../onat-vector';
 
@@ -42,6 +50,7 @@ describe('parseOnatCsv', () => {
       base: 'fija',
       rc04a: '00206',
       pagado: false,
+      canalPago: null,
     });
   });
 
@@ -304,7 +313,7 @@ describe('almacenamiento del vector', () => {
     saveOnatVector(vectorConObligaciones([
       {
         periodo: '2025-01', vence: '2025-02-20', codigo: '0114022',
-        importe: 99, porcentaje: null, base: 'fija', rc04a: '99999', pagado: true,
+        importe: 99, porcentaje: null, base: 'fija', rc04a: '99999', pagado: true, canalPago: null,
       },
     ]));
 
@@ -320,7 +329,7 @@ describe('almacenamiento del vector', () => {
     saveOnatVector(vectorConObligaciones([
       {
         periodo: '2026-01', vence: '2026-02-20', codigo: '0114022',
-        importe: 500, porcentaje: null, base: 'fija', rc04a: '30016', pagado: false,
+        importe: 500, porcentaje: null, base: 'fija', rc04a: '30016', pagado: false, canalPago: null,
       },
     ]));
 
@@ -347,5 +356,134 @@ describe('almacenamiento del vector', () => {
 
     expect(saveOnatVector(crearVectorVacio(OWNER_ID, YEAR))).toEqual({ succeeded: false });
     vi.restoreAllMocks();
+  });
+});
+
+describe('canal de pago', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    saveOnatVector(vectorConObligaciones(parseOnatCsv(CSV_VALIDO).obligaciones));
+  });
+
+  it('guarda el canal en la obligación indicada y solo en esa', () => {
+    expect(setCanalPago(OWNER_ID, YEAR, '2026-01', '0114022', 'electronico').succeeded).toBe(true);
+
+    const [primera, segunda] = getOnatVector(OWNER_ID, YEAR).obligaciones;
+    expect(primera.canalPago).toBe('electronico');
+    expect(segunda.canalPago).toBeNull();
+  });
+
+  it('al desmarcar el pago se borra el canal', () => {
+    setObligacionPagada(OWNER_ID, YEAR, '2026-01', '0114022', true);
+    setCanalPago(OWNER_ID, YEAR, '2026-01', '0114022', 'efectivo');
+    setObligacionPagada(OWNER_ID, YEAR, '2026-01', '0114022', false);
+
+    const obligacion = getOnatVector(OWNER_ID, YEAR).obligaciones[0];
+    expect(obligacion.pagado).toBe(false);
+    expect(obligacion.canalPago).toBeNull();
+  });
+});
+
+describe('bonificaciones propias', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('añade una rebaja con nombre, tipo y dónde aplica', () => {
+    const resultado = addBonificacion(OWNER_ID, YEAR, {
+      id: 'b1',
+      nombre: 'Acuerdo MFP',
+      tipo: 'porcentaje',
+      valor: 3,
+      aplica: 'impuesto',
+    });
+
+    expect(resultado.succeeded).toBe(true);
+    expect(getOnatVector(OWNER_ID, YEAR).bonificaciones).toEqual([
+      { id: 'b1', nombre: 'Acuerdo MFP', tipo: 'porcentaje', valor: 3, aplica: 'impuesto' },
+    ]);
+  });
+
+  it('rechaza una rebaja sin nombre o con valor no positivo', () => {
+    const sinNombre = addBonificacion(OWNER_ID, YEAR, {
+      id: 'b1', nombre: '   ', tipo: 'porcentaje', valor: 3, aplica: 'base',
+    });
+    const sinValor = addBonificacion(OWNER_ID, YEAR, {
+      id: 'b2', nombre: 'Otra', tipo: 'porcentaje', valor: 0, aplica: 'base',
+    });
+
+    expect(sinNombre.succeeded).toBe(false);
+    expect(sinValor.succeeded).toBe(false);
+    expect(getOnatVector(OWNER_ID, YEAR).bonificaciones).toEqual([]);
+  });
+
+  it('elimina una rebaja por id', () => {
+    addBonificacion(OWNER_ID, YEAR, {
+      id: 'b1', nombre: 'Acuerdo MFP', tipo: 'importe', valor: 500, aplica: 'impuesto',
+    });
+
+    expect(removeBonificacion(OWNER_ID, YEAR, 'b1').succeeded).toBe(true);
+    expect(getOnatVector(OWNER_ID, YEAR).bonificaciones).toEqual([]);
+  });
+});
+
+describe('gastos sin comprobante', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('nace desactivado con el 20 por defecto', () => {
+    expect(getOnatVector(OWNER_ID, YEAR).gastosSinComprobante).toEqual({
+      activo: false,
+      porcentaje: PORCENTAJE_GASTOS_SIN_COMPROBANTE,
+    });
+  });
+
+  it('acepta el rango de 0 a 20', () => {
+    expect(setGastosSinComprobante(OWNER_ID, YEAR, true, 0).succeeded).toBe(true);
+    expect(getOnatVector(OWNER_ID, YEAR).gastosSinComprobante).toEqual({ activo: true, porcentaje: 0 });
+
+    expect(setGastosSinComprobante(OWNER_ID, YEAR, true, 20).succeeded).toBe(true);
+    expect(getOnatVector(OWNER_ID, YEAR).gastosSinComprobante).toEqual({ activo: true, porcentaje: 20 });
+  });
+
+  it('rechaza fuera del rango sin tocar lo guardado', () => {
+    setGastosSinComprobante(OWNER_ID, YEAR, true, 15);
+
+    expect(setGastosSinComprobante(OWNER_ID, YEAR, true, 21).succeeded).toBe(false);
+    expect(setGastosSinComprobante(OWNER_ID, YEAR, true, -1).succeeded).toBe(false);
+    expect(getOnatVector(OWNER_ID, YEAR).gastosSinComprobante.porcentaje).toBe(15);
+  });
+});
+
+describe('correcciones del Owner', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('congela el original de la primera edición', () => {
+    setOverride(OWNER_ID, YEAR, '2026-01', 'ingresos', 1000, 900);
+    setOverride(OWNER_ID, YEAR, '2026-01', 'ingresos', 1200, 850);
+
+    const override = getOnatVector(OWNER_ID, YEAR).overrides['2026-01']?.ingresos;
+    expect(override?.original).toBe(1000);
+    expect(override?.value).toBe(850);
+  });
+
+  it('devuelve la corrección si existe y el calculado si no', () => {
+    const vector = getOnatVector(OWNER_ID, YEAR);
+
+    expect(valorAjustado(vector, 'anual', 'cuotasPagadas', 300)).toBe(300);
+
+    setOverride(OWNER_ID, YEAR, 'anual', 'cuotasPagadas', 300, 280);
+    expect(valorAjustado(getOnatVector(OWNER_ID, YEAR), 'anual', 'cuotasPagadas', 300)).toBe(280);
+  });
+
+  it('borra la corrección y vuelve al calculado', () => {
+    setOverride(OWNER_ID, YEAR, '2026-01', 'gastos', 500, 450);
+    expect(clearOverride(OWNER_ID, YEAR, '2026-01', 'gastos').succeeded).toBe(true);
+
+    expect(getOnatVector(OWNER_ID, YEAR).overrides).toEqual({});
+    expect(valorAjustado(getOnatVector(OWNER_ID, YEAR), '2026-01', 'gastos', 500)).toBe(500);
   });
 });

@@ -1,5 +1,14 @@
 # store-mgmt — Agent Instructions
 
+## Cuando el Owner pregunta, SOLO se responde — INNEGOCIABLE (user-mandated 2026-10-28)
+
+**Si el mensaje del Owner es una pregunta, la única acción permitida es responder.** Nada de editar archivos, ejecutar comandos, lanzar subagentes ni "ir avanzando mientras tanto". Primero la respuesta y nada más.
+
+- Aplica a preguntas directas, dudas de diseño, "¿qué falta?", "¿tienes dudas?", "¿por qué…?" y pedidos de confirmación.
+- Si el mensaje mezcla una pregunta con una orden de trabajo, se contesta la pregunta y se espera. No se ejecuta la orden en el mismo turno salvo que el Owner lo pida explícitamente.
+- Si se intuye una acción siguiente, se anuncia en una línea al final de la respuesta y se espera autorización.
+- Esta regla gana sobre cualquier impulso de continuidad, de "no dejar trabajo a medias" o de avanzar por iniciativa propia.
+
 ## Angular frontend is LEGACY — NON-NEGOTIABLE (user-mandated 2026-09-17; reinforced 2026-09-24)
 
 **The Angular frontend (`frontend/`) is legacy and is NEVER touched — and NEVER read or inspected.** All changes belong in the React frontend (`frontend-react/`). Do not read, edit, search, or derive ANY decision, context, or parity conclusion from the Angular app — it is frozen. "Angular parity" is NOT an authorized reason to open it.
