@@ -2,8 +2,8 @@
 
 > **Origen:** `Vector fiscal 2025.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
 > contiene datos personales y vive fuera del repositorio.
-> **PII enmascarado:** NIT y carné de identidad. El nombre se conserva porque el documento lo trae.
-> Si se prefiere anonimizar también el nombre, se cambia en un minuto.
+> **PII enmascarado:** NIT y carné de identidad. **El nombre es ficticio**: sustituye al real para no
+> publicar datos personales. La estructura, los códigos, los importes y las fechas son los del documento.
 
 ---
 
@@ -14,7 +14,7 @@
 | Título | `Vector fiscal de persona natural` |
 | NIT | `84051234567` |
 | Carné de identidad | `84051234567` |
-| Nombre y apellidos | `Osmany Perdomo Sotelo` |
+| Nombre y apellidos | `Osmany Perdomo Sotelo` (ficticio) |
 | Municipio | `2310- Cerro` |
 | Código de barras del RC-05 (DPA, NIT) | `7412 - 0345 - 6789 - 0123` |
 | Año | `2025` |
