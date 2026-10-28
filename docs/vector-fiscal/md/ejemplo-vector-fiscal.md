@@ -3,7 +3,8 @@
 > **Origen:** `Ejemplo-Vector-Fiscal.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
 > contiene datos personales y vive fuera del repositorio. Esta transcripción es la fuente de consulta.
 > Transcripción estructurada (no es la extracción cruda: el PDF desordena las columnas al extraer).
-> **NIT y carné de identidad enmascarados**; el nombre ya venía como `XXXXXXXX` en el original.
+> **Datos personales sustituidos:** NIT, carné de identidad y código RC-05 son ficticios; el nombre ya
+> venía como `XXXXXXXX` en el original.
 
 ---
 

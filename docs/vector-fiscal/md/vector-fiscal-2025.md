@@ -2,8 +2,8 @@
 
 > **Origen:** `Vector fiscal 2025.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
 > contiene datos personales y vive fuera del repositorio.
-> **PII enmascarado:** NIT y carné de identidad. **El nombre es ficticio**: sustituye al real para no
-> publicar datos personales. La estructura, los códigos, los importes y las fechas son los del documento.
+> **Datos personales sustituidos:** NIT, carné de identidad, código RC-05 y nombre son ficticios.
+> La estructura, los códigos de tributo, los importes y las fechas son los del documento.
 
 ---
 
