@@ -27,6 +27,15 @@ namespace Application.Features.WebCatalog.Public
         public string? PublicBaseUrl { get; set; }
 
         /// <summary>
+        /// Publicar la superficie pública para los buscadores. El default es el comportamiento de
+        /// producción (indexable): un entorno donde la bandera no esté configurada, o esté mal
+        /// escrita, sigue indexando. Solo el entorno de pruebas la pone en <c>false</c> por
+        /// configuración (<c>CatalogStaticPage__AllowIndexing</c>), y allí <c>robots.txt</c> prohíbe
+        /// el rastreo completo y el sitemap se publica sin URLs.
+        /// </summary>
+        public bool AllowIndexing { get; set; } = true;
+
+        /// <summary>
         /// Segundos entre comprobaciones del shell del SPA (T6). El valor mínimo efectivo es 5 s
         /// (<see cref="SynchronizationInterval"/>): un 0 accidental no puede convertirse en un bucle.
         /// </summary>
