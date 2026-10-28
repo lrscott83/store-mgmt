@@ -23,19 +23,41 @@ interface TramoEscala {
   readonly tasa: number;
 }
 
-/** Tramos acumulativos: cada tasa grava solo el exceso sobre el límite anterior. */
-const TRAMOS_ESCALA: readonly TramoEscala[] = [
-  { hasta: 25_000, tasa: 0.05 },
-  { hasta: 50_000, tasa: 0.1 },
-  { hasta: 100_000, tasa: 0.15 },
-  { hasta: 200_000, tasa: 0.2 },
-  { hasta: 350_000, tasa: 0.25 },
-  { hasta: 500_000, tasa: 0.3 },
-  { hasta: 650_000, tasa: 0.35 },
-  { hasta: 800_000, tasa: 0.4 },
-  { hasta: 1_000_000, tasa: 0.45 },
-  { hasta: Number.POSITIVE_INFINITY, tasa: 0.5 },
-];
+/**
+ * Escala del Impuesto sobre los Ingresos Personales, por año de ingresos.
+ *
+ * En 2025 rige la de 10 tramos de la Ley 181/2025, art. 49.1. Un año sin escala
+ * propia usa la última publicada: si no hay ley nueva, la vigente sigue siendo esa.
+ * Aquí se añade la escala el día que se publique la del ejercicio siguiente.
+ */
+export const ESCALAS_ISR: Readonly<Record<number, readonly TramoEscala[]>> = {
+  2025: [
+    { hasta: 25_000, tasa: 0.05 },
+    { hasta: 50_000, tasa: 0.1 },
+    { hasta: 100_000, tasa: 0.15 },
+    { hasta: 200_000, tasa: 0.2 },
+    { hasta: 350_000, tasa: 0.25 },
+    { hasta: 500_000, tasa: 0.3 },
+    { hasta: 650_000, tasa: 0.35 },
+    { hasta: 800_000, tasa: 0.4 },
+    { hasta: 1_000_000, tasa: 0.45 },
+    { hasta: Number.POSITIVE_INFINITY, tasa: 0.5 },
+  ],
+};
+
+const ANIOS_CON_ESCALA = Object.keys(ESCALAS_ISR)
+  .map(Number)
+  .sort((a, b) => a - b);
+
+/** Último ejercicio con escala publicada. */
+export const ULTIMO_ANIO_ESCALA = ANIOS_CON_ESCALA[ANIOS_CON_ESCALA.length - 1];
+
+/** Escala aplicable a un ejercicio: la suya o, si no hay, la última publicada. */
+export function escalaDelAnio(year: number): readonly TramoEscala[] {
+  const aplicable =
+    [...ANIOS_CON_ESCALA].reverse().find((anio) => anio <= year) ?? ULTIMO_ANIO_ESCALA;
+  return ESCALAS_ISR[aplicable];
+}
 
 /** Impuesto sobre Ventas o Servicios: 10 % del ingreso del mes, nunca negativo. */
 export function impuestoVentas(ingresoMes: number): number {
@@ -53,10 +75,10 @@ export function fuerzaTrabajo(salariosMes: number): number {
 }
 
 /**
- * Escala progresiva por tramos del artículo 49.1 de la Ley 181/2025.
- * Base cero o negativa paga cero; cada tramo grava solo su exceso.
+ * Escala progresiva por tramos. Cada tramo grava solo el exceso sobre el límite
+ * anterior. Sin año explícito usa la última escala publicada.
  */
-export function impuestoEscala(baseImponible: number): number {
+export function impuestoEscala(baseImponible: number, year: number = ULTIMO_ANIO_ESCALA): number {
   if (!(baseImponible > 0)) {
     return 0;
   }
@@ -64,7 +86,7 @@ export function impuestoEscala(baseImponible: number): number {
   let impuesto = 0;
   let limiteInferior = 0;
 
-  for (const tramo of TRAMOS_ESCALA) {
+  for (const tramo of escalaDelAnio(year)) {
     const baseDelTramo = Math.min(baseImponible, tramo.hasta) - limiteInferior;
     if (baseDelTramo > 0) {
       impuesto += baseDelTramo * tramo.tasa;
@@ -79,6 +101,8 @@ export function impuestoEscala(baseImponible: number): number {
 }
 
 export interface CierreAnualInput {
+  /** Ejercicio de los ingresos; decide qué escala se aplica. */
+  readonly year?: number;
   readonly ingresos: number;
   readonly gastos: number;
   readonly tributosDeducibles: number;
@@ -128,7 +152,7 @@ export function cierreAnual(input: CierreAnualInput): CierreAnualResultado {
     ),
   );
 
-  const impuesto = impuestoEscala(baseImponible);
+  const impuesto = impuestoEscala(baseImponible, input.year);
 
   const impuestoAPagar = round2(
     Math.max(0, impuesto - input.cuotasPagadas - retenciones - bonificaciones),

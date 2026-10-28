@@ -40,6 +40,18 @@ cuántas obligaciones, cuántas marcas de pago y cuántos importes calculados se
 
 **S11 — Solo frontend.** Sin backend, sin endpoints. Persistencia por Owner y año en `localStorage`.
 
+**S12 — Escala por año, en código.** Los tramos viven en `ESCALAS_ISR`, indexados por año de ingresos. Un año
+sin escala propia usa la última publicada: hoy 2025 rige para 2026 y para los siguientes hasta que se publique
+otra. No es un cálculo provisional.
+
+**S13 — Bonificaciones por tipo.** El usuario introduce el dato que corresponde a cada tipo (pronto pago,
+pago electrónico) y la aplicación aplica el porcentaje.
+
+**S14 — Gastos sin comprobante.** Casilla que activa la deducción y un valor por defecto **20**, admitido entre
+0 y 20. El importe deducible se calcula sobre el total de gastos.
+
+**S15 — Fuera de alcance por ahora.** Sector cañero y las filas 56–68 de la DJ-08 (sector de la cultura).
+
 ## Tasks
 
 | ID | Tarea | Specs | Estado |
@@ -81,3 +93,20 @@ CSV. Son dos piezas del mismo vector y el CSV solo representa la tabla.
 
 **L5** — Verificación de T1: `onat-vector.test.ts` 32 tests; suite `app/onat` 123 tests; typecheck sin
 errores.
+
+**L6 (2026-10-28)** — Decisiones del Owner, verbatim:
+
+> calro que la idea es que el usuario introduzca todas esas bonificaciones segun el tipo y nosotros ponemos
+> esos % para hacer el calculo. 1. Escala de 2025 y no es provicional, si no hay una nueva para 2026 es la
+> que existe y punto. Estos datos de escala donde se almacenan? en codigo no? y tienen que ser por año [...]
+> 3. Eso vamos a ponerlo con un checkbox y que el usuario ponga el valor pero por defecto ponemos 20 y tiene
+> que estar entre 0 y 20. 4. Dejalo afuera por el momento. 5. Eso esta para el sector de la cultura y vamos a
+> dejarlo fuera.
+
+- `ESCALAS_ISR` es un mapa por año en `onat-calculations.ts`; `impuestoEscala` y `cierreAnual` reciben el
+  ejercicio y caen a la última escala publicada.
+- Canal de pago: se marcará por obligación al pagar, con una explicación en pantalla de por qué se pregunta.
+- Gastos sin comprobante: casilla + valor, por defecto 20, rango 0–20.
+- Fuera: sector cañero y filas 56–68 (cultura).
+
+**L7** — Verificación: `app/onat` 130 tests, typecheck sin errores.
