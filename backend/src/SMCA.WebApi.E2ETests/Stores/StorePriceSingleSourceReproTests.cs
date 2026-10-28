@@ -84,7 +84,11 @@ public sealed class StorePriceSingleSourceReproTests
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<Module>().IgnoreQueryFilters().Select(m => m.Id).ToListAsync();
+        return await db.Set<Module>().IgnoreQueryFilters()
+            .Where(m => m.IsActive)
+            .OrderBy(m => m.Id)
+            .Select(m => m.Id)
+            .ToListAsync();
     }
 
     private async Task SeedStoreModuleAsync(Guid storeId, int moduleId, float price, float percent, float discount)

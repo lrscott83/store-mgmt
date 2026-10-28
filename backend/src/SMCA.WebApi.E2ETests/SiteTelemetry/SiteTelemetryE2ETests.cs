@@ -239,7 +239,7 @@ public sealed class SiteTelemetryE2ETests
             (await anon.GetAsync(ManualHtmlPath)).StatusCode.Should().Be(HttpStatusCode.OK);
             (await anon.SendAsync(new HttpRequestMessage(HttpMethod.Head, ManualPdfPath)))
                 .StatusCode.Should().Be(HttpStatusCode.OK);
-            (await anon.GetAsync("/api/manual/images/01-crear-cuenta.png")).StatusCode
+            (await anon.GetAsync("/api/manual/images/01-crear-cuenta.webp")).StatusCode
                 .Should().Be(HttpStatusCode.OK);
 
             List<SiteEvent> rows = await RecentAsync(since);
