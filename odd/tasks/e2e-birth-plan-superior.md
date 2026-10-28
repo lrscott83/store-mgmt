@@ -53,7 +53,7 @@ L1 (verbatim, 2026-10-13):
 > "ok, dale. Cuando se crea debe ser en el plan Superior y no el de Pago"
 
 - Causa raíz confirmada: `CreateStoreService.cs:45,53` (Superior) y `RegisterService.cs:58-66` (delega).
-- Ficha 08 abierta en `docs/testing/known-issues/2026-10-06-e2e-verification/`.
+- Ficha 08 abierta en `docs/testing/known-issues/2026-10-28-e2e-verification/`.
 
 ### Progreso
 

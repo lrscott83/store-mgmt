@@ -151,7 +151,7 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 ## Flaky recurrentes — Grupo G (cerrado 2026-09-25)
 
-De los 38 flaky de las seis corridas (23 + 4 + 2 + 3 + 2 + 2), 33 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Los dos specs con recurrencia quedaron resueltos con autorización del usuario y sus fichas se retiraron (nota de cierre en el [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas)):
+De los 38 flaky de las seis corridas (23 + 4 + 2 + 3 + 2 + 2), 33 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Los dos specs con recurrencia quedaron resueltos con autorización del usuario y sus fichas se retiraron (nota de cierre en el [Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas)):
 
 - **`warehouses` — StoreUser sin Almacenes** (flaky en 4 de 6 corridas: el boot del StoreUser no terminaba bajo contención y la espera del enlace "Catálogo Productos" vencía): el test estaba **duplicado** por `create-store-user.spec.ts` — mismo flujo línea por línea — y fue retirado; el gating del menú de Almacenes sigue pineado por el test anterior del mismo spec.
 - **`store-switch-back-logout` SSR-1** (flaky en 2 de 6 corridas): el setup podía avanzar con el nombre de la tienda **vacío** → `storeRow('')` generaba una regex vacía que casaba con TODOS los botones (strict mode violation). Endurecido con reintentos acotados del refresh de sesión y fallo ruidoso si el nombre no llega; el timeout x2 temporal se retiró — la causa nunca fue el tiempo.
@@ -177,7 +177,7 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 **Contexto.** Suite completa E2E del frontend contra backend real (`:5019`, BD `smca_test`), 4 workers, tras hacer merge de `origin/qa` en `test`. La última corrida conocida (2026-09-25) tuvo **0 fallos**. Estos 8 fallos son **nuevos** — los trajo el merge.
 
 **Resultado:** 8 fallos (7 únicos + 1 retry). Las fichas individuales ya estan retiradas; su resumen y su cierre, en el
-[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
+[Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 | #   | Spec                          | Qué prueba                                                                                                        | Qué fallaba                                                                                                    | Estado |
 | --- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
@@ -186,7 +186,7 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 | 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | Defecto del test: esperaba el aviso de éxito del guardado por producto, que ya no existe (decisión del 2026-10-01) | ✅ **Resuelto 2026-10-04** (1/1) |
 | 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | Defecto del test: buscaba el radio "Transferencia (CUP)"; con el módulo 15 activo el sufijo de moneda se omite a propósito | ✅ **Resuelto 2026-10-04** (6/6) |
 | 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | ✅ **Resuelto 2026-10-06** — corría con el config equivocado (el dev server bloquea los service workers), no con el suyo; ficha retirada |
-| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ✅ **Causa raíz confirmada y fix aplicado y verificado el 2026-10-06** — la selección persistida puede quedar en una tienda creada por la interfaz (plan Pago, sin el módulo 14) y el botón nunca aparece; reapareció el 2026-10-05 (falló el intento 1, pasó al reintento). Ficha: [`known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ✅ **Causa raíz confirmada y fix aplicado y verificado el 2026-10-06** — la selección persistida puede quedar en una tienda creada por la interfaz (plan Pago, sin el módulo 14) y el botón nunca aparece; reapareció el 2026-10-05 (falló el intento 1, pasó al reintento). Ficha: [`known-issues/2026-10-28-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-28-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
 | —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | ✅ **Resuelto 2026-10-02** — la Opción A se aplicó en el commit `d6f47d53`; ficha retirada el 2026-10-06 |
 
 **Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
@@ -279,7 +279,7 @@ suite que la decisión pedía. La ficha 7 se retiró.
    `store-switcher-refresh`, viva en su ficha del 2026-10-05.
 
 Cierre completo de las fichas 5 y 7 en el
-[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
+[Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 _Actualizado por última vez: 2026-10-06 (Opción A confirmada como ya aplicada el 2026-10-02 y las
 fichas 5 y 7 retiradas; queda pendiente solo la autorización para endurecer `admin-routes.spec.ts`)._
@@ -291,7 +291,7 @@ fichas 5 y 7 retiradas; queda pendiente solo la autorización para endurecer `ad
 **Contexto.** Verificación completa siguiendo el README del proyecto, sobre la rama test, que ya
 tenía integrado todo lo que había en dev. Compilación, tests unitarios y tests E2E del backend y
 del frontend, todo en verde; los E2E del frontend no. Detalle y fichas (ya retiradas) en el
-[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
+[Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 | Suite | Resultado |
 | --- | --- |
@@ -400,7 +400,7 @@ ficha 8)._
 
 Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 fallidos): esos dos fallos ya estaban corregidos el mismo 2026-10-04 (commit `ede7e030`) y esta corrida confirma que quedaron cerrados. Teardown OK: 2988 filas `e2e-*` borradas de `smca_test`.
 
-**Ningún test quedó fallando**, así que no se creó ninguna ficha por un fallo determinista. Sí quedaron **3 inestables** (fallaron el intento 1 y pasaron en el reintento), y cada uno tiene su ficha en [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md):
+**Ningún test quedó fallando**, así que no se creó ninguna ficha por un fallo determinista. Sí quedaron **3 inestables** (fallaron el intento 1 y pasaron en el reintento), y cada uno tiene su ficha en [`known-issues/2026-10-28-e2e-verification/`](known-issues/2026-10-28-e2e-verification/README.md):
 
 | # | Test | Qué se vio en el fallo | Estado |
 | --- | --- | --- | --- |
@@ -408,7 +408,7 @@ Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 falli
 | 2 | `store-create-security.spec.ts:88:7` — "StoreUser en /management/stores/create es deslogueado y redirigido a /login" | `Test timeout of 120000ms exceeded while setting up "signedInPage"`: la app quedó a mitad de un login en el layout de invitado (leído antes como "portada pública") | ✅ **Causa raíz definitiva y fix aplicado el 2026-10-06** — bajo contención el `POST /auth/register` del mint aborta (`net::ERR_ABORTED`), la app pinta su diálogo de error y el `waitForURL` de `session.ts:255` esperaba **sin límite** (`navigationTimeout` default 0; `actionTimeout` no aplica a la familia de navegación, verificado en el fuente de Playwright 1.62.1). Fix (opciones 2+3+4 de la ficha 02): `navigationTimeout: 60_000` + mint con detección por diálogo propio, 1 retry y error nombrado + `workers` local default 4; timeout del spec restaurado a 120_000. Verificado: solitario 2 passed (18.6 s), modo oficial 4 workers 27 passed (42.2 s); a 16 workers los 4 specs que caían pasan |
 | 3 | `store-switcher-refresh.spec.ts:173:5` — "SWR-1 — a store created this session appears in the header switcher without re-login" | `/management/my-stores` pintó sus tarjetas pero sin el botón de crear (el permiso `hasMultiStores` en falso) | ✅ **Causa raíz confirmada el 2026-10-06** — la selección persistida quedó en una tienda creada por la interfaz (plan Pago, sin el módulo 14); el fix (realinear) quedó **aplicado y verificado** el 2026-10-06 |
 
-**Fichas retiradas en esta corrida** (sus tests pasaron; el resumen y el cierre quedaron en el [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas)):
+**Fichas retiradas en esta corrida** (sus tests pasaron; el resumen y el cierre quedaron en el [Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas)):
 
 - La corrida del 2026-10-01 — las 6 fichas (guard del preflight, chat siempre montado, whitelist de sync-export-import-v2, `mayorista-sale`, `movement-reversal` E-R7, `web-catalog`).
 - El merge de qa (2026-09-29) — las fichas 1 a 4 y 6.
@@ -464,7 +464,7 @@ cambios de la sesión del 2026-10-12, y los introdujo el merge `dev ← test` (l
 > (commit `22b73679`): 15 specs + 4 fixtures. Nueva ficha de seguimiento del hallazgo de app en
 > [`../../known-issues.md`](../../known-issues.md).
 
-**Fichas:** [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md)
+**Fichas:** [`known-issues/2026-10-28-e2e-verification/`](known-issues/2026-10-28-e2e-verification/README.md)
 (05 a 08 nuevas; 01 a 04 **verdes en aislamiento** — su spec pasa; no se retiran porque no están verdes de
 forma sostenida en la corrida completa). El `category-crud` (primer fallo de la 1.ª corrida) pasa en
 aislamiento → inestable de carga. **Ninguna propuesta aplicada**: editar un test E2E o la app requiere
@@ -482,7 +482,7 @@ las dos fichas que seguían vivas del merge de qa y para confirmar (o refutar) l
 documentos daban por tentativas. La suite completa **no** se corrió — pedido explícito. Backend real
 `:5019` (perfil `http-e2e`, `smca_test` confirmada por el teardown de cada corrida), dev server `:3333`.
 Detalle y fichas en
-[`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md).
+[`known-issues/2026-10-28-e2e-verification/`](known-issues/2026-10-28-e2e-verification/README.md).
 
 ### Las dos fichas vivas del merge de qa quedaron cerradas
 
@@ -517,7 +517,7 @@ Detalle y fichas en
 
 Cada spec **solo**, con `--workers=1 --retries=0` (sin `--retries=0`, un verde puede ser el reintento,
 que es justo lo que la suite completa esconde). Inventario completo y reglas de mantenimiento en
-[`known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md).
+[`known-issues/2026-10-28-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-28-e2e-verification/funcionan-en-solitario.md).
 
 | Spec | Resultado en solitario | Duración | Exit |
 | --- | --- | --- | --- |
@@ -546,10 +546,10 @@ existente requiere autorización 1 a 1.
 
 | Ficha | Estado |
 | --- | --- |
-| [`known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md`](known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **Fix aplicado y verificado** (2026-10-06) — locator acotado con `exact: true`; la sonda midió 2 nodos con el locator viejo y 1 con el nuevo; spec verde dos corridas seguidas |
-| [La carpeta de fichas](known-issues/2026-10-06-e2e-verification/README.md) (fichas 01 a 03) | ✅ **Causa raíz confirmada en las tres** (2026-10-06): ventana de pre-hidratación del shell (01), setup con login real que bajo contención se duplica — 32.3 s → 63.6 s, por suma de esperas acotadas — (02) y selección persistida en una tienda sin el módulo 14 (03). Los fixes de 03, de 02 (presupuesto del spec a `240_000`) y de 01 (espera del formulario) quedaron **aplicados y verificados** el mismo 2026-10-06, igual que el de la ficha 04 (locator exacto) |
-| [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas) | Todas las demás están cerradas y su resumen vive ahí |
-| [`known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md) | Inventario (no es una ficha) de los specs que pasan en solitario |
+| [`known-issues/2026-10-28-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md`](known-issues/2026-10-28-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **Fix aplicado y verificado** (2026-10-06) — locator acotado con `exact: true`; la sonda midió 2 nodos con el locator viejo y 1 con el nuevo; spec verde dos corridas seguidas |
+| [La carpeta de fichas](known-issues/2026-10-28-e2e-verification/README.md) (fichas 01 a 03) | ✅ **Causa raíz confirmada en las tres** (2026-10-06): ventana de pre-hidratación del shell (01), setup con login real que bajo contención se duplica — 32.3 s → 63.6 s, por suma de esperas acotadas — (02) y selección persistida en una tienda sin el módulo 14 (03). Los fixes de 03, de 02 (presupuesto del spec a `240_000`) y de 01 (espera del formulario) quedaron **aplicados y verificados** el mismo 2026-10-06, igual que el de la ficha 04 (locator exacto) |
+| [Registro de fichas retiradas](known-issues/2026-10-28-e2e-verification/README.md#registro-de-fichas-retiradas) | Todas las demás están cerradas y su resumen vive ahí |
+| [`known-issues/2026-10-28-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-28-e2e-verification/funcionan-en-solitario.md) | Inventario (no es una ficha) de los specs que pasan en solitario |
 
 ### Las tres causas "no confirmadas" quedaron confirmadas (2026-10-06)
 
@@ -598,7 +598,7 @@ Las carpetas por corrida que ya no tenían **ninguna ficha de test** se retiraro
 `2026-10-01-e2e-verification/`, `2026-10-03-e2e-verification/`, `group-g/`, `qa-merge-2026-09-29/` y
 `2026-10-05-e2e-verification/` (esta última solo tenía el README de su corrida). Las 4 fichas vivas y
 el inventario de tests que pasan en solitario quedan en **una sola** carpeta,
-[`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md), y su README lleva además el
+[`known-issues/2026-10-28-e2e-verification/`](known-issues/2026-10-28-e2e-verification/README.md), y su README lleva además el
 **Registro de fichas retiradas**: qué era cada una, su causa raíz y con qué commit o verificación se
 cerró. El texto completo de las carpetas retiradas sigue en el historial de git, así que no se pierde
 nada: lo que se gana es no tener que abrir cinco carpetas para saber qué falla hoy.
@@ -610,3 +610,65 @@ _Actualizado por última vez: 2026-10-06 (verificación dirigida: fichas 5 y 7 c
 causas documentadas confirmadas —salvo la de SWR-2, que quedó refutada—, las fichas 01, 02 y 03 con
 causa raíz confirmada, el realineado de la ficha 03 aplicado y verificado, y nueva carpeta de tests que
 pasan en solitario)._
+
+---
+
+## Corrida del 2026-10-28 — verificación completa del frontend
+
+**Contexto.** Suite completa (`pnpm test:e2e --workers=2`) contra backend real con perfil `http-e2e`
+(`:5019`, guard `Database=smca_test`) y dev server levantado por Playwright en `:3333`, con ambos
+puertos verificados **libres** antes de correr: **338 passed / 16 failed / 2 flaky / 1 did not run**
+de 357, 20.6 min, exit 1.
+
+> Una corrida anterior de este mismo día se **descartó** y no se documenta: `:5019` y `:3333` estaban
+> ocupados por el backend y el dev server del checkout **`qa-env`** (procesos del 2026-10-26), así que
+> los specs de `test-env` corrieron contra otro entorno (327/22/2/6). Se detuvieron esos procesos y se
+> repitió limpia.
+
+**Veredicto.** Ninguno de los 16 fallos corresponde a un cambio de esta rama (`AGENTS.md`, los dos E2E
+del backend y el merge de `qa` que tocó `products.tsx`). Se agrupan en **tres causas** más dos
+inestables:
+
+| # | Causa raíz | Tests | Clasificación | Fichas |
+| --- | --- | --- | --- | --- |
+| 1 | El beacon `POST /api/v1/public/site/events` (telemetría pública) no está en la allowlist de HTTP de los specs offline | `login-offline` (12) + `sync-export-import-v2` T1/T2 | **Defecto del test** (allowlist obsoleta) | [10](known-issues/2026-10-28-e2e-verification/10-login-offline-t1-golden-path.md)–[21](known-issues/2026-10-28-e2e-verification/21-login-offline-t11-sin-conexion.md), [23](known-issues/2026-10-28-e2e-verification/23-sync-export-import-t1-site-events.md), [24](known-issues/2026-10-28-e2e-verification/24-sync-export-import-t2-site-events.md) |
+| 2 | El plan Superior incluye el módulo **22 (ONAT, `IsActive=false`)** y el helper del esperado no aplica el filtro `IsActive` de `CreateStoreService.cs:62` | `owner-store-create` MC-02 | **Defecto del test** | [22](known-issues/2026-10-28-e2e-verification/22-owner-store-create-mc02-plan-superior-onat.md) |
+| 3 | Cuatro scripts **inline** violan `script-src-elem` en `/` bajo el dev server | `csp-report-only` | **A confirmar** (app vs entorno dev) | [09](known-issues/2026-10-28-e2e-verification/09-csp-report-only-inline-scripts.md) |
+| 4 | `getAttribute('class')` sobre el sidebar agota 30 s; pasa al reintentar | `channel-rates-catalogue` | **Inestable de carga** | [25](known-issues/2026-10-28-e2e-verification/25-channel-rates-catalogue-nav-timeout.md) |
+| 5 | El login del StoreUser no navega a `/sales/products` en 60 s; pasa al reintentar | `store-create-security` | **Inestable de carga** | [26](known-issues/2026-10-28-e2e-verification/26-store-create-security-waitforurl-timeout.md) |
+
+**El "1 did not run"** es `channel-rates-catalogue.spec.ts:204` (*"el menú no ofrece la página y la
+ruta queda gateada"*): pertenece al mismo `test.describe.serial` que el test de la ficha 25, que falló
+en el primer intento; el runner no ejecutó al hermano aunque el primero pasara en el retry.
+
+**Fichas 01 a 08.** No se re-corrieron en aislamiento: sus specs sí se ejecutaron en la corrida
+completa y **no aparecieron en la lista de fallos** (01–07). No se retiran: la regla exige verde
+sostenido y autorización 1 a 1. La ficha **08** sigue abierta por decisión de negocio (nacimiento en
+Superior vs Pago).
+
+_Nuevo estado, 2026-10-28: 18 fichas vivas (09–26) en la carpeta única, renombrada a
+`known-issues/2026-10-28-e2e-verification/`. Ningún test ni código de la aplicación fue modificado._
+
+### Cierre parcial del 2026-10-28 — causas 1 y 2 resueltas (autorizadas)
+
+Con autorización 1 a 1 del usuario se aplicaron y verificaron los dos primeros grupos de fichas:
+
+- **Fichas 10–21, 23 y 24 — ✅ resueltas.** `/api/v1/public/site/events` (beacon de telemetría pública)
+  agregado a `KNOWN_BACKGROUND_PATHS` en `login-offline.spec.ts` y `sync-export-import-v2.spec.ts`;
+  los casos T3–T7 y T9 de `login-offline` pasaron de `anyRequest.expectNoRequests(...)` a
+  `expectOnlyKnownTelemetry(anyRequest, ...)`, y T8 filtra la allowlist antes de exigir exactamente una
+  petición. Comando:
+  `pnpm exec playwright test e2e/login-offline.spec.ts e2e/sync-export-import-v2.spec.ts e2e/owner-store-create.spec.ts --workers=2 --retries=0`
+  → **17 passed**, exit 0. Prueba de mutación: con el path tolerado cambiado a
+  `/api/v1/public/site/events-MUTATED` la misma corrida dio **14 failed** en la aserción tocada.
+- **Ficha 22 — ✅ resuelta.** `readSuperiorPlanModuleIds()` ahora hace `JOIN "Module"` y filtra
+  `m."IsActive" AND m."AvailableToStore"`, el mismo predicado de `CreateStoreService.cs:62`. Mutación:
+  neutralizar el filtro (`OR TRUE`) devuelve el fallo con la diferencia `- 22`; restaurado, `1 passed`.
+- **Ficha 09 — 🔴 sigue abierta, con la investigación avanzada.** Los cuatro scripts inline son
+  identificados: el de `<ScrollRestoration />` de React Router (`root.tsx:85`) y el runtime Fizz de
+  `react-dom 19.2.6` (`$RT`, `$RB/$RV`, `$RC("B:1","S:1")`). Aparecen **solo en `/`**; `/login` y
+  `/register` emiten los 4 scripts ya allowlisteados. Queda sin confirmar **qué cambio** introdujo ese
+  boundary/streaming en `/`, y si los cuatro deben ir a la allowlist dev o a los hashes de producción.
+- **Fichas 25 y 26 — 🟡 sin cambios** (inestables; no se tocaron).
+
+Ningún código de la aplicación fue modificado en este cierre; solo los dos specs E2E, con autorización.

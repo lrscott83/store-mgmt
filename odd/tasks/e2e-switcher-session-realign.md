@@ -9,7 +9,7 @@ seleccionada **persistida en la base**, sino de la tienda de su snapshot.
 ## Problem / Why
 
 Causa confirmada el 2026-10-06 (ficha
-[`03-store-switcher-refresh-boton-crear-no-aparece.md`](../../docs/testing/known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md)
+[`03-store-switcher-refresh-boton-crear-no-aparece.md`](../../docs/testing/known-issues/2026-10-28-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md)
 + demo determinista): `User.SelectedStoreId` se persiste server-side (`SwitchMyStoreCommand.cs:98`) y
 `/me` devuelve los módulos de **esa** tienda (`GetMeQuery.cs:103`). Una tienda creada por la interfaz
 nace en el plan Pago y `CreateStoreCommand` la clampa a ese catálogo, que **no incluye MultiStores
