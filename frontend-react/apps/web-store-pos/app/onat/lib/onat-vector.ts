@@ -1,10 +1,9 @@
 /**
- * Modelo, carga y persistencia del Vector Fiscal por año (S1–S8).
+ * Modelo, carga y persistencia del Vector Fiscal por año (S1–S9).
  *
- * Cada ejercicio se configura de cero: identidad, actividades, tributos con su
- * porcentaje y la agenda de obligaciones que trae el CSV. Nada se hereda del año
- * anterior, porque el vector de un año puede tener más o menos actividades y más
- * o menos tributos.
+ * Cada ejercicio se configura de cero: identidad, actividades y la agenda de
+ * obligaciones que trae el CSV. El archivo es la fuente de qué tributos aplican y
+ * con qué porcentaje; no hay catálogo especulativo.
  */
 
 import type { OnatWriteResult } from './onat-storage';
@@ -13,6 +12,8 @@ export type OnatPeriodicidad = 'mensual' | 'trimestral' | 'anual';
 
 /** Naturaleza del tributo: sobre qué se calcula o si es un importe declarado. */
 export type OnatBase = 'ingresos' | 'salarios' | 'fija';
+
+export const ONAT_BASES: readonly OnatBase[] = ['ingresos', 'salarios', 'fija'];
 
 export interface OnatActividad {
   nombre: string;
@@ -30,27 +31,32 @@ export interface OnatIdentidad {
   provincia: string;
 }
 
-export interface OnatTributo {
-  /** Código ONAT de 7 dígitos, tal como lo usa el vector (p. ej. `0114022`). */
-  codigo: string;
-  nombre: string;
-  /** Tasa expresada como fracción: `0.10` es 10 %. */
-  porcentaje: number;
-  base: OnatBase;
-  periodicidad: OnatPeriodicidad;
-}
-
 export interface OnatObligacion {
   /** `2026-01` mensual, `2026-Q1` trimestral, `2026-A` anual. */
   periodo: string;
   /** Fecha límite de pago en ISO `AAAA-MM-DD`, tal como la trae el vector. */
   vence: string;
+  /** Código ONAT de 7 dígitos, tal como lo usa el vector (p. ej. `0114022`). */
   codigo: string;
-  /** `null` cuando el tributo se calcula; el vector solo trae importe en los fijos. */
+  /**
+   * Importe fijo tal como lo trae el vector. Si no es `null`, es el valor a pagar
+   * y no se calcula nada: el documento manda.
+   */
   importe: number | null;
+  /** Tasa como fracción (`0.10` es 10 %). `null` cuando la fila trae importe. */
+  porcentaje: number | null;
+  /** Sobre qué se aplica el porcentaje. `fija` cuando la fila trae importe. */
+  base: OnatBase;
   /** Código de pago de 5 dígitos (RC-04A). */
   rc04a: string;
   pagado: boolean;
+}
+
+/** Tributo derivado de la agenda: código, porcentaje y base, sin repetir períodos. */
+export interface OnatTributo {
+  codigo: string;
+  porcentaje: number | null;
+  base: OnatBase;
 }
 
 export interface OnatVector {
@@ -58,11 +64,19 @@ export interface OnatVector {
   year: number;
   identidad: OnatIdentidad;
   actividades: OnatActividad[];
-  tributos: OnatTributo[];
   obligaciones: OnatObligacion[];
 }
 
-export const ONAT_CSV_COLUMNS = ['periodo', 'vence', 'codigo', 'importe', 'rc04a', 'pagado'] as const;
+export const ONAT_CSV_COLUMNS = [
+  'periodo',
+  'vence',
+  'codigo',
+  'importe',
+  'rc04a',
+  'porcentaje',
+  'base',
+  'pagado',
+] as const;
 
 export interface OnatCsvError {
   /** Número de línea del archivo, 1-based. La cabecera es la línea 1. */
@@ -92,8 +106,8 @@ function normalizarCabecera(valor: string): string {
   return valor.trim().toLowerCase();
 }
 
-/** Acepta `1200.00` y `1200,00`; devuelve `null` si no es un número válido. */
-function parseImporte(valor: string): number | null | 'invalido' {
+/** Acepta `1200.00` y `1200,00`; devuelve `'invalido'` si no es un número válido. */
+function parseDecimal(valor: string): number | null | 'invalido' {
   const limpio = valor.trim();
   if (limpio === '') return null;
   const numero = Number(limpio.replace(',', '.'));
@@ -118,6 +132,10 @@ function esPeriodoValido(valor: string): boolean {
   return PERIODO_MENSUAL.test(valor) || PERIODO_TRIMESTRAL.test(valor) || PERIODO_ANUAL.test(valor);
 }
 
+function esBaseValida(valor: string): valor is OnatBase {
+  return (ONAT_BASES as readonly string[]).includes(valor);
+}
+
 function esPagadoValido(valor: string): boolean | null {
   const limpio = valor.trim().toLowerCase();
   if (limpio === '' || limpio === 'no') return false;
@@ -126,8 +144,15 @@ function esPagadoValido(valor: string): boolean | null {
 }
 
 /**
- * Lee el CSV de obligaciones del vector. La cabecera es obligatoria y se mapea por
- * nombre, así que el orden de las columnas no importa.
+ * Lee el CSV del vector. La cabecera es obligatoria y se mapea por nombre, así que
+ * el orden de las columnas no importa.
+ *
+ * Reglas por fila:
+ * - Si trae `importe`, ese es el valor a pagar y no se calcula (fijos, seguridad social).
+ * - Si no trae `importe` y trae `porcentaje`, se calcula sobre `base`.
+ * - Si no trae ninguno de los dos, la obligación existe pero queda pendiente de declarar
+ *   (el caso del `0530222`, que el vector trae sin importe).
+ * - El porcentaje se escribe en unidades de por ciento: `10` es 10 %.
  *
  * Devuelve todos los errores encontrados, no solo el primero: importar a medias en
  * silencio produciría una agenda incompleta que parece válida.
@@ -143,7 +168,7 @@ export function parseOnatCsv(texto: string): OnatCsvParseResult {
   }
 
   const cabecera = lineas[indiceCabecera].split(SEPARADOR).map(normalizarCabecera);
-  const requeridas = ['periodo', 'vence', 'codigo', 'importe', 'rc04a'];
+  const requeridas = ['periodo', 'vence', 'codigo', 'rc04a'];
   const faltantes = requeridas.filter((columna) => !cabecera.includes(columna));
   if (faltantes.length > 0) {
     return {
@@ -153,6 +178,7 @@ export function parseOnatCsv(texto: string): OnatCsvParseResult {
     };
   }
 
+  const tiene = (columna: string): boolean => cabecera.includes(columna);
   const posicion = (columna: string): number => cabecera.indexOf(columna);
 
   for (let i = indiceCabecera + 1; i < lineas.length; i += 1) {
@@ -161,7 +187,8 @@ export function parseOnatCsv(texto: string): OnatCsvParseResult {
 
     const numeroLinea = i + 1;
     const campos = crudo.split(SEPARADOR);
-    const tomar = (columna: string): string => (campos[posicion(columna)] ?? '').trim();
+    const tomar = (columna: string): string =>
+      tiene(columna) ? (campos[posicion(columna)] ?? '').trim() : '';
 
     const periodo = tomar('periodo');
     if (!esPeriodoValido(periodo)) {
@@ -181,49 +208,135 @@ export function parseOnatCsv(texto: string): OnatCsvParseResult {
       continue;
     }
 
-    const importe = parseImporte(tomar('importe'));
-    if (importe === 'invalido') {
-      errores.push({ linea: numeroLinea, motivo: `Importe inválido: "${tomar('importe')}".` });
-      continue;
-    }
-
     const rc04a = parseRc04(tomar('rc04a'));
     if (rc04a === null) {
       errores.push({ linea: numeroLinea, motivo: `Código RC-04A inválido: "${tomar('rc04a')}".` });
       continue;
     }
 
-    const pagado = cabecera.includes('pagado') ? esPagadoValido(tomar('pagado')) : false;
+    const importe = parseDecimal(tomar('importe'));
+    if (importe === 'invalido') {
+      errores.push({ linea: numeroLinea, motivo: `Importe inválido: "${tomar('importe')}".` });
+      continue;
+    }
+
+    const porcentajeCrudo = parseDecimal(tomar('porcentaje'));
+    if (porcentajeCrudo === 'invalido') {
+      errores.push({ linea: numeroLinea, motivo: `Porcentaje inválido: "${tomar('porcentaje')}".` });
+      continue;
+    }
+    if (porcentajeCrudo !== null && porcentajeCrudo > 100) {
+      errores.push({
+        linea: numeroLinea,
+        motivo: `Porcentaje fuera de rango: "${tomar('porcentaje')}". Se escribe en por ciento (10 = 10 %).`,
+      });
+      continue;
+    }
+
+    const baseCruda = tomar('base').toLowerCase();
+
+    if (importe === null && porcentajeCrudo !== null && !esBaseValida(baseCruda)) {
+      errores.push({
+        linea: numeroLinea,
+        motivo: `Base inválida para un tributo calculado: "${baseCruda}". Use ingresos, salarios o fija.`,
+      });
+      continue;
+    }
+
+    const pagado = tiene('pagado') ? esPagadoValido(tomar('pagado')) : false;
     if (pagado === null) {
       errores.push({ linea: numeroLinea, motivo: `Valor de "pagado" inválido: "${tomar('pagado')}".` });
       continue;
     }
 
-    obligaciones.push({ periodo, vence, codigo, importe, rc04a, pagado });
+    obligaciones.push({
+      periodo,
+      vence,
+      codigo,
+      importe,
+      porcentaje: importe === null && porcentajeCrudo !== null ? porcentajeCrudo / 100 : null,
+      base: importe === null && esBaseValida(baseCruda) ? baseCruda : 'fija',
+      rc04a,
+      pagado,
+    });
   }
 
   if (obligaciones.length === 0 && errores.length === 0) {
     errores.push({ linea: indiceCabecera + 1, motivo: 'El archivo no tiene obligaciones.' });
   }
 
+  if (errores.length === 0) {
+    errores.push(...erroresDeCoherencia(obligaciones));
+  }
+
   return { ok: errores.length === 0, obligaciones, errores };
+}
+
+/**
+ * Un mismo tributo no puede llevar dos porcentajes o dos bases distintas en el
+ * mismo archivo: la agenda se contradiría a sí misma.
+ */
+function erroresDeCoherencia(obligaciones: readonly OnatObligacion[]): OnatCsvError[] {
+  const porCodigo = new Map<string, OnatObligacion>();
+  const errores: OnatCsvError[] = [];
+
+  for (const obligacion of obligaciones) {
+    const previa = porCodigo.get(obligacion.codigo);
+    if (previa === undefined) {
+      porCodigo.set(obligacion.codigo, obligacion);
+      continue;
+    }
+
+    const mismoPorcentaje = previa.porcentaje === obligacion.porcentaje;
+    const mismaBase = previa.base === obligacion.base;
+    if (!mismoPorcentaje || !mismaBase) {
+      errores.push({
+        linea: 0,
+        motivo: `El tributo ${obligacion.codigo} declara porcentaje o base distintos entre filas.`,
+      });
+      break;
+    }
+  }
+
+  return errores;
 }
 
 /** Exporta las obligaciones al mismo CSV que se importa, para poder reeditarlo. */
 export function serializeOnatCsv(obligaciones: readonly OnatObligacion[]): string {
   const filas = obligaciones.map((obligacion) => {
     const importe = obligacion.importe === null ? '' : obligacion.importe.toFixed(2);
+    const porcentaje =
+      obligacion.porcentaje === null ? '' : String(Math.round(obligacion.porcentaje * 10000) / 100);
     return [
       obligacion.periodo,
       obligacion.vence,
       obligacion.codigo,
       importe,
       obligacion.rc04a,
+      porcentaje,
+      obligacion.base,
       obligacion.pagado ? 'si' : 'no',
     ].join(SEPARADOR);
   });
 
   return [ONAT_CSV_COLUMNS.join(SEPARADOR), ...filas].join('\n');
+}
+
+/** Tributos del año, en el orden en que aparecen en la agenda y sin repetir. */
+export function tributosDelVector(obligaciones: readonly OnatObligacion[]): OnatTributo[] {
+  const vistos = new Map<string, OnatTributo>();
+
+  for (const obligacion of obligaciones) {
+    if (!vistos.has(obligacion.codigo)) {
+      vistos.set(obligacion.codigo, {
+        codigo: obligacion.codigo,
+        porcentaje: obligacion.porcentaje,
+        base: obligacion.base,
+      });
+    }
+  }
+
+  return [...vistos.values()];
 }
 
 export function crearVectorVacio(ownerId: string, year: number): OnatVector {
@@ -240,7 +353,6 @@ export function crearVectorVacio(ownerId: string, year: number): OnatVector {
       provincia: '',
     },
     actividades: [],
-    tributos: [],
     obligaciones: [],
   };
 }
@@ -260,7 +372,8 @@ function textoDe(valor: unknown): string {
 }
 
 function normalizarIdentidad(valor: unknown): OnatIdentidad {
-  if (!esObjeto(valor)) return crearVectorVacio('', 0).identidad;
+  const vacia = crearVectorVacio('', 0).identidad;
+  if (!esObjeto(valor)) return vacia;
   return {
     nombre: textoDe(valor.nombre),
     nit: textoDe(valor.nit),
@@ -280,27 +393,6 @@ function normalizarActividades(valor: unknown): OnatActividad[] {
   }));
 }
 
-function normalizarTributos(valor: unknown): OnatTributo[] {
-  if (!Array.isArray(valor)) return [];
-  const bases: OnatBase[] = ['ingresos', 'salarios', 'fija'];
-  const periodicidades: OnatPeriodicidad[] = ['mensual', 'trimestral', 'anual'];
-
-  return valor
-    .filter(esObjeto)
-    .filter((tributo) => typeof tributo.codigo === 'string' && CODIGO_TRIBUTO.test(tributo.codigo))
-    .map((tributo) => ({
-      codigo: textoDe(tributo.codigo),
-      nombre: textoDe(tributo.nombre),
-      porcentaje: typeof tributo.porcentaje === 'number' && Number.isFinite(tributo.porcentaje)
-        ? tributo.porcentaje
-        : 0,
-      base: bases.includes(tributo.base as OnatBase) ? (tributo.base as OnatBase) : 'ingresos',
-      periodicidad: periodicidades.includes(tributo.periodicidad as OnatPeriodicidad)
-        ? (tributo.periodicidad as OnatPeriodicidad)
-        : 'mensual',
-    }));
-}
-
 function normalizarObligaciones(valor: unknown): OnatObligacion[] {
   if (!Array.isArray(valor)) return [];
   return valor
@@ -308,16 +400,30 @@ function normalizarObligaciones(valor: unknown): OnatObligacion[] {
     .filter((obligacion) => esPeriodoValido(textoDe(obligacion.periodo)))
     .filter((obligacion) => esFechaValida(textoDe(obligacion.vence)))
     .filter((obligacion) => CODIGO_TRIBUTO.test(textoDe(obligacion.codigo)))
-    .map((obligacion) => ({
-      periodo: textoDe(obligacion.periodo),
-      vence: textoDe(obligacion.vence),
-      codigo: textoDe(obligacion.codigo),
-      importe: typeof obligacion.importe === 'number' && Number.isFinite(obligacion.importe)
-        ? obligacion.importe
-        : null,
-      rc04a: parseRc04(textoDe(obligacion.rc04a)) ?? '',
-      pagado: obligacion.pagado === true,
-    }))
+    .map((obligacion) => {
+      const importe =
+        typeof obligacion.importe === 'number' && Number.isFinite(obligacion.importe)
+          ? obligacion.importe
+          : null;
+      const porcentaje =
+        typeof obligacion.porcentaje === 'number' && Number.isFinite(obligacion.porcentaje)
+          ? obligacion.porcentaje
+          : null;
+      const base = esBaseValida(textoDe(obligacion.base))
+        ? (obligacion.base as OnatBase)
+        : 'fija';
+
+      return {
+        periodo: textoDe(obligacion.periodo),
+        vence: textoDe(obligacion.vence),
+        codigo: textoDe(obligacion.codigo),
+        importe,
+        porcentaje: importe === null ? porcentaje : null,
+        base: importe === null ? base : 'fija',
+        rc04a: parseRc04(textoDe(obligacion.rc04a)) ?? '',
+        pagado: obligacion.pagado === true,
+      };
+    })
     .filter((obligacion) => obligacion.rc04a !== '');
 }
 
@@ -337,7 +443,6 @@ export function getOnatVector(ownerId: string, year: number): OnatVector {
       year,
       identidad: normalizarIdentidad(guardado.identidad),
       actividades: normalizarActividades(guardado.actividades),
-      tributos: normalizarTributos(guardado.tributos),
       obligaciones: normalizarObligaciones(guardado.obligaciones),
     };
   } catch {
@@ -357,8 +462,8 @@ export function saveOnatVector(vector: OnatVector): OnatWriteResult {
 
 /**
  * Importa el CSV del vector para un año. **Reemplaza todas las obligaciones** de
- * ese año (S2); la identidad, las actividades y los tributos configurados se
- * conservan. Si el archivo tiene cualquier error no se escribe nada.
+ * ese año (S2); la identidad y las actividades configuradas se conservan. Si el
+ * archivo tiene cualquier error no se escribe nada.
  */
 export function importOnatCsv(
   ownerId: string,

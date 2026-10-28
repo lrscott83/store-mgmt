@@ -281,44 +281,43 @@ Hay **tres vectores fiscales reales** en `docs/vector-fiscal/md/`:
 | **Tabla de obligaciones** | Tabla real, 5 columnas, 29 filas | **CSV** |
 | Reglas por tributo (tasas, deducciones, bonificaciones) | Texto legal, no dato del contribuyente | Catálogo en código, **no se importa** |
 
-Por eso el CSV son **5 columnas**, no 15. Cada fila del vector es exactamente:
-
-```
-período | fecha límite | código de tributo | importe | código RC-04A
-```
-
-Y el estado de pago no viene: la columna `Pagado` existe en el papel pero está vacía; el estado real está
-en el servicio "Consulta de Pagos" del portal.
+Por eso la tabla del documento son **5 columnas**. Al CSV se le añaden las dos que hacen falta para
+calcular, porque el vector explica el porcentaje de cada tributo:
 
 | Columna | Obligatoria | Ejemplo 2026 | Nota |
 |---|---|---|---|
 | `periodo` | sí | `2026-01`, `2026-Q1`, `2026-A` | Derivado del texto del período |
 | `vence` | sí | `2026-02-20` | Viene en el documento, ya con el corrimiento a día hábil |
 | `codigo` | sí | `0114022` | 7 dígitos |
-| `importe` | no | `1200.00` | **Vacío = variable**, lo calcula la app |
+| `importe` | no | `1200.00` | **Si viene, manda**: es el caso de los fijos (seguridad social) |
 | `rc04a` | sí | `30016` | 5 dígitos; en 2025 venía como `100 - 15` |
+| `porcentaje` | no | `10` | En por ciento (`10` = 10 %). Obligatorio si no hay importe |
+| `base` | no | `ingresos` | `ingresos`, `salarios` o `fija`. Obligatorio si hay porcentaje |
+| `pagado` | no | `no` | Marca manual del Owner; al importar se conserva si viene |
 
 ```csv
-periodo;vence;codigo;importe;rc04a
-2026-01;2026-02-20;0114022;;30016
-2026-01;2026-02-20;0510122;;60046
-2026-Q1;2026-04-20;0820132;1200.00;00206
-2026-A;2027-04-30;0530222;;10106
+periodo;vence;codigo;importe;rc04a;porcentaje;base
+2026-01;2026-02-20;0114022;;30016;10;ingresos
+2026-01;2026-02-20;0510122;;60046;5;ingresos
+2026-Q1;2026-04-20;0820132;1200.00;00206;;
+2026-A;2027-04-30;0530222;;10106;;
 ```
 
-**Lo que cambia respecto a las dos propuestas anteriores:**
+**Reglas del archivo:**
 
-1. **No hay columnas de tasa, base, exención ni vigencia.** Eso es ley o configuración, no vector. Meterlo
-   en el CSV solo produce columnas vacías.
-2. **No se repite la identidad en cada fila.** El NIT no va en el CSV: sale de la sesión y del formulario.
-3. **Los códigos son de 7 dígitos** (`0114022`), no 6.
-4. El **importe** solo existe en los fijos (la CESS: `1,200.00` trimestral) y **el vencimiento siempre viene**.
-5. El **RC-04A** es el código de 5 dígitos de la segunda columna de la tabla, tal como lo explica el
+1. **Si trae importe, ese es el valor y no se calcula** (seguridad social y demás fijos).
+2. **Si no trae importe, debe traer porcentaje y base** para poder calcularlo.
+3. **Si no trae ninguno de los dos**, la obligación existe pero queda pendiente de declarar. Es el caso del
+   `0530222`: el vector lo trae sin importe y sin porcentaje.
+4. **El mismo tributo no puede declarar dos porcentajes distintos** en el mismo archivo.
+5. **No se repite la identidad en cada fila.** El NIT no va en el CSV: sale de la sesión y del formulario.
+6. Los códigos son de **7 dígitos** (`0114022`), no de 6.
+7. El **RC-04A** es el código de 5 dígitos de la segunda columna de la tabla, tal como lo explica el
    documento de 2026.
 
-**Huecos que esto cierra:** forma de la tabla, código RC-04A, vencimiento, importe fijo de la CESS.
-**Siguen abiertos:** cuándo aparece `081013` (no está en ningún vector), la contribución agropecuaria
-`081043` y el catálogo de "otros tributos".
+**Huecos que esto cierra:** forma de la tabla, código RC-04A, vencimiento, importe fijo de la CESS y el
+porcentaje por tributo. **Siguen abiertos:** cuándo aparece `081013` (no está en ningún vector), la
+contribución agropecuaria `081043` y el catálogo de "otros tributos".
 
 ### 3.6.3 Decisiones del Owner (2026-10-28)
 

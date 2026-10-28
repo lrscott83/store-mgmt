@@ -11,20 +11,22 @@ o menos tributos. Nada se hereda del año anterior.
 **S2 — El import reemplaza todo.** Importar un CSV sustituye íntegramente las obligaciones de ese año. No hay
 fusión con lo anterior.
 
-**S3 — Cada tributo lleva su porcentaje.** El cálculo es `base × %`. El porcentaje es dato de configuración
-del año, no una constante escondida en el código.
+**S3 — Cada tributo lleva su porcentaje.** El cálculo es `base × %`. El porcentaje viene **en el CSV**, porque
+en el vector se explica por cada tributo. Si la fila trae importe, ese importe manda y no se calcula nada.
 
 **S4 — El pago es manual.** El Owner paga por fuera y marca la obligación como pagada. No hay integración con
 el portal.
 
-**S5 — El CSV define qué tributos aplican.** No hay interruptores ni catálogo especulativo: los tributos del
-año son los que trae el archivo.
+**S5 — El CSV define qué tributos aplican.** Los tributos del año son exactamente los códigos del archivo. Si
+un tributo no está en el vector, no se usa: no se calcula nada que el documento no declare.
 
 **S6 — Salarios = total del mes.** Varios gastos de tipo `Salario` en un mes se suman; ese total es la base
 del tributo de fuerza de trabajo.
 
-**S7 — CSV de cinco columnas:** `periodo;vence;codigo;importe;rc04a` (`pagado` opcional al exportar). El
-`importe` vacío significa tributo calculado.
+**S7 — CSV con las columnas de la tabla más las del cálculo:**
+`periodo;vence;codigo;importe;rc04a;porcentaje;base` (`pagado` opcional al exportar). El `porcentaje` se
+escribe en por ciento (`10` = 10 %). Una fila sin importe ni porcentaje queda **pendiente de declarar**: es
+el caso del `0530222`.
 
 **S8 — Identidad con RC-05 y ejercicio.** La identidad guarda el código de barras del RC-05 (16 dígitos) y el
 vector vive bajo un año.
