@@ -118,7 +118,7 @@ export function TutorialPage() {
         <h6 className="font-semibold">1. Adicionar un empleado.</h6>
         <p>1.1 Abrir el menú y en la sección Gestión tocar en Empleados.</p>
         <img
-          src="/images/help/users-menu.png"
+          src="/tutorials/usuarios/users-menu.png"
           alt="Menú Gestión Empleados"
           className="my-2 max-w-full"
         />
@@ -127,7 +127,7 @@ export function TutorialPage() {
           (Exportar roster sin conexión y Compartir por hotspot).
         </p>
         <img
-          src="/images/help/users-list.png"
+          src="/tutorials/usuarios/users-list.png"
           alt="Lista de empleados"
           className="my-2 max-w-full"
         />
@@ -136,7 +136,7 @@ export function TutorialPage() {
           Correo es opcional. Tocar el botón Adicionar.
         </p>
         <img
-          src="/images/help/users-create-form.png"
+          src="/tutorials/usuarios/users-create-form.png"
           alt="Formulario de nuevo empleado"
           className="my-2 max-w-full"
         />
@@ -148,7 +148,7 @@ export function TutorialPage() {
         <h6 className="font-semibold">2. Editar un empleado.</h6>
         <p>2.1 En la tarjeta del empleado tocar el engranaje y después tocar Editar.</p>
         <img
-          src="/images/help/users-card-actions.png"
+          src="/tutorials/usuarios/users-card-actions.png"
           alt="Acciones de la tarjeta del empleado"
           className="my-2 max-w-full"
         />
@@ -157,7 +157,7 @@ export function TutorialPage() {
           Actualizar. El Usuario no se puede cambiar.
         </p>
         <img
-          src="/images/help/users-edit-form.png"
+          src="/tutorials/usuarios/users-edit-form.png"
           alt="Formulario de edición del empleado"
           className="my-2 max-w-full"
         />
@@ -178,7 +178,7 @@ export function TutorialPage() {
           Se descarga un archivo con extensión .smcabundle.
         </p>
         <img
-          src="/images/help/users-roster-export.png"
+          src="/tutorials/usuarios/users-roster-export.png"
           alt="Exportar roster sin conexión"
           className="my-2 max-w-full"
         />
