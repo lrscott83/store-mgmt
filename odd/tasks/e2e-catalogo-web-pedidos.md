@@ -136,3 +136,8 @@
   scope+contexto a un `QueryAsync<T>` privado; se añade el caso separado que apaga SOLO la recogida
   y afirma `PickupEnabled=false` con el resto encendido; el log queda en orden cronológico.
   Evidencia: E2E de las 7 suites **51/51**.
+- **L6b (2026-11-03)** — RDD del tercer slice: lineage `review-2eceb3484f9493d3`, lentes
+  readability+reliability → **APROBADO**, 0 bloqueantes, 3 advisories informacionales
+  (`R2-DUP-WRITE-PREAMBLE`, `R3-REORDER-STATE`, `R3-NAME-BOUNDARY`); `acknowledge-approved` quemó
+  la autoridad (`consumed_revision` `sha256:655f1259…`). Nota: el candidato se calculó desde
+  `0efcbc88`, así que el motor revisó también el contenido del slice anterior.
