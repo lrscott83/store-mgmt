@@ -42,30 +42,30 @@
 | 1.7 | `PUT /catalog/products/{id}/images/order` | cubierto | `Catalog/WebCatalogImagesTests.cs` |
 | 2.1 | `GET /catalog/branding` | cubierto | `Catalog/WebCatalogBrandingTests.cs` |
 | 2.2 | `PUT /catalog/branding` | cubierto | `Catalog/WebCatalogBrandingTests.cs` |
-| 3.1 | `GET /catalog/showcase` | cubierto | `Catalog/ShowcaseValidationEnvelopeTests.cs` |
-| 3.2 | `POST /catalog/showcase` | cubierto | `Catalog/ShowcaseValidationEnvelopeTests.cs` |
-| 3.3 | `DELETE /catalog/showcase/{id}` | cubierto | `Catalog/ShowcaseRepositoryPersistenceTests.cs` |
-| 3.4 | `PUT /catalog/showcase/order` | cubierto | `Catalog/ShowcaseRepositoryPersistenceTests.cs` |
+| 3.1 | `GET /catalog/showcase` | cubierto (nuevo) | `Catalog/ShowcaseEndpointsE2ETests.cs`. Ojo: las rutas de SuperAdmin (`/stores/{id}/catalog/showcase`) y el repositorio ya tenían E2E; la ruta de SESIÓN no. |
+| 3.2 | `POST /catalog/showcase` | cubierto (nuevo) | `Catalog/ShowcaseEndpointsE2ETests.cs` (binding multipart por la ruta de sesión) |
+| 3.3 | `DELETE /catalog/showcase/{id}` | cubierto (nuevo) | `Catalog/ShowcaseEndpointsE2ETests.cs` |
+| 3.4 | `PUT /catalog/showcase/order` | cubierto (nuevo) | `Catalog/ShowcaseEndpointsE2ETests.cs` |
 | 4.1 | `GET /public/catalog/{slug}` | cubierto | `Catalog/WebCatalogPublicApiTests.cs` |
 | 4.2 | `GET /public/catalog/{slug}/products` | cubierto | `Catalog/WebCatalogPublicApiTests.cs` |
 | 4.3 | `GET /public/catalog/{slug}/products/{id}` | cubierto | `Catalog/WebCatalogPublicApiTests.cs` |
 | 4.4 | `GET /public/catalog/{slug}/media/{**key}` | cubierto | `Catalog/WebCatalogImagesTests.cs` |
-| 5.1 | `GET /online-ordering/settings` | **GAP** | solo `OrderingSettingsRouteAuthE2ETests` (auth de ruta) |
-| 5.2 | `PUT /online-ordering/settings` | **GAP** | ídem |
-| 6.1 | `GET /online-orders` | **GAP** | sin E2E |
-| 6.2 | `GET /online-orders/{id}` | **GAP** | sin E2E |
-| 6.3 | `GET /online-orders/stats` | **GAP** | sin E2E |
-| 6.4 | `PATCH /online-orders/{id}/status` | **GAP** | sin E2E |
-| 6.5 | `PATCH /online-orders/{id}/payment` | parcial | `Orders/OrderPaidAtE2ETests.cs` fija `PaidAt`, no el contrato del PATCH |
-| 6.6 | `PATCH /online-orders/{id}/driver` | parcial | `Orders/DeliveryDriverPartialUpdateE2ETests.cs` lo usa como efecto lateral |
+| 5.1 | `GET /online-ordering/settings` | cubierto (nuevo) | `Orders/OnlineOrderingSettingsE2ETests.cs`; el gating de ruta sigue en `OrderingSettingsRouteAuthE2ETests.cs` |
+| 5.2 | `PUT /online-ordering/settings` | cubierto (nuevo) | `Orders/OnlineOrderingSettingsE2ETests.cs` |
+| 6.1 | `GET /online-orders` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs` |
+| 6.2 | `GET /online-orders/{id}` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs` |
+| 6.3 | `GET /online-orders/stats` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs` |
+| 6.4 | `PATCH /online-orders/{id}/status` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs` |
+| 6.5 | `PATCH /online-orders/{id}/payment` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs`; `OrderPaidAtE2ETests.cs` sigue fijando `PaidAt` |
+| 6.6 | `PATCH /online-orders/{id}/driver` | cubierto (nuevo) | `Orders/OnlineOrdersManagementE2ETests.cs` |
 | 7.1 | `GET /delivery-drivers` | cubierto | `Orders/DeliveryDriverPartialUpdateE2ETests.cs` (ambos `activeOnly`) |
-| 7.2 | `POST /delivery-drivers` | **GAP** | sin E2E |
+| 7.2 | `POST /delivery-drivers` | cubierto (nuevo) | `Orders/DeliveryDriverCreateE2ETests.cs` |
 | 7.3 | `PATCH /delivery-drivers/{id}` | cubierto | `Orders/DeliveryDriverPartialUpdateE2ETests.cs` |
-| 8.1 | `GET /public/ordering/{slug}/config` | **GAP** | sin E2E de comportamiento |
-| 8.2 | `POST /public/ordering/{slug}/orders` | parcial | `PublicOrderingRateLimitE2ETests` solo ejercita el 429 |
+| 8.1 | `GET /public/ordering/{slug}/config` | cubierto (nuevo) | `Orders/PublicOrderingConfigE2ETests.cs` |
+| 8.2 | `POST /public/ordering/{slug}/orders` | cubierto (nuevo) | `Orders/PublicOrderingCreateE2ETests.cs`; el 429 sigue en `PublicOrderingRateLimitE2ETests.cs` |
 | 8.3 | `GET /public/ordering/{slug}/orders/{code}` | cubierto | `Orders/PublicOrderingReadE2ETests.cs` |
-| 9.1 | `GET /stores/{storeId}/catalog-template` | **GAP** | sin E2E |
-| 9.2 | `PUT /stores/{storeId}/catalog-template` | **GAP** | sin E2E |
+| 9.1 | `GET /stores/{storeId}/catalog-template` | cubierto (nuevo) | `Stores/CatalogTemplateE2ETests.cs` |
+| 9.2 | `PUT /stores/{storeId}/catalog-template` | cubierto (nuevo) | `Stores/CatalogTemplateE2ETests.cs` |
 
 ## Tasks
 
@@ -101,13 +101,18 @@
 - **L2b (2026-11-03)** — La auditoría de las unidades 1-4 encontró un hueco más, no previsto en
   L2: la ruta de SESIÓN del showcase (`/api/v1/catalog/showcase` GET/POST/DELETE/order) no tenía
   ningún E2E; lo que existía cubría las rutas de SuperAdmin y el repositorio. Corregido en T7.
-- **L3 (2026-11-03)** — **T1–T4 y T7 HECHOS** en `9197827c` (8 archivos, 1796 líneas): 7 suites
-  nuevas, **46 tests**. Evidencia: `dotnet test` con filtro `Catalog|Orders` → **175/175 verde**.
-  Ningún E2E existente tocado; ningún archivo de producción modificado.
-  RDD sobre el commit (`--base-ref 2eedabe4 --committed-only`): `risk: medium`
+- **L3 (2026-11-03)** — **T1–T7 HECHOS** en `9197827c` (8 archivos, 1811 líneas según el
+  manifiesto del commit): 7 suites nuevas, **46 tests**. Evidencia: `dotnet test` con filtro
+  `Catalog|Orders` → **175/175 verde**. Ningún E2E existente tocado; ningún archivo de producción
+  modificado.
+  Assess sobre el commit (`--base-ref 2eedabe4 --committed-only`): `risk: medium`
   (`executable_change`), `review_due: false`, `review_due_reason: under_budget`. **Sin receipt**:
-  el candidato queda pendiente en el slice, no aprobado.
-- **L4 (2026-11-03)** — Pendiente: T5/T6 quedaron cerrados dentro de L3 (el listado/detalle/stats/
-  PATCH y la configuración de pedidos entraron en las 7 suites). Lo que sigue abierto es la
-  cobertura de unidades 1-4 más allá del showcase: su matriz está en la tabla de arriba y se apoya
-  en suites preexistentes; no se añadieron archivos nuevos ahí.
+  el candidato quedaba pendiente en el slice.
+- **L3b (2026-11-03)** — El usuario pidió abrir el ciclo igualmente. `review start` (lineage
+  `review-a6aaa86f9943fb57`, lentes readability+reliability) → **APROBADO**, 0 bloqueantes,
+  10 advisories informacionales; `acknowledge-approved` quemó la autoridad
+  (`consumed_revision` `sha256:9b95c457…`). Entrega (push/PR/merge) sigue sin autorizar.
+- **L4 (2026-11-03)** — Correcciones de este commit de docs, derivadas de RDD: la matriz ya no
+  marca como GAP endpoints que este feature cerró, y las filas del showcase distinguen la ruta de
+  sesión (nueva) de las rutas de SuperAdmin y el repositorio (preexistentes). L3 dice T1–T7 y 1811
+  líneas para dejar de contradecir Tasks y el manifiesto.
