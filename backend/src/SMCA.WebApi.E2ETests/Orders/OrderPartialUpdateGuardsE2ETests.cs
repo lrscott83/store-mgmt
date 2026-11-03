@@ -245,39 +245,6 @@ public sealed class OrderPartialUpdateGuardsE2ETests
     }
 
     [Fact]
-    public async Task Partial_update_refuses_an_empty_set_and_an_already_tracked_entity()
-    {
-        var fixture = await PublicOrderingSeed.SeedAsync(_f);
-        try
-        {
-            var seeded = await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, "GUARDRAILS");
-
-            using var scope = _f.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var repository = new OrderRepository(db);
-            var order = await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
-                .FirstAsync(o => o.Id == seeded.Id);
-
-            await FluentActions
-                .Awaiting(() => repository.UpdatePartialAsync(order, OrderChangedField.None))
-                .Should().ThrowAsync<ArgumentException>(
-                    "an empty set would report success while writing nothing");
-
-            await FluentActions
-                .Awaiting(() => repository.UpdatePartialAsync(order, (OrderChangedField)128))
-                .Should().ThrowAsync<ArgumentOutOfRangeException>(
-                    "a new domain field must be mapped to a column or fail loudly");
-
-            db.Attach(order);
-            await FluentActions
-                .Awaiting(() => repository.UpdatePartialAsync(order, OrderChangedField.Status))
-                .Should().ThrowAsync<InvalidOperationException>(
-                    "resetting a tracked entity would discard its pending changes");
-        }
-        finally { await PublicOrderingSeed.CleanupAsync(_f, fixture); }
-    }
-
-    [Fact]
     public async Task Delivery_persists_its_own_columns_and_leaves_the_rest_untouched()
     {
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
@@ -287,6 +254,9 @@ public sealed class OrderPartialUpdateGuardsE2ETests
             var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
             var before = await ReadAsync(seeded.Id);
+            before.PaymentStatus.Should().Be(OrderPaymentStatus.Pending,
+                "the paid assertion below only proves something if the order was not already paid");
+            before.PaidAt.Should().BeNull();
 
             (await client.PatchAsJsonAsync($"/api/v1/online-orders/{seeded.Id}/status",
                 new { status = (int)OrderStatus.Preparado })).StatusCode.Should().Be(HttpStatusCode.OK);

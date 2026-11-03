@@ -237,12 +237,15 @@ public class UpdateOrderStatusCommandHandlerTests
         Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
+        using var cts = new CancellationTokenSource();
+
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), cts.Token);
 
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Preparado),
-                OrderChangedField.Status, It.IsAny<CancellationToken>()),
+                OrderChangedField.Status,
+                It.Is<CancellationToken>(token => token == cts.Token)),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);

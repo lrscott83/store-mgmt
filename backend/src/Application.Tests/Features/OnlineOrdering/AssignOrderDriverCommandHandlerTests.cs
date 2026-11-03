@@ -218,12 +218,15 @@ public class AssignOrderDriverCommandHandlerTests
         Order order = OrderFor();
         Returns(order);
 
-        await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
+        using var cts = new CancellationTokenSource();
+
+        await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), cts.Token);
 
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.Is<Order>(o => o.Id == order.Id && o.DriverId == driver.Id),
-                OrderChangedField.DriverId, It.IsAny<CancellationToken>()),
+                OrderChangedField.DriverId,
+                It.Is<CancellationToken>(token => token == cts.Token)),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);

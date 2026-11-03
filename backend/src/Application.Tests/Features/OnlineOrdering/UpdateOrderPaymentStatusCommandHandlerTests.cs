@@ -212,13 +212,16 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         Order order = OrderWith(OrderPaymentStatus.Pending);
         Returns(order);
 
+        using var cts = new CancellationTokenSource();
+
         await Handler().Handle(
-            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), cts.Token);
 
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid),
-                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt, It.IsAny<CancellationToken>()),
+                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt,
+                It.Is<CancellationToken>(token => token == cts.Token)),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);

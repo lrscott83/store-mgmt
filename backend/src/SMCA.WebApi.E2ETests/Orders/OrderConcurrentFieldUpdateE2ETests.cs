@@ -13,19 +13,15 @@ using Xunit;
 namespace SMCA.WebApi.E2ETests.Orders;
 
 /// <summary>
-/// Actualización parcial de la fila del pedido (P0-2, opción A): lo que los unitarios NO pueden
-/// probar —que dos PATCH concurrentes sobre el MISMO pedido sobrevivan uno al otro en PostgreSQL
-/// real.
+/// Cada `PATCH` de un pedido escribe SOLO su eje (P0-2, opción A), extremo a extremo: lo que los
+/// unitarios no pueden ver —que el SQL que emite EF toque únicamente las columnas de la operación y
+/// que la fila quede con los dos ejes.
 ///
-/// El defecto que este test vigila es el "lost update" de la fila entera: recepción marca el
-/// pedido como preparado y caja lo marca pagado, cada handler lee la fila, muta su eje y guarda
-/// TODAS las columnas con los valores que leyó. El que guarda último devuelve el eje del otro a su
-/// valor anterior — sin conflicto, sin error y sin aviso. Con la actualización por columnas cada
-/// PATCH escribe solo las suyas, así que las dos sobreviven sin importar el orden.
-///
-/// El E2E es la prueba que el plan exige (S5) porque el defecto vive en el SQL que emite EF: un
-/// mock del repositorio acepta cualquier llamada y una entidad en memoria no tiene columnas. Aquí
-/// se disparan las DOS rutas HTTP autenticadas a la vez y se afirma la FILA.
+/// Esta prueba es SECUENCIAL a propósito. Un test de carrera por HTTP no puede obligar a los dos
+/// handlers a leer antes de que el otro escriba (no hay barrera en el medio), así que pasaría
+/// también con el guardado de fila entera y no serviría de red de seguridad. La prueba determinista
+/// del lost update —lectura vieja + escritura posterior— vive en
+/// <c>OrderPartialUpdateGuardsE2ETests</c>.
 ///
 /// Reutiliza <see cref="PublicOrderingSeed"/>: tienda con `OwnerAdmin` y tienda seleccionada,
 /// módulos 19 y 20, y un pedido `Creado`/`Pending` de recogida. No toca ningún archivo del
@@ -56,17 +52,11 @@ public sealed class OrderConcurrentFieldUpdateE2ETests
     }
 
     /// <summary>
-    /// Un `PATCH /payment` y un `PATCH /status` disparados a la vez sobre el MISMO pedido: los dos
-    /// responden 200 y los dos ejes quedan en la fila.
-    ///
-    /// Es una prueba de HUMO de los dos endpoints, no la prueba determinista del lost update: sin
-    /// una barrera que obligue a los dos handlers a leer antes de que el otro escriba, el
-    /// entrelazado real depende del planificador, así que puede pasar sin el arreglo. La prueba
-    /// determinista —lectura vieja + escritura del otro eje, y la escritura posterior— vive en
-    /// `OrderPartialUpdateGuardsE2ETests`, que sí falla siempre con el guardado de fila entera.
+    /// Un `PATCH /payment` y después un `PATCH /status` sobre el MISMO pedido: los dos responden
+    /// 200 y los dos ejes quedan en la fila, con el detalle devolviendo lo mismo que la fila.
     /// </summary>
     [Fact]
-    public async Task R_CONCURRENT_1_a_concurrent_payment_patch_and_status_patch_both_persist()
+    public async Task R_CONCURRENT_1_payment_and_status_patches_keep_their_own_axis()
     {
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
@@ -80,21 +70,18 @@ public sealed class OrderConcurrentFieldUpdateE2ETests
             before.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
             before.PaidAt.Should().BeNull("un pedido recién creado no tiene cobro que constatar");
 
-            // Un cliente por acción: es lo que hace una sesión por puesto en el panel. Las dos
-            // peticiones se lanzan ANTES del primer await para que viajen a la vez.
+            // Un cliente por acción: es lo que hace una sesión por puesto en el panel.
             var paymentClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
             var statusClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
-            Task<HttpResponseMessage> payment = paymentClient.PatchAsJsonAsync(
+            var payment = await paymentClient.PatchAsJsonAsync(
                 $"/api/v1/online-orders/{seeded.Id}/payment", PaymentBody(OrderPaymentStatus.Paid));
-            Task<HttpResponseMessage> status = statusClient.PatchAsJsonAsync(
-                $"/api/v1/online-orders/{seeded.Id}/status", StatusBody(OrderStatus.Preparado));
-
-            HttpResponseMessage[] responses = await Task.WhenAll(payment, status);
-
-            responses[0].StatusCode.Should().Be(HttpStatusCode.OK,
+            payment.StatusCode.Should().Be(HttpStatusCode.OK,
                 "marcar el pago es válido en un pedido `Creado`");
-            responses[1].StatusCode.Should().Be(HttpStatusCode.OK,
+
+            var status = await statusClient.PatchAsJsonAsync(
+                $"/api/v1/online-orders/{seeded.Id}/status", StatusBody(OrderStatus.Preparado));
+            status.StatusCode.Should().Be(HttpStatusCode.OK,
                 "`Creado → Preparado` es una transición válida de recogida");
 
             // La FILA: los dos ejes, no solo el último que escribió.
