@@ -150,3 +150,9 @@
   (`DeliveryDriverCreateE2ETests.cs:179`) ya envía `NameMaxLength + 1` y espera 400 sin fila; la
   lente no tenía ese tramo a la vista. No se añadió código por ese punto.
   Evidencia: E2E de `PublicOrderingConfigE2ETests` + `ShowcaseEndpointsE2ETests` **14/14**.
+- **L7b (2026-11-03)** — RDD del cuarto slice: lineage `review-38611e7edcb977cf`, lentes
+  readability+reliability → **APROBADO**, 0 bloqueantes, 4 advisories informacionales
+  (`R2-OPAQUE-DECISION-REF`, `R2-FLAG-ENUM-NAME`, `R3-LIMIT-CONSTANT-COUPLING`,
+  `R3-REORDER-EMPTY-LIST`); `acknowledge-approved` quemó la autoridad
+  (`consumed_revision` `sha256:790ff25a…`). Los cuatro son de estilo o de un borde barato: la
+  revisión converge.
