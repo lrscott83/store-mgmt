@@ -3,17 +3,25 @@
 > **Índice único y evolutivo.** Actualizar este documento cada vez que un plan se
 > complete, se agregue uno nuevo o cambie de prioridad.
 >
-> **Última auditoría:** 2026-09-20 · Rama: `qa` · 40 documentos analizados.
-> **Método:** verificación plan-por-plan contra el código real con evidencia
-> (archivo:línea o commit). Sin asumir: cada clasificación tiene prueba.
+> **Última auditoría:** 2026-11-03 · Rama: `qa` · 34 documentos en `docs/plans`
+> (10 agregados después de la auditoría del 2026-09-20, que estaban sin indexar).
+> **Método:** verificación plan-por-plan contra el código real (archivo:línea o
+> commit). Sin asumir: cada clasificación tiene prueba.
+>
+> **Cambio de formato (2026-11-03):** cada pendiente lleva **Problema**, **Propuestas**
+> y **Recomendación**. La prioridad ya no es "lo que dice el plan", sino impacto real
+> verificado en código.
 
 ## Cómo usar este documento
 
 - **Pendiente** = trabajo real por hacer, ordenado de P0 (mayor) a P3 (menor).
-- Al cerrar un ítem: marcar la casilla y anotar el commit / evidencia.
+- Al cerrar un ítem: marcar la casilla, anotar commit / evidencia observada y mover el
+  detalle a §2 (cerrado).
 - Al crear un plan nuevo en `docs/plans/`, agregarlo a la sección que corresponda.
-- Los planes ya implementados se eliminaron (recuperables con `git log --all -- <ruta>` /
-  `git show <commit>:<ruta>`).
+- **`docs/plans` no es el backlog completo.** El trabajo de ejecución vive en
+  `odd/tasks/`; aquí quedan las decisiones de diseño, los pendientes y el índice.
+- Un plan marcado como "no iniciado" puede estar implementado: varios documentos no se
+  actualizaron después de su entrega (ver §3).
 
 ---
 
@@ -21,164 +29,368 @@
 
 ### P0 — Correctitud de datos e invariantes (alto impacto, desbloqueado)
 
-- [x] **Totales por moneda fuera del dashboard (MultiMonedas §6).** — HECHO (2026-09-20, sin commit)
-  Las 5 vistas agrupan por moneda (total primario + chips) con el gate `hasMultiMonedasAvailable`;
-  sin el módulo la salida es idéntica. Nuevo componente compartido
-  `app/shared/components/multimonedas/currency-total-amount.tsx`; reutiliza `currency-totals`.
-  Fuente: `docs/plans/2026-09-17-multimonedas-module-plan.md` §6; tracker `odd/tasks/multicurrency-view-totals.md`.
-  Revisión RDD: `review-reliability` **aprobada** (lineage `review-0f25edfbdaddef0b`, authority burned).
-  3 hallazgos no bloqueantes pendientes (ver «Follow-ups» abajo).
-  Pendiente: **commit** (decisión del usuario).
+#### [ ] P0-1 · El snapshot de venta: una lectura que escribe y puede tumbar la pantalla
 
-- [ ] **Invariante de sesión autenticada — ruta `/unlock-data`.**
-  Una sesión válida pero bloqueada aún aterriza en `/login?unlock=1`. El diseño
-  propone una ruta dedicada y desacoplar `guestOnlyLoader`.
-  Fuente: `docs/plans/2026-09-06-auth-session-redirect-invariant-e2e-gaps.md` §6.
-  Evidencia: no existe ruta `unlock-data`; `app/auth/routes/loaders.ts:36-39,79-81`
-  redirigen/retornan null cuando `needsUnlock && hasUnreadableCiphertext`.
-  Relacionado: contrato `docs/contracts/authenticated-session-redirect.md`.
+- **Fuente:** `2026-10-06-sale-snapshot-review-findings.md` §F1 y §F3 (hallazgos RDD).
+- **Problema:** `order-offline-service.ts:895` hace `if (changed) this.setOrdersLocalStorage(stored)`
+  dentro de `getOrdersFromLocalStorage`. Desde el backfill del 2026-10-06 la lectura sanea la
+  orden **y la reescribe**. Si esa escritura falla —`QuotaExceededError` con `localStorage` lleno,
+  o `MissingDataKeyError` porque la DEK aún no está en memoria (`setOrdersLocalStorage` cifra)— la
+  excepción **se propaga** y la lectura completa falla. Antes del backfill la lectura no podía
+  fallar. El diseño original (`D4`) era explícito: un store ilegible nunca se sobrescribe.
+- **Propuestas:**
+  - **A. Persistencia best-effort.** `try { setOrdersLocalStorage(stored) } catch { /* log */ }` y
+    devolver siempre el resultado saneado. Cambio de 4 líneas, no cambia el contrato.
+  - **B. Precondición explícita.** Persistir solo si la DEK está disponible y hay espacio
+    (`navigator.storage.estimate()`); no cubre la carrera entre la comprobación y el `setItem`.
+  - **C. Sacar la escritura del camino de lectura.** Una migración explícita al abrir la app
+    (una sola vez) y la lectura vuelve a ser solo lectura. Es el diseño conceptualmente correcto,
+    pero más trabajo y hay que garantizar que la cura ocurra.
+- **Recomendación:** **A**, con el test de F3 en el mismo cambio (leer dos veces un store legacy:
+  la primera persiste, la segunda **no** llama a `setOrdersLocalStorage`). C queda como ideal a
+  futuro; no bloquea nada. Telemetría/consola del fallo, sin marcarlo como persistido.
+- **Riesgo del arreglo:** bajo (ningún dato, seguridad, contrato ni concurrencia). Tests: unit del
+  servicio + un caso que fuerza el fallo de `setOrdersLocalStorage`.
 
-- [ ] **Actualizar spec canónico REQ-5 (contradice el código).**
-  Fuente: `docs/plans/2026-09-15-store-plan-change-permission-refresh-plan.md` §6.2.
-  Evidencia: `openspec/specs/e2e-store-plan-activation-ui/spec.md:68-80` exige
-  "cero llamadas a `GET /v1/auth/me`", mientras el código hace **una** (`soft-refresh-session.ts`).
+#### [ ] P0-2 · Lost update en los 3 `PATCH` de pedidos online (6.1 / X2)
+
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidad 6.1 y transversal X2.
+- **Problema:** `UpdateOrderStatusCommand.cs:137`, `UpdateOrderPaymentStatusCommand.cs:89` y
+  `AssignOrderDriverCommand.cs:103` cargan el pedido, mutan **un** eje y llaman a
+  `_orderRepository.UpdateAsync(order)`. `GenericRepository.cs:29-33` hace
+  `Entry(entity).State = EntityState.Modified`: **UPDATE de fila completa**, con contexto
+  `NoTracking` y sin token de concurrencia. Si A marca el pago mientras B marca "aceptado", el
+  último `SaveChanges` **revierte en silencio la columna del otro**. No hay error, no hay rastro.
+  El flujo multiusuario (dueño + StoreUser) es el caso normal, no el borde.
+- **Evidencia verificada:** `GenericRepository.cs:29-33`; los 3 call sites comparten el patrón;
+  `Order` no tiene `RowVersion`/`ConcurrencyToken` (grep en `Domain/Entities/Orders/Order.cs`).
+- **Propuestas:**
+  - **A. Actualización parcial por columnas.** Marcar solo las propiedades que la operación tocó
+    (`Entry(entity).Property(x => x.Status).IsModified = true`, etc.). Es el patrón que ya se
+    aplicó y probó en `StoreCatalogSettingsRepository.UpsertAsync` (5.3, `00acfe44`).
+  - **B. Token de concurrencia.** `rowversion`/`xmin` en `Order` + mapear
+    `DbUpdateConcurrencyException` → **409**. Exige migración, script y cambio de contrato.
+  - **C. Solo A ahora; B como unidad aparte.**
+- **Recomendación:** **C**. A resuelve la pérdida entre ejes distintos (estado vs pago vs
+  repartidor) sin migración y reutiliza un patrón ya aprobado en este repo. B aporta protección
+  real cuando dos personas editan **la misma** columna, pero el dominio ya serializa transiciones;
+  se difiere a una unidad con migración y semántica 409 documentada. A no debe presentarse como
+  "cerrado": en el plan queda B como deuda explícita.
+- **Riesgo:** alto (datos). Requiere aprobación backend y test contra PostgreSQL real (el E2E
+  nuevo debe demostrar que un `PATCH payment` concurrente sobrevive a un `PATCH status`).
+
+#### [ ] P0-3 · `PATCH /delivery-drivers/{id}` da de baja al repartidor en silencio (7.1)
+
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidad 7.1.
+- **Problema:** `UpdateDeliveryDriverCommand.IsActive` es `bool` **no nullable** y el handler
+  escribe siempre (`driver.IsActive = request.IsActive`). Un `PATCH` canónico
+  `{"name":"...","phone":"..."}` deja `IsActive = false` y devuelve **200**: el repartidor
+  desaparece de la lista por defecto y no se puede asignar a pedidos nuevos. Hoy solo lo tapa el
+  tipo TypeScript del cliente; cualquier otro consumidor (o un cliente futuro) lo dispara.
+  Semántica `PATCH` = "lo omitido no se toca", y aquí lo omitido borra.
+- **Propuestas:**
+  - **A. `bool? IsActive` + escribir solo si `HasValue`.** Cambio mínimo, conserva el contrato y
+    el endpoint único.
+  - **B. Separar acciones.** `PATCH` solo nombre/teléfono + `POST /{id}/deactivate` y
+    `/activate`. Más explícito, pero duplica endpoints y no arregla el cuerpo actual.
+  - **C. JSON Patch (RFC 6902).** Fuera de escala para este repo.
+- **Recomendación:** **A** + validator que exija al menos un campo del cuerpo y un test E2E nuevo
+  (`PATCH` sin `isActive` no cambia el estado; `isActive:false` sí). Documentar la semántica en el
+  endpoint. B es una mejora de UX posterior, no un requisito.
+- **Riesgo:** medio (contrato de un endpoint consumido por la app, no publicado). Requiere
+  aprobación backend por la regla del repo.
+
+#### [ ] P0-4 · `POST /public/ordering/{slug}/orders` sin tope de líneas ni de cantidad (8.1 / 8.2)
+
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidades 8.1 y 8.2.
+- **Problema:** `CreateOnlineOrderCommandValidator.cs:66-67` solo exige `Quantity > 0`; no hay tope
+  por línea ni de líneas por carrito. `Order.ItemsCount` es `checked` y desborda con cantidades
+  grandes → **500 anónimo**. Además el rate limit cuenta **requests**, no filas: un solo POST
+  puede insertar cientos de miles de `OrderItem`, así que el límite no cierra el hueco que dice
+  cerrar.
+- **Propuestas:**
+  - **A. Topes en el validator.** Cantidad máxima por línea (p. ej. 10 000) y máximo de líneas por
+    carrito (p. ej. 100), con mensajes localizados. Barato y suficiente.
+  - **B. A + límite de filas por IP/ventana** (no solo requests) o límite de payload.
+  - **C. Guard en el handler** además del validator, para comandos internos.
+- **Recomendación:** **A + C**. Un endpoint público sin topes es una invitación; el guard en el
+  handler cubre el caso de un comando construido sin pasar por el validator. B se evalúa cuando
+  exista métrica de abuso real (no hay panel de lectura todavía).
+
+---
 
 ### P1 — Features pendientes acordadas (desbloqueadas)
 
-- [x] **Warehouse movements — Fases 3-5.** — HECHO (2026-09-21)
-  Fuente: `docs/plans/2026-09-16-warehouse-movements-plan.md`.
-  **Fase 3** (propagación de costo) + **Fase 4** (tests faltantes) + **F4b** (A9a) + **Fase 5**
-  (verificación) implementadas. Diseño: `odd/tasks/warehouse-cost-propagation-design.md`; tracker:
-  `odd/tasks/warehouse-movements-fases-3-5.md`. Commits `7106ecfc`, `81ccd8e5`, `ea112c23`,
-  `cb919fc8`, `c3f65c35` (pusheados). Checks: `pnpm test` 4044 verdes, typecheck y lint OK.
-  Revisión RDD aprobada. Pendiente menor: R3-001 (el contador A9a relee movimientos por iteración →
-  O(N²) en imports grandes). Los E2E nuevos no se ejecutaron (backend `:5019` caído).
+#### [ ] P1-1 · Resto de `api-endpoint-review` (unidades 7-9 y transversales)
 
-- [ ] **PWA offline shell — restos.**
-  Fuente: `docs/plans/2026-07-27-pwa-offline-shell-frontend-plan.md` (cambio activo
-  `openspec/changes/pwa-offline-shell`, no archivado).
-  Evidencia: Task 6 nginx sin `text/javascript` ni `application/manifest+json`
-  (`frontend-react/deploy/nginx.conf:27-35`); Task 8: logs TEMP `[SW]`/`[PWA]` vivos
-  (`app/service-worker.ts:39,45,63,154`, `app/shared/lib/pwa/service-worker-registration.ts:28-52`)
-  — **requiere sign-off del usuario**; Task 7 walkthrough manual (hoy cubierto por
-  `e2e/offline-shell.spec.ts`); desviaciones de diseño sin implementar
-  (`offlineFallback`, prune por entrada — aceptadas en el cambio).
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md`. Controllers 1-5 **hechos y
+  aprobados por RDD**; quedan 61 casillas abiertas (HIGH ya cubiertos en P0-2..P0-4 + MEDIUM/LOW
+  y transversales X1, X3, X4, X5, X6, X7, X8, X9).
+- **Problema:** hallazgos de revisión sin implementar en `DeliveryDrivers` (resto), `PublicOrdering`
+  (PII en query string y logs, código no criptográfico, 200 en un create), `OnlineOrders`
+  (paginación sin tope, `search` sin índice, PII sin máscara, sin `[Authorize]` de feature) y
+  `catalog-template` (allowlist de `templateId`, join de 4 tablas para un escalar, 400 vs 404).
+  Los transversales X1 (multipart global sin tope real), X3 (check-then-act → 500) y X4
+  (OpenAPI incompleto) tocan varios controladores.
+- **Propuestas:** implementar **unidad por unidad** con aprobación punto por punto, como se hizo
+  con 1-5 (build + `Application.Tests` + RDD por unidad). No un solo PR gigante.
+- **Recomendación:** orden por riesgo real, no por número: **8 → 6 → 9 → 7 (resto) → transversales**
+  (X1 antes de X4; X3 junto con la unidad que lo toque). Cada unidad cierra con tests nuevos; los
+  E2E existentes no se tocan.
 
-- [ ] **E2E gated modules auth roster — filas faltantes.**
-  Fuente: `docs/plans/2026-09-08-e2e-plan-gated-modules-auth-roster.md`.
-  Faltan: `E1-6` (storeuser inactivo fuera de roles), `E1-7` (superusuario ve la lista
-  completa de módulos), `E2-5` (roster pagado incluye warehouse/wholesale/multistores).
-  (Regla AGENTS.md: agregar tests NUEVOS; no tocar los existentes.)
+#### [ ] P1-2 · Deriva del spec canónico REQ-5 (documentación que contradice el código)
+
+- **Fuente:** `2026-09-15-store-plan-change-permission-refresh-plan.md` §6.2; auditoría 2026-11-03.
+- **Problema:** `openspec/specs/e2e-store-plan-activation-ui/spec.md:76` exige que el conteo de
+  `GET /v1/auth/me` sea **CERO**, pero el E2E se actualizó el 2026-09-16
+  (`store-plan-activation.spec.ts:233-248`) y el código hace **uno** vía
+  `soft-refresh-session.ts` (`getMe()`), que es justamente el arreglo del plan de permisos. Un
+  lector del spec "arregla" el test contra la realidad equivocada.
+- **Propuestas:**
+  - **A. Actualizar el spec** para que REQ-5 exija **exactamente uno** (el refresco online tras
+    cambiar el plan) y cero en la recarga (REQ-1 de `e2e-session-hydration`).
+  - **B. Forzar cero** y volver al perfil cacheado: reintroduce el menú congelado que el plan vino
+    a arreglar. Descartada.
+- **Recomendación:** **A**. Es un cambio de documento; la implementación ya está hecha y probada.
+  Añadir la nota de por qué existe el `/me` (best-effort, explícito, online-only).
+
+#### [ ] P1-3 · SEO de la landing — pendientes P3/P4/P5
+
+- **Fuente:** `2026-10-20-landing-seo-audit.md` §5. Iteraciones 1-4 cerradas (JSON-LD, H1, OG,
+  `offers`, constantes de schema, timeout de vitest).
+- **Problema:** **P5** `frontend-react/Dockerfile:24` tiene
+  `ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net`: si el build de producción no lo
+  sobreescribe, `canonical`, `og:url` y `og:image` apuntan a **staging** (daño SEO real y
+  silencioso). **P3** el sitemap solo lista catálogos, no `/`. **P4** `robots.txt` permite `/` sin
+  exclusiones: `/login`, `/sales/*`, `/admin/*` y URLs inventadas (el fallback SPA responde 200) son
+  indexables como soft 404.
+- **Propuestas:** P5 = verificación operativa (inspeccionar el build desplegado, no el repo) y, si
+  falta, fijar el ARG en el pipeline; P3 = incluir `/` en el builder del sitemap; P4 = `Disallow`
+  de rutas privadas o `X-Robots-Tag: noindex` en el fallback SPA.
+- **Recomendación:** **P5 primero** (es el único con daño activo si está mal), luego **P3+P4**
+  juntos (mismo archivo/área, cambio pequeño). P1 (cuerpo estático) y P2 (`offers` server-side)
+  quedan como proyecto aparte: son el cambio caro y no bloquean nada.
+
+#### [ ] P1-4 · Las vistas deben suscribirse solas al aviso de cambios
+
+- **Fuente:** `2026-10-06-subscription-refresh-for-views.md`.
+- **Problema:** `data-revision-store` sube un contador cuando algo cambia, pero **no despierta a
+  nadie**: solo `sale.tsx` y `wholesale.tsx` se suscriben a mano. Gastos, almacenes, tasas, ventas
+  a crédito, entradas y créditos no se vuelven a pintar aunque el dato en memoria sea nuevo. Y una
+  pantalla nueva que olvide suscribirse queda congelada sin que nada falle.
+- **Propuestas:**
+  - **A. Hook único** (`useLiveValue`) que se suscribe internamente al contador, invalida la foto
+    de los servicios y devuelve el valor recalculado; la pantalla no declara dependencias.
+  - **B. Suscripción explícita por pantalla** (lo de hoy, generalizado): barato pero repite el
+    error que el plan quiere eliminar.
+  - **C. Test de guardia** que falle si una pantalla con datos vivos no está suscrita.
+- **Recomendación:** **A + C**, migrando en este orden: `sale`/`wholesale` (quitar la suscripción
+  manual) → gastos → almacenes → el resto. El agrupamiento por ráfaga de
+  `invalidation-universal-write-through` ya está hecho: es la precondición de seguridad, no un
+  extra.
+
+#### [ ] P1-5 · Restos de PWA (logs de diagnóstico y tipos MIME)
+
+- **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; auditoría 2026-11-03.
+- **Problema:** quedan 4 logs `[SW]`/`[PWA]` vivos (`app/service-worker.ts`, y
+  `service-worker-registration.ts`) que ensucian la consola de producción, y `nginx.conf:35-41`
+  no incluye `text/javascript` ni `application/manifest+json` en `gzip_types` (el JS se sirve como
+  `application/javascript` así que funciona, pero el manifest no se comprime).
+- **Propuestas:** A. borrar los logs; B. dejarlos detrás de un flag de depuración; C. mantenerlos.
+- **Recomendación:** **B** para los logs (útiles en soporte, invisibles por defecto) y **añadir los
+  dos tipos a `gzip_types`** (riesgo cero, ganancia real). Requiere **sign-off del owner** porque
+  toca el despliegue y el service worker.
+
+#### [ ] P1-6 · Reconciliar las fichas E2E desactualizadas
+
+- **Fuente:** `odd/tasks/e2e-birth-plan-superior.md`, `odd/tasks/e2e-plan-gated-modules-gaps.md`,
+  `odd/tasks/e2e-switcher-session-realign.md`; auditoría 2026-11-03.
+- **Problema:** hay fichas cuyo log dice "hecho" y cuyas casillas siguen `[ ]`
+  (`e2e-birth-plan-superior` T3..Tn/Tfinal; `e2e-plan-gated-modules-gaps` G1-G4, cuyos tres tests
+  **existen** en `AuthMePlanModulesGapTests.cs` y `ExportOfflineRosterPlanGapTests.cs`). Una ficha
+  que se contradice hace que la próxima sesión reabra trabajo cerrado o descarte trabajo real.
+- **Propuestas:** A. marcar lo verificado y cerrar; B. reabrir con criterio; C. dejar como está.
+- **Recomendación:** **A** en una sola pasada de 20 minutos: abrir el test/fixture citado, marcar,
+  y anotar el commit. El "hallazgo de APP" de `e2e-birth-plan-superior.md:98-104` (guard de
+  monedas) **ya está resuelto**: ver §2.
+
+#### [ ] P1-7 · Confirmar el estado del VPS (catálogo y columnas)
+
+- **Fuente:** `2026-09-24-revisar-e2e-expectativa-contra-bd.md` acción 2; `2026-09-27-web-catalog-module-plan.md`.
+- **Problema:** las BD locales quedaron corregidas el 2026-09-25, pero el VPS nunca se confirmó:
+  módulos/features (17/42) y columnas `Currency` (script 26). Sin eso, un cambio de plan en
+  producción puede materializar menos features de las anunciadas y el catálogo puede fallar con
+  `column p.Currency does not exist`.
+- **Propuestas:** A. consulta **de solo lectura** (`__EFMigrationsHistory` + conteos por módulo) y
+  decidir con el resultado; B. aplicar el backfill/script 26 si falta.
+- **Recomendación:** **A primero** (información, sin mutación), con autorización explícita de
+  acceso. B solo si la consulta muestra drift, y con el mismo criterio idempotente ya usado.
+
+---
 
 ### P2 — Bloqueado por decisión de producto o aprobación backend
 
-- [ ] **Sesión de caja POS (apertura/cierre/arqueo).**
-  Fuente: `docs/plans/sesion-de-caja-apertura-cierre-pos.md` (diseño; **sin código**).
-  5 decisiones abiertas (§3.8) sin resolver. Es la misma necesidad de
-  `2026-08-04-frontend-work-queue.md` Group C.
+#### [ ] P2-1 · Sesión de caja POS (apertura / cierre / arqueo)
 
-- [ ] **Store payment zero override (pago 0 por tienda).**
-  Fuente: `docs/plans/2026-09-05-store-payment-zero-override-plan.md` (**sin código**).
-  No confundir con el plan canónico de precio (`2026-09-15-store-plan-canonical-price-plan.md`,
-  ya implementado).
+- **Fuente:** `sesion-de-caja-apertura-cierre-pos.md`; **sin código**; 5 decisiones abiertas (§3.8).
+- **Problema:** hoy no hay turno de caja: no se puede saber con qué fondo se abrió, quién cobró
+  ni si el efectivo cuadra. Es la misma necesidad del Group C de `2026-08-04-frontend-work-queue.md`.
+- **Propuestas:** A. MVP (apertura con fondo, cierre con conteo por denominación y diferencia);
+  B. completo (arqueo, retiros/ingresos, multi-caja por tienda); C. solo registro informativo sin
+  bloqueo de ventas.
+- **Recomendación:** **A**, y decidir primero las 5 preguntas (moneda del fondo, quién puede
+  abrir/cerrar, qué pasa si se vende sin caja abierta, cierre a ciegas, arqueo obligatorio). Sin
+  esas respuestas no se escribe código: es dinero.
 
-- [ ] **Telegram exception alerts.**
-  Fuente: `docs/plans/2026-09-05-telegram-exception-alerts.md` (**sin código**).
-  Requiere aprobación explícita para tocar código de producción backend.
+#### [ ] P2-2 · Pago 0 por tienda (100 % de descuento)
 
-- [ ] **Rate-limit / quota doc drift.**
-  Fuente: `docs/plans/2026-09-17-rate-limit-quota-doc-drift-plan.md` (**sin ejecutar**).
-  Evidencia: `frontend-react/e2e/README.md:195,256,262-266`; comentario obsoleto en
-  `backend/src/SMCA.WebApi/PolicyCode/RateLimitPolicies.cs:20-24` (requiere aprobación backend).
+- **Fuente:** `2026-09-05-store-payment-zero-override-plan.md`; **sin código**.
+- **Problema:** el SuperAdmin no puede dejar el pago de una tienda en 0 sin reescribir precios de
+  módulos; tampoco hay "Restablecer", ni el precio tachado en las dos vistas.
+- **Propuestas:** A. flag por tienda (`BillableAmount = 0` / override) resuelto en
+  `BillingService` y `ModulePriceCalculator`; B. descuento del 100 % en cada `StoreModule`
+  (destructivo, pierde el precio negociado); C. no hacerlo y usar el mecanismo actual.
+- **Recomendación:** **A**, entrando por la **regla única de precio** para que cartel y cobro no
+  discrepen, y reutilizando el gate `hasBillableAmount` (monto 0 no entra en trial). Aprobar
+  antes el contrato de "Restablecer".
+
+#### [ ] P2-3 · Owner que también es ReSeller + comisiones como crédito
+
+- **Fuente:** `2026-10-16-owner-reseller-dual-role-comisiones-plan.md`; **propuesta, no iniciado**.
+- **Problema:** el modelo permite ambos roles a medias, pero no existe flujo, ni home/features para
+  el doble rol, ni saldo de comisiones, ni forma de aplicarlo al pago propio. Sin guard de
+  auto-comisión, comisión y descuento se realimentan.
+- **Propuestas:** A. fases A→D→B→C del plan (doble rol, guard anti-auto-comisión, ledger, aplicar
+  crédito); B. solo reporte de comisiones (ya existe) sin doble rol; C. crédito manual por
+  SuperAdmin.
+- **Recomendación:** responder primero §5 (automático vs elegido, caducidad, moneda, trial,
+  retroactividad) y ejecutar **A** con el guard **antes** del ledger. Es dinero: ODD + verificación
+  independiente.
+
+#### [ ] P2-4 · Telegram exception alerts
+
+- **Fuente:** `2026-09-05-telegram-exception-alerts.md`; **sin código**; requiere aprobación backend.
+- **Problema:** las excepciones no manejadas quedan solo en logs; nadie se entera en producción.
+- **Propuestas:** A. sink asíncrono desde `ErrorHandlerMiddleware` (fire-and-forget, rate-limited);
+  B. health-check externo que lea logs; C. no hacerlo.
+- **Recomendación:** **A**, con token en configuración, límite de mensajes por minuto y sin PII.
+  Nunca bloquear la respuesta al cliente por Telegram.
+
+#### [ ] P2-5 · Desacoplar la pantalla de desbloqueo a `/unlock-data`
+
+- **Fuente:** `2026-09-06-auth-session-redirect-invariant-e2e-gaps.md` §6.
+- **Problema:** una sesión válida con ciphertext ilegible aterriza en `/login?unlock=1`
+  (`loaders.ts:44`). **No viola el contrato**: `docs/contracts/authenticated-session-redirect.md`
+  documenta ese camino como **excepción legítima** del cifrado at-rest. El plan propone separar
+  "¿está autenticado?" de "¿puede leer los datos?" con una ruta propia y un `guestOnlyLoader` que
+  ya no mire `needsUnlock`.
+- **Propuestas:** A. implementar la ruta dedicada; B. mantener la excepción actual y no tocar los
+  loaders; C. mejora intermedia: mantener `/login?unlock=1` pero con copy/UI de desbloqueo en vez
+  de formulario de login.
+- **Recomendación:** **B** mientras no haya fricción real reportada; si se decide tocar loaders,
+  **C** primero (UX, sin mover guards) y **A** como cambio propio con E2E nuevos. Cualquier cambio
+  en `authLoader`/`guestOnlyLoader`/`needsUnlock` exige re-leer el contrato y aprobación explícita.
+
+#### [ ] P2-6 · Limpieza de imágenes huérfanas del catálogo web
+
+- **Fuente:** `2026-10-02-superadmin-web-catalog-orphan-image-cleanup.md`; **sin código**;
+  bloqueado por O-1..O-5 (O-2 es la que bloquea).
+- **Problema:** tras `cd4c6246` la fuente única es `Product.Image`; las filas de `ProductImage`
+  que no coinciden y los archivos sin fila se acumulan en `storage_data` sin medición. Una purga
+  ingenua borra la imagen principal (caso C) y rompe el catálogo público.
+- **Propuestas:** A. vista por tienda con contador + botón + checkbox, condición
+  `ProductImage.Path <> Product.Image`, misma SQL para contar y purgar; B. purga global; C. barrido
+  manual documentado.
+- **Recomendación:** **A**. Contador y purga **deben** compartir la misma condición; test dedicado
+  del caso C y de idempotencia. Decidir O-2 (qué autoriza exactamente la casilla) antes de escribir
+  el diálogo.
+
+#### [ ] P2-7 · Popup de re-autenticación al cambiar de plan
+
+- **Fuente:** `2026-09-10-store-plan-change-reauth-popup-plan.md`.
+- **Problema:** la premisa es obsoleta (`updateStore` → `changeStorePlan`) y el popup nunca se
+  implementó. El refresco real de permisos ya existe (`soft-refresh-session.ts`).
+- **Propuestas:** A. borrar el plan; B. replantearlo como confirmación de impacto (qué módulos se
+  pierden) sin re-auth; C. implementarlo como estaba.
+- **Recomendación:** **A** o **B**; **C no**. Si se quiere UX, el valor está en mostrar el delta de
+  módulos, no en pedir la contraseña otra vez.
+
+---
 
 ### P3 — Housekeeping / documentación
 
-- [ ] **Triage de artefactos legacy Superpowers.**
-  Fuente: `docs/plans/2026-08-12-legacy-superpowers-artifacts-triage.md`.
-  5 archivos siguen en `docs/superpowers/`; ninguna opción (§3 A-D) fue marcada.
-  Decisión de ubicación, sin código.
-
-- [ ] **Retirar `docs/plans/2026-08-04-frontend-work-queue.md`.**
-  Snapshot obsoleto: sus premisas ("no hay automatización de navegador", "bloqueado
-  en backend") ya no aplican; su único pendiente real (Group C) es la sesión de caja (P2).
-
-- [ ] **Smoke checklist offline-auth (manual, 9 pasos).**
-  Fuente: `docs/plans/2026-07-28-offline-auth-frontend-smoke-checklist.md`.
-  Nunca ejecutado por un humano; mayormente cubierto hoy por
-  `e2e/login-offline.spec.ts`, `offline-access-panel.spec.ts`, `roster-recovery.spec.ts`.
-
-- [ ] **Doc obsoleto: `docs/plans/2026-08-04-offline-roster-billing-fields-frontend.md`.**
-  Código ya enviado (`FormatVersion = 3`, campos de billing en el roster); el doc quedó
-  sin actualizar y describe un contrato v2 viejo. **Candidato a borrar.**
+- [ ] **P3-1 · `endpoints-e2e-coverage.md` está obsoleto (2026-07-29).** Dice `ProductsController`
+  0 % cuando hay E2E del recurso. Propuesta: regenerar el inventario contra los specs actuales o
+  retirarlo y dejar que el runner sea la fuente. **Recomendación: regenerar** (sirve para decidir
+  P1-1 y P0-4).
+- [ ] **P3-2 · Deriva de la documentación de rate limit** (`2026-09-17-rate-limit-quota-doc-drift-plan.md`).
+  `frontend-react/e2e/README.md:195,256,262-266` y el comentario de
+  `RateLimitPolicies.cs:20-24` no coinciden con el código. **Recomendación:** corregir el README y
+  el comentario en una sola unidad (sin cambio de comportamiento).
+- [ ] **P3-3 · Triage de `docs/superpowers/`** (`2026-08-12-legacy-superpowers-artifacts-triage.md`).
+  5 archivos siguen ahí y ninguna opción está marcada. **Recomendación:** mover los 2 con destino
+  inequívoco y dejar los 3 restantes con una nota de por qué se quedan.
+- [ ] **P3-4 · Retirar documentos obsoletos.** `2026-08-04-frontend-work-queue.md` (premisas
+  muertas), `2026-08-04-offline-roster-billing-fields-frontend.md` (contrato v2 viejo; el código
+  ya usa v3), `2026-09-03-offline-roster-jwt-online-operations.md` (Option A superseded por el
+  interceptor de bearer). **Recomendación:** borrar con `git rm` (recuperables con `git log`).
+- [ ] **P3-5 · Manual: `srcset`/AVIF opcional.** `2026-10-27-manual-image-optimization.md` ya
+  entregó −51 % en imágenes. **Recomendación:** no hacerlo hasta que haya una queja real de peso;
+  el PDF ya se genera aparte.
+- [ ] **P3-6 · Smoke checklist offline-auth (manual, 9 pasos).** Nunca ejecutado por un humano;
+  hoy cubierto en su mayoría por `login-offline`, `offline-access-panel` y `roster-recovery`.
+  **Recomendación:** cerrarlo citando los specs que lo cubren y dejar solo los pasos que de verdad
+  no se pueden automatizar (si queda alguno).
 
 ---
 
-## 2. Planes implementados y eliminados en esta auditoría (2026-09-20)
+## 2. Cerrado en esta auditoría — no reabrir
 
-Eliminados (`git rm`), cada uno con evidencia de implementación completa:
-
-| Plan eliminado | Evidencia principal |
+| Tema | Evidencia verificada (2026-11-03) |
 | --- | --- |
-| `2026-07-25-at-rest-encryption-frontend-plan.md` | Archivo SDD `2026-08-02-at-rest-encryption-frontend` (25/25 reqs); `entity-crypto.ts`, `data-key-store.ts`, `dek-unwrap.ts`, `entity-migration.ts` + 6 seams |
-| `2026-09-06-valid-session-navigation-e2e-plan.md` | `e2e/valid-session-navigation.spec.ts` (12 tests); `unlock-gate.ts:114`; `loaders.ts:36-38,79-81` |
-| `2026-09-08-store-plans-multistores-backend-plan.md` | `StorePlan`/`StorePlanModule`, migraciones `20260908*`, `WarehousesCatalogTests` |
-| `2026-09-15-store-plan-canonical-price-plan.md` | `PlanPricingUtils.cs`, `StoreDto`/`OwnerStoreDto`, `StorePlanCanonicalPriceTests` |
-| `2026-09-15-store-price-parity-plan.md` | `StoreRepository` includes, `StoreListPriceParityTests` |
-| `2026-09-08-owner-stores-cards-plan.md` | `StoresController` `my-stores` / `{id}/activation`; `MyStoresTests`, `owner-stores.spec.ts` |
-| `2026-09-10-seamless-store-switch-plan.md` | `AuthDto.StoreDekWraps`, `switch-store.ts`, `LoginCommandHandlerTests` |
-| `2026-09-14-plan-panels-delta-modules.md` | `plan-panels.tsx` (delta de módulos) + i18n `INCLUDES_PREVIOUS_PLAN` |
-| `2026-09-04-wholesale-sales-plan.md` | `wholesale.ts`, ruta `/sales/wholesale`, `mayorista-sale.spec.ts` |
-| `2026-09-03-sale-barcode-scanner.md` | `scanner-modal.tsx`, `@zxing/browser`, `sale-barcode-scanner.spec.ts` |
-| `2026-09-04-elaboration-module.md` | Recetas/elaboraciones; migración `20260918153139`; `elaboration.spec.ts` |
-| `2026-09-17-payment-methods-percent-tax-plan.md` | Enum `SalePaymentMethod`, `payment-pricing.ts`, `OrderPaymentMethodPricingTests` |
-| `2026-09-10-csp-enforcing-flip-plan.md` | `csp-policy.mjs`, `deploy/nginx.conf`, `csp-enforcing-export.spec.ts` |
-| `2026-09-14-client-error-log-pwa-plan.md` | `client-log.ts`, `diagnostics.tsx`, `diagnostics.spec.ts` |
-| `2026-09-15-damaged-data-recovery-export-wipe-plan.md` | `damaged-data-recovery.ts`, `blocking-alert.ts`, tests |
-| `2026-09-16-dashboard-kpi.md` | `dashboard.tsx`, `dashboard-range-aggregator.ts`, `dashboard-metrics.spec.ts` |
-| `2026-09-17-dashboard-ganancia-monedas-mixtas-plan.md` | `profit-calculator.ts` (decisión B1), tests del aggregator |
-| `2026-09-17-dashboard-moneda-plan.md` | `currency-totals.ts`, `dashboard-metrics-body.tsx` |
+| Regla "una sola moneda por venta" | **Retirada** por decisión del owner el 2026-10-13: `currency-guard.ts` solo conserva `productCurrency`; `sale.tsx`, `egress.tsx` y `wholesale.tsx` ya no levantan el guard. El "hallazgo de APP" al final de `odd/tasks/e2e-birth-plan-superior.md:98-104` está **resuelto**; esa sección debe corregirse. |
+| Refresco de permisos tras cambiar de plan | Implementado en `soft-refresh-session.ts` (un `GET /me` explícito, best-effort) y usado por `store-list.tsx:187` y `my-stores.tsx`; E2E actualizado el 2026-09-16. El plan `2026-09-15-...` dice "implementación NO iniciada": **el documento está mal**. |
+| Filas E1-6/E1-7/E2-5 de la matriz E2E | Existen `Me_inactive_storeuser_not_in_roles`, `Me_superuser_sees_full_module_list` y `Roster_warehouse_wholesale_multistores_in_paid_roster` en `AuthMePlanModulesGapTests.cs` / `ExportOfflineRosterPlanGapTests.cs`. La ficha G1-G4 sin marcar está desactualizada. |
+| Optimización de imágenes del manual | Entregada y medida (−51,3 % en imágenes servidas; PDF 9,06 MB). |
+| SEO de la landing (iteraciones 1-4) | JSON-LD, H1, OG 1200×630, `offers` en runtime, constantes de schema y tests; veredicto RDD aprobado. |
+| Módulo WebCatalog (18) y MultiMonedas (15) | Entregados, con E2E y scripts del VPS (script 26 incluye las columnas `Currency`). |
+| Contrato de redirección de sesión | `docs/contracts/authenticated-session-redirect.md` documenta `/login?unlock=1` como excepción legítima; por eso P2-5 es decisión de UX, no un bug de invariante. |
 
-> **Nota de integridad:** varios de estos planes están citados como procedencia en
-> comentarios del código (p. ej. `PlanPricingUtils.cs:10`, `dashboard-range-aggregator.ts:1`,
-> `switch-store.ts:1`). Esos comentarios apuntan ahora a archivos borrados; el
-> contenido sigue recuperable con `git show <commit>:docs/plans/<archivo>`. No se
-> tocaron (modificar código de producción requiere aprobación).
+## 3. Planes con estado desactualizado o superseded
 
----
-
-## 3. Superseded — decisión de borrado pendiente
-
-- `docs/plans/2026-09-03-offline-roster-jwt-online-operations.md` — su "Option A"
-  (JWT como token de sesión) no se implementó; el resultado se logró con "Option 2"
-  (interceptor de bearer, `api-client.ts:52-88`). **Candidato a borrar.**
-- `docs/plans/2026-09-10-store-plan-change-reauth-popup-plan.md` — premisa obsoleta
-  (`updateStore` → `changeStorePlan`); el popup de re-auth nunca se implementó.
-  **Borrar o re-planear** si aún se quiere la UX.
-
----
+| Documento | Estado real (verificado) | Acción |
+| --- | --- | --- |
+| `2026-09-15-store-plan-change-permission-refresh-plan.md` | Implementado | Marcar como implementado; conservar §6.2 como origen de P1-2 |
+| `2026-09-08-e2e-plan-gated-modules-auth-roster.md` | Filas faltantes ya existen | Cerrar la matriz |
+| `2026-09-24-revisar-e2e-expectativa-contra-bd.md` | Local resuelto; VPS pendiente | Solo P1-7 |
+| `2026-09-17-multimonedas-module-plan.md` | **EN IMPLEMENTACIÓN** en el encabezado; el módulo está entregado y la regla de monedas retirada | Actualizar encabezado y §7 |
+| `2026-09-05-store-payment-zero-override-plan.md` | Sin código | P2-2 |
+| `2026-09-10-store-plan-change-reauth-popup-plan.md` | Premisa obsoleta | P2-7 |
+| `2026-09-03-offline-roster-jwt-online-operations.md` | Superseded (Option 2 implementada) | Borrar (P3-4) |
+| `2026-08-04-offline-roster-billing-fields-frontend.md` | v3 en código; doc describe v2 | Borrar (P3-4) |
+| `2026-08-04-frontend-work-queue.md` | Snapshot obsoleto; su único pendiente vivo es P2-1 | Borrar (P3-4) |
 
 ## 4. Trackers vivos (no borrar; actualizar periódicamente)
 
-- `docs/plans/2026-08-02-pending-manual-verification.md` — registro de pasos bloqueados por humano.
-- `docs/plans/2026-09-11-preexisting-e2e-failures.md` — bitácora de fallos E2E preexistentes.
-- `docs/plans/endpoints-e2e-coverage.md` — inventario de cobertura E2E de endpoints.
+- `docs/plans/2026-08-02-pending-manual-verification.md` — pasos bloqueados por humano.
+- `docs/plans/2026-09-11-preexisting-e2e-failures.md` — **RESUELTO 2026-09-14**; conservar como bitácora.
+- `docs/plans/endpoints-e2e-coverage.md` — inventario **obsoleto** (P3-1).
 
 ## 5. Registros de diseño (histórico, no borrar)
 
-- `docs/plans/2026-07-25-at-rest-encryption-local-data-design.md` — diseño implementado (base del archivo SDD 2026-08-02).
+- `docs/plans/2026-07-25-at-rest-encryption-local-data-design.md` — diseño implementado.
 - `docs/plans/2026-07-27-pwa-offline-shell-design.md` — diseño implementado; ligado al cambio activo `pwa-offline-shell`.
-- `docs/plans/2026-08-02-getme-failure-as-200-backend.md` — **RESUELTO**; el archivo SDD
-  `2026-08-04-getme-failure-as-200-backend` decidió retenerlo como registro histórico.
-
----
+- `docs/plans/2026-08-02-getme-failure-as-200-backend.md` — **RESUELTO**; se retiene como registro histórico.
+- `docs/plans/sesion-de-caja-apertura-cierre-pos.md` — investigación de referencia para P2-1.
+- `docs/plans/imagenes-manual-referencia-pos.md` — referencia de las capturas del manual.
 
 ## 6. Cómo se clasificó
 
 | Estado | Significado |
 | --- | --- |
-| IMPLEMENTED | Todos los entregables del plan están en el código con evidencia → eliminado. |
+| IMPLEMENTED | Todos los entregables están en el código con evidencia → cerrado o eliminado. |
 | PARTIAL | Parte implementada, parte pendiente → queda, con lo pendiente arriba. |
-| NOT_IMPLEMENTED | Sin entregables en el código → queda pendiente. |
+| NOT_IMPLEMENTED | Sin entregables en el código → pendiente. |
 | DESIGN_ONLY | Doc de diseño sin checklist; se indica si el diseño existe en código. |
-| SUPERSEDED | Otro plan/cambio cubre lo mismo → ver §3. |
-| LIVING_TRACKER | Doc de seguimiento continuo, no entregable → ver §4. |
+| SUPERSEDED | Otro plan/cambio cubre lo mismo → §3. |
+| LIVING_TRACKER | Doc de seguimiento continuo, no entregable → §4. |
