@@ -120,21 +120,12 @@
 - **Recomendación:** **6 → 7 (resto) → transversales** (X1 antes de X4; X3 junto con la unidad que
   lo toque). Cada unidad cierra con tests nuevos; los E2E existentes no se tocan.
 
-#### [ ] P1-2 · Deriva del spec canónico REQ-5 (documentación que contradice el código)
+#### [x] P1-2 · Deriva del spec canónico REQ-5 — HECHO 2026-11-03
 
-- **Fuente:** `2026-09-15-store-plan-change-permission-refresh-plan.md` §6.2; auditoría 2026-11-03.
-- **Problema:** `openspec/specs/e2e-store-plan-activation-ui/spec.md:76` exige que el conteo de
-  `GET /v1/auth/me` sea **CERO**, pero el E2E se actualizó el 2026-09-16
-  (`store-plan-activation.spec.ts:233-248`) y el código hace **uno** vía
-  `soft-refresh-session.ts` (`getMe()`), que es justamente el arreglo del plan de permisos. Un
-  lector del spec "arregla" el test contra la realidad equivocada.
-- **Propuestas:**
-  - **A. Actualizar el spec** para que REQ-5 exija **exactamente uno** (el refresco online tras
-    cambiar el plan) y cero en la recarga (REQ-1 de `e2e-session-hydration`).
-  - **B. Forzar cero** y volver al perfil cacheado: reintroduce el menú congelado que el plan vino
-    a arreglar. Descartada.
-- **Recomendación:** **A**. Es un cambio de documento; la implementación ya está hecha y probada.
-  Añadir la nota de por qué existe el `/me` (best-effort, explícito, online-only).
+Cerrado: `openspec/specs/e2e-store-plan-activation-ui/spec.md` REQ-5 ahora exige **exactamente un**
+`GET /v1/auth/me` tras cambiar el plan (el refresco suave), conserva cero en una recarga (REQ-1 de
+`e2e-session-hydration`) y explica las dos correcciones (2026-08-08 y 2026-11-03). Sin cambios de
+código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 
 #### [ ] P1-3 · SEO de la landing — pendientes P3/P4/P5
 
