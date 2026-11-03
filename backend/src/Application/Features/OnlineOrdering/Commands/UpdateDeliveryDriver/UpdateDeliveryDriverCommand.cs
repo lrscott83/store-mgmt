@@ -48,8 +48,13 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
         /// <summary>
         /// Interruptor de alta. `false` = baja lógica: deja de salir en las listas, no se borra.
         /// Los pedidos ya asignados NO se reasignan aquí (es una decisión de F5, y manual).
+        ///
+        /// NULABLE A PROPÓSITO (P0-3): `null` = el cuerpo OMITIÓ el campo, y omitir significa "no
+        /// cambiar", no "apagar". Con un `bool` no nulable el binding convertía la omisión en
+        /// `false` y el handler la escribía: un PATCH que solo corregía el nombre daba de baja al
+        /// repartidor sin que nadie lo hubiera pedido. Mandar `true` o `false` sigue mandando.
         /// </summary>
-        public bool IsActive { get; set; }
+        public bool? IsActive { get; set; }
     }
 
     public class UpdateDeliveryDriverCommandHandler : ICommandHandler<UpdateDeliveryDriverCommand, DeliveryDriverDto>
@@ -90,7 +95,11 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
             // contexto `NoTracking` — mutar y guardar sin marcar escribiría NADA, sin error.
             driver.Name = request.Name.Trim();
             driver.Phone = request.Phone.Trim();
-            driver.IsActive = request.IsActive;
+
+            // Omitir el interruptor NO lo apaga (P0-3): el cuerpo no lo pidió, así que la fila
+            // conserva su estado. Solo un `true`/`false` explícito escribe el valor.
+            if (request.IsActive.HasValue)
+                driver.IsActive = request.IsActive.Value;
 
             await _deliveryDriverRepository.UpdateAsync(driver);
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
