@@ -168,17 +168,8 @@ sus casillas marcadas con evidencia. La sección del guard de monedas quedó mar
 (la regla se retiró el 2026-10-13). **G4 sigue abierta a propósito**: la corrida de los 3 tests no se
 repitió en esta reconciliación.
 
-#### [ ] P1-7 · Confirmar el estado del VPS (catálogo y columnas)
-
-- **Fuente:** `2026-09-24-revisar-e2e-expectativa-contra-bd.md` acción 2; `2026-09-27-web-catalog-module-plan.md`.
-- **Problema:** las BD locales quedaron corregidas el 2026-09-25, pero el VPS nunca se confirmó:
-  módulos/features (17/42) y columnas `Currency` (script 26). Sin eso, un cambio de plan en
-  producción puede materializar menos features de las anunciadas y el catálogo puede fallar con
-  `column p.Currency does not exist`.
-- **Propuestas:** A. consulta **de solo lectura** (`__EFMigrationsHistory` + conteos por módulo) y
-  decidir con el resultado; B. aplicar el backfill/script 26 si falta.
-- **Recomendación:** **A primero** (información, sin mutación), con autorización explícita de
-  acceso. B solo si la consulta muestra drift, y con el mismo criterio idempotente ya usado.
+> **Quitado del backlog (2026-11-03):** el owner confirma que producción ya tiene aplicado el
+> catálogo. No es trabajo de código y no queda pendiente.
 
 ---
 
@@ -328,7 +319,7 @@ repitió en esta reconciliación.
 | --- | --- | --- |
 | `2026-09-15-store-plan-change-permission-refresh-plan.md` | Implementado | Marcar como implementado; conservar §6.2 como origen de P1-2 |
 | `2026-09-08-e2e-plan-gated-modules-auth-roster.md` | Filas faltantes ya existen | Cerrar la matriz |
-| `2026-09-24-revisar-e2e-expectativa-contra-bd.md` | Local resuelto; VPS pendiente | Solo P1-7 |
+| `2026-09-24-revisar-e2e-expectativa-contra-bd.md` | **CERRADO**: local resuelto y producción confirmada por el owner (2026-11-03) | Sin acción |
 | `2026-09-17-multimonedas-module-plan.md` | **EN IMPLEMENTACIÓN** en el encabezado; el módulo está entregado y la regla de monedas retirada | Actualizar encabezado y §7 |
 | `2026-09-05-store-payment-zero-override-plan.md` | Sin código | P2-2 |
 | `2026-09-10-store-plan-change-reauth-popup-plan.md` | Premisa obsoleta | P2-7 |
