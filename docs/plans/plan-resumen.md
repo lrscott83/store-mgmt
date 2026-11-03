@@ -139,17 +139,26 @@ código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 - **Recomendación:** P1 y P2 son **un proyecto aparte**, caro, y no bloquean nada de la operación
   actual. No se agendan hasta que el owner los pida.
 
-#### [ ] P1-5 · Restos de PWA (logs de diagnóstico y tipos MIME)
+#### [ ] P1-5 · Restos de PWA (logs de diagnóstico) — DIFERIDO al próximo cambio del service worker
 
-- **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; auditoría 2026-11-03.
-- **Problema:** quedan 4 logs `[SW]`/`[PWA]` vivos (`app/service-worker.ts`, y
-  `service-worker-registration.ts`) que ensucian la consola de producción, y `nginx.conf:35-41`
-  no incluye `text/javascript` ni `application/manifest+json` en `gzip_types` (el JS se sirve como
-  `application/javascript` así que funciona, pero el manifest no se comprime).
-- **Propuestas:** A. borrar los logs; B. dejarlos detrás de un flag de depuración; C. mantenerlos.
-- **Recomendación:** **B** para los logs (útiles en soporte, invisibles por defecto) y **añadir los
-  dos tipos a `gzip_types`** (riesgo cero, ganancia real). Requiere **sign-off del owner** porque
-  toca el despliegue y el service worker.
+> **Decisión del owner (2026-11-03):** no se hace como trabajo aparte. Cualquier cambio en
+> `service-worker.ts` cambia su huella y **fuerza la actualización de todos los clientes**, así que
+> este trabajo se ejecuta **junto con la próxima modificación real del service worker**. El punto
+> del gzip queda **descartado** (ver abajo).
+
+- **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; verificado en código el
+  2026-11-03.
+- **Problema (verificado):** quedan **4** `console.info` `[SW]` en `app/service-worker.ts:38,44,62,155`
+  y **8** logs `[PWA]` en `service-worker-registration.ts:29,38,43,45,54,57,64` (el de `:71` es un
+  `console.error` legítimo y se conserva). Ensucian la consola de producción; no filtran datos ni
+  rompen nada.
+- **Descartado — gzip/MIME:** `nginx.conf:35-43` ya comprime los bundles
+  (`application/javascript`), y `application/manifest+json` está por debajo de
+  `gzip_min_length 1024`, así que añadirlo no comprimiría nada. Sin acción.
+- **Propuestas (para cuando se toque el SW):** A. borrar los `console.info` y dejar solo el
+  `console.error`; B. dejarlos detrás de un flag de depuración.
+- **Recomendación:** **B** en ese momento (útiles en soporte, invisibles por defecto), dentro del
+  mismo cambio que ya fuerza la actualización. No justifica una actualización por sí solo.
 
 #### [ ] P1-6 · Reconciliar las fichas E2E desactualizadas
 
