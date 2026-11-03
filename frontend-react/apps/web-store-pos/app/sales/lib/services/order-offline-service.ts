@@ -891,7 +891,21 @@ export class OrderOfflineService {
     );
     if (stored) {
       // sale snapshot (2026-10-06): persist the backfilled defaults once.
-      if (changed) this.setOrdersLocalStorage(stored);
+      //
+      // R3-READ-WRITE-BACK (2026-11-03): the write is BEST-EFFORT. This is a read path, and
+      // the repair is an optimisation, so it must never decide whether the history opens: a
+      // full quota (`QuotaExceededError`) or a data key that is not in memory yet
+      // (`encryptEntity` inside `setOrdersLocalStorage`) would otherwise turn every screen
+      // that reads orders into a hard error. The healed result is returned either way and
+      // the next read retries the write; design D4 (an unreadable store is never written
+      // over) stays intact because a failed read still throws before reaching here.
+      if (changed) {
+        try {
+          this.setOrdersLocalStorage(stored);
+        } catch {
+          // Intentionally swallowed: see above. The in-memory repair is still returned.
+        }
+      }
       return stored;
     }
 

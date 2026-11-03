@@ -153,6 +153,37 @@ describe('OrderOfflineService read — revive + backfill sale snapshot (2026-10-
     expect(order.payments?.[0].targetRateEffectiveFrom).toBeInstanceOf(Date);
   });
 
+  it('returns the healed orders even when the repair cannot be persisted (R3-READ-WRITE-BACK)', () => {
+    seed([legacyOrder()]);
+    const service = new OrderOfflineService(S1);
+    // A full quota throws from `setItem`; before the fix that exception escaped the READ
+    // and the whole history became unreadable.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    try {
+      const order = service.getStorageOrders().find((o) => o.id === 'legacy-1') as Order;
+      expect(order).toBeDefined();
+      expect(order.orderItems[0].originalPrice).toBe(5);
+      expect(order.orderItems[0].conversionRate).toBe(1);
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('a second read of an already-healed store does not write again (R3-BACKFILL-IDEMPOTENCE)', () => {
+    seed([legacyOrder()]);
+    new OrderOfflineService(S1).getStorageOrders();
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
   it('leaves an already-complete snapshot untouched (no overwrite)', () => {
     seed([
       legacyOrder({
