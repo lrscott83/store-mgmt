@@ -100,43 +100,25 @@
 - **Riesgo:** medio (contrato de un endpoint consumido por la app, no publicado). Requiere
   aprobación backend por la regla del repo.
 
-#### [ ] P0-4 · `POST /public/ordering/{slug}/orders` sin tope de líneas ni de cantidad (8.1 / 8.2)
-
-- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidades 8.1 y 8.2.
-- **Problema:** `CreateOnlineOrderCommandValidator.cs:66-67` solo exige `Quantity > 0`; no hay tope
-  por línea ni de líneas por carrito. `Order.ItemsCount` es `checked` y desborda con cantidades
-  grandes → **500 anónimo**. Además el rate limit cuenta **requests**, no filas: un solo POST
-  puede insertar cientos de miles de `OrderItem`, así que el límite no cierra el hueco que dice
-  cerrar.
-- **Propuestas:**
-  - **A. Topes en el validator.** Cantidad máxima por línea (p. ej. 10 000) y máximo de líneas por
-    carrito (p. ej. 100), con mensajes localizados. Barato y suficiente.
-  - **B. A + límite de filas por IP/ventana** (no solo requests) o límite de payload.
-  - **C. Guard en el handler** además del validator, para comandos internos.
-- **Recomendación:** **A + C**. Un endpoint público sin topes es una invitación; el guard en el
-  handler cubre el caso de un comando construido sin pasar por el validator. B se evalúa cuando
-  exista métrica de abuso real (no hay panel de lectura todavía).
-
 ---
 
 ### P1 — Features pendientes acordadas (desbloqueadas)
 
-#### [ ] P1-1 · Resto de `api-endpoint-review` (unidades 7-9 y transversales)
+#### [ ] P1-1 · Resto de `api-endpoint-review` en pedidos y repartidores (unidades 6-7)
 
 - **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md`. Controllers 1-5 **hechos y
-  aprobados por RDD**; quedan 61 casillas abiertas (HIGH ya cubiertos en P0-2..P0-4 + MEDIUM/LOW
-  y transversales X1, X3, X4, X5, X6, X7, X8, X9).
-- **Problema:** hallazgos de revisión sin implementar en `DeliveryDrivers` (resto), `PublicOrdering`
-  (PII en query string y logs, código no criptográfico, 200 en un create), `OnlineOrders`
-  (paginación sin tope, `search` sin índice, PII sin máscara, sin `[Authorize]` de feature) y
-  `catalog-template` (allowlist de `templateId`, join de 4 tablas para un escalar, 400 vs 404).
-  Los transversales X1 (multipart global sin tope real), X3 (check-then-act → 500) y X4
-  (OpenAPI incompleto) tocan varios controladores.
+  aprobados por RDD**; de las unidades restantes solo siguen vivas las de **gestión de pedidos**
+  (6) y **repartidores** (7). Lo del catálogo web público y la plantilla (unidades 8-9) queda
+  **descartado** por decisión del owner (§7).
+- **Problema:** hallazgos sin implementar en `OnlineOrders` (paginación sin tope, `search` sin
+  índice, PII sin máscara, sin `[Authorize]` de feature) y `DeliveryDrivers` (resto: validación que
+  mide distinto que lo que guarda, DTO copiado, store-guard repetido). Los transversales X1
+  (multipart global sin tope real), X3 (check-then-act → 500) y X4 (OpenAPI incompleto) tocan
+  varios controladores.
 - **Propuestas:** implementar **unidad por unidad** con aprobación punto por punto, como se hizo
   con 1-5 (build + `Application.Tests` + RDD por unidad). No un solo PR gigante.
-- **Recomendación:** orden por riesgo real, no por número: **8 → 6 → 9 → 7 (resto) → transversales**
-  (X1 antes de X4; X3 junto con la unidad que lo toque). Cada unidad cierra con tests nuevos; los
-  E2E existentes no se tocan.
+- **Recomendación:** **6 → 7 (resto) → transversales** (X1 antes de X4; X3 junto con la unidad que
+  lo toque). Cada unidad cierra con tests nuevos; los E2E existentes no se tocan.
 
 #### [ ] P1-2 · Deriva del spec canónico REQ-5 (documentación que contradice el código)
 
@@ -291,20 +273,6 @@
   **C** primero (UX, sin mover guards) y **A** como cambio propio con E2E nuevos. Cualquier cambio
   en `authLoader`/`guestOnlyLoader`/`needsUnlock` exige re-leer el contrato y aprobación explícita.
 
-#### [ ] P2-6 · Limpieza de imágenes huérfanas del catálogo web
-
-- **Fuente:** `2026-10-02-superadmin-web-catalog-orphan-image-cleanup.md`; **sin código**;
-  bloqueado por O-1..O-5 (O-2 es la que bloquea).
-- **Problema:** tras `cd4c6246` la fuente única es `Product.Image`; las filas de `ProductImage`
-  que no coinciden y los archivos sin fila se acumulan en `storage_data` sin medición. Una purga
-  ingenua borra la imagen principal (caso C) y rompe el catálogo público.
-- **Propuestas:** A. vista por tienda con contador + botón + checkbox, condición
-  `ProductImage.Path <> Product.Image`, misma SQL para contar y purgar; B. purga global; C. barrido
-  manual documentado.
-- **Recomendación:** **A**. Contador y purga **deben** compartir la misma condición; test dedicado
-  del caso C y de idempotencia. Decidir O-2 (qué autoriza exactamente la casilla) antes de escribir
-  el diálogo.
-
 #### [ ] P2-7 · Popup de re-autenticación al cambiar de plan
 
 - **Fuente:** `2026-09-10-store-plan-change-reauth-popup-plan.md`.
@@ -322,7 +290,7 @@
 - [ ] **P3-1 · `endpoints-e2e-coverage.md` está obsoleto (2026-07-29).** Dice `ProductsController`
   0 % cuando hay E2E del recurso. Propuesta: regenerar el inventario contra los specs actuales o
   retirarlo y dejar que el runner sea la fuente. **Recomendación: regenerar** (sirve para decidir
-  P1-1 y P0-4).
+  P1-1).
 - [ ] **P3-2 · Deriva de la documentación de rate limit** (`2026-09-17-rate-limit-quota-doc-drift-plan.md`).
   `frontend-react/e2e/README.md:195,256,262-266` y el comentario de
   `RateLimitPolicies.cs:20-24` no coinciden con el código. **Recomendación:** corregir el README y
@@ -394,3 +362,27 @@
 | DESIGN_ONLY | Doc de diseño sin checklist; se indica si el diseño existe en código. |
 | SUPERSEDED | Otro plan/cambio cubre lo mismo → §3. |
 | LIVING_TRACKER | Doc de seguimiento continuo, no entregable → §4. |
+
+---
+
+## 7. Descartado por decisión del owner (2026-11-03)
+
+**Decisión:** el catálogo web se queda **como está**. No se proponen cambios de comportamiento,
+validación, contratos ni limpieza sobre el catálogo web, sus endpoints públicos, la plantilla del
+catálogo ni sus imágenes.
+
+Descartado en esta auditoría:
+
+- **P0-4 — topes del pedido público (8.1/8.2).** No se añaden límites de cantidad por línea ni de
+  líneas por carrito.
+- **Unidades 8-9 del `api-endpoint-review`.** PII del teléfono en query string y logs, código de
+  pedido no criptográfico, `200` en un create, allowlist de `templateId` y `400` vs `404`: fuera.
+- **P2-6 — limpieza de imágenes huérfanas del catálogo web.** La vista, el contador y la purga no se
+  implementan.
+
+**Motivo:** pedido explícito del owner (2026-11-03): «todo lo del catálogo web se mantiene como
+está y punto».
+
+**Cómo se reabre:** solo con un incidente real observado en esa superficie, y con evidencia del
+incidente. "La auditoría lo decía" no es motivo suficiente.
+
