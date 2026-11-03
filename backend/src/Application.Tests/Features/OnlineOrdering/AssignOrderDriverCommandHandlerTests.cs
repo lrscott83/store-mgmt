@@ -48,7 +48,8 @@ public class AssignOrderDriverCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()))
+            .ReturnsAsync(true);
     }
 
     private AssignOrderDriverCommandHandler Handler() => new(
@@ -204,8 +205,14 @@ public class AssignOrderDriverCommandHandlerTests
             x => x.GetByStoreIdAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<bool>()), Times.Never);
     }
 
+    /// <summary>
+    /// Asignar repartidor escribe SOLO `DriverId`. El conjunto EXACTO de campos se afirma por
+    /// igualdad porque esta acción comparte fila con el cambio de estado y la marca de pago:
+    /// guardar las otras columnas —aunque vengan sin cambios aparentes— reescribe los valores
+    /// leídos antes del cambio concurrente y lo borra.
+    /// </summary>
     [Fact]
-    public async Task Handle_WithAnActiveDriver_ShouldMarkTheOrderAsModifiedBeforeSaving()
+    public async Task Handle_WithAnActiveDriver_ShouldMarkOnlyTheDriverColumn()
     {
         DeliveryDriver driver = ActiveDriver();
         Order order = OrderFor();
@@ -214,7 +221,10 @@ public class AssignOrderDriverCommandHandlerTests
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.DriverId == driver.Id)), Times.Once);
+            x => x.UpdatePartialAsync(
+                It.Is<Order>(o => o.Id == order.Id && o.DriverId == driver.Id),
+                OrderChangedField.DriverId),
+            Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -327,7 +337,7 @@ public class AssignOrderDriverCommandHandlerTests
             new AssignOrderDriverCommand(order.Id, Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

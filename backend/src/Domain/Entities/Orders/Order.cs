@@ -191,7 +191,11 @@ namespace Domain.Entities.Orders
         /// Reloj con el que se sella <see cref="PaidAt"/> al entregar. null = reloj del sistema; los
         /// tests pasan uno fijo para que la fecha sea afirmable sin ventanas de tiempo real.
         /// </param>
-        public void ChangeStatus(
+        /// <returns>
+        /// Los campos que la transición mutó, para que la persistencia escriba SOLO esas columnas
+        /// (una fila que comparten estado, pago y repartidor no se guarda entera).
+        /// </returns>
+        public OrderChangedField ChangeStatus(
             OrderStatus next,
             Guid? driverId = null,
             string? cancellationReason = null,
@@ -199,6 +203,8 @@ namespace Domain.Entities.Orders
         {
             if (!AllowedTransitionsFrom(Status, DeliveryType).Contains(next))
                 throw new InvalidOrderStatusTransitionException(Status, next);
+
+            OrderChangedField changed = OrderChangedField.Status;
 
             if (next != OrderStatus.Cancelado && cancellationReason is not null)
                 throw new UnexpectedStatusOptionException(next, nameof(cancellationReason));
@@ -213,6 +219,7 @@ namespace Domain.Entities.Orders
                     throw new MissingCancellationReasonException(Status);
 
                 CancellationReason = reason;
+                changed |= OrderChangedField.CancellationReason;
             }
 
             if (next == OrderStatus.Transportando)
@@ -221,6 +228,7 @@ namespace Domain.Entities.Orders
                     throw new MissingDeliveryDriverException(Status);
 
                 DriverId = driverId;
+                changed |= OrderChangedField.DriverId;
             }
 
             Status = next;
@@ -229,7 +237,9 @@ namespace Domain.Entities.Orders
             // dejar en Pending por descuido. Pasa por la MISMA puerta que el pago manual, así que
             // el cobro deja también su constancia (`PaidAt`).
             if (next == OrderStatus.Entregado)
-                ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
+                changed |= ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
+
+            return changed;
         }
 
         /// <summary>
@@ -267,22 +277,34 @@ namespace Domain.Entities.Orders
         /// <param name="clock">
         /// Reloj con el que se sella la fecha. null = reloj del sistema; los tests pasan uno fijo.
         /// </param>
-        public void ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
+        /// <returns>
+        /// Los campos que la operación mutó: siempre el pago, y la fecha solo cuando se sella o se
+        /// borra. Sin esto la persistencia tendría que adivinar qué columnas escribir.
+        /// </returns>
+        public OrderChangedField ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
         {
             if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
                 throw new DeliveredOrderCannotBeUnpaidException();
 
+            OrderChangedField changed = OrderChangedField.PaymentStatus;
+
             if (next == OrderPaymentStatus.Paid)
             {
                 if (PaymentStatus != OrderPaymentStatus.Paid)
+                {
                     PaidAt = (clock ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+                    changed |= OrderChangedField.PaidAt;
+                }
             }
             else if (next == OrderPaymentStatus.Pending)
             {
                 PaidAt = null;
+                changed |= OrderChangedField.PaidAt;
             }
 
             PaymentStatus = next;
+
+            return changed;
         }
     }
 

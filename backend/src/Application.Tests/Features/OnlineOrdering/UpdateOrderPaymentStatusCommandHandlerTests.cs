@@ -22,8 +22,10 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      cobrar en la puerta). Por eso este comando NO pasa por la máquina de `ChangeStatus` y por
 ///      eso el handler no le pregunta al dominio nada.
 ///   2. Solo hay dos valores, y en los dos sentidos: `Pending ⇄ Paid`. No hay "Reembolsado".
-///   3. El aislamiento por tienda y el `UpdateAsync` explícito son los mismos que en T3 —
+///   3. El aislamiento por tienda y el guardado explícito son los mismos que en T3 —
 ///      `ApplicationDbContext` es `NoTracking`, así que sin marcar la entidad no se escribe nada.
+///      Pero aquí solo se marcan `PaymentStatus` y `PaidAt`: el estado y el repartidor de la MISMA
+///      fila son de otras acciones, y guardarlos también borraría su trabajo concurrente.
 /// </summary>
 public class UpdateOrderPaymentStatusCommandHandlerTests
 {
@@ -45,7 +47,8 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()))
+            .ReturnsAsync(true);
     }
 
     private UpdateOrderPaymentStatusCommandHandler Handler() => new(
@@ -196,11 +199,15 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
     #region Integration / Dependencies
 
     /// <summary>
-    /// `ApplicationDbContext` es `NoTracking`: sin `UpdateAsync` el cambio se queda en memoria y
+    /// `ApplicationDbContext` es `NoTracking`: sin marcar la fila, el cambio se queda en memoria y
     /// `SaveChanges` no escribe NADA — sin error y sin aviso.
+    ///
+    /// El conjunto EXACTO de campos se afirma por igualdad: marcar `Status` o `DriverId` además de
+    /// estas dos compilaría y pasaría un "contiene", y es exactamente lo que pisaría un cambio de
+    /// estado o de reparto concurrente.
     /// </summary>
     [Fact]
-    public async Task Handle_WithAValidPaymentStatus_ShouldMarkTheOrderAsModifiedBeforeSaving()
+    public async Task Handle_WithAValidPaymentStatus_ShouldMarkOnlyThePaymentColumns()
     {
         Order order = OrderWith(OrderPaymentStatus.Pending);
         Returns(order);
@@ -209,7 +216,9 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
             new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid)),
+            x => x.UpdatePartialAsync(
+                It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid),
+                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -269,7 +278,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
             new UpdateOrderPaymentStatusCommand(Guid.NewGuid(), OrderPaymentStatus.Paid), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
