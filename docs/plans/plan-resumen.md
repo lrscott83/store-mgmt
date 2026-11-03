@@ -139,24 +139,6 @@ código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 - **Recomendación:** P1 y P2 son **un proyecto aparte**, caro, y no bloquean nada de la operación
   actual. No se agendan hasta que el owner los pida.
 
-#### [ ] P1-4 · Las vistas deben suscribirse solas al aviso de cambios
-
-- **Fuente:** `2026-10-06-subscription-refresh-for-views.md`.
-- **Problema:** `data-revision-store` sube un contador cuando algo cambia, pero **no despierta a
-  nadie**: solo `sale.tsx` y `wholesale.tsx` se suscriben a mano. Gastos, almacenes, tasas, ventas
-  a crédito, entradas y créditos no se vuelven a pintar aunque el dato en memoria sea nuevo. Y una
-  pantalla nueva que olvide suscribirse queda congelada sin que nada falle.
-- **Propuestas:**
-  - **A. Hook único** (`useLiveValue`) que se suscribe internamente al contador, invalida la foto
-    de los servicios y devuelve el valor recalculado; la pantalla no declara dependencias.
-  - **B. Suscripción explícita por pantalla** (lo de hoy, generalizado): barato pero repite el
-    error que el plan quiere eliminar.
-  - **C. Test de guardia** que falle si una pantalla con datos vivos no está suscrita.
-- **Recomendación:** **A + C**, migrando en este orden: `sale`/`wholesale` (quitar la suscripción
-  manual) → gastos → almacenes → el resto. El agrupamiento por ráfaga de
-  `invalidation-universal-write-through` ya está hecho: es la precondición de seguridad, no un
-  extra.
-
 #### [ ] P1-5 · Restos de PWA (logs de diagnóstico y tipos MIME)
 
 - **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; auditoría 2026-11-03.
@@ -295,6 +277,32 @@ código: la implementación y el E2E ya coincidían desde el 2026-09-16.
   hoy cubierto en su mayoría por `login-offline`, `offline-access-panel` y `roster-recovery`.
   **Recomendación:** cerrarlo citando los specs que lo cubren y dejar solo los pasos que de verdad
   no se pueden automatizar (si queda alguno).
+
+#### [ ] P3-7 · Las pantallas con datos vivos no se suscriben al aviso de cambios
+
+> Movido al final de la lista por decisión del owner (2026-11-03). Antes era P1-4.
+
+- **Fuente:** `2026-10-06-subscription-refresh-for-views.md`; verificado en código el 2026-11-03.
+- **Problema (verificado):** `data-revision-store` sube un contador cuando algo cambia y los
+  servicios lo leen para invalidar su copia en memoria, pero **despertar la pantalla** es aparte:
+  solo `sale.tsx`, `wholesale.tsx` y `cash-closing.tsx` usan `useDataRevisionStore`. Siete
+  pantallas con datos vivos **no** lo usan (`products`, `entries`, `egress`, `warehouses`,
+  `channel-rates`, `credits`, `today-orders`). El carrito (`cart-shell.tsx`) vive en la barra de
+  navegación, así que **una venta puede completarse desde cualquier pantalla**: el pedido y el
+  inventario quedan bien guardados, pero la pantalla abierta sigue mostrando los números viejos
+  hasta cambiar de ruta o recargar. Es el mismo fallo que se corrigió en venta.
+- **No verificado aún:** qué campo exacto de cada una de esas siete pantallas cambia con una venta.
+  Se cierra pantalla por pantalla al implementar.
+- **Propuestas:**
+  - **A. Hook único** (`useLiveValue`) que se suscribe internamente al contador y devuelve el valor
+    recalculado; la pantalla no declara dependencias.
+  - **B. Suscripción explícita por pantalla** (lo de hoy, repetido): barato pero repite el olvido.
+  - **C. Test de guardia** que falle si una pantalla con datos vivos no está suscrita.
+- **Recomendación:** **A + C**, empezando por las que muestran cantidades que una venta cambia
+  (`today-orders`, `warehouses`, `entries`/`egress`, `credits`) y siguiendo con el resto. El
+  agrupamiento por ráfaga de `invalidation-universal-write-through` ya está hecho: es la
+  precondición de rendimiento, no un extra. No es P0: no corrompe datos, solo muestra números
+  viejos.
 
 ---
 
