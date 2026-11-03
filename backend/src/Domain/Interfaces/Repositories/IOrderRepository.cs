@@ -118,7 +118,8 @@ namespace Domain.Interfaces.Repositories
         /// dejar que el handler mute y guarde: es la única puerta que marca. Mismo patrón que
         /// `StoreCatalogSettingsRepository.UpsertAsync`.
         /// </summary>
-        Task<bool> UpdatePartialAsync(Order order, OrderChangedField changedFields);
+        Task<bool> UpdatePartialAsync(
+            Order order, OrderChangedField changedFields, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

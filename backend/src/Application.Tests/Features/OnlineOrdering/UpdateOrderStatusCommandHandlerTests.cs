@@ -61,7 +61,7 @@ public class UpdateOrderStatusCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()))
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // T6 defaults: sin módulo 21 activo y sin atribución no se genera ninguna comisión.
@@ -242,7 +242,7 @@ public class UpdateOrderStatusCommandHandlerTests
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Preparado),
-                OrderChangedField.Status),
+                OrderChangedField.Status, It.IsAny<CancellationToken>()),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -268,7 +268,7 @@ public class UpdateOrderStatusCommandHandlerTests
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.IsAny<Order>(),
-                OrderChangedField.Status | OrderChangedField.CancellationReason),
+                OrderChangedField.Status | OrderChangedField.CancellationReason, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -286,7 +286,7 @@ public class UpdateOrderStatusCommandHandlerTests
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.IsAny<Order>(),
-                OrderChangedField.Status | OrderChangedField.DriverId),
+                OrderChangedField.Status | OrderChangedField.DriverId, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -308,7 +308,7 @@ public class UpdateOrderStatusCommandHandlerTests
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.IsAny<Order>(),
-                OrderChangedField.Status | OrderChangedField.PaymentStatus | OrderChangedField.PaidAt),
+                OrderChangedField.Status | OrderChangedField.PaymentStatus | OrderChangedField.PaidAt, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -443,7 +443,7 @@ public class UpdateOrderStatusCommandHandlerTests
 
         await act.Should().ThrowAsync<ApiException>();
         order.Status.Should().Be(OrderStatus.Creado);
-        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -470,7 +470,7 @@ public class UpdateOrderStatusCommandHandlerTests
         Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Preparado), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

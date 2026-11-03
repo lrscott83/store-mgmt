@@ -42,11 +42,23 @@ public sealed class OrderPartialUpdateGuardsE2ETests
             afterPay.UpdatedDate.Should().NotBeNull("a partial UPDATE must keep the audit stamp");
             afterPay.UpdatedBy.Should().Be(fixture.UserId);
 
-            await Task.Delay(1100);
+            // Sentinela: la marca de auditoría se retrasa a un instante conocido y el PATCH tiene
+            // que avanzarla. Un `Task.Delay` "para que pase el tiempo" acopla el test al reloj y
+            // añade un segundo de espera; un valor puesto a mano es determinista.
+            var sentinel = DateTimeOffset.UtcNow.AddDays(-1);
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.Set<Order>().IgnoreQueryFilters()
+                    .Where(o => o.Id == seeded.Id)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(o => o.UpdatedDate, sentinel));
+            }
+
             (await client.PatchAsJsonAsync($"/api/v1/online-orders/{seeded.Id}/status",
                 new { status = (int)OrderStatus.Preparado })).StatusCode.Should().Be(HttpStatusCode.OK);
             var afterStatus = await ReadAsync(seeded.Id);
-            afterStatus.UpdatedDate.Should().BeAfter(afterPay.UpdatedDate!.Value);
+            afterStatus.UpdatedDate.Should().BeAfter(sentinel,
+                "the partial UPDATE must advance the audit stamp it inherited");
             afterStatus.UpdatedBy.Should().Be(fixture.UserId);
             afterStatus.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
         }
@@ -123,16 +135,13 @@ public sealed class OrderPartialUpdateGuardsE2ETests
             Guid driverId = await SeedDriverAsync(seeded.Id);
             driverIds.Add(driverId);
 
-            using (var scope = _f.Services.CreateScope())
-            {
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var order = await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
-                    .FirstAsync(o => o.Id == seeded.Id);
-                order.DriverId = driverId;
-
-                await new OrderRepository(db).UpdatePartialAsync(order, OrderChangedField.DriverId);
-                await db.SaveChangesAsync();
-            }
+            // Por el ENDPOINT, no por el repositorio: el contrato que usa el panel es el PATCH, y
+            // una ruta que delegara en un guardado de fila entera tiene que romper este test.
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            var response = await client.PatchAsJsonAsync(
+                $"/api/v1/online-orders/{seeded.Id}/driver", new { driverId });
+            response.StatusCode.Should().Be(HttpStatusCode.OK,
+                "the seeded driver is active and belongs to the session store");
 
             (await ReadAsync(seeded.Id)).DriverId.Should().Be(driverId,
                 "the DriverId column must reach the database through the partial path");
@@ -233,6 +242,73 @@ public sealed class OrderPartialUpdateGuardsE2ETests
             await ClearDriversAsync(orderIds, driverIds);
             await PublicOrderingSeed.CleanupAsync(_f, fixture);
         }
+    }
+
+    [Fact]
+    public async Task Partial_update_refuses_an_empty_set_and_an_already_tracked_entity()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            var seeded = await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, "GUARDRAILS");
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var repository = new OrderRepository(db);
+            var order = await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+                .FirstAsync(o => o.Id == seeded.Id);
+
+            await FluentActions
+                .Awaiting(() => repository.UpdatePartialAsync(order, OrderChangedField.None))
+                .Should().ThrowAsync<ArgumentException>(
+                    "an empty set would report success while writing nothing");
+
+            await FluentActions
+                .Awaiting(() => repository.UpdatePartialAsync(order, (OrderChangedField)128))
+                .Should().ThrowAsync<ArgumentOutOfRangeException>(
+                    "a new domain field must be mapped to a column or fail loudly");
+
+            db.Attach(order);
+            await FluentActions
+                .Awaiting(() => repository.UpdatePartialAsync(order, OrderChangedField.Status))
+                .Should().ThrowAsync<InvalidOperationException>(
+                    "resetting a tracked entity would discard its pending changes");
+        }
+        finally { await PublicOrderingSeed.CleanupAsync(_f, fixture); }
+    }
+
+    [Fact]
+    public async Task Delivery_persists_its_own_columns_and_leaves_the_rest_untouched()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            var seeded = await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, "GUARDDELIVER");
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+
+            var before = await ReadAsync(seeded.Id);
+
+            (await client.PatchAsJsonAsync($"/api/v1/online-orders/{seeded.Id}/status",
+                new { status = (int)OrderStatus.Preparado })).StatusCode.Should().Be(HttpStatusCode.OK);
+            (await client.PatchAsJsonAsync($"/api/v1/online-orders/{seeded.Id}/status",
+                new { status = (int)OrderStatus.Entregado })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var after = await ReadAsync(seeded.Id);
+            after.Status.Should().Be(OrderStatus.Entregado);
+            after.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
+            after.PaidAt.Should().NotBeNull();
+
+            // La comisión que genera la entrega escribe filas PROPIAS: lo que no está en el conjunto
+            // de campos cambiados tiene que sobrevivir intacto, o la escritura parcial estaría
+            // perdiendo columnas que el guardado de fila entera sí llevaba.
+            after.Notes.Should().Be(before.Notes);
+            after.CustomerName.Should().Be(before.CustomerName);
+            after.CustomerPhone.Should().Be(before.CustomerPhone);
+            after.Description.Should().Be(before.Description);
+            after.Total.Should().Be(before.Total);
+            after.Code.Should().Be(before.Code);
+        }
+        finally { await PublicOrderingSeed.CleanupAsync(_f, fixture); }
     }
 
     /// <summary>

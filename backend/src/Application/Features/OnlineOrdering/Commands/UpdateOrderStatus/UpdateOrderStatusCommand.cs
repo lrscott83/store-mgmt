@@ -140,7 +140,7 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
             // guardarla entera reescribiría el pago o el repartidor que otra persona acaba de
             // cambiar: la última en guardar pisaría a la primera, sin conflicto y sin aviso.
             // `ApplicationDbContext` es NoTracking: sin marcar, `SaveChanges` no escribiría NADA.
-            await _orderRepository.UpdatePartialAsync(order, changed);
+            await _orderRepository.UpdatePartialAsync(order, changed, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

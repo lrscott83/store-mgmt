@@ -322,8 +322,11 @@ namespace Infrastructure.Persistence.Repositories
         /// YA trackeada (resetearla a `Unchanged` descartaría sus cambios pendientes) y un conjunto
         /// de campos vacío (no escribiría nada y aun así devolvería `true`).
         /// </summary>
-        public Task<bool> UpdatePartialAsync(Order order, OrderChangedField changedFields)
+        public Task<bool> UpdatePartialAsync(
+            Order order, OrderChangedField changedFields, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (changedFields == OrderChangedField.None)
                 throw new ArgumentException(
                     "A partial order update needs at least one changed field.", nameof(changedFields));

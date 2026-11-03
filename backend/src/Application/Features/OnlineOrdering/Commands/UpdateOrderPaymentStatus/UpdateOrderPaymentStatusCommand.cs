@@ -92,7 +92,7 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus
             // entera reescribiría sus valores leídos antes y los borraría.
             // `ApplicationDbContext` es NoTracking: sin marcar columnas, `SaveChanges` no
             // escribiría NADA — sin error y sin aviso.
-            await _orderRepository.UpdatePartialAsync(order, changed);
+            await _orderRepository.UpdatePartialAsync(order, changed, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

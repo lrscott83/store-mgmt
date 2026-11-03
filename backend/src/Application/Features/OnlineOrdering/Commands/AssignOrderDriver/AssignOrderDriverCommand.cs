@@ -103,7 +103,7 @@ namespace Application.Features.OnlineOrdering.Commands.AssignOrderDriver
             // fila entera reescribiría sus valores leídos antes y los borraría.
             // `ApplicationDbContext` es NoTracking: sin marcar la columna, `SaveChanges` no
             // escribiría NADA — sin error y sin aviso.
-            await _orderRepository.UpdatePartialAsync(order, OrderChangedField.DriverId);
+            await _orderRepository.UpdatePartialAsync(order, OrderChangedField.DriverId, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

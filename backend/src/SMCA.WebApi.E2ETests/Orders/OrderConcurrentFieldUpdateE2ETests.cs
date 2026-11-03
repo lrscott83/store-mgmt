@@ -57,9 +57,13 @@ public sealed class OrderConcurrentFieldUpdateE2ETests
 
     /// <summary>
     /// Un `PATCH /payment` y un `PATCH /status` disparados a la vez sobre el MISMO pedido: los dos
-    /// responden 200 y los dos ejes quedan en la fila. Con un guardado de fila entera el segundo en
-    /// guardar borra el cambio del primero, y el test lo vería como un eje revertido a su valor
-    /// inicial — que es exactamente el síntoma que reportó el dueño.
+    /// responden 200 y los dos ejes quedan en la fila.
+    ///
+    /// Es una prueba de HUMO de los dos endpoints, no la prueba determinista del lost update: sin
+    /// una barrera que obligue a los dos handlers a leer antes de que el otro escriba, el
+    /// entrelazado real depende del planificador, así que puede pasar sin el arreglo. La prueba
+    /// determinista —lectura vieja + escritura del otro eje, y la escritura posterior— vive en
+    /// `OrderPartialUpdateGuardsE2ETests`, que sí falla siempre con el guardado de fila entera.
     /// </summary>
     [Fact]
     public async Task R_CONCURRENT_1_a_concurrent_payment_patch_and_status_patch_both_persist()
@@ -67,54 +71,51 @@ public sealed class OrderConcurrentFieldUpdateE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            for (int attempt = 0; attempt < 6; attempt++)
-            {
-                Order seeded = await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, $"E2ECONC{attempt}");
+            Order seeded = await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, "E2ECONC");
 
-                // Precondición: sin los dos valores iniciales, "cambió" no distinguiría un guardado
-                // correcto de una columna que ya venía con basura.
-                Order before = (await ReadRowAsync(seeded.Id))!;
-                before.Status.Should().Be(OrderStatus.Creado);
-                before.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
-                before.PaidAt.Should().BeNull("un pedido recién creado no tiene cobro que constatar");
+            // Precondición: sin los dos valores iniciales, "cambió" no distinguiría un guardado
+            // correcto de una columna que ya venía con basura.
+            Order before = (await ReadRowAsync(seeded.Id))!;
+            before.Status.Should().Be(OrderStatus.Creado);
+            before.PaymentStatus.Should().Be(OrderPaymentStatus.Pending);
+            before.PaidAt.Should().BeNull("un pedido recién creado no tiene cobro que constatar");
 
-                // Un cliente por acción: es lo que hace una sesión por puesto en el panel. Las dos
-                // peticiones se lanzan ANTES del primer await para que viajen a la vez.
-                var paymentClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
-                var statusClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            // Un cliente por acción: es lo que hace una sesión por puesto en el panel. Las dos
+            // peticiones se lanzan ANTES del primer await para que viajen a la vez.
+            var paymentClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            var statusClient = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
-                Task<HttpResponseMessage> payment = paymentClient.PatchAsJsonAsync(
-                    $"/api/v1/online-orders/{seeded.Id}/payment", PaymentBody(OrderPaymentStatus.Paid));
-                Task<HttpResponseMessage> status = statusClient.PatchAsJsonAsync(
-                    $"/api/v1/online-orders/{seeded.Id}/status", StatusBody(OrderStatus.Preparado));
+            Task<HttpResponseMessage> payment = paymentClient.PatchAsJsonAsync(
+                $"/api/v1/online-orders/{seeded.Id}/payment", PaymentBody(OrderPaymentStatus.Paid));
+            Task<HttpResponseMessage> status = statusClient.PatchAsJsonAsync(
+                $"/api/v1/online-orders/{seeded.Id}/status", StatusBody(OrderStatus.Preparado));
 
-                HttpResponseMessage[] responses = await Task.WhenAll(payment, status);
+            HttpResponseMessage[] responses = await Task.WhenAll(payment, status);
 
-                responses[0].StatusCode.Should().Be(HttpStatusCode.OK,
-                    $"intento {attempt}: marcar el pago es válido en un pedido `Creado`");
-                responses[1].StatusCode.Should().Be(HttpStatusCode.OK,
-                    $"intento {attempt}: `Creado → Preparado` es una transición válida de recogida");
+            responses[0].StatusCode.Should().Be(HttpStatusCode.OK,
+                "marcar el pago es válido en un pedido `Creado`");
+            responses[1].StatusCode.Should().Be(HttpStatusCode.OK,
+                "`Creado → Preparado` es una transición válida de recogida");
 
-                // La FILA: los dos ejes, no solo el último que escribió.
-                Order after = (await ReadRowAsync(seeded.Id))!;
-                after.PaymentStatus.Should().Be(OrderPaymentStatus.Paid,
-                    $"intento {attempt}: el `PATCH /status` concurrente no puede revertir el pago");
-                after.PaidAt.Should().NotBeNull(
-                    "la constancia del cobro viaja en la MISMA escritura parcial que el pago");
-                after.Status.Should().Be(OrderStatus.Preparado,
-                    $"intento {attempt}: el `PATCH /payment` concurrente no puede revertir el estado");
+            // La FILA: los dos ejes, no solo el último que escribió.
+            Order after = (await ReadRowAsync(seeded.Id))!;
+            after.PaymentStatus.Should().Be(OrderPaymentStatus.Paid,
+                "el `PATCH /status` concurrente no puede revertir el pago");
+            after.PaidAt.Should().NotBeNull(
+                "la constancia del cobro viaja en la MISMA escritura parcial que el pago");
+            after.Status.Should().Be(OrderStatus.Preparado,
+                "el `PATCH /payment` concurrente no puede revertir el estado");
 
-                // Y el contrato de lectura: el detalle devuelve lo mismo que la fila, no un recálculo.
-                var response = await statusClient.GetAsync($"/api/v1/online-orders/{seeded.Id}");
-                response.StatusCode.Should().Be(HttpStatusCode.OK);
-                var body = await response.Content
-                    .ReadFromJsonAsync<ApiResponse<OnlineOrderDetailDto>>(ApiResponse.Json);
+            // Y el contrato de lectura: el detalle devuelve lo mismo que la fila, no un recálculo.
+            var response = await statusClient.GetAsync($"/api/v1/online-orders/{seeded.Id}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content
+                .ReadFromJsonAsync<ApiResponse<OnlineOrderDetailDto>>(ApiResponse.Json);
 
-                body!.Succeeded.Should().BeTrue();
-                body.Data!.Status.Should().Be(OrderStatus.Preparado);
-                body.Data.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
-                body.Data.PaidAt.Should().Be(after.PaidAt);
-            }
+            body!.Succeeded.Should().BeTrue();
+            body.Data!.Status.Should().Be(OrderStatus.Preparado);
+            body.Data.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
+            body.Data.PaidAt.Should().Be(after.PaidAt);
         }
         finally
         {

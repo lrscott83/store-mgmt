@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus;
 using Application.UnitOfWorks;
@@ -47,7 +47,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()))
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
     }
 
@@ -218,7 +218,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         _orderRepository.Verify(
             x => x.UpdatePartialAsync(
                 It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid),
-                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt),
+                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt, It.IsAny<CancellationToken>()),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -278,7 +278,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
             new UpdateOrderPaymentStatusCommand(Guid.NewGuid(), OrderPaymentStatus.Paid), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
