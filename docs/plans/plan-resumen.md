@@ -3,7 +3,7 @@
 > **Índice único y evolutivo.** Actualizar este documento cada vez que un plan se
 > complete, se agregue uno nuevo o cambie de prioridad.
 >
-> **Última auditoría:** 2026-11-03 · Rama: `qa` · 34 documentos en `docs/plans`
+> **Última auditoría:** 2026-11-03 · Rama: `dev` · 34 documentos en `docs/plans`
 > (10 agregados después de la auditoría del 2026-09-20, que estaban sin indexar).
 > **Método:** verificación plan-por-plan contra el código real (archivo:línea o
 > commit). Sin asumir: cada clasificación tiene prueba.
@@ -100,106 +100,65 @@
 - **Riesgo:** medio (contrato de un endpoint consumido por la app, no publicado). Requiere
   aprobación backend por la regla del repo.
 
-#### [ ] P0-4 · `POST /public/ordering/{slug}/orders` sin tope de líneas ni de cantidad (8.1 / 8.2)
-
-- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidades 8.1 y 8.2.
-- **Problema:** `CreateOnlineOrderCommandValidator.cs:66-67` solo exige `Quantity > 0`; no hay tope
-  por línea ni de líneas por carrito. `Order.ItemsCount` es `checked` y desborda con cantidades
-  grandes → **500 anónimo**. Además el rate limit cuenta **requests**, no filas: un solo POST
-  puede insertar cientos de miles de `OrderItem`, así que el límite no cierra el hueco que dice
-  cerrar.
-- **Propuestas:**
-  - **A. Topes en el validator.** Cantidad máxima por línea (p. ej. 10 000) y máximo de líneas por
-    carrito (p. ej. 100), con mensajes localizados. Barato y suficiente.
-  - **B. A + límite de filas por IP/ventana** (no solo requests) o límite de payload.
-  - **C. Guard en el handler** además del validator, para comandos internos.
-- **Recomendación:** **A + C**. Un endpoint público sin topes es una invitación; el guard en el
-  handler cubre el caso de un comando construido sin pasar por el validator. B se evalúa cuando
-  exista métrica de abuso real (no hay panel de lectura todavía).
-
 ---
 
 ### P1 — Features pendientes acordadas (desbloqueadas)
 
-#### [ ] P1-1 · Resto de `api-endpoint-review` (unidades 7-9 y transversales)
+#### [ ] P1-1 · Resto de `api-endpoint-review` en pedidos y repartidores (unidades 6-7)
 
 - **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md`. Controllers 1-5 **hechos y
-  aprobados por RDD**; quedan 61 casillas abiertas (HIGH ya cubiertos en P0-2..P0-4 + MEDIUM/LOW
-  y transversales X1, X3, X4, X5, X6, X7, X8, X9).
-- **Problema:** hallazgos de revisión sin implementar en `DeliveryDrivers` (resto), `PublicOrdering`
-  (PII en query string y logs, código no criptográfico, 200 en un create), `OnlineOrders`
-  (paginación sin tope, `search` sin índice, PII sin máscara, sin `[Authorize]` de feature) y
-  `catalog-template` (allowlist de `templateId`, join de 4 tablas para un escalar, 400 vs 404).
-  Los transversales X1 (multipart global sin tope real), X3 (check-then-act → 500) y X4
-  (OpenAPI incompleto) tocan varios controladores.
+  aprobados por RDD**; de las unidades restantes solo siguen vivas las de **gestión de pedidos**
+  (6) y **repartidores** (7). Lo del catálogo web público y la plantilla (unidades 8-9) queda
+  **descartado** por decisión del owner (§7).
+- **Problema:** hallazgos sin implementar en `OnlineOrders` (paginación sin tope, `search` sin
+  índice, PII sin máscara, sin `[Authorize]` de feature) y `DeliveryDrivers` (resto: validación que
+  mide distinto que lo que guarda, DTO copiado, store-guard repetido). Los transversales X1
+  (multipart global sin tope real), X3 (check-then-act → 500) y X4 (OpenAPI incompleto) tocan
+  varios controladores.
 - **Propuestas:** implementar **unidad por unidad** con aprobación punto por punto, como se hizo
   con 1-5 (build + `Application.Tests` + RDD por unidad). No un solo PR gigante.
-- **Recomendación:** orden por riesgo real, no por número: **8 → 6 → 9 → 7 (resto) → transversales**
-  (X1 antes de X4; X3 junto con la unidad que lo toque). Cada unidad cierra con tests nuevos; los
-  E2E existentes no se tocan.
+- **Recomendación:** **6 → 7 (resto) → transversales** (X1 antes de X4; X3 junto con la unidad que
+  lo toque). Cada unidad cierra con tests nuevos; los E2E existentes no se tocan.
 
-#### [ ] P1-2 · Deriva del spec canónico REQ-5 (documentación que contradice el código)
+#### [x] P1-2 · Deriva del spec canónico REQ-5 — HECHO 2026-11-03
 
-- **Fuente:** `2026-09-15-store-plan-change-permission-refresh-plan.md` §6.2; auditoría 2026-11-03.
-- **Problema:** `openspec/specs/e2e-store-plan-activation-ui/spec.md:76` exige que el conteo de
-  `GET /v1/auth/me` sea **CERO**, pero el E2E se actualizó el 2026-09-16
-  (`store-plan-activation.spec.ts:233-248`) y el código hace **uno** vía
-  `soft-refresh-session.ts` (`getMe()`), que es justamente el arreglo del plan de permisos. Un
-  lector del spec "arregla" el test contra la realidad equivocada.
-- **Propuestas:**
-  - **A. Actualizar el spec** para que REQ-5 exija **exactamente uno** (el refresco online tras
-    cambiar el plan) y cero en la recarga (REQ-1 de `e2e-session-hydration`).
-  - **B. Forzar cero** y volver al perfil cacheado: reintroduce el menú congelado que el plan vino
-    a arreglar. Descartada.
-- **Recomendación:** **A**. Es un cambio de documento; la implementación ya está hecha y probada.
-  Añadir la nota de por qué existe el `/me` (best-effort, explícito, online-only).
+Cerrado: `openspec/specs/e2e-store-plan-activation-ui/spec.md` REQ-5 ahora exige **exactamente un**
+`GET /v1/auth/me` tras cambiar el plan (el refresco suave), conserva cero en una recarga (REQ-1 de
+`e2e-session-hydration`) y explica las dos correcciones (2026-08-08 y 2026-11-03). Sin cambios de
+código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 
-#### [ ] P1-3 · SEO de la landing — pendientes P3/P4/P5
+#### [ ] P1-3 · SEO de la landing — solo queda el cuerpo estático (P1/P2)
 
 - **Fuente:** `2026-10-20-landing-seo-audit.md` §5. Iteraciones 1-4 cerradas (JSON-LD, H1, OG,
   `offers`, constantes de schema, timeout de vitest).
-- **Problema:** **P5** `frontend-react/Dockerfile:24` tiene
-  `ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net`: si el build de producción no lo
-  sobreescribe, `canonical`, `og:url` y `og:image` apuntan a **staging** (daño SEO real y
-  silencioso). **P3** el sitemap solo lista catálogos, no `/`. **P4** `robots.txt` permite `/` sin
-  exclusiones: `/login`, `/sales/*`, `/admin/*` y URLs inventadas (el fallback SPA responde 200) son
-  indexables como soft 404.
-- **Propuestas:** P5 = verificación operativa (inspeccionar el build desplegado, no el repo) y, si
-  falta, fijar el ARG en el pipeline; P3 = incluir `/` en el builder del sitemap; P4 = `Disallow`
-  de rutas privadas o `X-Robots-Tag: noindex` en el fallback SPA.
-- **Recomendación:** **P5 primero** (es el único con daño activo si está mal), luego **P3+P4**
-  juntos (mismo archivo/área, cambio pequeño). P1 (cuerpo estático) y P2 (`offers` server-side)
-  quedan como proyecto aparte: son el cambio caro y no bloquean nada.
+- **Problema que queda:** **P1** el `<body>` servido no trae contenido (los rastreadores sin JS no
+  tienen qué describir) y **P2** los `offers` del JSON-LD se inyectan en runtime. **P6** (title de
+  62 caracteres) es cosmético y opcional.
+- **Propuestas:** P1 = prerender real o bloque semántico inyectado en el build; P2 = generar los
+  `offers` del lado servidor cuando exista P1.
+- **Recomendación:** P1 y P2 son **un proyecto aparte**, caro, y no bloquean nada de la operación
+  actual. No se agendan hasta que el owner los pida.
 
-#### [ ] P1-4 · Las vistas deben suscribirse solas al aviso de cambios
+#### [ ] P1-5 · Restos de PWA (logs de diagnóstico) — DIFERIDO al próximo cambio del service worker
 
-- **Fuente:** `2026-10-06-subscription-refresh-for-views.md`.
-- **Problema:** `data-revision-store` sube un contador cuando algo cambia, pero **no despierta a
-  nadie**: solo `sale.tsx` y `wholesale.tsx` se suscriben a mano. Gastos, almacenes, tasas, ventas
-  a crédito, entradas y créditos no se vuelven a pintar aunque el dato en memoria sea nuevo. Y una
-  pantalla nueva que olvide suscribirse queda congelada sin que nada falle.
-- **Propuestas:**
-  - **A. Hook único** (`useLiveValue`) que se suscribe internamente al contador, invalida la foto
-    de los servicios y devuelve el valor recalculado; la pantalla no declara dependencias.
-  - **B. Suscripción explícita por pantalla** (lo de hoy, generalizado): barato pero repite el
-    error que el plan quiere eliminar.
-  - **C. Test de guardia** que falle si una pantalla con datos vivos no está suscrita.
-- **Recomendación:** **A + C**, migrando en este orden: `sale`/`wholesale` (quitar la suscripción
-  manual) → gastos → almacenes → el resto. El agrupamiento por ráfaga de
-  `invalidation-universal-write-through` ya está hecho: es la precondición de seguridad, no un
-  extra.
+> **Decisión del owner (2026-11-03):** no se hace como trabajo aparte. Cualquier cambio en
+> `service-worker.ts` cambia su huella y **fuerza la actualización de todos los clientes**, así que
+> este trabajo se ejecuta **junto con la próxima modificación real del service worker**. El punto
+> del gzip queda **descartado** (ver abajo).
 
-#### [ ] P1-5 · Restos de PWA (logs de diagnóstico y tipos MIME)
-
-- **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; auditoría 2026-11-03.
-- **Problema:** quedan 4 logs `[SW]`/`[PWA]` vivos (`app/service-worker.ts`, y
-  `service-worker-registration.ts`) que ensucian la consola de producción, y `nginx.conf:35-41`
-  no incluye `text/javascript` ni `application/manifest+json` en `gzip_types` (el JS se sirve como
-  `application/javascript` así que funciona, pero el manifest no se comprime).
-- **Propuestas:** A. borrar los logs; B. dejarlos detrás de un flag de depuración; C. mantenerlos.
-- **Recomendación:** **B** para los logs (útiles en soporte, invisibles por defecto) y **añadir los
-  dos tipos a `gzip_types`** (riesgo cero, ganancia real). Requiere **sign-off del owner** porque
-  toca el despliegue y el service worker.
+- **Fuente:** `2026-07-27-pwa-offline-shell-frontend-plan.md` Task 6/8; verificado en código el
+  2026-11-03.
+- **Problema (verificado):** quedan **4** `console.info` `[SW]` en `app/service-worker.ts:38,44,62,155`
+  y **8** logs `[PWA]` en `service-worker-registration.ts:29,38,43,45,54,57,64` (el de `:71` es un
+  `console.error` legítimo y se conserva). Ensucian la consola de producción; no filtran datos ni
+  rompen nada.
+- **Descartado — gzip/MIME:** `nginx.conf:35-43` ya comprime los bundles
+  (`application/javascript`), y `application/manifest+json` está por debajo de
+  `gzip_min_length 1024`, así que añadirlo no comprimiría nada. Sin acción.
+- **Propuestas (para cuando se toque el SW):** A. borrar los `console.info` y dejar solo el
+  `console.error`; B. dejarlos detrás de un flag de depuración.
+- **Recomendación:** **B** en ese momento (útiles en soporte, invisibles por defecto), dentro del
+  mismo cambio que ya fuerza la actualización. No justifica una actualización por sí solo.
 
 #### [ ] P1-6 · Reconciliar las fichas E2E desactualizadas
 
@@ -291,20 +250,6 @@
   **C** primero (UX, sin mover guards) y **A** como cambio propio con E2E nuevos. Cualquier cambio
   en `authLoader`/`guestOnlyLoader`/`needsUnlock` exige re-leer el contrato y aprobación explícita.
 
-#### [ ] P2-6 · Limpieza de imágenes huérfanas del catálogo web
-
-- **Fuente:** `2026-10-02-superadmin-web-catalog-orphan-image-cleanup.md`; **sin código**;
-  bloqueado por O-1..O-5 (O-2 es la que bloquea).
-- **Problema:** tras `cd4c6246` la fuente única es `Product.Image`; las filas de `ProductImage`
-  que no coinciden y los archivos sin fila se acumulan en `storage_data` sin medición. Una purga
-  ingenua borra la imagen principal (caso C) y rompe el catálogo público.
-- **Propuestas:** A. vista por tienda con contador + botón + checkbox, condición
-  `ProductImage.Path <> Product.Image`, misma SQL para contar y purgar; B. purga global; C. barrido
-  manual documentado.
-- **Recomendación:** **A**. Contador y purga **deben** compartir la misma condición; test dedicado
-  del caso C y de idempotencia. Decidir O-2 (qué autoriza exactamente la casilla) antes de escribir
-  el diálogo.
-
 #### [ ] P2-7 · Popup de re-autenticación al cambiar de plan
 
 - **Fuente:** `2026-09-10-store-plan-change-reauth-popup-plan.md`.
@@ -322,7 +267,7 @@
 - [ ] **P3-1 · `endpoints-e2e-coverage.md` está obsoleto (2026-07-29).** Dice `ProductsController`
   0 % cuando hay E2E del recurso. Propuesta: regenerar el inventario contra los specs actuales o
   retirarlo y dejar que el runner sea la fuente. **Recomendación: regenerar** (sirve para decidir
-  P1-1 y P0-4).
+  P1-1).
 - [ ] **P3-2 · Deriva de la documentación de rate limit** (`2026-09-17-rate-limit-quota-doc-drift-plan.md`).
   `frontend-react/e2e/README.md:195,256,262-266` y el comentario de
   `RateLimitPolicies.cs:20-24` no coinciden con el código. **Recomendación:** corregir el README y
@@ -341,6 +286,32 @@
   hoy cubierto en su mayoría por `login-offline`, `offline-access-panel` y `roster-recovery`.
   **Recomendación:** cerrarlo citando los specs que lo cubren y dejar solo los pasos que de verdad
   no se pueden automatizar (si queda alguno).
+
+#### [ ] P3-7 · Las pantallas con datos vivos no se suscriben al aviso de cambios
+
+> Movido al final de la lista por decisión del owner (2026-11-03). Antes era P1-4.
+
+- **Fuente:** `2026-10-06-subscription-refresh-for-views.md`; verificado en código el 2026-11-03.
+- **Problema (verificado):** `data-revision-store` sube un contador cuando algo cambia y los
+  servicios lo leen para invalidar su copia en memoria, pero **despertar la pantalla** es aparte:
+  solo `sale.tsx`, `wholesale.tsx` y `cash-closing.tsx` usan `useDataRevisionStore`. Siete
+  pantallas con datos vivos **no** lo usan (`products`, `entries`, `egress`, `warehouses`,
+  `channel-rates`, `credits`, `today-orders`). El carrito (`cart-shell.tsx`) vive en la barra de
+  navegación, así que **una venta puede completarse desde cualquier pantalla**: el pedido y el
+  inventario quedan bien guardados, pero la pantalla abierta sigue mostrando los números viejos
+  hasta cambiar de ruta o recargar. Es el mismo fallo que se corrigió en venta.
+- **No verificado aún:** qué campo exacto de cada una de esas siete pantallas cambia con una venta.
+  Se cierra pantalla por pantalla al implementar.
+- **Propuestas:**
+  - **A. Hook único** (`useLiveValue`) que se suscribe internamente al contador y devuelve el valor
+    recalculado; la pantalla no declara dependencias.
+  - **B. Suscripción explícita por pantalla** (lo de hoy, repetido): barato pero repite el olvido.
+  - **C. Test de guardia** que falle si una pantalla con datos vivos no está suscrita.
+- **Recomendación:** **A + C**, empezando por las que muestran cantidades que una venta cambia
+  (`today-orders`, `warehouses`, `entries`/`egress`, `credits`) y siguiendo con el resto. El
+  agrupamiento por ráfaga de `invalidation-universal-write-through` ya está hecho: es la
+  precondición de rendimiento, no un extra. No es P0: no corrompe datos, solo muestra números
+  viejos.
 
 ---
 
@@ -394,3 +365,27 @@
 | DESIGN_ONLY | Doc de diseño sin checklist; se indica si el diseño existe en código. |
 | SUPERSEDED | Otro plan/cambio cubre lo mismo → §3. |
 | LIVING_TRACKER | Doc de seguimiento continuo, no entregable → §4. |
+
+---
+
+## 7. Descartado por decisión del owner (2026-11-03)
+
+**Decisión:** el catálogo web se queda **como está**. No se proponen cambios de comportamiento,
+validación, contratos ni limpieza sobre el catálogo web, sus endpoints públicos, la plantilla del
+catálogo ni sus imágenes.
+
+Descartado en esta auditoría:
+
+- **P0-4 — topes del pedido público (8.1/8.2).** No se añaden límites de cantidad por línea ni de
+  líneas por carrito.
+- **Unidades 8-9 del `api-endpoint-review`.** PII del teléfono en query string y logs, código de
+  pedido no criptográfico, `200` en un create, allowlist de `templateId` y `400` vs `404`: fuera.
+- **P2-6 — limpieza de imágenes huérfanas del catálogo web.** La vista, el contador y la purga no se
+  implementan.
+
+**Motivo:** pedido explícito del owner (2026-11-03): «todo lo del catálogo web se mantiene como
+está y punto».
+
+**Cómo se reabre:** solo con un incidente real observado en esa superficie, y con evidencia del
+incidente. "La auditoría lo decía" no es motivo suficiente.
+
