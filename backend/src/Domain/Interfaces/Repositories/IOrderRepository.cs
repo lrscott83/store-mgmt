@@ -6,8 +6,9 @@ namespace Domain.Interfaces.Repositories
 {
     /// <summary>
     /// Lecturas de los pedidos ONLINE (F2). La escritura es un alta nueva (el POS no escribe aquí,
-    /// D14), así que este repositorio no añade comandos de actualización: los handlers de F5 llaman
-    /// a `UpdateAsync` del genérico cuando cambian estado o pago.
+    /// D14); sobre una fila existente los handlers de F5 escriben columnas SUELTAS con
+    /// <see cref="UpdatePartialAsync"/>, porque estado, pago y repartidor son tres ejes
+    /// independientes de la MISMA fila y cada acción solo debe tocar los suyos.
     /// </summary>
     public interface IOrderRepository : IGenericRepository<Order, Guid>
     {
@@ -95,6 +96,30 @@ namespace Domain.Interfaces.Repositories
         /// </summary>
         Task<int> CountOnlineOrdersAsync(DateTime fromUtc, DateTime toUtc,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Actualización PARCIAL: persiste SOLO las columnas de los campos de
+        /// <paramref name="changedFields"/>, los que la operación tocó de verdad.
+        ///
+        /// Existe porque la fila es UNA y la comparten tres acciones que ocurren a la vez en dos
+        /// puestos distintos: recepción mueve el estado, caja marca el pago y el reparto asigna el
+        /// repartidor. Guardar la fila entera desde cualquiera de las tres reescribe las columnas
+        /// que leyó ANTES del cambio de la otra persona, así que la última en guardar borra el
+        /// trabajo de la primera — sin conflicto, sin error y sin aviso. Marcar solo lo propio es
+        /// lo que hace que un `PATCH /payment` concurrente sobreviva a un `PATCH /status`.
+        ///
+        /// Los campos vienen del dominio (`ChangeStatus` / `ChangePaymentStatus`) o de la operación
+        /// que asigna un repartidor: el handler NUNCA escribe nombres de columna. Una lista de
+        /// strings mantenida a mano se queda corta en cuanto la regla de negocio crece, y lo hace
+        /// en silencio: la columna se muta en memoria y no llega a la base.
+        ///
+        /// OJO (`ApplicationDbContext` es NoTracking): actualizar una entidad CARGADA sin marcar
+        /// sus columnas no escribe NADA — ni error, ni aviso. Por eso este método existe en vez de
+        /// dejar que el handler mute y guarde: es la única puerta que marca. Mismo patrón que
+        /// `StoreCatalogSettingsRepository.UpsertAsync`.
+        /// </summary>
+        Task<bool> UpdatePartialAsync(
+            Order order, OrderChangedField changedFields, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

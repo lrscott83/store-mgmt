@@ -98,9 +98,12 @@ namespace Application.Features.OnlineOrdering.Commands.AssignOrderDriver
             // repartidor se retiró. No es un dato ausente y por eso no se valida.
             order.DriverId = request.DriverId;
 
-            // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
-            // sin marcar NO escribiría nada — sin error y sin aviso.
-            await _orderRepository.UpdateAsync(order);
+            // Actualización PARCIAL: SOLO `DriverId`. La fila la comparten el estado y el pago, que
+            // son de otras acciones y pueden estar cambiándose en este mismo instante: escribir la
+            // fila entera reescribiría sus valores leídos antes y los borraría.
+            // `ApplicationDbContext` es NoTracking: sin marcar la columna, `SaveChanges` no
+            // escribiría NADA — sin error y sin aviso.
+            await _orderRepository.UpdatePartialAsync(order, OrderChangedField.DriverId, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

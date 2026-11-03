@@ -75,18 +75,24 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus
             // El pago no tiene máquina de estados —un pedido en `Creado` puede estar pagado por
             // adelantado—, pero SÍ tiene una invariante: un pedido entregado ya está pagado. La
             // puerta es `ChangePaymentStatus`, que es la que la hace cumplir.
+            OrderChangedField changed;
+
             try
             {
-                order.ChangePaymentStatus(request.PaymentStatus);
+                changed = order.ChangePaymentStatus(request.PaymentStatus);
             }
             catch (DeliveredOrderCannotBeUnpaidException exception)
             {
                 throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
             }
 
-            // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
-            // sin marcar NO escribiría nada — sin error y sin aviso.
-            await _orderRepository.UpdateAsync(order);
+            // Actualización PARCIAL: el dominio ya dijo qué campos mutó (el pago y, cuando
+            // corresponde, su fecha). La fila la comparten el estado y el repartidor, que son de
+            // otras acciones y pueden estar cambiándose en este mismo instante: escribir la fila
+            // entera reescribiría sus valores leídos antes y los borraría.
+            // `ApplicationDbContext` es NoTracking: sin marcar columnas, `SaveChanges` no
+            // escribiría NADA — sin error y sin aviso.
+            await _orderRepository.UpdatePartialAsync(order, changed, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

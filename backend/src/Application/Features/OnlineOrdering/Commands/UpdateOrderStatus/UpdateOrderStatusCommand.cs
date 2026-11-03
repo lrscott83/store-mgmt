@@ -99,11 +99,15 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
             if (order is null)
                 throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
 
+            OrderChangedField changed;
+
             try
             {
                 // La tabla vive en el dominio. `ChangeStatus` no toca el estado si la transición no
-                // es alcanzable, así que aquí no hay nada que deshacer.
-                order.ChangeStatus(request.Status, request.DriverId, request.CancellationReason);
+                // es alcanzable, así que aquí no hay nada que deshacer. Devuelve los campos que
+                // mutó: la persistencia parcial los usa tal cual, sin una lista paralela que se
+                // quede corta cuando la regla crezca.
+                changed = order.ChangeStatus(request.Status, request.DriverId, request.CancellationReason);
             }
             catch (InvalidOrderStatusTransitionException exception)
             {
@@ -131,10 +135,12 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
             if (request.Status == OrderStatus.Entregado)
                 await GenerateCommissionsAsync(order);
 
-            // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
-            // sin marcar NO escribiría nada — sin error y sin aviso. El `Update` explícito del
-            // repositorio es lo que adjunta la entidad como Modified.
-            await _orderRepository.UpdateAsync(order);
+            // Actualización PARCIAL (S4): el dominio ya dijo qué campos mutó y la persistencia marca
+            // SOLO esas columnas. La fila es UNA y la comparten recepción, caja y reparto, así que
+            // guardarla entera reescribiría el pago o el repartidor que otra persona acaba de
+            // cambiar: la última en guardar pisaría a la primera, sin conflicto y sin aviso.
+            // `ApplicationDbContext` es NoTracking: sin marcar, `SaveChanges` no escribiría NADA.
+            await _orderRepository.UpdatePartialAsync(order, changed, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

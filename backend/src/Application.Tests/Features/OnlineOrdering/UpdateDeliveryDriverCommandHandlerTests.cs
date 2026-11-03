@@ -66,7 +66,11 @@ public class UpdateDeliveryDriverCommandHandlerTests
         return driver;
     }
 
-    private static UpdateDeliveryDriverCommand Command(Guid id, bool isActive = true)
+    /// <summary>
+    /// `isActive` es NULABLE a propósito: `null` representa un cuerpo que OMITE el interruptor,
+    /// que no es lo mismo que mandarlo en `false` (P0-3).
+    /// </summary>
+    private static UpdateDeliveryDriverCommand Command(Guid id, bool? isActive = true)
         => new() { Id = id, Name = "Ana María", Phone = "+5352222222", IsActive = isActive };
 
     #region Happy Path
@@ -165,6 +169,77 @@ public class UpdateDeliveryDriverCommandHandlerTests
         await Handler().Handle(Command(driver.Id), CancellationToken.None);
 
         _driverRepository.Verify(x => x.AddAsync(It.IsAny<DeliveryDriver>()), Times.Never);
+    }
+
+    #endregion
+
+    #region IsActive parcial (P0-3)
+
+    /// <summary>
+    /// Un cuerpo que OMITE `IsActive` no es un cuerpo que pide la baja. El binding de un `bool` no
+    /// nulable convertía la omisión en `false`, y el handler lo escribía: un PATCH que solo
+    /// corregía el nombre apagaba al repartidor sin que nadie lo hubiera pedido. Omitir = no tocar.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheBodyOmitsIsActive_ShouldKeepAnActiveDriverActive()
+    {
+        DeliveryDriver driver = Existing(active: true);
+
+        var result = await Handler().Handle(
+            Command(driver.Id, isActive: null), CancellationToken.None);
+
+        result.Data!.IsActive.Should().BeTrue(
+            "omitir el interruptor no puede dar de baja a un repartidor activo");
+        driver.IsActive.Should().BeTrue("la fila cargada conserva su estado");
+
+        // El nombre y el teléfono SÍ se editan: omitir `IsActive` no cancela el resto del PATCH.
+        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
+            d.Id == driver.Id
+            && d.Name == "Ana María"
+            && d.Phone == "+5352222222"
+            && d.IsActive)), Times.Once);
+    }
+
+    /// <summary>
+    /// La otra dirección: un repartidor ya dado de baja sigue de baja si el cuerpo no menciona el
+    /// interruptor. Es lo que evita que "omitir = no cambiar" se implemente como "omitir = activar".
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheBodyOmitsIsActive_ShouldKeepAnInactiveDriverInactive()
+    {
+        DeliveryDriver driver = Existing(active: false);
+
+        var result = await Handler().Handle(
+            Command(driver.Id, isActive: null), CancellationToken.None);
+
+        result.Data!.IsActive.Should().BeFalse(
+            "un PATCH parcial no puede reactivar por accidente a un repartidor dado de baja");
+        driver.IsActive.Should().BeFalse("la fila cargada conserva su estado");
+
+        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
+            d.Id == driver.Id && !d.IsActive)), Times.Once);
+    }
+
+    /// <summary>
+    /// Preserva el interruptor explícito: mandar `true` o `false` sigue escribiendo ese valor, en
+    /// las dos direcciones. Sin este caso, "omitir no cambia nada" podría haberse implementado
+    /// como "no escribir nunca".
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Handle_WhenTheBodySendsIsActive_ShouldWriteThatValue(bool stored, bool requested)
+    {
+        DeliveryDriver driver = Existing(active: stored);
+
+        var result = await Handler().Handle(
+            Command(driver.Id, isActive: requested), CancellationToken.None);
+
+        result.Data!.IsActive.Should().Be(requested, "un valor explícito sigue mandando");
+        driver.IsActive.Should().Be(requested);
+
+        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
+            d.Id == driver.Id && d.IsActive == requested)), Times.Once);
     }
 
     #endregion

@@ -301,5 +301,91 @@ namespace Infrastructure.Persistence.Repositories
                 ByDeliveryType = deliveryRows.ToDictionary(row => row.DeliveryType, row => row.Count),
             };
         }
+
+        /// <summary>
+        /// Actualización PARCIAL por columnas: el pedido es el MISMO documento para tres puestos
+        /// (recepción mueve el estado, caja marca el pago, reparto asigna el repartidor), así que
+        /// guardar la fila entera desde una acción reescribe lo que la otra leyó antes de su
+        /// cambio. Marcar SOLO lo que la operación tocó es lo que impide que la última en guardar
+        /// pise a la primera.
+        ///
+        /// `EntityState.Unchanged` + `IsModified` por columna NO es opcional:
+        /// `ApplicationDbContext` es NoTracking, así que una entidad cargada y mutada por el
+        /// handler sigue en `Detached` y `SaveChanges` no escribiría NADA — sin excepción y sin
+        /// aviso. Es el mismo patrón aprobado en `StoreCatalogSettingsRepository.UpsertAsync`.
+        ///
+        /// No hay consulta ni `SaveChanges` aquí: el handler ya leyó la fila y la unidad de trabajo
+        /// del request es la que guarda. Igual que `UpdateAsync`, devuelve `true` porque el
+        /// contrato del genérico reporta "marcado", no "filas afectadas".
+        ///
+        /// Falla en voz alta en los dos casos en que antes perdía trabajo en silencio: una entidad
+        /// YA trackeada (resetearla a `Unchanged` descartaría sus cambios pendientes) y un conjunto
+        /// de campos vacío (no escribiría nada y aun así devolvería `true`).
+        /// </summary>
+        public Task<bool> UpdatePartialAsync(
+            Order order, OrderChangedField changedFields, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (changedFields == OrderChangedField.None)
+                throw new ArgumentException(
+                    "A partial order update needs at least one changed field.", nameof(changedFields));
+
+            var entry = _dbContext.Entry(order);
+            if (entry.State != EntityState.Detached)
+                throw new InvalidOperationException(
+                    "The order is already tracked by this context; resetting it to Unchanged would discard its " +
+                    "pending changes. Pass a NoTracking instance, or persist the tracked changes with UpdateAsync.");
+
+            IReadOnlyList<string> columns = ToColumnNames(changedFields);
+
+            entry.State = EntityState.Unchanged;
+            foreach (string column in columns)
+                entry.Property(column).IsModified = true;
+
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// El ÚNICO mapeo de campo de dominio a propiedad de EF. Usa `nameof` a propósito: renombrar
+        /// una propiedad rompe la compilación en vez de romper la escritura en producción.
+        ///
+        /// Valida el conjunto ANTES de marcar nada, para que un valor no mapeado no deje la entrada
+        /// medio marcada; y el `throw` del final es la razón de existir de este método: añadir un
+        /// miembro a <see cref="OrderChangedField"/> sin mapearlo aquí falla en voz alta.
+        /// </summary>
+        private static IReadOnlyList<string> ToColumnNames(OrderChangedField changedFields)
+        {
+            const OrderChangedField all =
+                OrderChangedField.Status
+                | OrderChangedField.CancellationReason
+                | OrderChangedField.DriverId
+                | OrderChangedField.PaymentStatus
+                | OrderChangedField.PaidAt;
+
+            if ((changedFields & ~all) != 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(changedFields), changedFields,
+                    "Unmapped order field: add it to the partial-update column map.");
+
+            List<string> columns = new(5);
+
+            if (changedFields.HasFlag(OrderChangedField.Status))
+                columns.Add(nameof(Order.Status));
+
+            if (changedFields.HasFlag(OrderChangedField.CancellationReason))
+                columns.Add(nameof(Order.CancellationReason));
+
+            if (changedFields.HasFlag(OrderChangedField.DriverId))
+                columns.Add(nameof(Order.DriverId));
+
+            if (changedFields.HasFlag(OrderChangedField.PaymentStatus))
+                columns.Add(nameof(Order.PaymentStatus));
+
+            if (changedFields.HasFlag(OrderChangedField.PaidAt))
+                columns.Add(nameof(Order.PaidAt));
+
+            return columns;
+        }
     }
 }
