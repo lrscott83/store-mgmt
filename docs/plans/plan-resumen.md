@@ -127,22 +127,17 @@ Cerrado: `openspec/specs/e2e-store-plan-activation-ui/spec.md` REQ-5 ahora exige
 `e2e-session-hydration`) y explica las dos correcciones (2026-08-08 y 2026-11-03). Sin cambios de
 código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 
-#### [ ] P1-3 · SEO de la landing — pendientes P3/P4/P5
+#### [ ] P1-3 · SEO de la landing — solo queda el cuerpo estático (P1/P2)
 
 - **Fuente:** `2026-10-20-landing-seo-audit.md` §5. Iteraciones 1-4 cerradas (JSON-LD, H1, OG,
   `offers`, constantes de schema, timeout de vitest).
-- **Problema:** **P5** `frontend-react/Dockerfile:24` tiene
-  `ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net`: si el build de producción no lo
-  sobreescribe, `canonical`, `og:url` y `og:image` apuntan a **staging** (daño SEO real y
-  silencioso). **P3** el sitemap solo lista catálogos, no `/`. **P4** `robots.txt` permite `/` sin
-  exclusiones: `/login`, `/sales/*`, `/admin/*` y URLs inventadas (el fallback SPA responde 200) son
-  indexables como soft 404.
-- **Propuestas:** P5 = verificación operativa (inspeccionar el build desplegado, no el repo) y, si
-  falta, fijar el ARG en el pipeline; P3 = incluir `/` en el builder del sitemap; P4 = `Disallow`
-  de rutas privadas o `X-Robots-Tag: noindex` en el fallback SPA.
-- **Recomendación:** **P5 primero** (es el único con daño activo si está mal), luego **P3+P4**
-  juntos (mismo archivo/área, cambio pequeño). P1 (cuerpo estático) y P2 (`offers` server-side)
-  quedan como proyecto aparte: son el cambio caro y no bloquean nada.
+- **Problema que queda:** **P1** el `<body>` servido no trae contenido (los rastreadores sin JS no
+  tienen qué describir) y **P2** los `offers` del JSON-LD se inyectan en runtime. **P6** (title de
+  62 caracteres) es cosmético y opcional.
+- **Propuestas:** P1 = prerender real o bloque semántico inyectado en el build; P2 = generar los
+  `offers` del lado servidor cuando exista P1.
+- **Recomendación:** P1 y P2 son **un proyecto aparte**, caro, y no bloquean nada de la operación
+  actual. No se agendan hasta que el owner los pida.
 
 #### [ ] P1-4 · Las vistas deben suscribirse solas al aviso de cambios
 

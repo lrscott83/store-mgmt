@@ -69,19 +69,6 @@ mayores signals on-page y hoy está dedicado a un eslogan. La línea que sí des
 - Faltan `og:image:width`, `og:image:height`, `og:image:alt`, `twitter:title`, `twitter:description`,
   `twitter:image`.
 
-### H5 (medio) — Descubrimiento y canibalización
-
-- El sitemap en curso (`backend/.../CatalogStaticPageSitemapBuilder.cs:19-37`) itera **solo**
-  `publishedSlugs`: `/` quedaría fuera del sitemap.
-- `BuildRobots` emite `Allow: /` sin exclusiones: `/login`, `/register`, `/sales/*`, `/admin/*` y
-  cualquier URL inventada quedan indexables (el fallback SPA responde 200 → soft 404s).
-
-### H6 (medio, riesgo operativo) — El canonical por defecto apunta a staging
-
-`frontend-react/Dockerfile:24` → `ARG PUBLIC_BASE_URL=https://pos.playground.sceiba.net`. Si el build de
-producción no sobreescribe el ARG, `canonical`, `og:url` y `og:image` apuntan al entorno de pruebas.
-Hay que verificarlo en el despliegue real, no en el repo.
-
 ### H7 (bajo) — Longitudes
 
 - `title`: 62 caracteres (borde de truncado en SERP, ~60).
@@ -239,7 +226,4 @@ los `waitFor` individuales conservan su timeout propio.
 |---|---|---|
 | P1 | Cuerpo estático en el HTML | prerender real o bloque semántico inyectado. Es el cambio caro y el único que resuelve H1 de raíz |
 | P2 | JSON-LD `offers` generados del lado servidor | hoy se inyectan en runtime desde `/v1/public/plans`; solo los ve un crawler que ejecute JS (Google sí) |
-| P3 | `sitemap.xml` con `/` incluido | el builder actual solo lista catálogos |
-| P4 | `robots.txt` con `Disallow` de rutas privadas | o `X-Robots-Tag: noindex` en el fallback SPA |
-| P5 | Verificar `PUBLIC_BASE_URL` en el build de producción | riesgo de canonical a staging |
 | P6 | Title a ≤ 60 caracteres | opcional |
