@@ -62,6 +62,19 @@ public sealed class PublicOrderingConfigE2ETests
             .ExecuteUpdateAsync(setters => setters.SetProperty(settings => settings.Enabled, false));
     }
 
+    /// <summary>
+    /// Apaga SOLO la recogida, dejando el interruptor maestro y el envío encendidos: es el estado
+    /// que prueba que el config público reporta la modalidad deshabilitada como `false`.
+    /// </summary>
+    private async Task DisablePickupAsync(Guid storeId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
+            .Where(settings => settings.StoreId == storeId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(settings => settings.PickupEnabled, false));
+    }
+
     [Fact]
     public async Task Config_of_a_store_with_orders_open_exposes_the_flags_and_the_whatsapp_number()
     {
@@ -113,6 +126,32 @@ public sealed class PublicOrderingConfigE2ETests
             body!.Data!.Enabled.Should().BeFalse("el interruptor lo apagó el dueño");
             body.Data.PickupEnabled.Should().BeTrue(
                 "apagar el interruptor maestro no cambia las modalidades: el helper solo tocó `Enabled`");
+        }
+        finally
+        {
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    /// <summary>
+    /// El camino `false` de una modalidad concreta. El caso de tienda cerrada fuerza el
+    /// interruptor maestro, no la modalidad, así que sin este caso "recogida deshabilitada" solo
+    /// estaría probada a través de un helper que apaga todo.
+    /// </summary>
+    [Fact]
+    public async Task Config_reports_a_disabled_pickup_mode_as_false()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            await DisablePickupAsync(fixture.StoreId);
+
+            var (status, body) = await GetConfigAsync(fixture.Slug);
+
+            status.Should().Be(HttpStatusCode.OK);
+            body!.Data!.Enabled.Should().BeTrue("el interruptor maestro no se tocó");
+            body.Data.PickupEnabled.Should().BeFalse("la tienda deshabilitó la recogida");
+            body.Data.DeliveryEnabled.Should().BeTrue("la otra modalidad sigue disponible");
         }
         finally
         {

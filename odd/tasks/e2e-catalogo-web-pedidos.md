@@ -112,7 +112,11 @@
   `review-a6aaa86f9943fb57`, lentes readability+reliability) → **APROBADO**, 0 bloqueantes,
   10 advisories informacionales; `acknowledge-approved` quemó la autoridad
   (`consumed_revision` `sha256:9b95c457…`). Entrega (push/PR/merge) sigue sin autorizar.
-- **L5 (2026-11-03)** — Los 8 advisories de test de la RDD, cerrados:
+- **L4 (2026-11-03)** — Correcciones del commit de docs, derivadas de la RDD anterior: la matriz ya
+  no marca como GAP endpoints que este feature cerró, y las filas del showcase distinguen la ruta de
+  sesión (nueva) de las rutas de SuperAdmin y el repositorio (preexistentes). L3 dice T1–T7 y 1811
+  líneas para dejar de contradecir Tasks y el manifiesto.
+- **L5 (2026-11-03)** — Los 8 advisories de test de esa RDD, cerrados:
   R2-003 `SetOrdersEnabledAsync` → `CloseOrdersAsync`, que escribe SOLO `Enabled`, y la aserción
   ahora prueba que las modalidades no se tocan; R2-004 lecturas duplicadas → `Infrastructure/OrderingQueries.cs`
   (settings, conteo de settings, pedido, conteo de pedidos); R2-005 nota de por qué el `TinyJpeg`
@@ -126,7 +130,9 @@
   (los 4 casos del validador de plantilla). Se intentaron crear dos archivos y se borraron al
   comprobar que **duplicaban** cobertura existente; ninguna prueba previa se modificó.
   Evidencia: E2E de las 7 suites **50/50**.
-- **L4 (2026-11-03)** — Correcciones de este commit de docs, derivadas de RDD: la matriz ya no
-  marca como GAP endpoints que este feature cerró, y las filas del showcase distinguen la ruta de
-  sesión (nueva) de las rutas de SuperAdmin y el repositorio (preexistentes). L3 dice T1–T7 y 1811
-  líneas para dejar de contradecir Tasks y el manifiesto.
+- **L6 (2026-11-03)** — Tercer slice, con los 5 advisories de la RDD de L5: el `switch` de la
+  teoría de reordenado ya nombra el caso `foreign` y su brazo por defecto **lanza** (un `InlineData`
+  mal escrito falla en vez de degradar al caso ajeno); `OrderingQueries` mueve el prólogo
+  scope+contexto a un `QueryAsync<T>` privado; se añade el caso separado que apaga SOLO la recogida
+  y afirma `PickupEnabled=false` con el resto encendido; el log queda en orden cronológico.
+  Evidencia: E2E de las 7 suites **51/51**.

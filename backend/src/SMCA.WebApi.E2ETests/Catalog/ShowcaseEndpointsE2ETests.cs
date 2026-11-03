@@ -249,7 +249,7 @@ public sealed class ShowcaseEndpointsE2ETests
     [Theory]
     [InlineData("subset")]
     [InlineData("duplicate")]
-    [InlineData("unknown")]
+    [InlineData("foreign")]
     public async Task Reorder_rejects_a_list_that_does_not_match_the_set_exactly(string scenario)
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
@@ -260,11 +260,16 @@ public sealed class ShowcaseEndpointsE2ETests
             await UploadAsync(client, StoreCatalogImageKind.Carousel);
 
             // El reordenado es el conjunto COMPLETO: ni subconjunto, ni repetidas, ni ajenas.
+            // El brazo por defecto LANZA: si un `InlineData` se renombra o se escribe mal, la
+            // teoría falla en vez de caer en silencio en el caso "ajeno" y dar verde cubriendo
+            // el escenario equivocado.
             Guid[] orderedIds = scenario switch
             {
                 "subset" => [first.Id],
                 "duplicate" => [first.Id, first.Id],
-                _ => [first.Id, Guid.NewGuid()],
+                "foreign" => [first.Id, Guid.NewGuid()],
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(scenario), scenario, "Escenario de reordenado no reconocido"),
             };
 
             var reorder = await client.PutAsJsonAsync($"{ShowcaseUrl}/order", new

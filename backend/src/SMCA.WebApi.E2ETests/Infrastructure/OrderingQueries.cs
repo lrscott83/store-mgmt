@@ -14,39 +14,33 @@ namespace SMCA.WebApi.E2ETests.Infrastructure;
 /// filtro. Son <c>AsNoTracking</c> para no interferir con el seguimiento de la petición que se está
 /// verificando.
 ///
-/// Existen en UN solo sitio porque cuatro suites nuevas necesitaban exactamente la misma lectura;
-/// con una copia por archivo, cualquier cambio del fixture habría que buscarlo con grep.
+/// Existen en UN solo sitio porque cuatro suites nuevas necesitaban exactamente la misma lectura.
+/// El scope y la resolución del contexto viven en <see cref="QueryAsync{T}"/>: cada método público
+/// solo declara lo que de verdad lo distingue (entidad, filtro y proyección).
 /// </summary>
 internal static class OrderingQueries
 {
-    public static async Task<StoreCatalogSettings?> ReadSettingsRowAsync(AppTestFactory factory, Guid storeId)
+    private static async Task<T> QueryAsync<T>(
+        AppTestFactory factory, Func<ApplicationDbContext, Task<T>> query)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<StoreCatalogSettings>().IgnoreQueryFilters().AsNoTracking()
-            .FirstOrDefaultAsync(settings => settings.StoreId == storeId);
+        return await query(db);
     }
 
-    public static async Task<int> CountSettingsRowsAsync(AppTestFactory factory, Guid storeId)
-    {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
-            .CountAsync(settings => settings.StoreId == storeId);
-    }
+    public static Task<StoreCatalogSettings?> ReadSettingsRowAsync(AppTestFactory factory, Guid storeId)
+        => QueryAsync(factory, db => db.Set<StoreCatalogSettings>().IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(settings => settings.StoreId == storeId));
 
-    public static async Task<Order?> ReadOrderRowAsync(AppTestFactory factory, Guid orderId)
-    {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
-            .FirstOrDefaultAsync(order => order.Id == orderId);
-    }
+    public static Task<int> CountSettingsRowsAsync(AppTestFactory factory, Guid storeId)
+        => QueryAsync(factory, db => db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
+            .CountAsync(settings => settings.StoreId == storeId));
 
-    public static async Task<int> CountOrdersAsync(AppTestFactory factory, Guid storeId)
-    {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<Order>().IgnoreQueryFilters().CountAsync(order => order.StoreId == storeId);
-    }
+    public static Task<Order?> ReadOrderRowAsync(AppTestFactory factory, Guid orderId)
+        => QueryAsync(factory, db => db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(order => order.Id == orderId));
+
+    public static Task<int> CountOrdersAsync(AppTestFactory factory, Guid storeId)
+        => QueryAsync(factory, db => db.Set<Order>().IgnoreQueryFilters()
+            .CountAsync(order => order.StoreId == storeId));
 }
