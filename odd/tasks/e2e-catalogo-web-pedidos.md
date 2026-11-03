@@ -112,6 +112,20 @@
   `review-a6aaa86f9943fb57`, lentes readability+reliability) → **APROBADO**, 0 bloqueantes,
   10 advisories informacionales; `acknowledge-approved` quemó la autoridad
   (`consumed_revision` `sha256:9b95c457…`). Entrega (push/PR/merge) sigue sin autorizar.
+- **L5 (2026-11-03)** — Los 8 advisories de test de la RDD, cerrados:
+  R2-003 `SetOrdersEnabledAsync` → `CloseOrdersAsync`, que escribe SOLO `Enabled`, y la aserción
+  ahora prueba que las modalidades no se tocan; R2-004 lecturas duplicadas → `Infrastructure/OrderingQueries.cs`
+  (settings, conteo de settings, pedido, conteo de pedidos); R2-005 nota de por qué el `TinyJpeg`
+  basta; R3-BOUNDARY-NAME casos ACEPTADOS en el límite de nombre y teléfono (+ teléfono 33 → 400);
+  R3-REJECTED-WRITE-STATE carrito vacío y cantidad inválida ya comprueban que no persiste pedido;
+  R3-REORDER-GUARD teoría con subconjunto, duplicado e id inventado; R3-SETTINGS-UNIQUENESS conteo
+  de filas = 1.
+  R3-COVERAGE-LEVEL **no requería código nuevo**: la revisión no tenía a la vista
+  `Application.Tests/Features/OnlineOrdering/DeliveryDriverCommandValidatorTests.cs` (incluye el
+  caso ACEPTADO en el límite) ni `Features/StoreManagement/Stores/StoreCatalogTemplateTests.cs`
+  (los 4 casos del validador de plantilla). Se intentaron crear dos archivos y se borraron al
+  comprobar que **duplicaban** cobertura existente; ninguna prueba previa se modificó.
+  Evidencia: E2E de las 7 suites **50/50**.
 - **L4 (2026-11-03)** — Correcciones de este commit de docs, derivadas de RDD: la matriz ya no
   marca como GAP endpoints que este feature cerró, y las filas del showcase distinguen la ruta de
   sesión (nueva) de las rutas de SuperAdmin y el repositorio (preexistentes). L3 dice T1–T7 y 1811

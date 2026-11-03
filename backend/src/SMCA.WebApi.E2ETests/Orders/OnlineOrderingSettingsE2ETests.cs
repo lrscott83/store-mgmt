@@ -40,14 +40,6 @@ public sealed class OnlineOrderingSettingsE2ETests
             .ExecuteDeleteAsync();
     }
 
-    private async Task<StoreCatalogSettings?> ReadSettingsRowAsync(Guid storeId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<StoreCatalogSettings>().IgnoreQueryFilters().AsNoTracking()
-            .FirstOrDefaultAsync(settings => settings.StoreId == storeId);
-    }
-
     [Fact]
     public async Task Get_without_a_row_returns_the_defaults_with_orders_closed()
     {
@@ -113,8 +105,12 @@ public sealed class OnlineOrderingSettingsE2ETests
                 "un texto en blanco se guarda como null: sin valor, no cadena vacía");
             saved.SyncedAt.Should().NotBeNull("el guardado sella la sincronización");
 
-            // La fila existe UNA vez y la lectura posterior devuelve lo mismo.
-            var row = await ReadSettingsRowAsync(fixture.StoreId);
+            // La fila existe UNA vez —el índice único por tienda es el contrato— y no dos: una
+            // lectura de "la primera" daría verde con un upsert que hubiera insertado un duplicado.
+            (await OrderingQueries.CountSettingsRowsAsync(_f, fixture.StoreId)).Should().Be(1,
+                "la configuración es una fila por tienda (D19)");
+
+            var row = await OrderingQueries.ReadSettingsRowAsync(_f, fixture.StoreId);
             row.Should().NotBeNull();
             row!.WhatsappNumber.Should().Be("+5355551234");
 
@@ -149,7 +145,7 @@ public sealed class OnlineOrderingSettingsE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "todos los pedidos salen por wa.me: sin número no hay a dónde enviarlos");
-            (await ReadSettingsRowAsync(fixture.StoreId)).Should().BeNull(
+            (await OrderingQueries.ReadSettingsRowAsync(_f, fixture.StoreId)).Should().BeNull(
                 "un guardado rechazado no puede dejar la fila creada");
         }
         finally
@@ -176,7 +172,7 @@ public sealed class OnlineOrderingSettingsE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "un pedido que no se puede recoger ni enviar no lo puede hacer nadie");
-            (await ReadSettingsRowAsync(fixture.StoreId)).Should().BeNull();
+            (await OrderingQueries.ReadSettingsRowAsync(_f, fixture.StoreId)).Should().BeNull();
         }
         finally
         {

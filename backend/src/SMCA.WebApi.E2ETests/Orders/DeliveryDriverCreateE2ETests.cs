@@ -199,4 +199,72 @@ public sealed class DeliveryDriverCreateE2ETests
             await PublicOrderingSeed.CleanupAsync(_f, fixture);
         }
     }
+
+    /// <summary>
+    /// El lado ACEPTADO del límite. Sin este caso, un validador que rechazara exactamente
+    /// `NameMaxLength`/`PhoneMaxLength` pasaría toda la suite y rompería entradas que hoy son
+    /// válidas. Se afirman las longitudes persistidas, no solo el 200.
+    /// </summary>
+    [Fact]
+    public async Task Post_accepts_values_exactly_at_the_column_limits()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            string nameAtLimit = new string('a', CreateDeliveryDriverCommand.NameMaxLength);
+            string phoneAtLimit = "+" + new string('1', CreateDeliveryDriverCommand.PhoneMaxLength - 1);
+
+            var response = await client.PostAsJsonAsync(DriversUrl, new
+            {
+                name = nameAtLimit,
+                phone = phoneAtLimit,
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK,
+                "el límite es inclusivo: el valor igual al máximo cabe en la columna");
+
+            var rows = await ReadDriversAsync(fixture.StoreId);
+            rows.Should().ContainSingle();
+            rows[0].Name.Should().HaveLength(CreateDeliveryDriverCommand.NameMaxLength);
+            rows[0].Phone.Should().HaveLength(CreateDeliveryDriverCommand.PhoneMaxLength);
+        }
+        finally
+        {
+            // El alta SÍ creó fila: hay que borrarla antes del grafo de la tienda (FK `Restrict`).
+            try
+            {
+                await DeleteDriversAsync(fixture.StoreId);
+            }
+            finally
+            {
+                await PublicOrderingSeed.CleanupAsync(_f, fixture);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Post_rejects_a_phone_longer_than_the_column()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            string tooLong = "+" + new string('1', CreateDeliveryDriverCommand.PhoneMaxLength);
+
+            var response = await client.PostAsJsonAsync(DriversUrl, new
+            {
+                name = "Ana Repartidora",
+                phone = tooLong,
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+                "un teléfono más largo que la columna es un 400, no un 500 del INSERT");
+            (await ReadDriversAsync(fixture.StoreId)).Should().BeEmpty();
+        }
+        finally
+        {
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
 }

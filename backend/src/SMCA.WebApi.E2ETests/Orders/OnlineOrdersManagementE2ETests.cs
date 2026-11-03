@@ -38,14 +38,6 @@ public sealed class OnlineOrdersManagementE2ETests
     private HttpClient ClientOf(PublicOrderingSeed.OrderingFixture fixture)
         => DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
-    private async Task<Order?> ReadOrderRowAsync(Guid orderId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
-            .FirstOrDefaultAsync(order => order.Id == orderId);
-    }
-
     /// <summary>
     /// Limpieza de repartidores antes del grafo de la tienda: `Order.DriverId` y
     /// `DeliveryDriver.StoreId` son FK `Restrict`, así que se suelta la asignación y se borra al
@@ -267,7 +259,7 @@ public sealed class OnlineOrdersManagementE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var row = await ReadOrderRowAsync(order.Id);
+            var row = await OrderingQueries.ReadOrderRowAsync(_f, order.Id);
             row!.Status.Should().Be(OrderStatus.Preparado,
                 "la transición alcanzable se persiste, no solo se responde 200");
         }
@@ -292,7 +284,7 @@ public sealed class OnlineOrdersManagementE2ETests
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "la tabla de transiciones la decide el dominio, y una no alcanzable es un 400");
 
-            (await ReadOrderRowAsync(order.Id))!.Status.Should().Be(OrderStatus.Creado);
+            (await OrderingQueries.ReadOrderRowAsync(_f, order.Id))!.Status.Should().Be(OrderStatus.Creado);
         }
         finally
         {
@@ -313,7 +305,7 @@ public sealed class OnlineOrdersManagementE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "cancelar exige una razón: la tabla de transiciones la guarda con el estado");
-            (await ReadOrderRowAsync(order.Id))!.Status.Should().Be(OrderStatus.Creado);
+            (await OrderingQueries.ReadOrderRowAsync(_f, order.Id))!.Status.Should().Be(OrderStatus.Creado);
         }
         finally
         {
@@ -335,7 +327,7 @@ public sealed class OnlineOrdersManagementE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var row = await ReadOrderRowAsync(order.Id);
+            var row = await OrderingQueries.ReadOrderRowAsync(_f, order.Id);
             row!.PaymentStatus.Should().Be(OrderPaymentStatus.Paid);
             row.PaidAt.Should().NotBeNull("marcar pagado deja constancia del momento del cobro");
             row.Status.Should().Be(OrderStatus.Creado,
@@ -364,7 +356,7 @@ public sealed class OnlineOrdersManagementE2ETests
                 $"{OrdersUrl}/{order.Id}/status", new { status = (int)OrderStatus.Entregado }))
                 .StatusCode.Should().Be(HttpStatusCode.OK);
 
-            (await ReadOrderRowAsync(order.Id))!.PaymentStatus.Should().Be(OrderPaymentStatus.Paid,
+            (await OrderingQueries.ReadOrderRowAsync(_f, order.Id))!.PaymentStatus.Should().Be(OrderPaymentStatus.Paid,
                 "entregar equivale a haber cobrado");
 
             var response = await client.PatchAsJsonAsync(
@@ -417,13 +409,13 @@ public sealed class OnlineOrdersManagementE2ETests
             var assign = await client.PatchAsJsonAsync(
                 $"{OrdersUrl}/{order.Id}/driver", new { driverId = ownDriverId });
             assign.StatusCode.Should().Be(HttpStatusCode.OK);
-            (await ReadOrderRowAsync(order.Id))!.DriverId.Should().Be(ownDriverId);
+            (await OrderingQueries.ReadOrderRowAsync(_f, order.Id))!.DriverId.Should().Be(ownDriverId);
 
             var foreign = await client.PatchAsJsonAsync(
                 $"{OrdersUrl}/{order.Id}/driver", new { driverId = foreignDriverId });
             foreign.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "un repartidor de otra tienda no es asignable, y el 400 no distingue el motivo");
-            (await ReadOrderRowAsync(order.Id))!.DriverId.Should().Be(ownDriverId,
+            (await OrderingQueries.ReadOrderRowAsync(_f, order.Id))!.DriverId.Should().Be(ownDriverId,
                 "el intento rechazado no cambia la asignación vigente");
         }
         finally

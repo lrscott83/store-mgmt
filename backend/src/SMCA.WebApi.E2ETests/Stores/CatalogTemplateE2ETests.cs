@@ -48,14 +48,6 @@ public sealed class CatalogTemplateE2ETests
 
     private HttpClient SuperAdminClient(Guid id, string login) => DbTestHelpers.AuthedClient(_f, id, login);
 
-    private async Task<StoreCatalogSettings?> ReadSettingsRowAsync(Guid storeId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<StoreCatalogSettings>().IgnoreQueryFilters().AsNoTracking()
-            .FirstOrDefaultAsync(settings => settings.StoreId == storeId);
-    }
-
     /// <summary>
     /// Siembra la fila que la escritura NO debe tocar. `Enabled`/`PickupEnabled`/`PaletteId`
     /// distintos de los defaults son la prueba: si el handler escribiera la fila completa, estos
@@ -115,7 +107,7 @@ public sealed class CatalogTemplateE2ETests
             body.Data.CatalogSlug.Should().BeEmpty(
                 "la tienda sembrada nunca sincronizó su catálogo, así que no tiene URL pública");
 
-            (await ReadSettingsRowAsync(store.StoreId)).Should().BeNull(
+            (await OrderingQueries.ReadSettingsRowAsync(_f, store.StoreId)).Should().BeNull(
                 "la lectura no puede crear la fila que no existe");
         }
         finally
@@ -144,7 +136,7 @@ public sealed class CatalogTemplateE2ETests
             putBody.Data!.TemplateId.Should().Be("boutique");
 
             // La COLUMNA, no solo el DTO que sale del mismo objeto mutado.
-            var row = await ReadSettingsRowAsync(store.StoreId);
+            var row = await OrderingQueries.ReadSettingsRowAsync(_f, store.StoreId);
             row.Should().NotBeNull("la fila ya existía y se actualiza en sitio");
             row!.TemplateId.Should().Be("boutique");
             row.Enabled.Should().BeTrue(
@@ -183,7 +175,7 @@ public sealed class CatalogTemplateE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-            var row = await ReadSettingsRowAsync(store.StoreId);
+            var row = await OrderingQueries.ReadSettingsRowAsync(_f, store.StoreId);
             row!.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId,
                 "un id rechazado no puede quedar persistido");
         }
@@ -209,7 +201,7 @@ public sealed class CatalogTemplateE2ETests
                 "la vista del catálogo es una decisión de plataforma, no de la tienda");
             put.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-            (await ReadSettingsRowAsync(owner.StoreId)).Should().BeNull(
+            (await OrderingQueries.ReadSettingsRowAsync(_f, owner.StoreId)).Should().BeNull(
                 "la escritura rechazada no puede dejar fila creada");
         }
         finally

@@ -48,15 +48,18 @@ public sealed class PublicOrderingConfigE2ETests
         return (response.StatusCode, body);
     }
 
-    private async Task SetOrdersEnabledAsync(Guid storeId, bool enabled)
+    /// <summary>
+    /// Apaga SOLO el interruptor maestro. Las modalidades se dejan intactas a propósito: así el
+    /// test distingue "el handler devuelve la fila apagada" de "el helper apagó también las
+    /// modalidades", que es lo que pasaría si esto escribiera dos columnas.
+    /// </summary>
+    private async Task CloseOrdersAsync(Guid storeId)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
             .Where(settings => settings.StoreId == storeId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(settings => settings.Enabled, enabled)
-                .SetProperty(settings => settings.PickupEnabled, enabled));
+            .ExecuteUpdateAsync(setters => setters.SetProperty(settings => settings.Enabled, false));
     }
 
     [Fact]
@@ -101,14 +104,15 @@ public sealed class PublicOrderingConfigE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await SetOrdersEnabledAsync(fixture.StoreId, enabled: false);
+            await CloseOrdersAsync(fixture.StoreId);
 
             var (status, body) = await GetConfigAsync(fixture.Slug);
 
             status.Should().Be(HttpStatusCode.OK,
                 "una tienda que apagó los pedidos sigue existiendo: no es un 404");
             body!.Data!.Enabled.Should().BeFalse("el interruptor lo apagó el dueño");
-            body.Data.PickupEnabled.Should().BeFalse();
+            body.Data.PickupEnabled.Should().BeTrue(
+                "apagar el interruptor maestro no cambia las modalidades: el helper solo tocó `Enabled`");
         }
         finally
         {

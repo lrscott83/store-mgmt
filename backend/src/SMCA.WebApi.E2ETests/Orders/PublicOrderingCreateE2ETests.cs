@@ -45,13 +45,6 @@ public sealed class PublicOrderingCreateE2ETests
             .FirstOrDefaultAsync(order => order.StoreId == storeId && order.Code == code);
     }
 
-    private async Task<int> CountOrdersAsync(Guid storeId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<Order>().IgnoreQueryFilters().CountAsync(order => order.StoreId == storeId);
-    }
-
     private async Task<List<OrderItem>> ReadItemsAsync(Guid orderId)
     {
         using var scope = _f.Services.CreateScope();
@@ -134,7 +127,7 @@ public sealed class PublicOrderingCreateE2ETests
 
             var order = await ReadOrderByCodeAsync(target.StoreId, body!.Data!.Code);
             order.Should().NotBeNull("el pedido pertenece a la tienda de la RUTA");
-            (await CountOrdersAsync(other.StoreId)).Should().Be(0,
+            (await OrderingQueries.CountOrdersAsync(_f, other.StoreId)).Should().Be(0,
                 "el slug del cuerpo no puede crear pedidos en otra tienda");
         }
         finally
@@ -150,14 +143,14 @@ public sealed class PublicOrderingCreateE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            int before = await CountOrdersAsync(fixture.StoreId);
+            int before = await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId);
 
             var response = await PostAsync(
                 fixture.Slug,
                 PublicOrderingSeed.CreateOrderBody(Guid.NewGuid(), fixture.Phone));
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            (await CountOrdersAsync(fixture.StoreId)).Should().Be(before,
+            (await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId)).Should().Be(before,
                 "un producto que no está publicado no puede dejar pedido a medias");
         }
         finally
@@ -172,6 +165,8 @@ public sealed class PublicOrderingCreateE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
+            int before = await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId);
+
             var response = await PostAsync(fixture.Slug, new
             {
                 deliveryType = (int)OrderDeliveryType.Pickup,
@@ -181,6 +176,8 @@ public sealed class PublicOrderingCreateE2ETests
             });
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId)).Should().Be(before,
+                "un carrito vacío rechazado no puede dejar pedido a medias");
         }
         finally
         {
@@ -196,6 +193,8 @@ public sealed class PublicOrderingCreateE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
+            int before = await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId);
+
             var response = await PostAsync(fixture.Slug, new
             {
                 deliveryType = (int)OrderDeliveryType.Pickup,
@@ -205,6 +204,8 @@ public sealed class PublicOrderingCreateE2ETests
             });
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await OrderingQueries.CountOrdersAsync(_f, fixture.StoreId)).Should().Be(before,
+                "una cantidad inválida rechazada no puede dejar pedido a medias");
         }
         finally
         {

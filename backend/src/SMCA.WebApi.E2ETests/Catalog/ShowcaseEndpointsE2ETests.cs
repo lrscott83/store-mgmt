@@ -29,6 +29,12 @@ public sealed class ShowcaseEndpointsE2ETests
 {
     private const string ShowcaseUrl = "/api/v1/catalog/showcase";
 
+    /// <summary>
+    /// JPEG mínimo: SOI + segmento APP0/JFIF + EOI. Doce bytes bastan porque el endpoint valida
+    /// FORMATO y TAMAÑO del archivo (extensión/content-type y tope de 2 MB), no decodifica la
+    /// imagen. No lo sustituyas por bytes arbitrarios sin comprobarlo: si algún día se añade
+    /// verificación por magic bytes, este fixture debe pasar a ser un JPEG real.
+    /// </summary>
     private static readonly byte[] TinyJpeg =
         { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0xFF, 0xD9 };
 
@@ -240,8 +246,11 @@ public sealed class ShowcaseEndpointsE2ETests
         }
     }
 
-    [Fact]
-    public async Task Reorder_rejects_a_list_that_does_not_cover_the_set()
+    [Theory]
+    [InlineData("subset")]
+    [InlineData("duplicate")]
+    [InlineData("unknown")]
+    public async Task Reorder_rejects_a_list_that_does_not_match_the_set_exactly(string scenario)
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
@@ -250,11 +259,18 @@ public sealed class ShowcaseEndpointsE2ETests
             var first = await UploadAsync(client, StoreCatalogImageKind.Carousel);
             await UploadAsync(client, StoreCatalogImageKind.Carousel);
 
-            // Falta la segunda imagen: el reordenado es el conjunto COMPLETO.
+            // El reordenado es el conjunto COMPLETO: ni subconjunto, ni repetidas, ni ajenas.
+            Guid[] orderedIds = scenario switch
+            {
+                "subset" => [first.Id],
+                "duplicate" => [first.Id, first.Id],
+                _ => [first.Id, Guid.NewGuid()],
+            };
+
             var reorder = await client.PutAsJsonAsync($"{ShowcaseUrl}/order", new
             {
                 kind = (int)StoreCatalogImageKind.Carousel,
-                orderedIds = new[] { first.Id },
+                orderedIds,
             });
 
             reorder.StatusCode.Should().Be(HttpStatusCode.BadRequest);
