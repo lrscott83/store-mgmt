@@ -69,23 +69,25 @@
 
 ## Tasks
 
-- **T1** · Unidad 9 — `GET`/`PUT catalog-template`: default sin fila, escritura parcial (no toca
-  pedidos/marca), contrato kebab-case, SuperAdmin-only. Cierra S1, S3, S4. → `Stores/CatalogTemplateE2ETests.cs`
-- **T2** · Unidad 8 — `GET config`: flags de pedidos, flags de módulo 19/20, WhatsApp, defaults de
-  plantilla/paleta/columnas, 404 uniforme de slug, slug case-insensitive, tienda con pedidos
-  cerrados devuelve 200/`Enabled=false`. → `Orders/PublicOrderingConfigE2ETests.cs`
-- **T3** · Unidad 8 — `POST orders`: alta feliz con precio del catálogo (no del cliente), el
-  `storeSlug` del cuerpo no redirige, producto inexistente / carrito vacío / cantidad 0 → 400 y
-  sin filas. → `Orders/PublicOrderingCreateE2ETests.cs`
-- **T4** · Unidad 7 — `POST delivery-drivers`: alta activa, trim, validaciones, `storeId` del
-  cuerpo ignorado, anónimo 401. → `Orders/DeliveryDriverCreateE2ETests.cs`
-- **T5** · Unidad 6 — listado (paginación/filtros/orden), detalle (404 cross-store), stats,
-  `PATCH status`, `PATCH payment`, `PATCH driver` (asignar/desasignar/ajeno). → `Orders/OnlineOrdersManagementE2ETests.cs`
-- **T6** · Unidad 5 — `GET`/`PUT online-ordering/settings`: alta y actualización de la fila,
-  defaults, aislamiento por tienda. → `Orders/OnlineOrderingSettingsE2ETests.cs`
-- **T7** · Auditoría final de unidades 1-4: re-ejecutar el namespace `Catalog` y confirmar que
-  cada endpoint sigue cubierto; abrir gaps puntuales si alguno queda sin guarda. → sin archivo nuevo
-  salvo gap demostrado.
+- **T1** — HECHO `9197827c` · Unidad 9 — `GET`/`PUT catalog-template`: default sin fila, escritura
+  parcial (no toca pedidos/marca), contrato kebab-case, SuperAdmin-only. → `Stores/CatalogTemplateE2ETests.cs`
+- **T2** — HECHO `9197827c` · Unidad 8 — `GET config`: flags de pedidos, flags de módulo 19/20,
+  WhatsApp, defaults de plantilla/paleta/columnas, 404 uniforme de slug, slug case-insensitive,
+  tienda con pedidos cerrados devuelve 200/`Enabled=false`. → `Orders/PublicOrderingConfigE2ETests.cs`
+- **T3** — HECHO `9197827c` · Unidad 8 — `POST orders`: alta feliz con precio del catálogo (no del
+  cliente), el `storeSlug` del cuerpo no redirige, producto inexistente / carrito vacío / cantidad
+  0 → 400 y sin filas. → `Orders/PublicOrderingCreateE2ETests.cs`
+- **T4** — HECHO `9197827c` · Unidad 7 — `POST delivery-drivers`: alta activa, trim, validaciones,
+  `storeId` del cuerpo ignorado, anónimo 401. → `Orders/DeliveryDriverCreateE2ETests.cs`
+- **T5** — HECHO `9197827c` · Unidad 6 — listado (paginación/filtros), detalle (404 cross-store),
+  stats, `PATCH status`, `PATCH payment` (incluida la invariante entregado⇒pagado), `PATCH driver`
+  (asignar/rechazar ajeno), anónimo 401. → `Orders/OnlineOrdersManagementE2ETests.cs`
+- **T6** — HECHO `9197827c` · Unidad 5 — `GET`/`PUT online-ordering/settings`: defaults sin fila,
+  alta con trim y null de texto en blanco, rechazo sin WhatsApp y sin modalidad. →
+  `Orders/OnlineOrderingSettingsE2ETests.cs`
+- **T7** — HECHO `9197827c` · Auditoría de unidades 1-4: el resto ya estaba cubierto por suites
+  preexistentes; el único hueco demostrado fue la ruta de sesión del showcase, cerrado con
+  `Catalog/ShowcaseEndpointsE2ETests.cs`.
 
 ## Log
 
@@ -96,3 +98,16 @@
 - **L2 (2026-11-03)** — Reconocimiento hecho: inventario de 33 endpoints desde los atributos de
   ruta + inventario de 190 archivos E2E con conteo de `[Fact]/[Theory]`. Huecos demostrados en
   unidades 5, 6, 7 (`POST`), 8 (`config` y alta feliz) y 9. Descartado duplicar unidades 1-4.
+- **L2b (2026-11-03)** — La auditoría de las unidades 1-4 encontró un hueco más, no previsto en
+  L2: la ruta de SESIÓN del showcase (`/api/v1/catalog/showcase` GET/POST/DELETE/order) no tenía
+  ningún E2E; lo que existía cubría las rutas de SuperAdmin y el repositorio. Corregido en T7.
+- **L3 (2026-11-03)** — **T1–T4 y T7 HECHOS** en `9197827c` (8 archivos, 1796 líneas): 7 suites
+  nuevas, **46 tests**. Evidencia: `dotnet test` con filtro `Catalog|Orders` → **175/175 verde**.
+  Ningún E2E existente tocado; ningún archivo de producción modificado.
+  RDD sobre el commit (`--base-ref 2eedabe4 --committed-only`): `risk: medium`
+  (`executable_change`), `review_due: false`, `review_due_reason: under_budget`. **Sin receipt**:
+  el candidato queda pendiente en el slice, no aprobado.
+- **L4 (2026-11-03)** — Pendiente: T5/T6 quedaron cerrados dentro de L3 (el listado/detalle/stats/
+  PATCH y la configuración de pedidos entraron en las 7 suites). Lo que sigue abierto es la
+  cobertura de unidades 1-4 más allá del showcase: su matriz está en la tabla de arriba y se apoya
+  en suites preexistentes; no se añadieron archivos nuevos ahí.
