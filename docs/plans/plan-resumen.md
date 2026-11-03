@@ -160,18 +160,13 @@ código: la implementación y el E2E ya coincidían desde el 2026-09-16.
 - **Recomendación:** **B** en ese momento (útiles en soporte, invisibles por defecto), dentro del
   mismo cambio que ya fuerza la actualización. No justifica una actualización por sí solo.
 
-#### [ ] P1-6 · Reconciliar las fichas E2E desactualizadas
+#### [x] P1-6 · Reconciliar las fichas E2E desactualizadas — HECHO 2026-11-03
 
-- **Fuente:** `odd/tasks/e2e-birth-plan-superior.md`, `odd/tasks/e2e-plan-gated-modules-gaps.md`,
-  `odd/tasks/e2e-switcher-session-realign.md`; auditoría 2026-11-03.
-- **Problema:** hay fichas cuyo log dice "hecho" y cuyas casillas siguen `[ ]`
-  (`e2e-birth-plan-superior` T3..Tn/Tfinal; `e2e-plan-gated-modules-gaps` G1-G4, cuyos tres tests
-  **existen** en `AuthMePlanModulesGapTests.cs` y `ExportOfflineRosterPlanGapTests.cs`). Una ficha
-  que se contradice hace que la próxima sesión reabra trabajo cerrado o descarte trabajo real.
-- **Propuestas:** A. marcar lo verificado y cerrar; B. reabrir con criterio; C. dejar como está.
-- **Recomendación:** **A** en una sola pasada de 20 minutos: abrir el test/fixture citado, marcar,
-  y anotar el commit. El "hallazgo de APP" de `e2e-birth-plan-superior.md:98-104` (guard de
-  monedas) **ya está resuelto**: ver §2.
+Cerrado: `e2e-birth-plan-superior` (T1-T2 `8f203dfe`, T3..Tn `22b73679`, Tfinal según la corrida
+registrada) y `e2e-plan-gated-modules-gaps` (G1-G3: los tres tests existen con nombre exacto) tienen
+sus casillas marcadas con evidencia. La sección del guard de monedas quedó marcada como **resuelta**
+(la regla se retiró el 2026-10-13). **G4 sigue abierta a propósito**: la corrida de los 3 tests no se
+repitió en esta reconciliación.
 
 #### [ ] P1-7 · Confirmar el estado del VPS (catálogo y columnas)
 

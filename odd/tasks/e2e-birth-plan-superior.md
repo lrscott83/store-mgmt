@@ -40,12 +40,19 @@ Fixtures/support: `multipayments-fixture`, `store-multimonedas-fixture`, `store-
 
 ## Tareas
 
-- [ ] **T1** — `multipayments-fixture.ts`: helper `disableStoreModule` (borra la fila `StoreModule`) +
-  actualizar el comentario obsoleto (el nacimiento es Superior).
-- [ ] **T2** — `channel-rates-catalogue.spec.ts` (**primer fallo**, ficha 08): negativa por desactivar
-  el 15; segunda mitad con identidad privada.
-- [ ] **T3..Tn** — el resto del corpus, spec por spec.
-- [ ] **Tfinal** — corrida E2E completa y cierre de fichas 05–08.
+> **Reconciliado 2026-11-03:** el trabajo estaba hecho y las casillas no. Evidencia: los commits
+> citados existen en `git log` y los archivos citados existen en el árbol.
+
+- [x] **T1** — `multipayments-fixture.ts`: helper `disableStoreModule` (borra la fila `StoreModule`) +
+  actualizar el comentario obsoleto (el nacimiento es Superior). **HECHO** `8f203dfe`;
+  `frontend-react/e2e/support/multipayments-fixture.ts:204`.
+- [x] **T2** — `channel-rates-catalogue.spec.ts` (**primer fallo**, ficha 08): negativa por desactivar
+  el 15; segunda mitad con identidad privada. **HECHO** `8f203dfe` (verificado por el log: 2 passed).
+- [x] **T3..Tn** — el resto del corpus, spec por spec. **HECHO** `22b73679` (15 specs + 4 fixtures;
+  37 passed / 1 flaky aislado, según el log de abajo).
+- [x] **Tfinal** — corrida E2E completa y cierre de fichas 05–08. **HECHO** según el log: corrida
+  completa 347 passed / 2 failed / 3 flaky / 4 did not run; los 2 fallos restantes se adaptaron y
+  verificaron en 8 passed; fichas 05, 06, 07 y 08 resueltas.
 
 ## Log
 
@@ -95,10 +102,13 @@ El owner eligió la opción 2: **"Múltiples monedas" permite mezclar y la regla
 (fila MMF4 actualizada), `odd/tasks/multimoneda-module-gating-and-store-currency-config.md`,
 `odd/tasks/multipayments.md` (T8).
 
-### ⚠️ Hallazgo de APP (NO corregido — fuera de alcance)
-`sale.tsx:229-234` y `:256-263` levantan la guarda de **"una sola moneda por venta"** con el módulo **15**
-(`hasMultiMonedasModuleAvailable`), mientras `currency-guard.ts:14-17` la documenta con el módulo **16**
-(MultiPayments). Consecuencia del nacimiento en Superior: el popup de bloqueo por mezcla de monedas queda
-**inalcanzable para toda tienda nueva**. **Necesita decisión del owner**: corregir el call site a
-`hasMultiPaymentsModuleAvailable`, o aceptar el 15 como el disparador real y retirar la regla. El mismo
-cableado existe en `inventory/routes/egress.tsx:89-92` y `sales/routes/wholesale.tsx:227-230`.
+### ✅ Hallazgo de APP — RESUELTO el 2026-10-13 (esta sección decía "NO corregido")
+
+El owner eligió **retirar la regla** de "una sola moneda por venta" (registrado arriba, con su
+implementación). Estado verificado en código el 2026-11-03:
+
+- `app/shared/lib/currency-guard.ts` ya **no exporta** `guardCurrency`; solo conserva
+  `productCurrency`.
+- `sale.tsx`, `egress.tsx` y `wholesale.tsx` ya **no** levantan ningún guard de moneda.
+
+No queda decisión pendiente ni call site que corregir.
