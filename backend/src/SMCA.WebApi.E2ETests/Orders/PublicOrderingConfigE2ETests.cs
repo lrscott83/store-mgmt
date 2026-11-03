@@ -48,31 +48,37 @@ public sealed class PublicOrderingConfigE2ETests
         return (response.StatusCode, body);
     }
 
-    /// <summary>
-    /// Apaga SOLO el interruptor maestro. Las modalidades se dejan intactas a propósito: así el
-    /// test distingue "el handler devuelve la fila apagada" de "el helper apagó también las
-    /// modalidades", que es lo que pasaría si esto escribiera dos columnas.
-    /// </summary>
-    private async Task CloseOrdersAsync(Guid storeId)
+    /// <summary>Qué columna de la fila de configuración escribe <see cref="SetFlagAsync"/>.</summary>
+    private enum SettingsFlag
     {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
-            .Where(settings => settings.StoreId == storeId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(settings => settings.Enabled, false));
+        Master,
+        Pickup,
     }
 
     /// <summary>
-    /// Apaga SOLO la recogida, dejando el interruptor maestro y el envío encendidos: es el estado
-    /// que prueba que el config público reporta la modalidad deshabilitada como `false`.
+    /// Escribe UNA sola columna de la fila de configuración, y solo esa: cada caso necesita
+    /// distinguir "el handler devuelve el valor de la fila" de "el helper cambió otra cosa".
+    ///
+    /// El scope y la resolución del contexto viven en un solo sitio, igual que en
+    /// `OrderingQueries.QueryAsync` para las lecturas. Un tercer indicador se añade aquí, no en
+    /// otra copia del prólogo.
     /// </summary>
-    private async Task DisablePickupAsync(Guid storeId)
+    private async Task SetFlagAsync(Guid storeId, SettingsFlag flag, bool value)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
-            .Where(settings => settings.StoreId == storeId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(settings => settings.PickupEnabled, false));
+        var rows = db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
+            .Where(settings => settings.StoreId == storeId);
+
+        await (flag switch
+        {
+            SettingsFlag.Master => rows.ExecuteUpdateAsync(
+                setters => setters.SetProperty(settings => settings.Enabled, value)),
+            SettingsFlag.Pickup => rows.ExecuteUpdateAsync(
+                setters => setters.SetProperty(settings => settings.PickupEnabled, value)),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(flag), flag, "Indicador de configuración no soportado"),
+        });
     }
 
     [Fact]
@@ -117,7 +123,7 @@ public sealed class PublicOrderingConfigE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await CloseOrdersAsync(fixture.StoreId);
+            await SetFlagAsync(fixture.StoreId, SettingsFlag.Master, false);
 
             var (status, body) = await GetConfigAsync(fixture.Slug);
 
@@ -144,7 +150,7 @@ public sealed class PublicOrderingConfigE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await DisablePickupAsync(fixture.StoreId);
+            await SetFlagAsync(fixture.StoreId, SettingsFlag.Pickup, false);
 
             var (status, body) = await GetConfigAsync(fixture.Slug);
 

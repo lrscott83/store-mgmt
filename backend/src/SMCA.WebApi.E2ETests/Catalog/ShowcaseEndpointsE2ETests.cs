@@ -272,6 +272,9 @@ public sealed class ShowcaseEndpointsE2ETests
                     nameof(scenario), scenario, "Escenario de reordenado no reconocido"),
             };
 
+            // El estado ANTES del rechazo: [first, second] en el orden del alta.
+            var before = (await GetImagesAsync(client)).Carousel.Select(image => image.Id).ToList();
+
             var reorder = await client.PutAsJsonAsync($"{ShowcaseUrl}/order", new
             {
                 kind = (int)StoreCatalogImageKind.Carousel,
@@ -279,6 +282,12 @@ public sealed class ShowcaseEndpointsE2ETests
             });
 
             reorder.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            // Un rechazo no puede dejar el conjunto a medias: si el handler reordenara y luego
+            // devolviera 400, el estado persistido ya no coincidiría con el de antes.
+            var after = (await GetImagesAsync(client)).Carousel.Select(image => image.Id).ToList();
+            after.Should().Equal(before,
+                "un reordenado rechazado deja el conjunto exactamente como estaba");
         }
         finally
         {

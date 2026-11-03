@@ -141,3 +141,12 @@
   (`R2-DUP-WRITE-PREAMBLE`, `R3-REORDER-STATE`, `R3-NAME-BOUNDARY`); `acknowledge-approved` quemó
   la autoridad (`consumed_revision` `sha256:655f1259…`). Nota: el candidato se calculó desde
   `0efcbc88`, así que el motor revisó también el contenido del slice anterior.
+- **L7 (2026-11-03)** — Cuarto slice, con los 3 advisories de L6b:
+  `R2-DUP-WRITE-PREAMBLE` → un único `SetFlagAsync(storeId, SettingsFlag, value)` escribe la
+  columna pedida y concentra el prólogo scope+contexto; las dos llamadas anteriores se sustituyen
+  sin cambiar qué columna toca cada caso. `R3-REORDER-STATE` → el caso de rechazo compara el orden
+  del carrusel ANTES y DESPUÉS del 400, así que un handler que reordenara y luego fallara se ve.
+  `R3-NAME-BOUNDARY` → **no se reproduce**: `Post_with_a_name_longer_than_the_column_is_rejected_with_a_400`
+  (`DeliveryDriverCreateE2ETests.cs:179`) ya envía `NameMaxLength + 1` y espera 400 sin fila; la
+  lente no tenía ese tramo a la vista. No se añadió código por ese punto.
+  Evidencia: E2E de `PublicOrderingConfigE2ETests` + `ShowcaseEndpointsE2ETests` **14/14**.
