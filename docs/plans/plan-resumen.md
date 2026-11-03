@@ -3,13 +3,13 @@
 > **Índice único y evolutivo.** Actualizar este documento cada vez que un plan se
 > complete, se agregue uno nuevo o cambie de prioridad.
 >
-> **Última auditoría:** 2026-11-03 · Rama: `test` · 34 documentos en `docs/plans`
+> **Última auditoría:** 2026-11-03 · Rama: `dev` · 34 documentos en `docs/plans`
 > (10 agregados después de la auditoría del 2026-09-20, que estaban sin indexar).
 > **Método:** verificación plan-por-plan contra el código real (archivo:línea o
 > commit). Sin asumir: cada clasificación tiene prueba.
 >
-> **Actualizado 2026-11-03 tras el merge de `dev` y `qa`:** P0-2 y P0-3 cerrados con sus
-> commits; P0-4 recuperado del índice de `qa` (se había perdido al reescribir el de `dev`).
+> **Actualizado 2026-11-03 tras integrar `test` en `dev`:** P0-2 y P0-3 cerrados con sus
+> commits (`471050e5`, `2eedabe4`). P0-4 sigue **descartado** por decisión del owner (§7).
 >
 > **Cambio de formato (2026-11-03):** cada pendiente lleva **Problema**, **Propuestas**
 > y **Recomendación**. La prioridad ya no es "lo que dice el plan", sino impacto real
@@ -32,7 +32,7 @@
 
 ### P0 — Correctitud de datos e invariantes (alto impacto, desbloqueado)
 
-#### [ ] P0-1 · El snapshot de venta: una lectura que escribe y puede tumbar la pantalla
+#### [x] P0-1 · El snapshot de venta: una lectura que escribe y puede tumbar la pantalla — HECHO 2026-11-03
 
 - **Fuente:** `2026-10-06-sale-snapshot-review-findings.md` §F1 y §F3 (hallazgos RDD).
 - **Problema:** `order-offline-service.ts:895` hace `if (changed) this.setOrdersLocalStorage(stored)`
@@ -54,6 +54,9 @@
   futuro; no bloquea nada. Telemetría/consola del fallo, sin marcarlo como persistido.
 - **Riesgo del arreglo:** bajo (ningún dato, seguridad, contrato ni concurrencia). Tests: unit del
   servicio + un caso que fuerza el fallo de `setOrdersLocalStorage`.
+- **Resuelto (opción A + seguimiento de los advisories de RDD):** `80751d0a` (best-effort),
+  `dd600c86` (reporte del fallo + tests) y `6e8904a8` (log blindado + ramas de error). RDD aprobada
+  y autoridad quemada en las dos revisiones. Suite completa verde.
 
 #### [x] P0-2 · Lost update en los 3 `PATCH` de pedidos online (6.1 / X2) - HECHO 2026-11-03
 
@@ -125,23 +128,6 @@
     (`PATCH` sin `isActive` no cambia el estado; `isActive:false` sí).
   - Commit: `2eedabe4`. El validator "al menos un campo del cuerpo" que pedía la recomendación
     **no** se añadió; queda como mejora posible.
-
-#### [ ] P0-4 · `POST /public/ordering/{slug}/orders` sin tope de líneas ni de cantidad (8.1 / 8.2)
-
-- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidades 8.1 y 8.2.
-- **Problema:** `CreateOnlineOrderCommandValidator.cs:66-67` solo exige `Quantity > 0`; no hay tope
-  por línea ni de líneas por carrito. `Order.ItemsCount` es `checked` y desborda con cantidades
-  grandes → **500 anónimo**. Además el rate limit cuenta **requests**, no filas: un solo POST
-  puede insertar cientos de miles de `OrderItem`, así que el límite no cierra el hueco que dice
-  cerrar.
-- **Propuestas:**
-  - **A. Topes en el validator.** Cantidad máxima por línea (p. ej. 10 000) y máximo de líneas por
-    carrito (p. ej. 100), con mensajes localizados. Barato y suficiente.
-  - **B. A + límite de filas por IP/ventana** (no solo requests) o límite de payload.
-  - **C. Guard en el handler** además del validator, para comandos internos.
-- **Recomendación:** **A + C**. Un endpoint público sin topes es una invitación; el guard en el
-  handler cubre el caso de un comando construido sin pasar por el validator. B se evalúa cuando
-  exista métrica de abuso real (no hay panel de lectura todavía).
 
 ---
 
