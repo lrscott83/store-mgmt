@@ -929,12 +929,17 @@ export class OrderOfflineService {
           // (`read-entity-or-throw.ts:49-52`).
           const candidateName = (error as { name?: unknown } | null)?.name;
           const errorName = typeof candidateName === 'string' ? candidateName : 'UnknownError';
-          logClientError({
-            level: RECOVERABLE_PERSIST_FAILURES.has(errorName) ? 'warn' : 'error',
-            message: 'orders.backfill-persist-failed',
-            location: 'OrderOfflineService.getOrdersFromLocalStorage',
-            context: { errorName },
-          });
+          try {
+            logClientError({
+              level: RECOVERABLE_PERSIST_FAILURES.has(errorName) ? 'warn' : 'error',
+              message: 'orders.backfill-persist-failed',
+              location: 'OrderOfflineService.getOrdersFromLocalStorage',
+              context: { errorName },
+            });
+          } catch {
+            // The diagnostics sink must never take the read down. `logClientError` already
+            // guards itself; this is defence in depth (R3-LOGGER-THROW-ESCAPES-CATCH).
+          }
         }
       }
       return stored;

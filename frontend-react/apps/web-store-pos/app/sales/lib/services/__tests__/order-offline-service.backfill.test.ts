@@ -186,6 +186,43 @@ describe('OrderOfflineService read — revive + backfill sale snapshot (2026-10-
     }
   });
 
+  it('reports an unexpected persist failure as an error (R3-ERROR-BRANCH-UNTESTED)', () => {
+    seed([legacyOrder()]);
+    const bug = new Error('boom');
+    bug.name = 'UnexpectedWriteBug';
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw bug;
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'error',
+          message: 'orders.backfill-persist-failed',
+          context: { errorName: 'UnexpectedWriteBug' },
+        }),
+      );
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('falls back to UnknownError when the thrown value has no name (R3-ERROR-BRANCH-UNTESTED)', () => {
+    seed([legacyOrder()]);
+    class PlainFailure {}
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new PlainFailure();
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'error', context: { errorName: 'UnknownError' } }),
+      );
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
   it('retries the repair on the next read after a failed persist (R3-RETRY-AFTER-FAILURE-UNTESTED)', () => {
     seed([legacyOrder()]);
 
