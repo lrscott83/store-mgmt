@@ -1,7 +1,9 @@
 # Vector fiscal — RC-04A, año 2026
 
-> **Origen:** `pdf/Vector fiscal 2026.pdf` — 3 páginas, con capa de texto.
-> **PII enmascarado:** NIT y carné de identidad. El nombre se conserva porque el documento lo trae.
+> **Origen:** `Vector fiscal 2026.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
+> contiene datos personales y vive fuera del repositorio.
+> **Datos personales sustituidos:** NIT, carné de identidad, código RC-05 y nombre son ficticios.
+> La estructura, los códigos de tributo, los importes y las fechas son los del documento.
 
 ---
 
@@ -10,11 +12,11 @@
 | Campo | Valor |
 |---|---|
 | Título | `RC-04A Vector fiscal de persona natural` |
-| NIT | `83•••••••80` |
-| Carné de identidad | `83•••••••80` |
-| Nombre y apellidos | `Osleivys Peña Sánchez` |
+| NIT | `84051234567` |
+| Carné de identidad | `84051234567` |
+| Nombre y apellidos | `Osmany Perdomo Sotelo` (ficticio) |
 | DPA-Municipio | `2310-Cerro` |
-| Código de barras del RC-05 (DPA, NIT) | `6520080384060132` (16 dígitos, sin guiones) |
+| Código de barras del RC-05 (DPA, NIT) | `7412034567890123` (16 dígitos, sin guiones) |
 | Año | `2026` |
 
 ---

@@ -175,3 +175,7 @@ frontend-react/e2e/diag-tmp/
 
 # runtime uploads: the API writes catalog images here at run time (never commit, back it up on the VPS)
 backend/src/SMCA.WebApi/storage/
+# Vector fiscal de ejemplo: contienen datos personales, se guardan fuera del repositorio
+/docs/vector-fiscal/pdf/Ejemplo-Vector-Fiscal.pdf
+/docs/vector-fiscal/pdf/Vector fiscal 2025.pdf
+/docs/vector-fiscal/pdf/Vector fiscal 2026.pdf

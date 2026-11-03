@@ -2284,6 +2284,8 @@ const messages: Record<string, string> = {
     'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
   'ONAT.NAME': 'Nombre',
   'ONAT.NIT': 'NIT',
+  // S8: código de barras del RC-05, 16 dígitos sin guiones.
+  'ONAT.RC05': 'RC-05',
   'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
   'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
   'ONAT.MUNICIPALITY': 'Municipio',
@@ -2340,6 +2342,38 @@ const messages: Record<string, string> = {
   'ONAT.LOAD_ERROR':
     'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
   'ONAT.RETRY': 'Reintentar',
+
+  // Vector Fiscal — agenda de obligaciones (S2, S4, S5): las filas del vector del
+  // año, su importe calculado y la marca de pago con el canal.
+  'ONAT.AGENDA': 'Agenda de obligaciones',
+  'ONAT.AGENDA_HINT':
+    'Obligaciones del año según tu Vector Fiscal. Marca cada una cuando la pagues.',
+  'ONAT.AGENDA_EMPTY':
+    'Todavía no hay obligaciones para este año. Importa el CSV del Vector Fiscal para crearlas.',
+  'ONAT.DUE_DATE': 'Fecha límite',
+  'ONAT.CODE': 'Código',
+  'ONAT.AMOUNT': 'Importe',
+  'ONAT.RC04A': 'RC-04A',
+  'ONAT.STATUS': 'Estado',
+  'ONAT.ACTIONS': 'Acciones',
+  'ONAT.PAID': 'Pagado',
+  'ONAT.UNPAID': 'Pendiente',
+  'ONAT.PENDING_DECLARATION': 'Pendiente de declarar',
+  'ONAT.MARK_PAID': 'Marcar pagada',
+  'ONAT.MARK_UNPAID': 'Marcar pendiente',
+  'ONAT.MARK_PAID_FOR': 'Marcar pagada la obligación {codigo} de {periodo}',
+  'ONAT.MARK_UNPAID_FOR': 'Marcar pendiente la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_QUESTION': '¿Cómo pagaste esta obligación?',
+  'ONAT.CHANNEL_CASH': 'Efectivo',
+  'ONAT.CHANNEL_ELECTRONIC': 'Electrónico',
+  'ONAT.CHANNEL_CASH_FOR':
+    'Registrar pago en efectivo de la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_ELECTRONIC_FOR':
+    'Registrar pago electrónico de la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_NOTE':
+    'El 3 % de descuento solo aplica a los pagos por Transfermóvil, Telebanca, banca remota o cajero. Pagar en efectivo en el banco no tiene descuento, por eso la aplicación necesita saber cómo pagaste.',
+  'ONAT.PAID_CASH': 'Pagado en efectivo',
+  'ONAT.PAID_ELECTRONIC': 'Pagado electrónicamente',
 };
 
 export default messages;

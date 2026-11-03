@@ -50,11 +50,35 @@ vi.mock('~/onat/lib/onat-storage', () => ({
 import { VectorFiscalPage, clientLoader } from '../vector-fiscal';
 import { aggregateOnatMonths } from '~/onat/lib/onat-aggregation';
 import { getOnatOverrides, setOnatOverride } from '~/onat/lib/onat-storage';
+import { crearVectorVacio, getOnatVector, saveOnatVector } from '~/onat/lib/onat-vector';
+import type { OnatObligacion } from '~/onat/lib/onat-vector';
 
 const CURRENT_YEAR = new Date().getFullYear();
+const OWNER_ID = 'u1';
 
 function renderPage() {
   return renderWithIntl(<VectorFiscalPage />);
+}
+
+type ObligacionSeed = Partial<OnatObligacion> & Pick<OnatObligacion, 'periodo' | 'codigo'>;
+
+/** Siembra el vector real del año; la pantalla lo lee con `getOnatVector`. */
+function seedAgenda(year: number, obligaciones: readonly ObligacionSeed[]): void {
+  const vector = crearVectorVacio(OWNER_ID, year);
+  saveOnatVector({
+    ...vector,
+    obligaciones: obligaciones.map((obligacion) => ({
+      periodo: obligacion.periodo,
+      vence: obligacion.vence ?? `${year}-02-10`,
+      codigo: obligacion.codigo,
+      importe: obligacion.importe ?? null,
+      porcentaje: obligacion.porcentaje ?? null,
+      base: obligacion.base ?? 'fija',
+      rc04a: obligacion.rc04a ?? '10012',
+      pagado: obligacion.pagado ?? false,
+      canalPago: obligacion.canalPago ?? null,
+    })),
+  });
 }
 
 beforeEach(() => {
@@ -454,5 +478,237 @@ describe('Vector Fiscal (S3, S4, S5, S6, S8)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
 
     expect(await screen.findAllByRole('row')).toHaveLength(13);
+  });
+});
+
+describe('Agenda de obligaciones (S2, S3, S4, S5)', () => {
+  it('muestra la agenda del año con sus períodos, códigos y RC-04A', async () => {
+    session.user = makeUser();
+    seedAgenda(CURRENT_YEAR, [
+      {
+        periodo: `${CURRENT_YEAR}-01`,
+        vence: `${CURRENT_YEAR}-02-10`,
+        codigo: '0114022',
+        rc04a: '30016',
+        importe: 1200,
+      },
+      {
+        periodo: `${CURRENT_YEAR}-Q1`,
+        vence: `${CURRENT_YEAR}-04-20`,
+        codigo: '0820132',
+        rc04a: '00206',
+        importe: 5000,
+      },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    expect(
+      within(agenda).getByRole('heading', { name: `${CURRENT_YEAR}-01` }),
+    ).toBeInTheDocument();
+    expect(
+      within(agenda).getByRole('heading', { name: `${CURRENT_YEAR}-Q1` }),
+    ).toBeInTheDocument();
+    expect(within(agenda).getByText('0114022')).toBeInTheDocument();
+    expect(within(agenda).getByText('30016')).toBeInTheDocument();
+    expect(within(agenda).getByText('0820132')).toBeInTheDocument();
+    expect(within(agenda).getByText('00206')).toBeInTheDocument();
+    expect(within(agenda).getByText(`${CURRENT_YEAR}-02-10`)).toBeInTheDocument();
+    expect(within(agenda).getByText(`${CURRENT_YEAR}-04-20`)).toBeInTheDocument();
+  });
+
+  it('usa el importe fijo y calcula la base por el porcentaje cuando no lo trae', async () => {
+    session.user = makeUser();
+    seedAgenda(CURRENT_YEAR, [
+      { periodo: `${CURRENT_YEAR}-01`, codigo: '0114022', importe: 1200 },
+      {
+        periodo: `${CURRENT_YEAR}-01`,
+        codigo: '0530222',
+        porcentaje: 0.1,
+        base: 'ingresos',
+      },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    expect(within(agenda).getByText('1200')).toBeInTheDocument();
+    // Enero ingresa 1.000: 10 % = 100.
+    expect(within(agenda).getByText('100')).toBeInTheDocument();
+  });
+
+  it('calcula una obligación trimestral sobre los tres meses del trimestre', async () => {
+    session.user = makeUser();
+    seedAgenda(CURRENT_YEAR, [
+      {
+        periodo: `${CURRENT_YEAR}-Q1`,
+        codigo: '0530222',
+        porcentaje: 0.1,
+        base: 'ingresos',
+      },
+      {
+        periodo: `${CURRENT_YEAR}-A`,
+        codigo: '0820132',
+        porcentaje: 0.1,
+        base: 'ingresos',
+      },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    // Enero + febrero + marzo = 1.000 + 2.000 + 3.000 = 6.000; 10 % = 600.
+    expect(within(agenda).getByText('600')).toBeInTheDocument();
+    // Los doce meses suman 78.000; 10 % = 7.800.
+    expect(within(agenda).getByText('7800')).toBeInTheDocument();
+  });
+
+  it('calcula el porcentaje sobre el ingreso con el override del Owner', async () => {
+    session.user = makeUser();
+    fixture.overrides = {
+      [String(CURRENT_YEAR)]: {
+        '0': {
+          ingresos: { original: 1000, value: 2000, editedAt: '2026-10-27T00:00:00.000Z' },
+        },
+      },
+    };
+    seedAgenda(CURRENT_YEAR, [
+      {
+        periodo: `${CURRENT_YEAR}-01`,
+        codigo: '0530222',
+        porcentaje: 0.1,
+        base: 'ingresos',
+      },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    // El ingreso vigente de enero es el override (2.000), no el agregado (1.000).
+    expect(within(agenda).getByText('200')).toBeInTheDocument();
+    expect(within(agenda).queryByText('100')).not.toBeInTheDocument();
+  });
+
+  it('usa los salarios del período como base del tributo de fuerza de trabajo', async () => {
+    session.user = makeUser();
+    fixture.months = fixture
+      .makeMonths()
+      .map((month) => (month.month === 0 ? { ...month, salaries: 25_000 } : month));
+    seedAgenda(CURRENT_YEAR, [
+      {
+        periodo: `${CURRENT_YEAR}-01`,
+        codigo: '0510122',
+        porcentaje: 0.05,
+        base: 'salarios',
+      },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    // 25.000 × 5 % = 1.250.
+    expect(within(agenda).getByText('1250')).toBeInTheDocument();
+  });
+
+  it('muestra pendiente de declarar cuando no hay importe ni porcentaje', async () => {
+    session.user = makeUser();
+    seedAgenda(CURRENT_YEAR, [
+      { periodo: `${CURRENT_YEAR}-A`, codigo: '0530222' },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    expect(within(agenda).getByText('Pendiente de declarar')).toBeInTheDocument();
+  });
+
+  it('marca pagada, registra el canal y lo limpia al volver a pendiente', async () => {
+    session.user = makeUser();
+    seedAgenda(CURRENT_YEAR, [
+      { periodo: `${CURRENT_YEAR}-01`, codigo: '0114022', importe: 1200 },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+
+    fireEvent.click(
+      within(agenda).getByRole('button', {
+        name: `Marcar pagada la obligación 0114022 de ${CURRENT_YEAR}-01`,
+      }),
+    );
+
+    expect(
+      await within(agenda).findByRole('button', {
+        name: `Registrar pago electrónico de la obligación 0114022 de ${CURRENT_YEAR}-01`,
+      }),
+    ).toBeInTheDocument();
+    // El descuento del 3 % solo aplica al pago por pasarela: se explica al preguntar.
+    expect(
+      within(agenda).getByText(
+        'El 3 % de descuento solo aplica a los pagos por Transfermóvil, Telebanca, banca remota o cajero. Pagar en efectivo en el banco no tiene descuento, por eso la aplicación necesita saber cómo pagaste.',
+      ),
+    ).toBeInTheDocument();
+
+    const soloPagada = getOnatVector(OWNER_ID, CURRENT_YEAR).obligaciones[0];
+    expect(soloPagada.pagado).toBe(true);
+    expect(soloPagada.canalPago).toBeNull();
+
+    fireEvent.click(
+      within(agenda).getByRole('button', {
+        name: `Registrar pago electrónico de la obligación 0114022 de ${CURRENT_YEAR}-01`,
+      }),
+    );
+
+    expect(
+      await within(agenda).findByText('Pagado electrónicamente'),
+    ).toBeInTheDocument();
+    expect(getOnatVector(OWNER_ID, CURRENT_YEAR).obligaciones[0].canalPago).toBe(
+      'electronico',
+    );
+
+    fireEvent.click(
+      within(agenda).getByRole('button', {
+        name: `Marcar pendiente la obligación 0114022 de ${CURRENT_YEAR}-01`,
+      }),
+    );
+
+    expect(await within(agenda).findByText('Pendiente')).toBeInTheDocument();
+    const despues = getOnatVector(OWNER_ID, CURRENT_YEAR).obligaciones[0];
+    expect(despues.pagado).toBe(false);
+    expect(despues.canalPago).toBeNull();
+  });
+
+  it('carga la agenda del año elegido al cambiar de ejercicio', async () => {
+    session.user = makeUser();
+    const previousYear = CURRENT_YEAR - 1;
+    seedAgenda(CURRENT_YEAR, [
+      { periodo: `${CURRENT_YEAR}-01`, codigo: '0114022', importe: 1200 },
+    ]);
+    seedAgenda(previousYear, [
+      { periodo: `${previousYear}-02`, codigo: '0820132', importe: 4500 },
+    ]);
+
+    renderPage();
+
+    const agenda = await screen.findByRole('region', { name: 'Agenda de obligaciones' });
+    expect(within(agenda).getByText('0114022')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Año'), {
+      target: { value: String(previousYear) },
+    });
+
+    const updatedAgenda = await screen.findByRole('region', {
+      name: 'Agenda de obligaciones',
+    });
+    expect(within(updatedAgenda).getByText('0820132')).toBeInTheDocument();
+    expect(within(updatedAgenda).queryByText('0114022')).not.toBeInTheDocument();
   });
 });
