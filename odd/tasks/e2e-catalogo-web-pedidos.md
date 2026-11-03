@@ -156,3 +156,18 @@
   `R3-REORDER-EMPTY-LIST`); `acknowledge-approved` quemó la autoridad
   (`consumed_revision` `sha256:790ff25a…`). Los cuatro son de estilo o de un borde barato: la
   revisión converge.
+
+## Deuda abierta (2026-11-03)
+
+Advisories de RDD no resueltos. **Ninguno es bloqueante ni cambia comportamiento**; se cierran en
+un slice aparte si alguna vez molestan:
+
+- **R2-OPAQUE-DECISION-REF** — `OnlineOrderingSettingsE2ETests.cs`: la aserción de unicidad se
+  justifica con "(D19)", un id sin documento que lo resuelva. Sustituir por la regla explícita.
+- **R2-FLAG-ENUM-NAME** — `PublicOrderingConfigE2ETests.cs`: `SettingsFlag.Master` no nombra la
+  columna que escribe. Renombrar a `Enabled`.
+- **R3-LIMIT-CONSTANT-COUPLING** — `DeliveryDriverCreateE2ETests.cs`: los límites salen de las
+  constantes del comando, no del metadata EF. Si divergen, el caso "aceptado en el límite" se
+  convierte en un 500 silencioso.
+- **R3-REORDER-EMPTY-LIST** — `ShowcaseEndpointsE2ETests.cs`: falta el brazo de `orderedIds`
+  vacío en la teoría de rechazo.
