@@ -22,6 +22,11 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
   })),
 }));
 
+vi.mock('~/shared/lib/diagnostics/client-log', () => ({
+  logClientError: vi.fn(),
+}));
+
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { OrderOfflineService } from '../order-offline-service';
 
 const S1 = 's1';
@@ -166,9 +171,38 @@ describe('OrderOfflineService read — revive + backfill sale snapshot (2026-10-
       expect(order).toBeDefined();
       expect(order.orderItems[0].originalPrice).toBe(5);
       expect(order.orderItems[0].conversionRate).toBe(1);
+      // The fix is only meaningful if the write was actually attempted (R3-WRITE-ATTEMPT-UNPROVED).
+      expect(setItem).toHaveBeenCalledTimes(1);
+      // ...and the failure must not disappear: it is reported as a warning (R4-QUOTA-SILENT-CATCH).
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          message: 'orders.backfill-persist-failed',
+          context: { errorName: 'QuotaExceededError' },
+        }),
+      );
     } finally {
       setItem.mockRestore();
     }
+  });
+
+  it('retries the repair on the next read after a failed persist (R3-RETRY-AFTER-FAILURE-UNTESTED)', () => {
+    seed([legacyOrder()]);
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+    } finally {
+      setItem.mockRestore();
+    }
+
+    // The failed write left the legacy order unhealed on disk, so a later read repairs it.
+    const service = new OrderOfflineService(S1);
+    service.getStorageOrders();
+    const stored = JSON.parse(service.getOrdersJson()) as Array<Record<string, unknown>>;
+    expect(stored[0]['saleCurrencyRateApplied']).toBe(1);
   });
 
   it('a second read of an already-healed store does not write again (R3-BACKFILL-IDEMPOTENCE)', () => {

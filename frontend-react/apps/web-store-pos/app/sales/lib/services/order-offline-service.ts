@@ -35,6 +35,21 @@ import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-ser
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
 import { getWholesaleConfig } from '../wholesale';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
+
+/**
+ * Failures the best-effort backfill write is expected to hit on a real POS device: a full
+ * quota, a private-mode/blocked storage, or a data key that is not in memory yet. Any other
+ * error name is a defect in the write path and is logged as an error instead of a warning.
+ */
+const RECOVERABLE_PERSIST_FAILURES = new Set([
+  'QuotaExceededError',
+  'NS_ERROR_DOM_QUOTA_REACHED',
+  'SecurityError',
+  'InvalidStateError',
+  'MissingDataKeyError',
+  'MissingExplicitDekError',
+]);
 
 /**
  * TopProduct — view model for getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth.
@@ -873,7 +888,8 @@ export class OrderOfflineService {
    * sale snapshot (2026-10-06): also revives the new date fields and backfills the snapshot
    * defaults (`originalPrice=price`, `originalCurrency=currency`, `conversionRate=1`,
    * `saleCurrencyRateApplied=1`, no provenance). The healed orders are written back
-   * ("se salvan así mismo") so a legacy order is repaired once, on disk.
+   * ("se salvan así mismo") so a legacy order is repaired once, on disk, when the write
+   * succeeds. The write is best-effort and retried on the next read (R3-READ-WRITE-BACK).
    */
   private getOrdersFromLocalStorage(): Order[] {
     // design D4: an unreadable store propagates and is never written over. The
@@ -902,8 +918,23 @@ export class OrderOfflineService {
       if (changed) {
         try {
           this.setOrdersLocalStorage(stored);
-        } catch {
-          // Intentionally swallowed: see above. The in-memory repair is still returned.
+        } catch (error) {
+          // R4-QUOTA-SILENT-CATCH / R4-BROAD-CATCH-SCOPE (2026-11-03): the failure is
+          // reported, never rethrown. Expected storage/key failures are a warning; anything
+          // else is an error because it would mean a defect inside the write path, and the
+          // name is what keeps the two distinguishable in /diagnostics (the client log is a
+          // leaf module, so this cannot cycle back into storage).
+          // Matched on `name`, not `instanceof Error`: DOMException is not an Error subclass
+          // in every runtime, and this repo already matches storage errors this way
+          // (`read-entity-or-throw.ts:49-52`).
+          const candidateName = (error as { name?: unknown } | null)?.name;
+          const errorName = typeof candidateName === 'string' ? candidateName : 'UnknownError';
+          logClientError({
+            level: RECOVERABLE_PERSIST_FAILURES.has(errorName) ? 'warn' : 'error',
+            message: 'orders.backfill-persist-failed',
+            location: 'OrderOfflineService.getOrdersFromLocalStorage',
+            context: { errorName },
+          });
         }
       }
       return stored;
