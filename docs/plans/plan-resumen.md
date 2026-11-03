@@ -3,10 +3,13 @@
 > **Índice único y evolutivo.** Actualizar este documento cada vez que un plan se
 > complete, se agregue uno nuevo o cambie de prioridad.
 >
-> **Última auditoría:** 2026-11-03 · Rama: `dev` · 34 documentos en `docs/plans`
+> **Última auditoría:** 2026-11-03 · Rama: `test` · 34 documentos en `docs/plans`
 > (10 agregados después de la auditoría del 2026-09-20, que estaban sin indexar).
 > **Método:** verificación plan-por-plan contra el código real (archivo:línea o
 > commit). Sin asumir: cada clasificación tiene prueba.
+>
+> **Actualizado 2026-11-03 tras el merge de `dev` y `qa`:** P0-2 y P0-3 cerrados con sus
+> commits; P0-4 recuperado del índice de `qa` (se había perdido al reescribir el de `dev`).
 >
 > **Cambio de formato (2026-11-03):** cada pendiente lleva **Problema**, **Propuestas**
 > y **Recomendación**. La prioridad ya no es "lo que dice el plan", sino impacto real
@@ -52,7 +55,7 @@
 - **Riesgo del arreglo:** bajo (ningún dato, seguridad, contrato ni concurrencia). Tests: unit del
   servicio + un caso que fuerza el fallo de `setOrdersLocalStorage`.
 
-#### [ ] P0-2 · Lost update en los 3 `PATCH` de pedidos online (6.1 / X2)
+#### [x] P0-2 · Lost update en los 3 `PATCH` de pedidos online (6.1 / X2) - HECHO 2026-11-03
 
 - **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidad 6.1 y transversal X2.
 - **Problema:** `UpdateOrderStatusCommand.cs:137`, `UpdateOrderPaymentStatusCommand.cs:89` y
@@ -78,8 +81,24 @@
   "cerrado": en el plan queda B como deuda explícita.
 - **Riesgo:** alto (datos). Requiere aprobación backend y test contra PostgreSQL real (el E2E
   nuevo debe demostrar que un `PATCH payment` concurrente sobrevive a un `PATCH status`).
+- **Resuelto (2026-11-03, opción C = A ahora, B como deuda):**
+  - El dominio reporta qué mutó: `OrderChangedField` (flags) y `ChangeStatus` /
+    `ChangePaymentStatus` lo devuelven, así que el handler no mantiene una lista de columnas
+    paralela que se quede corta.
+  - `IOrderRepository.UpdatePartialAsync(order, fields, cancellationToken)`: `State = Unchanged`
+    + `IsModified` por propiedad, columnas resueltas con `nameof` y una única tabla flag→columna
+    que revienta ante un campo sin mapear. Rechaza el conjunto vacío y una entidad ya rastreada.
+  - Los 3 handlers (`UpdateOrderStatus`, `UpdateOrderPaymentStatus`, `AssignOrderDriver`) escriben
+    solo su eje y reenvían el token del request.
+  - Pruebas: unitarios por handler (conjunto exacto de flags y token exacto), guardas del
+    repositorio en memoria, y E2E contra PostgreSQL para sello de auditoría, razón de cancelación,
+    repartidor, entrega y los entrelazados deterministas de lectura vieja.
+  - Commits: `471050e5`, `a02aabba`, `11905e5f`, `8771ad48` (rama `test`, RDD aprobado por slice).
+  - **Deuda explícita (B):** sin `rowversion`/`xmin` ni 409, dos personas editando la **misma**
+    columna siguen en last-writer-wins. Quedan además: cobertura de concurrencia HTTP real,
+    mapeo parametrizado por cada campo y el token exacto en `SaveChangesAsync`.
 
-#### [ ] P0-3 · `PATCH /delivery-drivers/{id}` da de baja al repartidor en silencio (7.1)
+#### [x] P0-3 · `PATCH /delivery-drivers/{id}` da de baja al repartidor en silencio (7.1) - HECHO 2026-11-03
 
 - **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidad 7.1.
 - **Problema:** `UpdateDeliveryDriverCommand.IsActive` es `bool` **no nullable** y el handler
@@ -99,6 +118,30 @@
   endpoint. B es una mejora de UX posterior, no un requisito.
 - **Riesgo:** medio (contrato de un endpoint consumido por la app, no publicado). Requiere
   aprobación backend por la regla del repo.
+- **Resuelto (2026-11-03, opción A, en `qa`):**
+  - `UpdateDeliveryDriverCommand.IsActive` pasa a `bool?` y el handler escribe solo cuando
+    `HasValue`: omitir el campo conserva el estado, mandar `true`/`false` sigue mandando.
+  - Pruebas: unitarios en ambos sentidos y E2E nuevo `DeliveryDriverPartialUpdateE2ETests`
+    (`PATCH` sin `isActive` no cambia el estado; `isActive:false` sí).
+  - Commit: `2eedabe4`. El validator "al menos un campo del cuerpo" que pedía la recomendación
+    **no** se añadió; queda como mejora posible.
+
+#### [ ] P0-4 · `POST /public/ordering/{slug}/orders` sin tope de líneas ni de cantidad (8.1 / 8.2)
+
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md` unidades 8.1 y 8.2.
+- **Problema:** `CreateOnlineOrderCommandValidator.cs:66-67` solo exige `Quantity > 0`; no hay tope
+  por línea ni de líneas por carrito. `Order.ItemsCount` es `checked` y desborda con cantidades
+  grandes → **500 anónimo**. Además el rate limit cuenta **requests**, no filas: un solo POST
+  puede insertar cientos de miles de `OrderItem`, así que el límite no cierra el hueco que dice
+  cerrar.
+- **Propuestas:**
+  - **A. Topes en el validator.** Cantidad máxima por línea (p. ej. 10 000) y máximo de líneas por
+    carrito (p. ej. 100), con mensajes localizados. Barato y suficiente.
+  - **B. A + límite de filas por IP/ventana** (no solo requests) o límite de payload.
+  - **C. Guard en el handler** además del validator, para comandos internos.
+- **Recomendación:** **A + C**. Un endpoint público sin topes es una invitación; el guard en el
+  handler cubre el caso de un comando construido sin pasar por el validator. B se evalúa cuando
+  exista métrica de abuso real (no hay panel de lectura todavía).
 
 ---
 
