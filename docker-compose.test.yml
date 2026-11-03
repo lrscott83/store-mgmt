@@ -57,6 +57,10 @@ services:
       - CatalogStaticPage__OutputRoot=/srv/catalog-pages
       - CatalogStaticPage__ShellPath=/srv/catalog-pages/shell/index.html
       - CatalogStaticPage__PublicBaseUrl=${PUBLIC_BASE_URL:-https://vdt.playground.sceiba.net}
+      # Entorno de pruebas: fuera de los buscadores. robots.txt prohíbe todo el rastreo y el
+      # sitemap se publica vacío. Producción NO define esta clave y conserva el default (indexable),
+      # así que un merge de test a main no puede apagar la indexación de pos.
+      - CatalogStaticPage__AllowIndexing=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s

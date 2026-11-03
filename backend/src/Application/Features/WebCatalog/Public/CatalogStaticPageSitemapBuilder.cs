@@ -13,7 +13,8 @@ namespace Application.Features.WebCatalog.Public
         private const string SitemapUrlPath = "/sitemap.xml";
         private const string UrlSetNamespace = "http://www.sitemaps.org/schemas/sitemap/0.9";
 
-        public static string BuildSitemap(string publicBaseUrl, IEnumerable<string> publishedSlugs)
+        public static string BuildSitemap(
+            string publicBaseUrl, IEnumerable<string> publishedSlugs, bool allowIndexing)
         {
             if (string.IsNullOrWhiteSpace(publicBaseUrl))
                 throw new ArgumentException("publicBaseUrl is required", nameof(publicBaseUrl));
@@ -25,15 +26,21 @@ namespace Application.Features.WebCatalog.Public
             var xml = new StringBuilder();
             xml.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
             xml.Append("<urlset xmlns=\"").Append(UrlSetNamespace).Append("\">\n");
-            // La landing pública va primero: es la página que describe el producto y la que el owner
-            // quiere que los buscadores conozcan (auditoría SEO, 2026-10-20).
-            xml.Append("  <url><loc>").Append(EscapeXml(baseUrl + "/")).Append("</loc></url>\n");
-            // Orden ordinal estable: el mismo conjunto de catálogos produce el mismo archivo.
-            foreach (var slug in publishedSlugs.OrderBy(slug => slug, StringComparer.Ordinal))
+            // Entorno cerrado a los buscadores: el urlset se publica VACÍO a propósito. Así un
+            // sitemap.xml anterior —que este mismo escritor dejó en disco con URLs— deja de
+            // anunciar páginas en el siguiente pase, sin necesidad de borrar el archivo.
+            if (allowIndexing)
             {
-                xml.Append("  <url><loc>")
-                    .Append(EscapeXml(baseUrl + CatalogPublicUrls.Catalog(slug)))
-                    .Append("</loc></url>\n");
+                // La landing pública va primero: es la página que describe el producto y la que el
+                // owner quiere que los buscadores conozcan (auditoría SEO, 2026-10-20).
+                xml.Append("  <url><loc>").Append(EscapeXml(baseUrl + "/")).Append("</loc></url>\n");
+                // Orden ordinal estable: el mismo conjunto de catálogos produce el mismo archivo.
+                foreach (var slug in publishedSlugs.OrderBy(slug => slug, StringComparer.Ordinal))
+                {
+                    xml.Append("  <url><loc>")
+                        .Append(EscapeXml(baseUrl + CatalogPublicUrls.Catalog(slug)))
+                        .Append("</loc></url>\n");
+                }
             }
             xml.Append("</urlset>\n");
             return xml.ToString();
@@ -50,12 +57,17 @@ namespace Application.Features.WebCatalog.Public
             "/login", "/management", "/profile", "/register", "/reports", "/sales", "/stats", "/sync",
         };
 
-        public static string BuildRobots(string publicBaseUrl)
+        public static string BuildRobots(string publicBaseUrl, bool allowIndexing)
         {
             if (string.IsNullOrWhiteSpace(publicBaseUrl))
                 throw new ArgumentException("publicBaseUrl is required", nameof(publicBaseUrl));
 
             var baseUrl = publicBaseUrl.TrimEnd('/');
+
+            // Entorno cerrado a los buscadores: se prohíbe TODO el rastreo y no se anuncia ningún
+            // sitemap. Deliberadamente sin la lista de rutas privadas: con `Disallow: /` sobra.
+            if (!allowIndexing)
+                return "User-agent: *\nDisallow: /\n";
 
             var robots = new StringBuilder();
             robots.Append("User-agent: *\n");

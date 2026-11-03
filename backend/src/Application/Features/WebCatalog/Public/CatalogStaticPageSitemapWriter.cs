@@ -42,11 +42,12 @@ namespace Application.Features.WebCatalog.Public
 
             await WriteAtomicAsync(
                 Path.Combine(outputRoot, "sitemap.xml"),
-                CatalogStaticPageSitemapBuilder.BuildSitemap(baseUrl!, publishedSlugs),
+                CatalogStaticPageSitemapBuilder.BuildSitemap(
+                    baseUrl!, publishedSlugs, _options.AllowIndexing),
                 cancellationToken);
             await WriteAtomicAsync(
                 Path.Combine(outputRoot, "robots.txt"),
-                CatalogStaticPageSitemapBuilder.BuildRobots(baseUrl!),
+                CatalogStaticPageSitemapBuilder.BuildRobots(baseUrl!, _options.AllowIndexing),
                 cancellationToken);
         }
 

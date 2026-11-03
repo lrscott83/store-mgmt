@@ -242,12 +242,12 @@ describe('TutorialPage — user management panel images', () => {
     );
     expect(srcs).toHaveLength(6);
     expect(srcs).toEqual([
-      '/images/help/users-menu.png',
-      '/images/help/users-list.png',
-      '/images/help/users-create-form.png',
-      '/images/help/users-card-actions.png',
-      '/images/help/users-edit-form.png',
-      '/images/help/users-roster-export.png',
+      '/tutorials/usuarios/users-menu.png',
+      '/tutorials/usuarios/users-list.png',
+      '/tutorials/usuarios/users-create-form.png',
+      '/tutorials/usuarios/users-card-actions.png',
+      '/tutorials/usuarios/users-edit-form.png',
+      '/tutorials/usuarios/users-roster-export.png',
     ]);
   });
 });

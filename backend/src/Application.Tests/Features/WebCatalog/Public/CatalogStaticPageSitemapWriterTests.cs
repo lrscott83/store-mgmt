@@ -28,11 +28,13 @@ public sealed class CatalogStaticPageSitemapWriterTests : IDisposable
         try { Directory.Delete(_root, recursive: true); } catch { /* best effort cleanup */ }
     }
 
-    private CatalogStaticPageSitemapWriter CreateWriter(string? outputRoot = null, string? baseUrl = null)
+    private CatalogStaticPageSitemapWriter CreateWriter(
+        string? outputRoot = null, string? baseUrl = null, bool allowIndexing = true)
         => new(Options.Create(new CatalogStaticPageOptions
         {
             OutputRoot = outputRoot ?? _outputRoot,
             PublicBaseUrl = baseUrl ?? BaseUrl,
+            AllowIndexing = allowIndexing,
         }));
 
     private string SitemapPath => Path.Combine(_outputRoot, "sitemap.xml");
@@ -91,6 +93,40 @@ public sealed class CatalogStaticPageSitemapWriterTests : IDisposable
         // rename atómico; nunca se reescribe in-place (un fallo a mitad no puede servir a medias).
         File.GetCreationTimeUtc(SitemapPath).Should().BeAfter(createdAt);
         Directory.GetFiles(_outputRoot).Should().BeEquivalentTo(new[] { SitemapPath, RobotsPath });
+    }
+
+    [Fact]
+    public async Task Write_closes_the_environment_to_crawlers_when_indexing_is_disallowed()
+    {
+        var writer = CreateWriter(allowIndexing: false);
+
+        await writer.WriteAsync(new[] { "mercado-uno", "mercado-dos" });
+
+        var robots = await File.ReadAllTextAsync(RobotsPath);
+        robots.Should().Be("User-agent: *\nDisallow: /\n");
+
+        // El sitemap sigue existiendo (el volumen puede tener uno anterior con URLs) pero vacío.
+        var sitemap = await File.ReadAllTextAsync(SitemapPath);
+        sitemap.Should().NotContain("<url>");
+        sitemap.Should().NotContain("mercado-uno");
+        sitemap.Should().EndWith("</urlset>\n");
+    }
+
+    [Fact]
+    public async Task Write_keeps_the_environment_indexable_by_default()
+    {
+        // El default del options es el comportamiento de producción: si la bandera no se configura
+        // (o se escribe mal), el entorno SIGUE indexándose. Es la garantía de que un merge de test a
+        // main no puede apagar la indexación de producción.
+        new CatalogStaticPageOptions().AllowIndexing.Should().BeTrue();
+
+        var writer = CreateWriter();
+
+        await writer.WriteAsync(new[] { "mercado-uno" });
+
+        var robots = await File.ReadAllTextAsync(RobotsPath);
+        robots.Should().StartWith("User-agent: *\nAllow: /\n");
+        robots.Should().Contain("Sitemap: https://vdt.playground.sceiba.net/sitemap.xml");
     }
 
     [Fact]

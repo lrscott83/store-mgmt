@@ -87,6 +87,10 @@ const KNOWN_BACKGROUND_PATHS = [
   USAGE_TRACKER_PATH,
   '/hubs/messages', // SignalR: /negotiate + the hub WebSocket itself
   '/api/v1/messages', // REST: conversations / messages / mark-as-read
+  // Public-site telemetry beacon (PublicSiteEventsController + SiteEventCatalog).
+  // It fires on unauthenticated page views (including /login) and is orthogonal
+  // to authentication, exactly like the usage tracker above.
+  '/api/v1/public/site/events',
 ];
 
 function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: string): void {
@@ -311,7 +315,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await loginPage.submit();
     await expect(page.getByText(INVALID_CREDENTIALS_TEXT)).toBeVisible();
 
-    anyRequest.expectNoRequests('T3 credenciales inválidas');
+    expectOnlyKnownTelemetry(anyRequest, 'T3 credenciales inválidas');
     loginNetwork.expectNoLoginAttempt();
   });
 
@@ -329,7 +333,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await loginPage.submit();
 
     await expect(page.getByText(ACCOUNT_INACTIVE_TEXT)).toBeVisible();
-    anyRequest.expectNoRequests('T4 cuenta inactiva');
+    expectOnlyKnownTelemetry(anyRequest, 'T4 cuenta inactiva');
     loginNetwork.expectNoLoginAttempt();
   });
 
@@ -348,7 +352,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
 
     await expect(page.getByText(INVALID_CREDENTIALS_TEXT)).toBeVisible();
     await expect(page.getByText(ACCOUNT_INACTIVE_TEXT)).not.toBeVisible();
-    anyRequest.expectNoRequests('T5 orden de verificación');
+    expectOnlyKnownTelemetry(anyRequest, 'T5 orden de verificación');
     loginNetwork.expectNoLoginAttempt();
   });
 
@@ -363,7 +367,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await loginPage.submit();
 
     await expect(page.getByText(SERVER_ERROR_TEXT)).toBeVisible();
-    anyRequest.expectNoRequests('T6 verifier malformado');
+    expectOnlyKnownTelemetry(anyRequest, 'T6 verifier malformado');
     loginNetwork.expectNoLoginAttempt();
   });
 
@@ -385,7 +389,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
 
     await expect(page.getByText(UNLOCK_FAILED_TEXT)).toBeVisible();
     await expect(page.getByText(INVALID_CREDENTIALS_TEXT)).not.toBeVisible();
-    anyRequest.expectNoRequests('T7 DekUnwrapError');
+    expectOnlyKnownTelemetry(anyRequest, 'T7 DekUnwrapError');
     loginNetwork.expectNoLoginAttempt();
   });
 
@@ -426,7 +430,9 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // generic observer independently saw exactly one request, to the login
     // endpoint, and nothing else.
     expect(interceptCount).toBe(1);
-    const requests = anyRequest.requests();
+    const requests = anyRequest
+      .requests()
+      .filter((r) => !KNOWN_BACKGROUND_PATHS.some((p) => r.url.includes(p)));
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toContain('/v1/auth/login');
   });
@@ -449,7 +455,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await loginPage.submit();
 
     await expect(page.getByText(OFFLINE_LOGIN_TEXT)).toBeVisible();
-    anyRequest.expectNoRequests('T9 vencido + offline');
+    expectOnlyKnownTelemetry(anyRequest, 'T9 vencido + offline');
     loginNetwork.expectNoLoginAttempt();
   });
 

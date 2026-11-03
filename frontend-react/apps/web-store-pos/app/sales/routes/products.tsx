@@ -14,7 +14,13 @@ import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/curre
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PlusIcon, PaperclipIcon, ChevronDownIcon, TrashIcon } from '~/shared/components/ui/icons';
+import {
+  PlusIcon,
+  PaperclipIcon,
+  ChevronDownIcon,
+  TrashIcon,
+  DownloadIcon,
+} from '~/shared/components/ui/icons';
 import { showBlockingError, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
@@ -642,23 +648,29 @@ export function ProductsPage() {
           </InfoBox>
         )}
 
-        <div className="flex justify-end gap-3 mb-4">
-          {isOwner && (
-            <Button variant="fab-danger" onClick={handleClearData} data-testid="clear-data-button">
-              <TrashIcon />
-              Limpiar
+        <div className="flex flex-col items-end gap-3 mb-4">
+          <div className="flex justify-end gap-3">
+            {isOwner && (
+              <Button
+                variant="fab-danger"
+                onClick={handleClearData}
+                data-testid="clear-data-button"
+              >
+                <TrashIcon />
+                Limpiar
+              </Button>
+            )}
+            <Button
+              variant="fab"
+              onClick={() => setModal({ type: 'csv' })}
+              data-testid="import-csv-button"
+            >
+              {/* Angular: <mat-icon>attach_file</mat-icon> */}
+              <PaperclipIcon />
+              {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
+              {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
             </Button>
-          )}
-          <Button
-            variant="fab"
-            onClick={() => setModal({ type: 'csv' })}
-            data-testid="import-csv-button"
-          >
-            {/* Angular: <mat-icon>attach_file</mat-icon> */}
-            <PaperclipIcon />
-            {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
-            {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
-          </Button>
+          </div>
           {canImportFromWebCatalog && (
             <Button
               variant="fab"
@@ -666,6 +678,7 @@ export function ProductsPage() {
               disabled={isImportingWebCatalog}
               data-testid="import-web-catalog-button"
             >
+              <DownloadIcon />
               {intl.formatMessage({
                 id: isImportingWebCatalog
                   ? 'PRODUCTS.WEB_IMPORT.IMPORTING'

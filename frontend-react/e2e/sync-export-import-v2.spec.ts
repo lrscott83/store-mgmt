@@ -70,6 +70,9 @@ const KNOWN_BACKGROUND_PATHS = [
   USAGE_TRACKER_PATH,
   '/hubs/messages', // SignalR: /negotiate + the hub WebSocket itself
   '/api/v1/messages', // REST: conversations / messages / mark-as-read
+  // Public-site telemetry beacon: fires on unauthenticated page views (the
+  // login screen included), orthogonal to authentication — see login-offline.
+  '/api/v1/public/site/events',
 ];
 
 let loginSequence = 0;

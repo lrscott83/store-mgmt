@@ -1,4 +1,4 @@
-# Fichas de test E2E — carpeta única (verificación del 2026-10-06)
+# Fichas de test E2E — carpeta única (verificación del 2026-10-28)
 
 **Qué es esta carpeta.** Es la **única** carpeta de fichas del proyecto: todas las fichas de tests E2E
 problemáticos viven juntas, bajo la fecha de la última verificación. El **2026-10-06** se retiraron las
@@ -6,6 +6,13 @@ carpetas por corrida que ya no tenían ninguna ficha de test (`2026-10-01-e2e-ve
 `2026-10-03-e2e-verification/`, `group-g/`, `qa-merge-2026-09-29/` y `2026-10-05-e2e-verification/`):
 su texto completo sigue en el historial de git y su resumen está en el
 [Registro de fichas retiradas](#registro-de-fichas-retiradas) de este documento.
+
+> **Verificación del 2026-10-28.** Se renombró la carpeta a esta fecha (la regla de la carpeta: una sola
+> carpeta, con la fecha de la última verificación) y se agregaron las fichas **09 a 26** de la corrida
+> completa de ese día: **338 passed / 16 failed / 2 flaky / 1 did not run** de 357 (`pnpm test:e2e
+> --workers=2`, backend `http-e2e` en `:5019` contra `smca_test`). Las fichas 01 a 08 conservan su
+> contenido y su estado; esta corrida **no volvió a ejecutar** sus planes de re-verificación dirigida.
+
 
 ## Fichas vivas
 
@@ -20,6 +27,13 @@ su texto completo sigue en el historial de git y su resumen está en el
 | [`06-plan-catalog-superadmin-superior-sin-multimonedas.md`](06-plan-catalog-superadmin-superior-sin-multimonedas.md) | ✅ **resuelto** (defecto del test; causa raíz confirmada: acordeón de estado único) | El clic sobre el panel ya activo lo **colapsaba**. `expandPlanPanel()` solo pulsa cuando `aria-expanded !== 'true'`. `2 passed` |
 | [`07-web-catalog-locator-file-ambiguo.md`](07-web-catalog-locator-file-ambiguo.md) | ✅ **resuelto** (defecto del test; dos locators ambiguos) | `input[type="file"]` casaba con 4 inputs y `Guardar` con 2 botones. Acotados a `[data-testid^="catalog-upload-"]` y `catalog-save-all-button`. `1 passed` |
 | [`08-channel-rates-nacimiento-superior-vs-pago.md`](08-channel-rates-nacimiento-superior-vs-pago.md) | 🔴 **abierto** (causa raíz CONFIRMADA — discrepancia de negocio) | **Primer fallo de la corrida completa del 2026-10-13**: las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`), que trae MultiMonedas (15); el spec y `main` asumen plan **Pago**. Requiere decisión del owner |
+| [`09-csp-report-only-inline-scripts.md`](09-csp-report-only-inline-scripts.md) | 🔴 **abierto** (origen CONFIRMADO; cambio introductor NO confirmado) | 2026-10-28: cuatro scripts inline de SSR en `/` fuera de la allowlist dev — `ScrollRestoration` de React Router + el runtime Fizz de `react-dom 19.2.6`. `/login` y `/register` emiten solo los 4 ya cubiertos |
+| [`10-login-offline-t1-golden-path.md`](10-login-offline-t1-golden-path.md) a [`21-login-offline-t11-sin-conexion.md`](21-login-offline-t11-sin-conexion.md) | ✅ **resueltos** (defecto del test; causa raíz confirmada) | 2026-10-28: se tolera `POST /api/v1/public/site/events` en `KNOWN_BACKGROUND_PATHS` y T3–T7/T9 usan `expectOnlyKnownTelemetry`. Verificado 17/17 y prueba de mutación (14 failed al revertir) |
+| [`22-owner-store-create-mc02-plan-superior-onat.md`](22-owner-store-create-mc02-plan-superior-onat.md) | ✅ **resuelto** (defecto del test; causa raíz confirmada) | 2026-10-28: `readSuperiorPlanModuleIds()` filtra `IsActive && AvailableToStore` como `CreateStoreService.cs:62`. Mutación: `OR TRUE` → vuelve a fallar con `- 22` |
+| [`23-sync-export-import-t1-site-events.md`](23-sync-export-import-t1-site-events.md) · [`24-sync-export-import-t2-site-events.md`](24-sync-export-import-t2-site-events.md) | ✅ **resueltos** (defecto del test; causa raíz confirmada) | 2026-10-28: mismo beacon agregado a `KNOWN_BACKGROUND_PATHS` de `sync-export-import-v2`; mutación confirmada |
+| [`25-channel-rates-catalogue-nav-timeout.md`](25-channel-rates-catalogue-nav-timeout.md) | 🟡 **inestable** (causa NO CONFIRMADA) | 2026-10-28: `getAttribute('class')` sobre el sidebar agota 30 s en el primer intento y pasa al reintentar. Su hermano serial (`:204`) quedó como el "1 did not run" |
+| [`26-store-create-security-waitforurl-timeout.md`](26-store-create-security-waitforurl-timeout.md) | 🟡 **inestable** (causa NO CONFIRMADA) | 2026-10-28: el login del StoreUser no navega a `/sales/products` en 60 s en el primer intento; pasa al reintentar |
+
 
 > Las fichas **05 a 07** son de la verificación del **2026-10-13** (la carpeta conserva el nombre de la
 > última verificación; ver la regla de la carpeta al final). En esa misma verificación se re-corrieron
@@ -32,6 +46,7 @@ su texto completo sigue en el historial de git y su resumen está en el
 | Backend | perfil `http-e2e` en `:5019`, BD `smca_test` (confirmada por el teardown de cada corrida) |
 | Dev server | `:3333`, levantado por Playwright en cada corrida |
 | Corrida completa del 2026-10-05 | `pnpm test:e2e --workers=4`: 354 tests, **351 passed / 0 failed / 3 flaky**, 12.2 min, exit 0 — de ahí salen las fichas 01 a 03 |
+| Corrida completa del 2026-10-28 | `pnpm test:e2e --workers=2`: 357 tests, **338 passed / 16 failed / 2 flaky / 1 did not run**, 20.6 min, exit 1 — de ahí salen las fichas 09 a 26. Backend propio con perfil `http-e2e` (`:5019`, guard `Database=smca_test`), dev server levantado por Playwright en `:3333` (los puertos se verificaron libres antes de correr; una corrida previa contra el backend/dev server de `qa-env` se descartó). Log: `C:\Users\Appollo\AppData\Local\Temp\opencode\e2e-frontend-clean.log` |
 | Verificación dirigida del 2026-10-06 | un spec por corrida, `--workers=1 --retries=0` (nunca la suite completa) — de ahí sale la ficha 04 y la re-verificación de las otras tres |
 | Logs | `/tmp/e2e-full.log` (2026-10-05), `/tmp/iso-<spec>.log`, `/tmp/iso-swr-run2.log`, `/tmp/pwa-run1.log`, `/tmp/pwa-rebuild.log` |
 
