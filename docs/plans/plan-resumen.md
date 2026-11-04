@@ -32,19 +32,22 @@
 
 #### [ ] P1-1 · Resto de `api-endpoint-review` en pedidos y repartidores (unidades 6-7)
 
-- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md`. Controllers 1-5 hechos y
-  aprobados por RDD; de las unidades restantes solo siguen vivas las de **gestión de pedidos**
-  (6) y **repartidores** (7). Lo del catálogo web público y la plantilla (unidades 8-9) queda
-  **descartado** por decisión del owner (§6).
-- **Problema:** hallazgos sin implementar en `OnlineOrders` (paginación sin tope, `search` sin
-  índice, PII sin máscara, sin `[Authorize]` de feature) y `DeliveryDrivers` (resto: validación que
-  mide distinto que lo que guarda, DTO copiado, store-guard repetido). Los transversales X1
-  (multipart global sin tope real), X3 (check-then-act → 500) y X4 (OpenAPI incompleto) tocan
-  varios controladores.
-- **Propuestas:** implementar **unidad por unidad** con aprobación punto por punto, como se hizo
-  con 1-5 (build + `Application.Tests` + RDD por unidad). No un solo PR gigante.
-- **Recomendación:** **6 → 7 (resto) → transversales** (X1 antes de X4; X3 junto con la unidad que
-  lo toque). Cada unidad cierra con tests nuevos; los E2E existentes no se tocan.
+- **Fuente:** `2026-10-11-api-endpoint-review-catalogo-pedidos.md`. Unidades 6 y 7 cerradas el
+  2026-11-04 (`5d6e0d90`, `3d607ddc`, `fac049c7`; RDD aprobado por unidad). Lo del catálogo web
+  público y la plantilla (unidades 8-9) queda **descartado** por decisión del owner (§6).
+- **Problema que queda:**
+  - **6.7 · PII sin máscara** en el listado de pedidos (`CustomerName` + `CustomerPhone`, 100 por
+    página). **Bloqueado por decisión del owner:** enmascarar rompe la operación (el dueño y el
+    repartidor usan el teléfono para llamar al cliente). Hay que decidir entre dejar la PII visible
+    para el personal autorizado, enmascararla, o auditar los accesos.
+  - **7.8 · resto (LOW)** — `POST /delivery-drivers` sigue en 200 y no hay `GET /{id}`. Pasar a 201
+    exige cambiar `DeliveryDriverCreateE2ETests`, que lo fija; requiere autorización explícita.
+  - **Transversales X1** (multipart global sin tope real), **X3** (check-then-act → 500) y **X4**
+    (OpenAPI incompleto) siguen abiertos: tocan varios controladores, no solo pedidos.
+- **Propuestas:** 6.7 y 7.8 con una decisión del owner cada uno; X1/X4 como unidad propia de
+  infraestructura, X3 junto con la unidad que lo toque.
+- **Recomendación:** decidir 6.7 primero (es la única con impacto operativo diario), luego X1 → X4,
+  y dejar 7.8 para cuando se acepte tocar ese E2E.
 
 #### [ ] P1-3 · SEO de la landing — solo queda el cuerpo estático (P1/P2)
 

@@ -63,9 +63,9 @@ S15. Toda unidad cierra con tests nuevos; ningún E2E existente se modifica.
 
 | ID | Qué | Specs | Ruta | Estado |
 | --- | --- | --- | --- | --- |
-| T1 | Pedidos online: page acotado, search acotado, `driverId` requerido, existencia de repartidor, `[Authorize]`, guard y 404 compartidos, `CancellationToken`, `Include`s | S1, S2, S3, S4, S5, S6, S7, S8, S15 | delegado (worker) | pendiente |
-| T2 | Repartidores: update parcial, validación recortada, DTO/límites/guard únicos, `:guid` y `ProducesResponseType`, E2E cross-store | S5, S9, S10, S11, S12, S13, S15 | delegado (worker) | pendiente |
-| T3 | Índices: `pg_trgm` GIN en `Code`/`CustomerPhone`, `(StoreId, Date)`, migración + script | S14, S15 | delegado (worker) | pendiente |
+| T1 | Pedidos online: page acotado, search acotado, `driverId` requerido, existencia de repartidor, `[Authorize]`, guard y 404 compartidos, `CancellationToken`, `Include`s | S1, S2, S3, S4, S5, S6, S7, S8, S15 | delegado (worker) | hecho — `5d6e0d90`, RDD `review-3904c69fea54839c` aprobado y quemado |
+| T2 | Repartidores: update parcial, validación recortada, DTO/límites/guard únicos, `:guid` y `ProducesResponseType`, E2E cross-store | S5, S9, S10, S11, S12, S13, S15 | delegado (worker) | hecho — `3d607ddc`, RDD `review-adecbd9e3044c26f` aprobado y quemado (2 avisos) |
+| T3 | Índices: `pg_trgm` GIN en `Code`/`CustomerPhone`, `(StoreId, Date)`, migración + script | S14, S15 | delegado (worker) | hecho — `fac049c7`, RDD `review-451fa6a3fd6d7371` aprobado y quemado (1 aviso) |
 
 ## Log
 
@@ -93,3 +93,19 @@ anónimo (`PublicCatalogController`, `PublicOrderingController`, auth) y no hay 
 anonimidad; S5 se limita a `[Authorize]` en los dos controllers.
 L5c (2026-11-04, decisión): **`POST /delivery-drivers` sigue en 200.** `DeliveryDriverCreateE2ETests`
 (nuevo en `qa`) lo fija y los E2E existentes no se tocan.
+
+L6 (2026-11-04, RDD): el slice completo (`b138440e..fac049c7`, 50 archivos, 6.980 líneas) NO se puede
+revisar: `lens_context_budget_exceeded` tanto con 3 lentes como con 1. Se revisó unidad por unidad,
+cada una en un worktree sobre su propio commit, y las tres quedaron `approved` + `acknowledged`
+(autoridad quemada).
+
+L7 (2026-11-04, avisos de revisión, NO bloqueantes, pendientes de decisión):
+- `review-adecbd9e3044c26f` R1-2 (WARNING): las reglas de teléfono son más estrictas que la línea base,
+  así que un repartidor ya guardado con `#`, `/` o menos de 6 dígitos **no se puede editar** (el PATCH
+  valida un campo que el cliente no cambió). Es un cambio de comportamiento real: hay que decidir si se
+  relaja la regla en `PATCH` o si se acepta.
+- `review-adecbd9e3044c26f` R1-1 (SUGGESTION): `char.IsControl` solo cubre categoría `Cc`; los
+  separadores U+2028/U+2029 y los bidi/zero-width (`Cf`) siguen pasando en el nombre.
+- `review-451fa6a3fd6d7371` R1-001 (SUGGESTION): `CREATE EXTENSION pg_trgm` sin `SCHEMA` explícito y con
+  los privilegios del rol de migración; documentar el privilegio y fijar el esquema.
+
