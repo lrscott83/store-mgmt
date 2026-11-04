@@ -269,6 +269,32 @@ public sealed class AdminShowcaseEndpointRulesE2ETests
     }
 
     /// <summary>
+    /// 10.4 — el lado ACEPTADO del borde: 200 caracteres se guardan tal cual. Sin este caso, una
+    /// regresión de un carácter (`&gt;= MaxCaptionLength`) en el validador pasaría desapercibida
+    /// (advisory R3-caption-boundary del ciclo review-28614dc28ac92ae7).
+    /// </summary>
+    [Fact]
+    public async Task Post_with_a_caption_at_the_limit_is_accepted()
+    {
+        var (store, superAdminId, client) = await SeedAsync();
+        try
+        {
+            string caption = new('x', 200);
+
+            var created = await UploadAsync(client, store.StoreId, Carousel, caption);
+
+            created.Caption.Should().Be(caption, "el tope es inclusivo y no trunca");
+
+            var images = await ReadAsync(client, store.StoreId);
+            images.Carousel.Should().ContainSingle().Which.Caption.Should().Be(caption);
+        }
+        finally
+        {
+            await CleanupAsync(store, superAdminId);
+        }
+    }
+
+    /// <summary>
     /// 10.4 — el tipo del archivo no permitido es 400 sin fila. `CatalogImageUploadRules` solo
     /// rechaza cuando la EXTENSIÓN y el CONTENT TYPE están los dos fuera de la lista
     /// (`CatalogImageUploadRules.cs:23`), así que este caso manda los dos inválidos — es el único

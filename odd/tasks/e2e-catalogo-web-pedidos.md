@@ -88,18 +88,24 @@
 - **T7** — HECHO `9197827c` · Auditoría de unidades 1-4: el resto ya estaba cubierto por suites
   preexistentes; el único hueco demostrado fue la ruta de sesión del showcase, cerrado con
   `Catalog/ShowcaseEndpointsE2ETests.cs`.
-- **T10** — HECHO · Unidad fuera del plan — `AdminCatalogBrandingController` (2 endpoints):
-  401 anónimo, nada-que-actualizar, `mobileColumns` fuera de rango, archivo+`remove*`, tipo,
-  >2 MB, tienda inexistente, y borrado parcial que conserva el otro lado. →
-  `Catalog/AdminBrandingEndpointRulesE2ETests.cs` (8 métodos, 9 casos)
-- **T11** — HECHO · Unidad fuera del plan — `AdminCatalogShowcaseController` (4 endpoints):
-  401 anónimo en los 4, tope de 10 por conjunto, `kind` inválido, sin archivo, `caption` >200, tipo
+- **T10** — HECHO · Superficie de catálogo web (fuera del recuento de 33, dentro del alcance pedido)
+  — `AdminCatalogBrandingController` (2 endpoints):
+  401 anónimo, nada-que-actualizar, `mobileColumns` fuera de rango **y dentro de rango**, archivo+`remove*`, tipo,
+  2 MB exactos aceptados y >2 MB rechazado, tienda inexistente, y borrado parcial que conserva el
+  otro lado. → `Catalog/AdminBrandingEndpointRulesE2ETests.cs` (9 métodos, 11 casos)
+- **T11** — HECHO · Superficie de catálogo web (fuera del recuento de 33, dentro del alcance pedido)
+  — `AdminCatalogShowcaseController` (4 endpoints):
+  401 anónimo en los 4, tope de 10 por conjunto, `kind` inválido, sin archivo, `caption` de 200
+  aceptado y >200 rechazado, tipo
   no permitido, lectura cross-store vacía, borrado de un id real de otra tienda, y la teoría de
   reordenado (vacío/subconjunto/duplicado/inventado/otro conjunto/otra tienda) con el orden
-  persistido intacto. → `Catalog/AdminShowcaseEndpointRulesE2ETests.cs` (7 métodos + teoría de 7
-  casos = 14 casos)
+  persistido intacto. → `Catalog/AdminShowcaseEndpointRulesE2ETests.cs` (8 métodos + teoría de 7
+  casos = 15 casos)
 
-## Fuera del alcance de este feature — mapa verificado 2026-11-04
+## Superficies adicionales de catálogo web — mapa verificado 2026-11-04
+
+Cuatro controladores quedan fuera del recuento de 33 endpoints del plan, pero **son superficie de
+catálogo web igual** y entran en el alcance de este feature (corrección del Owner, L11).
 
 El plan de auditoría define **33 endpoints** en 9 unidades; estos dos controladores quedan fuera de
 esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no con la documentación.
@@ -320,13 +326,45 @@ Reglas verificadas en el código, no en el plan:
   Nota de harness: el TestServer avisa "A request body size limit could not be applied", así que el
   `RequestSizeLimit` de los controladores no actúa en el E2E — el 400 del validador es lo único
   observable aquí, y así quedó comentado en la prueba de >2 MB.
+- **L13 (2026-11-04)** — RDD del slice `39b9c09d`: lineage `review-28614dc28ac92ae7`, lentes
+  readability+reliability → **APROBADO**, 0 bloqueantes, 11 advisories; `acknowledge-approved` quemó
+  la autoridad (`consumed_revision` `sha256:67eea228…`). Cerrados los cinco con peso real en el
+  slice siguiente: `R3-size-boundary` → 2 MB **exactos** aceptados antes del 2 MB+1 rechazado;
+  `R3-caption-boundary` → `caption` de 200 aceptado y releído sin truncar;
+  `R3-mobile-columns-range` → teoría del lado aceptado (1 y 2 persisten y se releen);
+  `R2-doc-debt-contradiction` → la sección "Deuda abierta" ya no dice "sin deuda" y enumera tres
+  hallazgos de producción; `R2-doc-scope-label` → T10/T11 se rotulan como superficie de catálogo web
+  dentro del alcance, y el encabezado de las superficies adicionales deja de decir "fuera del
+  alcance".
+  **No** actionados, con motivo: `R2-dup-cleanup` / `R2-dup-tinyjpeg` / `R2-dup-seed-idiom`
+  (extraer un helper compartido exige **modificar** `WebCatalogSeed.cs`, un support file E2E, y eso
+  necesita autorización del Owner; además es el idioma ya establecido de `AdminWebCatalogCrudTests`);
+  `R2-field-name-abbrev` y `R2-hardcoded-limits` (nombrar los límites con las constantes de
+  producción haría que la prueba no pudiera detectar un cambio en la regla — es el motivo por el que
+  L7b ya marcó el acoplamiento a constantes como advisory a evitar); `R3-seed-leak` (idioma
+  preexistente de todo el suite: la siembra va antes del `try`; corregirlo solo aquí sería
+  inconsistente).
+  Evidencia: E2E de las dos suites nuevas + `AdminWebCatalogCrudTests` → **30/30 verde**.
 
 ## Deuda abierta
 
-**Sin deuda de revisión.** Los cuatro advisories que estuvieron anotados aquí se cerraron en
-`47eba5f3` (quinto slice) y el guard de límites se movió a `Application.Tests` en el sexto.
+**Sin deuda de revisión de tests.** Los advisories que estuvieron anotados aquí se cerraron en
+`47eba5f3` (quinto slice) y el guard de límites se movió a `Application.Tests` en el sexto. El
+quinto ciclo (`review-28614dc28ac92ae7`, T10+T11) cerró sin bloqueantes y sus advisories de borde se
+cerraron en el slice siguiente.
 
-Lo único pendiente son las dos superficies fuera del plan de 33 endpoints — **T8**, **T9**, **T10** y
-**T11** — y las cuatro ya están cerradas. Lo que queda abierto son los dos hallazgos de código de
-producción anotados en "Descartado a propósito" (allowlist de `CatalogImageUploadRules` y asimetría
-del `TenantId` en showcase), que requieren autorización del Owner para tocarse.
+**Cobertura:** T1–T11 cerradas. Las seis superficies de catálogo web que no entran en el recuento de
+33 endpoints del plan —`AdminCatalogController` (T8), `PublicCatalogEventsController` (T9),
+`AdminCatalogBrandingController` (T10) y `AdminCatalogShowcaseController` (T11)— tienen matriz
+propia y sus huecos cerrados.
+
+**Abierto de verdad — código de producción, requiere autorización del Owner.** No son deuda de
+tests y por eso no se fijaron en ninguno:
+
+1. `CatalogImageUploadRules.cs:23` usa `&&` en vez de `||`: un archivo con la extensión permitida y
+   el content type prohibido (o al revés) pasa la allowlist.
+2. `POST showcase` toma el `TenantId` del claim del llamador (`AddStoreCatalogImageCommand.cs:82`),
+   mientras `PUT branding` lo toma de la fila de la tienda — un SuperAdmin con otro tenant escribe
+   la clave bajo el prefijo equivocado.
+3. `GET branding|showcase` con un `storeId` inexistente responde 200 con defaults/listas vacías
+   (`AdminStoreScopeFilter` valida el GUID, no la existencia), mientras `PUT branding` responde 404.

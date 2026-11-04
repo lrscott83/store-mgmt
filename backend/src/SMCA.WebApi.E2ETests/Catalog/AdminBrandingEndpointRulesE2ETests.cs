@@ -231,6 +231,19 @@ public sealed class AdminBrandingEndpointRulesE2ETests
 
             (await CountSettingsRowsAsync(store.StoreId)).Should().Be(1);
 
+            // El borde ACEPTADO: exactamente 2 MB. Sin este caso, un validador que rechazara con
+            // `>= MaxImageSizeInBytes` seguiría dando verde y el contrato "máximo 2 MB" quedaría a
+            // medias (advisory R3-size-boundary del ciclo review-28614dc28ac92ae7).
+            byte[] exactlyTwoMegabytes = new byte[2 * 1024 * 1024];
+            using (var atTheLimit = ImageForm("logo", "logo.jpg", exactlyTwoMegabytes))
+            {
+                var acceptedAtLimit = await sa.PutAsync(BrandingUrl(store.StoreId), atTheLimit);
+                acceptedAtLimit.StatusCode.Should().Be(HttpStatusCode.OK,
+                    "2 MB exactos están dentro del tope; solo lo que lo supera es 400");
+            }
+
+            (await CountSettingsRowsAsync(store.StoreId)).Should().Be(1);
+
             byte[] oversized = new byte[2 * 1024 * 1024 + 1];
             using var form = ImageForm("logo", "logo.jpg", oversized);
             var rejected = await sa.PutAsync(BrandingUrl(store.StoreId), form);
@@ -238,6 +251,40 @@ public sealed class AdminBrandingEndpointRulesE2ETests
             rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await CountSettingsRowsAsync(store.StoreId))
                 .Should().Be(1, "el rechazo no debe añadir otra fila sobre la del control");
+        }
+        finally
+        {
+            await CleanupAsync(store, saId);
+        }
+    }
+
+    /// <summary>Fila 10.2 — el lado ACEPTADO del rango: 1 y 2 se guardan y se releen igual.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Put_with_mobile_columns_in_range_is_accepted_and_persisted(int mobileColumns)
+    {
+        var store = await WebCatalogSeed.SeedOwnerAsync(_f);
+        var login = $"sa-brand-{Guid.NewGuid():N}@test.com";
+        Guid saId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var sa = DbTestHelpers.AuthedClient(_f, saId, login);
+
+            using var form = new MultipartFormDataContent
+            {
+                { new StringContent(mobileColumns.ToString()), "mobileColumns" },
+            };
+            var response = await sa.PutAsync(BrandingUrl(store.StoreId), form);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<BrandingDto>>(ApiResponse.Json);
+            body!.Data!.MobileColumns.Should().Be(mobileColumns);
+
+            var reread = await sa.GetFromJsonAsync<ApiResponse<BrandingDto>>(
+                BrandingUrl(store.StoreId), ApiResponse.Json);
+            reread!.Data!.MobileColumns.Should().Be(mobileColumns);
+            (await CountSettingsRowsAsync(store.StoreId)).Should().Be(1);
         }
         finally
         {
