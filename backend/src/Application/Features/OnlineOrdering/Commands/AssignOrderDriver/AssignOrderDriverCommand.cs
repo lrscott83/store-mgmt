@@ -1,10 +1,9 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
-using Domain.Common.Extensions;
-using Domain.Entities.DeliveryDrivers;
 using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -33,13 +32,6 @@ namespace Application.Features.OnlineOrdering.Commands.AssignOrderDriver
 
     public class AssignOrderDriverCommandHandler : ICommandHandler<AssignOrderDriverCommand, bool>
     {
-        /// <summary>
-        /// Mensaje del 404. Va literal, no por `IStringLocalizer`, por la misma razón que en
-        /// `UpdateOrderStatusCommandHandler`: la clave equivalente en `Resources/Localization/*.resx`
-        /// no existe y añadirla es un cambio de Resources, fuera de la superficie de esta unidad.
-        /// </summary>
-        private const string OrderNotFoundMessage = "Online order not found.";
-
         /// <summary>
         /// Mensaje del repartidor no asignable. Deliberadamente el MISMO para "no existe", "es de
         /// otra tienda" y "está dado de baja": si los distinguiera, un id ajeno devolvería un
@@ -71,26 +63,26 @@ namespace Application.Features.OnlineOrdering.Commands.AssignOrderDriver
         public async Task<ResponseResult<bool>> Handle(
             AssignOrderDriverCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             // El `storeId` va en el MISMO predicado que el id: pedir el pedido primero y comprobar
-            // la tienda después dejaría una ventana con el pedido ajeno ya cargado.
-            Order? order = await _orderRepository.GetByIdWithItemsAsync(storeId, request.Id);
-            if (order is null)
-                throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
+            // la tienda después dejaría una ventana con el pedido ajeno ya cargado. La FILA, sin
+            // `Include`s: esta operación solo escribe `DriverId`.
+            Order order = await OnlineOrderAccess.GetRowAsync(
+                _orderRepository, storeId, request.Id, cancellationToken);
 
             if (request.DriverId is { } driverId)
             {
-                // `includeInactive` se deja en false a propósito: la baja de un repartidor es
-                // LÓGICA (`IsActive`), no borrado, así que los pedidos que ya entregó conservan su
-                // referencia pero no se le puede asignar uno nuevo. El filtro es del repositorio —
-                // esta lista ya sale sin los dados de baja y así el handler no reimplementa la regla.
-                IReadOnlyCollection<DeliveryDriver> drivers =
-                    await _driverRepository.GetByStoreIdAsync(storeId);
+                // Solo la EXISTENCIA del repartidor asignable, no la plantilla: esta operación
+                // necesita una respuesta, y materializar la lista para preguntar por un id sería
+                // traer N filas —con nombre y teléfono— para usar una. `ExistsActiveAsync` conserva
+                // las tres condiciones de `GetByStoreIdAsync(storeId)` sin `includeInactive`: misma
+                // tienda, mismo id, y activo (la baja es LÓGICA: los pedidos que ya entregó
+                // conservan la referencia, pero no se le puede asignar uno nuevo).
+                bool assignable = await _driverRepository.ExistsActiveAsync(
+                    storeId, driverId, cancellationToken);
 
-                if (!drivers.Any(driver => driver.Id == driverId))
+                if (!assignable)
                     throw new ApiException(DriverNotAssignableMessage, HttpStatusCode.BadRequest);
             }
 

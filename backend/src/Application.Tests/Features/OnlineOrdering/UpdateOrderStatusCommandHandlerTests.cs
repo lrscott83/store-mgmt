@@ -111,7 +111,7 @@ public class UpdateOrderStatusCommandHandlerTests
     /// </summary>
     private void Returns(Order? order)
         => _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
 
     #region Happy Path
@@ -327,9 +327,9 @@ public class UpdateOrderStatusCommandHandlerTests
 
         await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _orderRepository.Verify(
-            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
+            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>Una transición que no entrega NO toca el pago.</summary>
@@ -490,7 +490,7 @@ public class UpdateOrderStatusCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

@@ -5,6 +5,7 @@ using Application.Features.OnlineOrdering.Queries.GetDeliveryDrivers;
 using Application.ResponseModels;
 using Asp.Versioning;
 using Domain.Common.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMCA.WebApi.Filters;
 
@@ -24,8 +25,13 @@ namespace SMCA.WebApi.Controllers.v1
     /// atributos de ruta se COMBINAN con los heredados — una ruta de action sin `~/` añadiría cada
     /// endpoint también en `api/v1/DeliveryDrivers`. El `~/` REEMPLAZA la plantilla del
     /// controlador, que es justo lo que hace `OnlineOrderingController` y `PublicCatalogController`.
+    ///
+    /// `[Authorize]` a nivel de clase, ADEMÁS de `[HasPermission]`: el anónimo recibe 401 por la
+    /// falta de sesión, sin depender de que el filtro de permisos lo rechace por arrastre. Es el
+    /// patrón de `StoreUsersController`.
     /// </summary>
     [ApiVersion("1.0")]
+    [Authorize]
     [HasPermission(StoreRoleFeatures.OnlineOrdersAdmin)]
     public class DeliveryDriversController : BaseApiController
     {

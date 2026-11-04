@@ -18,10 +18,10 @@ namespace Application.Tests.Features.OnlineOrdering;
 /// Asignar (o desasignar) el repartidor de un pedido (F5, T5, D5). Las reglas que este suite fija
 /// son tres, y las tres son de seguridad de negocio, no de ergonomía:
 ///
-///   1. El repartidor tiene que ser de ESTA tienda. `IDeliveryDriverRepository` solo expone
-///      `GetByStoreIdAsync(storeId)`, y el handler lo llama SIN `includeInactive`: un repartidor de
-///      otra tienda —o dado de baja— no aparece en esa lista, y por eso el mismo 400 cubre ambos
-///      casos. Un `GetByIdAsync` genérico habría abierto un agujero entre tiendas.
+///   1. El repartidor tiene que ser de ESTA tienda. `IDeliveryDriverRepository` expone
+///      `ExistsActiveAsync(storeId, driverId)`, que aplica las tres condiciones en UNA consulta de
+///      existencia: un repartidor de otra tienda —o dado de baja— da `false`, y por eso el mismo
+///      400 cubre ambos casos. Un `GetByIdAsync` genérico habría abierto un agujero entre tiendas.
 ///   2. La BAJA de un repartidor es lógica (`IsActive`), no borrado: no se puede asignar a uno que
 ///      se fue, pero los pedidos que ya entregó conservan la referencia.
 ///   3. `DriverId = null` es una operación válida —desasignar—, no un dato ausente. Por eso el
@@ -72,16 +72,28 @@ public class AssignOrderDriverCommandHandlerTests
 
     private void Returns(Order? order)
         => _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
+
+    /// <summary>
+    /// Da de alta en el repositorio los repartidores ASIGNABLES de la tienda. La comprobación es
+    /// una consulta de existencia por id, así que el mock responde por id y no con una lista: es
+    /// la forma de que "de otra tienda" y "dado de baja" sigan siendo <c>false</c> en vez de
+    /// colarse por un <c>true</c> genérico.
+    /// </summary>
+    private void StoreHasDrivers(params Guid[] driverIds)
+    {
+        HashSet<Guid> known = [.. driverIds];
+        _driverRepository
+            .Setup(x => x.ExistsActiveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, Guid driverId, CancellationToken _) => known.Contains(driverId));
+    }
 
     /// <summary>Repartidor activo de esta tienda, como lo devuelve el repositorio real.</summary>
     private DeliveryDriver ActiveDriver(string name = "Ana")
     {
         DeliveryDriver driver = DeliveryDriver.Create(_storeId, name, "+34600000000", Guid.NewGuid());
-        _driverRepository
-            .Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new List<DeliveryDriver> { driver });
+        StoreHasDrivers(driver.Id);
         return driver;
     }
 
@@ -121,9 +133,7 @@ public class AssignOrderDriverCommandHandlerTests
     {
         DeliveryDriver previous = DeliveryDriver.Create(_storeId, "Luis", "+34600000001", Guid.NewGuid());
         DeliveryDriver replacement = DeliveryDriver.Create(_storeId, "Ana", "+34600000000", Guid.NewGuid());
-        _driverRepository
-            .Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new List<DeliveryDriver> { previous, replacement });
+        StoreHasDrivers(previous.Id, replacement.Id);
 
         Order order = OrderFor();
         order.DriverId = previous.Id;
@@ -176,7 +186,9 @@ public class AssignOrderDriverCommandHandlerTests
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, null), CancellationToken.None);
 
-        _driverRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
+        _driverRepository.Verify(
+            x => x.ExistsActiveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -185,12 +197,13 @@ public class AssignOrderDriverCommandHandlerTests
     #region Integration / Dependencies
 
     /// <summary>
-    /// La lista se pide SIN `includeInactive`: la baja de un repartidor es lógica, así que el
-    /// repositorio es quien los filtra, y el handler no tiene que reimplementar ese filtro ni
-    /// acabar aceptando a uno dado de baja.
+    /// La comprobación es de EXISTENCIA y va acotada a esta tienda: una consulta que responde sí o
+    /// no por <c>(storeId, driverId)</c> dentro del filtro activo, no la plantilla completa. El
+    /// repositorio es quien aplica las tres condiciones (misma tienda, mismo id, activo), y así el
+    /// handler no tiene que reimplementar ese filtro ni acabar aceptando a uno dado de baja.
     /// </summary>
     [Fact]
-    public async Task Handle_WithADriver_ShouldReadTheActiveDriversOfTheStoreOnly()
+    public async Task Handle_WithADriver_ShouldCheckTheDriverExistsActiveInTheStoreOnly()
     {
         DeliveryDriver driver = ActiveDriver();
         Order order = OrderFor();
@@ -198,11 +211,14 @@ public class AssignOrderDriverCommandHandlerTests
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
 
-        _driverRepository.Verify(x => x.GetByStoreIdAsync(_storeId, false), Times.Once);
         _driverRepository.Verify(
-            x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Once);
+            x => x.ExistsActiveAsync(_storeId, driver.Id, It.IsAny<CancellationToken>()), Times.Once);
         _driverRepository.Verify(
-            x => x.GetByStoreIdAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<bool>()), Times.Never);
+            x => x.ExistsActiveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _driverRepository.Verify(
+            x => x.ExistsActiveAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     /// <summary>
@@ -241,9 +257,9 @@ public class AssignOrderDriverCommandHandlerTests
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _orderRepository.Verify(
-            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
+            x => x.GetByIdAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>El reparto NO mueve el estado del pedido (D18): el flujo no tiene "En camino".</summary>
@@ -275,7 +291,7 @@ public class AssignOrderDriverCommandHandlerTests
 
         await Handler().Handle(new AssignOrderDriverCommand(order.Id, driver.Id), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -283,17 +299,15 @@ public class AssignOrderDriverCommandHandlerTests
     #region Error Handling
 
     /// <summary>
-    /// Un repartidor de OTRA tienda no sale de `GetByStoreIdAsync(storeId)`, así que la respuesta
-    /// es el mismo 400 que para uno inexistente: no se le dice al cliente que ese id existe en
-    /// alguna otra tienda (criterio 7).
+    /// Un repartidor de OTRA tienda no es asignable —la consulta de existencia está acotada a la
+    /// tienda de la sesión—, así que la respuesta es el mismo 400 que para uno inexistente: no se
+    /// le dice al cliente que ese id existe en alguna otra tienda (criterio 7).
     /// </summary>
     [Fact]
     public async Task Handle_WithADriverFromAnotherStore_ShouldReportBadRequest()
     {
         DeliveryDriver ownStore = DeliveryDriver.Create(_storeId, "Ana", "+34600000000", Guid.NewGuid());
-        _driverRepository
-            .Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new List<DeliveryDriver> { ownStore });
+        StoreHasDrivers(ownStore.Id);
 
         Order order = OrderFor();
         Returns(order);
@@ -314,9 +328,7 @@ public class AssignOrderDriverCommandHandlerTests
     public async Task Handle_WithAnInactiveDriver_ShouldReportBadRequest()
     {
         DeliveryDriver active = DeliveryDriver.Create(_storeId, "Ana", "+34600000000", Guid.NewGuid());
-        _driverRepository
-            .Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new List<DeliveryDriver> { active });
+        StoreHasDrivers(active.Id);
 
         var inactive = DeliveryDriver.Create(_storeId, "Luis", "+34600000001", Guid.NewGuid());
         inactive.IsActive = false;
@@ -348,9 +360,7 @@ public class AssignOrderDriverCommandHandlerTests
     [Fact]
     public async Task Handle_WhenTheStoreHasNoDrivers_ShouldReportBadRequest()
     {
-        _driverRepository
-            .Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new List<DeliveryDriver>());
+        StoreHasDrivers();
         Order order = OrderFor();
         Returns(order);
 
@@ -383,7 +393,8 @@ public class AssignOrderDriverCommandHandlerTests
             new AssignOrderDriverCommand(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _driverRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
+        _driverRepository.Verify(
+            x => x.ExistsActiveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -397,7 +408,7 @@ public class AssignOrderDriverCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

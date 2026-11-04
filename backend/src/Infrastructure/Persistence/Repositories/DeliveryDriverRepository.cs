@@ -25,5 +25,17 @@ namespace Infrastructure.Persistence.Repositories
 
             return await query.OrderBy(d => d.Name).ToListAsync();
         }
+
+        /// <summary>
+        /// Existencia de un repartidor ASIGNABLE (ver el contrato). Una sola consulta `Any`, sin
+        /// materializar la plantilla: el `storeId` y el `IsActive` van en el mismo predicado por la
+        /// misma razón que en <see cref="GetByStoreIdAsync"/>, para que "de otra tienda", "dado de
+        /// baja" y "no existe" no se puedan distinguir desde fuera.
+        /// </summary>
+        public async Task<bool> ExistsActiveAsync(
+            Guid storeId, Guid driverId, CancellationToken cancellationToken = default)
+            => await _drivers.AnyAsync(
+                d => d.StoreId == storeId && d.Id == driverId && d.IsActive,
+                cancellationToken);
     }
 }

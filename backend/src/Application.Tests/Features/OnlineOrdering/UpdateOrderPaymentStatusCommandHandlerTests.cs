@@ -70,7 +70,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
 
     private void Returns(Order? order)
         => _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
 
     #region Happy Path
@@ -236,9 +236,9 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         await Handler().Handle(
             new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _orderRepository.Verify(
-            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
+            x => x.GetByIdAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>La asignación de repartidor es de T5: este comando no la toca.</summary>
@@ -295,7 +295,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

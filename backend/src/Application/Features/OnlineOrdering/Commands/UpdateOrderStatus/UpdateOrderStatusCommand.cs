@@ -1,10 +1,10 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
-using Domain.Common.Extensions;
 using Domain.Entities.OrderItems;
 using Domain.Entities.OrderSalesCommissions;
 using Domain.Entities.OrderSalesManagers;
@@ -48,14 +48,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
 
     public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatusCommand, bool>
     {
-        /// <summary>
-        /// Mensaje del 404. Va literal, no por `IStringLocalizer`, por la misma razón que en
-        /// `GetOnlineOrderByIdQueryHandler`: la clave equivalente en `Resources/Localization/*.resx`
-        /// no existe y añadirla es un cambio de Resources, fuera de la superficie de esta unidad.
-        /// Un texto en inglés claro es mejor que una clave sin traducir que el cliente recibe tal cual.
-        /// </summary>
-        private const string OrderNotFoundMessage = "Online order not found.";
-
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IOrderRepository _orderRepository;
@@ -88,16 +80,14 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderStatus
         public async Task<ResponseResult<bool>> Handle(
             UpdateOrderStatusCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
-            // El `storeId` va en el MISMO predicado que el id (dentro de `GetByIdWithItemsAsync`):
-            // pedir el pedido primero y comprobar la tienda después dejaría una ventana con el
-            // pedido ajeno ya cargado, y "no lo toco si no es mío" es el patrón que produce la fuga.
-            Order? order = await _orderRepository.GetByIdWithItemsAsync(storeId, request.Id);
-            if (order is null)
-                throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
+            // El `storeId` va en el MISMO predicado que el id (dentro del repositorio): pedir el
+            // pedido primero y comprobar la tienda después dejaría una ventana con el pedido ajeno
+            // ya cargado, y "no lo toco si no es mío" es el patrón que produce la fuga. Las líneas
+            // SÍ se cargan aquí porque la rama de comisión las recorre.
+            Order order = await OnlineOrderAccess.GetWithItemsAsync(
+                _orderRepository, storeId, request.Id, cancellationToken);
 
             OrderChangedField changed;
 

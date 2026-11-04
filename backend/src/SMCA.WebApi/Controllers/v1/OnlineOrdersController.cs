@@ -8,6 +8,7 @@ using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
 using Application.ResponseModels;
 using Asp.Versioning;
 using Domain.Common.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMCA.WebApi.Filters;
 
@@ -23,6 +24,12 @@ namespace SMCA.WebApi.Controllers.v1
     /// distintas porque son dos decisiones distintas: quién opera un pedido y quién publica el
     /// catálogo de la tienda.
     ///
+    /// `[Authorize]` a nivel de clase, ADEMÁS de `[HasPermission]`: son dos preguntas distintas.
+    /// `[Authorize]` exige una sesión (el anónimo recibe 401 antes de que corra ningún filtro de
+    /// permisos); `[HasPermission]` exige la feature dentro de esa sesión. Sin el primero, un
+    /// endpoint dependería de que el filtro de permisos rechace también al anónimo, que es una
+    /// consecuencia y no un contrato. Es el patrón de `StoreUsersController` y `UsersController`.
+    ///
     /// RUTAS ABSOLUTAS A PROPÓSITO (`~/api/v1/online-orders`): `BaseApiController` fija
     /// `[Route("api/v1/[controller]")]`, y el token `[controller]` no puede producir el segmento con
     /// guion de `online-orders`. Poner `[Route("api/v1/online-orders")]` en esta clase NO lo
@@ -33,8 +40,13 @@ namespace SMCA.WebApi.Controllers.v1
     /// Ninguna acción acepta `StoreId`: la tienda es la de la sesión, y el aislamiento se aplica
     /// DENTRO de los handlers (el `storeId` va en el mismo predicado que el id del pedido), que es
     /// donde no se puede saltar.
+    ///
+    /// Todas las acciones aceptan el `CancellationToken` de la petición y lo pasan a MediatR: una
+    /// consulta de listado sobre el histórico de pedidos es la lectura más larga de la vista, y sin
+    /// el token seguiría corriendo —y ocupando la conexión— después de que el cliente se haya ido.
     /// </summary>
     [ApiVersion("1.0")]
+    [Authorize]
     [HasPermission(StoreRoleFeatures.OnlineOrdersAdmin)]
     public class OnlineOrdersController : BaseApiController
     {
@@ -58,10 +70,12 @@ namespace SMCA.WebApi.Controllers.v1
             [FromQuery] string? search,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20,
-            [FromQuery] bool exactRange = false)
+            [FromQuery] bool exactRange = false,
+            CancellationToken cancellationToken = default)
         {
             return Ok(await Sender.Send(new GetOnlineOrdersQuery(
-                status, paymentStatus, deliveryType, driverId, from, to, search, page, pageSize, exactRange)));
+                status, paymentStatus, deliveryType, driverId, from, to, search, page, pageSize, exactRange),
+                cancellationToken));
         }
 
         /// <summary>
@@ -71,9 +85,9 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpGet("~/api/v1/online-orders/{id}")]
         [ProducesResponseType(typeof(ResponseResult<OnlineOrderDetailDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetOrderAsync(Guid id)
+        public async Task<IActionResult> GetOrderAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            return Ok(await Sender.Send(new GetOnlineOrderByIdQuery(id)));
+            return Ok(await Sender.Send(new GetOnlineOrderByIdQuery(id), cancellationToken));
         }
 
         /// <summary>
@@ -101,10 +115,12 @@ namespace SMCA.WebApi.Controllers.v1
             [FromQuery] DateTime? to,
             [FromQuery] OrderStatus? status,
             [FromQuery] OrderPaymentStatus? paymentStatus,
-            [FromQuery] OrderDeliveryType? deliveryType)
+            [FromQuery] OrderDeliveryType? deliveryType,
+            CancellationToken cancellationToken = default)
         {
             return Ok(await Sender.Send(new GetOnlineOrderStatsQuery(
-                from, to, status, paymentStatus, deliveryType)));
+                from, to, status, paymentStatus, deliveryType),
+                cancellationToken));
         }
 
         /// <summary>
@@ -120,10 +136,13 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPatch("~/api/v1/online-orders/{id}/status")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpdateStatusAsync(Guid id, [FromBody] UpdateOrderStatusCommand request)
+        public async Task<IActionResult> UpdateStatusAsync(
+            Guid id, [FromBody] UpdateOrderStatusCommand request,
+            CancellationToken cancellationToken = default)
         {
             return Ok(await Sender.Send(new UpdateOrderStatusCommand(
-                id, request.Status, request.DriverId, request.CancellationReason)));
+                id, request.Status, request.DriverId, request.CancellationReason),
+                cancellationToken));
         }
 
         /// <summary>
@@ -132,21 +151,36 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPatch("~/api/v1/online-orders/{id}/payment")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpdatePaymentStatusAsync(Guid id, [FromBody] UpdateOrderPaymentStatusCommand request)
+        public async Task<IActionResult> UpdatePaymentStatusAsync(
+            Guid id, [FromBody] UpdateOrderPaymentStatusCommand request,
+            CancellationToken cancellationToken = default)
         {
-            return Ok(await Sender.Send(new UpdateOrderPaymentStatusCommand(id, request.PaymentStatus)));
+            return Ok(await Sender.Send(
+                new UpdateOrderPaymentStatusCommand(id, request.PaymentStatus),
+                cancellationToken));
         }
 
         /// <summary>
         /// Asigna el repartidor, o lo desasigna con `driverId = null`. El repartidor tiene que ser
         /// de esta tienda y estar activo; un id que no lo es devuelve 400 —el mismo 400 que un id
         /// inexistente, para no convertir el endpoint en un oráculo de ids ajenos.
+        ///
+        /// El cuerpo es <see cref="AssignOrderDriverBody"/> y NO el comando: `driverId` es
+        /// OBLIGATORIO en el JSON, así que `{}` es un 400 de deserialización y no llega al handler.
+        /// Desasignar se pide con `{"driverId": null}` explícito, que es una intención y no un
+        /// olvido. Con el comando como cuerpo, `{}` deserializaba a `DriverId = null` y BORRABA la
+        /// asignación vigente respondiendo 200.
         /// </summary>
         [HttpPatch("~/api/v1/online-orders/{id}/driver")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> AssignDriverAsync(Guid id, [FromBody] AssignOrderDriverCommand request)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AssignDriverAsync(
+            Guid id, [FromBody] AssignOrderDriverBody request,
+            CancellationToken cancellationToken = default)
         {
-            return Ok(await Sender.Send(new AssignOrderDriverCommand(id, request.DriverId)));
+            return Ok(await Sender.Send(
+                new AssignOrderDriverCommand(id, request.DriverId),
+                cancellationToken));
         }
     }
 }

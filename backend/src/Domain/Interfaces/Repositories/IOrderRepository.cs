@@ -57,14 +57,31 @@ namespace Domain.Interfaces.Repositories
         /// la matemática de página es de aplicación, no de un repositorio que además tendría que
         /// inventar un límite de tamaño.
         /// </summary>
-        Task<PagedOrders> GetPagedByStoreIdAsync(Guid storeId, OrderListFilter filter, int skip, int take);
+        Task<PagedOrders> GetPagedByStoreIdAsync(
+            Guid storeId, OrderListFilter filter, int skip, int take,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Un pedido por su id DENTRO de la tienda, con sus líneas y su repartidor (F5, T2: el
         /// detalle). null si ese id no existe en esa tienda — y también si existe en OTRA, que es
         /// justo el aislamiento que el criterio 7 exige: la tienda ajena no existe desde aquí.
         /// </summary>
-        Task<Order?> GetByIdWithItemsAsync(Guid storeId, Guid orderId);
+        Task<Order?> GetByIdWithItemsAsync(
+            Guid storeId, Guid orderId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// La FILA del pedido por su id DENTRO de la tienda, sin `Include`s.
+        ///
+        /// Existe separada de <see cref="GetByIdWithItemsAsync"/> porque los `PATCH` de pago y de
+        /// repartidor solo mutan columnas de esa fila: cargar las líneas y el repartidor para no
+        /// leerlos es dos `JOIN` por petición sobre la tabla que más crece. El detalle y la rama de
+        /// comisión del cambio de estado sí los necesitan, y por eso conservan la sobrecarga con
+        /// `Include`s en vez de que esta la sustituya.
+        ///
+        /// Mismo aislamiento que la otra: `storeId` va en el MISMO predicado que el id, así que un
+        /// pedido de otra tienda es null —indistinguible de inexistente a propósito (criterio 7).
+        /// </summary>
+        Task<Order?> GetByIdAsync(Guid storeId, Guid orderId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Agregado de los pedidos de UNA tienda en un rango (F6, T1: las métricas de la vista
@@ -80,7 +97,8 @@ namespace Domain.Interfaces.Repositories
         /// <see cref="GetPagedByStoreIdAsync"/>: este repositorio no vuelve a normalizar, para que
         /// el filtro registrado y el filtro ejecutado sean el mismo.
         /// </summary>
-        Task<OrderAggregateStats> GetStatsByStoreIdAsync(Guid storeId, OrderStatsFilter filter);
+        Task<OrderAggregateStats> GetStatsByStoreIdAsync(
+            Guid storeId, OrderStatsFilter filter, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el numerador de la

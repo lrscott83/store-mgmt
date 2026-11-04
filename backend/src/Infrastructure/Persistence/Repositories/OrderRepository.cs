@@ -74,7 +74,9 @@ namespace Infrastructure.Persistence.Repositories
         /// (criterio 7), y que no dependa de ningún otro filtro significa que ni un `skip`/`take`
         /// descuidado ni un filtro mal formado pueden dejar ver un pedido de otra tienda.
         /// </summary>
-        public async Task<PagedOrders> GetPagedByStoreIdAsync(Guid storeId, OrderListFilter filter, int skip, int take)
+        public async Task<PagedOrders> GetPagedByStoreIdAsync(
+            Guid storeId, OrderListFilter filter, int skip, int take,
+            CancellationToken cancellationToken = default)
         {
             IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
 
@@ -116,7 +118,7 @@ namespace Infrastructure.Persistence.Repositories
             // El `Include` del repartidor va AQUÍ y no en la consulta de arriba a propósito: cargarlo
             // también en el `Count` añadiría su `LEFT JOIN` a la consulta que más filas cuenta sin
             // usar ninguna columna suya.
-            int total = await query.CountAsync();
+            int total = await query.CountAsync(cancellationToken);
 
             // El repartidor se carga para el LISTADO porque el DTO lleva su nombre, y porque el
             // contexto es `NoTracking` por omisión (`ApplicationDbContext`) sin ningún `AutoInclude`
@@ -129,7 +131,7 @@ namespace Infrastructure.Persistence.Repositories
                 .ThenByDescending(o => o.Id)
                 .Skip(skip)
                 .Take(take)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return new PagedOrders(items, total);
         }
@@ -140,12 +142,28 @@ namespace Infrastructure.Persistence.Repositories
         /// una ventana en la que el pedido ajeno ya está cargado, y "lo borro si no es mío" es
         /// exactamente el patrón que produce una fuga entre tiendas.
         /// </summary>
-        public async Task<Order?> GetByIdWithItemsAsync(Guid storeId, Guid orderId)
+        public async Task<Order?> GetByIdWithItemsAsync(
+            Guid storeId, Guid orderId, CancellationToken cancellationToken = default)
             => await _orders
                 .Where(o => o.StoreId == storeId && o.Id == orderId)
                 .Include(o => o.OrderItems)
                 .Include(o => o.Driver)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
+
+        /// <summary>
+        /// La FILA del pedido, sin `Include`s (ver la nota del contrato): los `PATCH` de pago y de
+        /// repartidor solo mutan columnas suyas, así que traer líneas y repartidor sería dos `JOIN`
+        /// por petición sobre la tabla que más crece sin que nada la acote, para tirar el resultado.
+        ///
+        /// El `storeId` va en el MISMO predicado que el id, igual que en
+        /// <see cref="GetByIdWithItemsAsync"/>: un pedido de otra tienda es null y no un "lo cargué
+        /// y luego lo descarté".
+        /// </summary>
+        public async Task<Order?> GetByIdAsync(
+            Guid storeId, Guid orderId, CancellationToken cancellationToken = default)
+            => await _orders
+                .Where(o => o.StoreId == storeId && o.Id == orderId)
+                .FirstOrDefaultAsync(cancellationToken);
 
         /// <summary>
         /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el NUMERADOR de la
@@ -208,7 +226,8 @@ namespace Infrastructure.Persistence.Repositories
         /// RECIENTE del rango, con desempate por id para que dos pedidos del mismo instante no
         /// dejen la moneda al azar. Sin ninguno, sale el default del dominio, <see cref="Currency.CUP"/>.
         /// </summary>
-        public async Task<OrderAggregateStats> GetStatsByStoreIdAsync(Guid storeId, OrderStatsFilter filter)
+        public async Task<OrderAggregateStats> GetStatsByStoreIdAsync(
+            Guid storeId, OrderStatsFilter filter, CancellationToken cancellationToken = default)
         {
             IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
 
@@ -252,7 +271,7 @@ namespace Infrastructure.Persistence.Repositories
                     PendingAmount = g.Sum(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Pending ? o.Total : 0m),
                 })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             // Rango sin pedidos: no hay grupo, así que no hay fila. Se devuelve el agregado vacío
             // con la moneda por defecto en vez de un `null` que el handler tendría que distinguir
@@ -271,7 +290,7 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderByDescending(o => o.Date)
                 .ThenByDescending(o => o.Id)
                 .Select(o => (Currency?)o.Currency)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             // Los dos desgloses CUENTAN cancelados: son el único sitio donde se ven, y es lo que
             // explica por qué `OrdersCount` no cuadra con `NonCancelledCount`. Se traen solo los
@@ -280,12 +299,12 @@ namespace Infrastructure.Persistence.Repositories
             var statusRows = await query
                 .GroupBy(o => o.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             var deliveryRows = await query
                 .GroupBy(o => o.DeliveryType)
                 .Select(g => new { DeliveryType = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return new OrderAggregateStats
             {
