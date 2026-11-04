@@ -247,6 +247,7 @@ public sealed class ShowcaseEndpointsE2ETests
     }
 
     [Theory]
+    [InlineData("empty")]
     [InlineData("subset")]
     [InlineData("duplicate")]
     [InlineData("foreign")]
@@ -265,6 +266,7 @@ public sealed class ShowcaseEndpointsE2ETests
             // el escenario equivocado.
             Guid[] orderedIds = scenario switch
             {
+                "empty" => [],
                 "subset" => [first.Id],
                 "duplicate" => [first.Id, first.Id],
                 "foreign" => [first.Id, Guid.NewGuid()],

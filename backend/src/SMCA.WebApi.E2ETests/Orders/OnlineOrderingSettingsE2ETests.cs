@@ -108,7 +108,7 @@ public sealed class OnlineOrderingSettingsE2ETests
             // La fila existe UNA vez —el índice único por tienda es el contrato— y no dos: una
             // lectura de "la primera" daría verde con un upsert que hubiera insertado un duplicado.
             (await OrderingQueries.CountSettingsRowsAsync(_f, fixture.StoreId)).Should().Be(1,
-                "la configuración es una fila por tienda (D19)");
+                "la configuración es UNA fila por tienda: el índice único sobre StoreId es lo que lo garantiza");
 
             var row = await OrderingQueries.ReadSettingsRowAsync(_f, fixture.StoreId);
             row.Should().NotBeNull();

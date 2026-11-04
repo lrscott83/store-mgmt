@@ -89,6 +89,24 @@
   preexistentes; el único hueco demostrado fue la ruta de sesión del showcase, cerrado con
   `Catalog/ShowcaseEndpointsE2ETests.cs`.
 
+## Fuera del alcance de este feature (pendiente, decidido 2026-11-04)
+
+El plan de auditoría define **33 endpoints** en 9 unidades. Estos dos controladores quedan FUERA de
+esa cuenta y por eso no se tocaron aquí; se anotan para cubrirlos después, sin asumir que están a
+cero (ya hay suites previas que los ejercitan):
+
+- **T8 · `AdminCatalogController`** — 11 endpoints bajo `/api/v1/stores/{storeId}/catalog/...`:
+  `POST sync` · `GET status` · `GET|POST categories` · `GET|POST products` ·
+  `PUT products/{productId}` · `POST|DELETE products/{productId}/images` ·
+  `PUT products/{productId}/images/order` · `POST import`.
+  **Ya existen** `Catalog/AdminCatalogCreateTests.cs`, `Catalog/AdminCatalogImportTests.cs`,
+  `Catalog/AdminWebCatalogTests.cs`, `Catalog/AdminWebCatalogCrudTests.cs` y
+  `Catalog/AdminWebCatalogScopeProbes.cs`. Lo que falta es la **matriz endpoint por endpoint**
+  (camino feliz + guarda principal) para saber qué queda sin cubrir, no una suite desde cero.
+- **T9 · `PublicCatalogEventsController`** — 1 endpoint: `POST /api/v1/public/catalog/{storeSlug}/events`
+  (telemetría anónima). Existe `Catalog/CatalogTelemetryE2ETests.cs`; verificar si cubre límite de
+  tasa, cuerpo inválido y slug inexistente antes de añadir nada.
+
 ## Log
 
 - **L1 (2026-11-03, verbatim)** — *"lo que quiero es hacer una suite completa de tests e2e en el

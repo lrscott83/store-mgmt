@@ -48,10 +48,14 @@ public sealed class PublicOrderingConfigE2ETests
         return (response.StatusCode, body);
     }
 
-    /// <summary>Qué columna de la fila de configuración escribe <see cref="SetFlagAsync"/>.</summary>
+    /// <summary>
+    /// Qué COLUMNA de la fila de configuración escribe <see cref="SetFlagAsync"/>. Cada valor se
+    /// llama como la columna: `Enabled` es el interruptor maestro y `Pickup` la modalidad de
+    /// recogida — nunca "las dos cosas".
+    /// </summary>
     private enum SettingsFlag
     {
-        Master,
+        Enabled,
         Pickup,
     }
 
@@ -72,7 +76,7 @@ public sealed class PublicOrderingConfigE2ETests
 
         await (flag switch
         {
-            SettingsFlag.Master => rows.ExecuteUpdateAsync(
+            SettingsFlag.Enabled => rows.ExecuteUpdateAsync(
                 setters => setters.SetProperty(settings => settings.Enabled, value)),
             SettingsFlag.Pickup => rows.ExecuteUpdateAsync(
                 setters => setters.SetProperty(settings => settings.PickupEnabled, value)),
@@ -123,7 +127,7 @@ public sealed class PublicOrderingConfigE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await SetFlagAsync(fixture.StoreId, SettingsFlag.Master, false);
+            await SetFlagAsync(fixture.StoreId, SettingsFlag.Enabled, false);
 
             var (status, body) = await GetConfigAsync(fixture.Slug);
 
