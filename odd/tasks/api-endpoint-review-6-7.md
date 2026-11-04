@@ -99,6 +99,20 @@ revisar: `lens_context_budget_exceeded` tanto con 3 lentes como con 1. Se revis�
 cada una en un worktree sobre su propio commit, y las tres quedaron `approved` + `acknowledged`
 (autoridad quemada).
 
+L8 (2026-11-04, decisiones del owner sobre lo que quedaba abierto):
+- **6.7 (PII): cerrado, se deja tal cual.** No todos los usuarios tienen acceso a la gestión de
+  pedidos. Sin acción de código.
+- **X1 (subidas): límites aprobados** (2 MB por imagen de catálogo, 4 MB por marca, 50 MB por copia
+  de seguridad) **y se cierran los dos huecos reales**: verificación del contenido real del archivo
+  y alineación del límite del proxy. Commit `642ceaf6`.
+- **X4 (OpenAPI), X3 (check-then-act) y 7.8: aprobados**, pendientes de ejecutar.
+- **R1-2 (teléfono legado): arreglado y revisado.** Commit `79feffce`, RDD `review-10c1b4ff3e9b694f`
+  aprobado y quemado.
+
+L9 (2026-11-04, RDD bloqueado): la revisión de `61806a6f..642ceaf6` arrancó
+(`review-e5d44c316a76db4e`) pero el STATUS del proveedor devolvió `operation_timeout` dos veces al
+negociar la captura. Nada quedó aprobado ni quemado: hay que reintentar más tarde.
+
 L7 (2026-11-04, avisos de revisión, NO bloqueantes, pendientes de decisión):
 - `review-adecbd9e3044c26f` R1-2 (WARNING): las reglas de teléfono son más estrictas que la línea base,
   así que un repartidor ya guardado con `#`, `/` o menos de 6 dígitos **no se puede editar** (el PATCH
