@@ -24,7 +24,7 @@ namespace SMCA.WebApi.E2ETests.Catalog;
 /// los demás (mismo criterio que `SiteTelemetryE2ETests.cs:22-24`).
 /// </summary>
 [Collection("e2e")]
-public sealed class CatalogTelemetryRulesE2ETests
+public sealed class CatalogTelemetryRulesE2ETests : IAsyncLifetime
 {
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36";
@@ -38,7 +38,25 @@ public sealed class CatalogTelemetryRulesE2ETests
 
     private readonly AppTestFactory _f;
 
+    /// <summary>
+    /// SuperAdmin del test, sembrado UNA sola vez por instancia (xUnit crea una instancia por
+    /// test) y borrado en <see cref="DisposeAsync"/>. Antes cada llamada a
+    /// <see cref="AdminClientAsync"/> sembraba un usuario nuevo y nadie lo borraba: las filas se
+    /// acumulaban entre corridas.
+    /// </summary>
+    private Task<HttpClient>? _adminClient;
+
+    private Guid _adminId;
+
     public CatalogTelemetryRulesE2ETests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        if (_adminId == Guid.Empty) return; // ningún test pidió el panel: nada que borrar
+        await DbTestHelpers.CleanupUserAsync(_f, _adminId);
+    }
 
     #region Rules
 
@@ -294,11 +312,18 @@ public sealed class CatalogTelemetryRulesE2ETests
         (await ownerClient.PostAsJsonAsync("/api/v1/catalog/sync", new { })).EnsureSuccessStatusCode();
     }
 
-    private async Task<HttpClient> AdminClientAsync()
+    /// <summary>
+    /// Cliente autenticado del SuperAdmin, memoizado: el usuario se siembra a lo sumo una vez por
+    /// instancia. La tarea se guarda ANTES de esperarla, así que dos llamadas concurrentes
+    /// comparten un solo seed.
+    /// </summary>
+    private Task<HttpClient> AdminClientAsync() => _adminClient ??= SeedAdminAsync();
+
+    private async Task<HttpClient> SeedAdminAsync()
     {
         string adminLogin = $"sa-catrules-{Guid.NewGuid():N}@test.com";
-        Guid adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
-        return DbTestHelpers.AuthedClient(_f, adminId, adminLogin);
+        _adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
+        return DbTestHelpers.AuthedClient(_f, _adminId, adminLogin);
     }
 
     private static async Task<CatalogStatsDto> StatsAsync(HttpClient admin, Guid storeId)

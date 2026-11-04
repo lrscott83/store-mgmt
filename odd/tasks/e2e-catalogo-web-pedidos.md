@@ -209,6 +209,16 @@ esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no c
   **12 tests**. Evidencia: `dotnet test` con ambos filtros → **12/12**. Ningún test ni support file
   existente tocado; ningún archivo de producción modificado. RDD pendiente al cierre de este log.
 
+- **L10 (2026-11-04)** — Los dos advisories con peso real, cerrados:
+  `R2-hidden-seed-side-effect` / `R3-3` → `CatalogTelemetryRulesE2ETests` implementa
+  `IAsyncLifetime`, memoiza el **Task** del cliente (`??=`, asignado antes del primer `await`) para
+  sembrar UN SuperAdmin por test y lo borra en `DisposeAsync`; las llamadas existentes no cambian.
+  `R3-1` → el test de >2 MB sube primero el JPEG pequeño con **el mismo nombre y content type**
+  (control positivo, 200) y después el buffer sobredimensionado (400), afirmando **una** fila: la
+  única diferencia entre las dos peticiones es el tamaño. El método se renombró a
+  `..._is_rejected_while_the_small_one_is_accepted` porque el nombre viejo decía "no row".
+  Evidencia: ambas suites **12/12**.
+
 ## Deuda abierta
 
 **Sin deuda de revisión.** Los cuatro advisories que estuvieron anotados aquí se cerraron en

@@ -111,19 +111,25 @@ public sealed class AdminCatalogImageRulesE2ETests
     }
 
     [Fact]
-    public async Task An_image_bigger_than_two_megabytes_is_rejected_and_no_row_is_written()
+    public async Task An_image_bigger_than_two_megabytes_is_rejected_while_the_small_one_is_accepted()
     {
         var seed = await SeedAsync();
         try
         {
             Guid productId = await SeedProductAsync(seed);
 
+            // Control positivo: MISMO nombre y MISMO tipo que el archivo rechazado, solo cambia el
+            // tamaño. Sin él, un handler que rechazara toda subida pasaría esta prueba sin que la
+            // regla de 2 MB hubiera hecho nada.
+            await UploadAsync(seed.Client, seed.Store.StoreId, productId, TinyJpeg, "grande.jpg", "image/jpeg");
+
             byte[] tooBig = new byte[ProductEntityLimits.MaxImageSizeInBytes + 1];
             using var content = WebCatalogSeed.BuildImageUpload(tooBig, "grande.jpg", "image/jpeg");
             var response = await seed.Client.PostAsync(ImagesUrl(seed.Store.StoreId, productId), content);
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            (await GalleryCountAsync(productId)).Should().Be(0);
+            // Solo queda la fila del control positivo: el archivo grande no escribió nada.
+            (await GalleryCountAsync(productId)).Should().Be(1);
         }
         finally
         {
