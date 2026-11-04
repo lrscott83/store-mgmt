@@ -88,6 +88,16 @@
 - **T7** — HECHO `9197827c` · Auditoría de unidades 1-4: el resto ya estaba cubierto por suites
   preexistentes; el único hueco demostrado fue la ruta de sesión del showcase, cerrado con
   `Catalog/ShowcaseEndpointsE2ETests.cs`.
+- **T10** — HECHO · Unidad fuera del plan — `AdminCatalogBrandingController` (2 endpoints):
+  401 anónimo, nada-que-actualizar, `mobileColumns` fuera de rango, archivo+`remove*`, tipo,
+  >2 MB, tienda inexistente, y borrado parcial que conserva el otro lado. →
+  `Catalog/AdminBrandingEndpointRulesE2ETests.cs` (8 métodos, 9 casos)
+- **T11** — HECHO · Unidad fuera del plan — `AdminCatalogShowcaseController` (4 endpoints):
+  401 anónimo en los 4, tope de 10 por conjunto, `kind` inválido, sin archivo, `caption` >200, tipo
+  no permitido, lectura cross-store vacía, borrado de un id real de otra tienda, y la teoría de
+  reordenado (vacío/subconjunto/duplicado/inventado/otro conjunto/otra tienda) con el orden
+  persistido intacto. → `Catalog/AdminShowcaseEndpointRulesE2ETests.cs` (7 métodos + teoría de 7
+  casos = 14 casos)
 
 ## Fuera del alcance de este feature — mapa verificado 2026-11-04
 
@@ -119,6 +129,50 @@ esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no c
   Hallazgos: `PageViews` cuenta solo `PageView`, mientras `Visits`/`Visitors` cuentan hashes
   distintos de cualquier evento; el `Take(10)` se aplica **antes** del filtro de nulos.
 
+### T10 — Superficie admin de branding y showcase (6 endpoints, 2026-11-04)
+
+Los dos controladores SuperAdmin de marca y escaparate quedaron sin matriz endpoint por endpoint.
+`AdminWebCatalogCrudTests` los ejercita con camino feliz suelto (branding `:141-174`, showcase
+`:177-222`) y `AdminWebCatalogScopeProbes` cubre el 403 de los 13 endpoints y la escritura de marca
+cruzada. Eso NO es la matriz: era superficie de catálogo web igual, solo que en otro controlador.
+
+**Guardas comunes** (`AdminCatalogBrandingController.cs:20-22`, `AdminCatalogShowcaseController.cs:21-23`):
+`[HasPermission(StoreRoleFeatures.SuperAdmin)]` + `[AdminStoreScope]`. Anónimo → **401**
+(`HasPermissionAttribute.cs:80-81`), no-SuperAdmin → **403** (`AdminStoreScopeAttribute.cs:45-49`).
+`AdminStoreScopeFilter` **valida el GUID pero no la existencia de la tienda**: solo publica el id
+(`AdminStoreScopeAttribute.cs:54-58`); el 404 de tienda inexistente lo produce únicamente
+`PUT branding` (`UpdateStoreCatalogBrandingCommand.cs:102-104`).
+
+| # | Endpoint | Camino feliz | 401 anónimo | 403 no-SA | Aislamiento cross-store | Reglas / bordes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10.1 | `GET .../catalog/branding` | ✅ CRUD `:141` | ✅ T10 | ✅ Probes `:44` | ✅ Probes `:92` | defaults sin fila ✅; normalización de paleta vacía y `MobileColumns` fuera de rango **no fijadas** (ver Descartado) |
+| 10.2 | `PUT .../catalog/branding` | ✅ CRUD `:141` | ✅ T10 | ✅ Probes `:44` | ✅ Probes `:92` | ✅ T10: nada-que-actualizar, `mobileColumns` fuera de rango, archivo+`remove*`, tipo no permitido, >2 MB (con control positivo), tienda inexistente 404, y borrado parcial que conserva el banner |
+| 10.3 | `GET .../catalog/showcase` | ✅ CRUD `:177` | ✅ T11 | ✅ Probes `:44` | ✅ T11 | nunca 404: las dos listas siempre presentes ✅ |
+| 10.4 | `POST .../catalog/showcase` | ✅ CRUD `:177` | ✅ T11 | ✅ Probes `:44` | ✅ (la tienda sale de la ruta; el filtro es el único alcance) | ✅ T11: tope **10 por (tienda, conjunto)** con el otro conjunto aceptando, `kind` inválido, sin archivo, `caption` >200, tipo no permitido |
+| 10.5 | `DELETE .../catalog/showcase/{id}` | ✅ CRUD `:177` | ✅ T11 | ✅ Probes `:44` | ✅ T11 (id real de otra tienda) | ✅ T11: 404 conservando la fila ajena |
+| 10.6 | `PUT .../catalog/showcase/order` | ✅ CRUD `:177` | ✅ T11 | ✅ Probes `:44` | ✅ T11 | ✅ T11: vacío, subconjunto, duplicado, inventado, otro conjunto, otra tienda y `kind` inválido → 400 con el orden persistido intacto |
+
+Reglas verificadas en el código, no en el plan:
+
+- **Tope de showcase**: `StoreCatalogImage.MaxImagesPerKind = 10` (`StoreCatalogImage.cs:36`), **por
+  conjunto**, no global. Se evalúa dos veces en `POST`: rechazo temprano
+  (`AddStoreCatalogImageCommand.cs:100-107`) y comprobación autoritativa dentro de la transacción
+  con `AcquireSetLockAsync` (`:129-139`). Es **400**, nunca 429.
+- **Reordenado**: `sameSet` = mismo conteo **y** sin duplicados **y** todo id vigente presente
+  (`ReorderStoreCatalogImagesCommand.cs:81-83`) — una sola comprobación cubre lista incompleta,
+  duplicados, ids inventados, ids del otro conjunto y ids de otra tienda. **No escribe nada antes**
+  de pasar la comprobación (`:91-101`).
+- **Borrado cross-store**: decidido en el repositorio por `(id, storeId)` →
+  **404** `ShowcaseImageNotFound` (`RemoveStoreCatalogImageCommand.cs:69-72`), nunca 403 ni 200.
+- **Marca**: sin fila → **200 con defaults**, nunca 404 (`GetStoreCatalogBrandingQuery.cs:63-69`);
+  `mobileColumns ∉ {1,2}` → **400** al escribir (`UpdateStoreCatalogBrandingCommandValidator.cs:42-46`)
+  pero se **normaliza a 2 en silencio al leer** (`GetStoreCatalogBrandingQuery.cs:91-92`);
+  `removeX=true` + archivo del mismo lado → **400** (`:51-59`).
+- **Límites de archivo**: jpg/jpeg/png/webp e imagen/jpeg|png|webp, máx. 2 MB, mismas reglas que
+  las imágenes de producto (`CatalogImageUploadRules.cs:23-36`). El `RequestSizeLimit` de los
+  controladores está por encima (2×2 MB+128 KB en marca, 2 MB+64 KB en showcase), así que el
+  archivo sobredimensionado llega al validador y responde **400**, no 413.
+
 ### Descartado a propósito, con motivo
 
 - **429 de telemetría**: `PublicCatalogPolicy` es un cubo de 120/min por IP **compartido por todo el
@@ -127,6 +181,26 @@ esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no c
 - **`GET /catalog/products|categories` con `storeId` inexistente**: devuelven 200 con lista vacía
   (`GetCatalogProductsQuery.cs:40-44`). Es una asimetría frente al 404 de `status` que huele a
   defecto; fijarla en un test bloquearía el arreglo.
+- **409 `ShowcaseSetBusy` de `POST showcase`** (`AddStoreCatalogImageCommand.cs:158-165`): exige dos
+  subidas concurrentes al mismo (tienda, conjunto) agotando el `AcquireSetLockAsync`. Es una prueba
+  de concurrencia real, no determinista en este harness; se deja como deuda explícita.
+- **`GET branding|showcase` con un `storeId` inexistente devuelve 200**: `AdminStoreScopeFilter` no
+  valida la existencia de la tienda, así que la lectura responde defaults/listas vacías mientras
+  `PUT branding` sí da 404. Asimetría que huele a defecto: **no se fija en un test** para no bloquear
+  el arreglo; queda anotada aquí.
+- **Asimetría de tenant en `POST showcase`** (hallazgo del explorer, no fijado): el showcase toma
+  `TenantId` del **claim** del llamador (`AddStoreCatalogImageCommand.cs:82`) mientras la marca lo
+  toma de la **fila de la tienda** (`UpdateStoreCatalogBrandingCommand.cs:102-106`). Un SuperAdmin
+  cuyo claim de tenant difiera del de la tienda de la ruta escribiría la clave bajo el prefijo
+  equivocado. Es código de producción: fuera del alcance permitido (solo tests nuevos), anotado para
+  el Owner.
+- **`CatalogImageUploadRules` acepta un archivo si CUALQUIERA de las dos señales está permitida**
+  (hallazgo de T11, no fijado): `if (!extensionAllowed && !contentTypeAllowed)`
+  (`CatalogImageUploadRules.cs:23`). La conjunción `&&` deja pasar `nota.txt` con `image/jpeg` y
+  `logo.jpg` con `text/plain`, es decir, la lista de content types no se aplica cuando el nombre
+  tiene extensión válida (y viceversa). Es una **posible erosión de la allowlist** en código de
+  producción compartido por marca, showcase e imágenes de producto: se reporta, no se parchea ni se
+  fija en un test. Pinchar cualquiera de los dos comportamientos bloquearía el arreglo.
 
 ## Log
 
@@ -219,10 +293,40 @@ esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no c
   `..._is_rejected_while_the_small_one_is_accepted` porque el nombre viejo decía "no row".
   Evidencia: ambas suites **12/12**.
 
+- **L11 (2026-11-04, verbatim)** — *"AdminCatalogBrandingController 2 (GET/PUT .../catalog/branding)
+  sin matriz / AdminCatalogShowcaseController 4 (...) sin matriz / Los dos que faltan no están a
+  cero: AdminWebCatalogCrudTests los ejercita ... Pero eso es camino feliz suelto, no la matriz
+  endpoint por endpoint ... Mi error fue tratar 'branding y showcase viven en otros controladores'
+  como si eso los sacara de la cuenta. No la saca: son superficie de catálogo web igual. Haz la
+  matriz de esos dos y cierro los huecos que aparezcan, con el mismo flujo (explorer con codegraph,
+  subagentes, worker, RDD)."*
+- **L11b (2026-11-04)** — Matriz levantada con `codegraph_explore` + lectura dirigida de los
+  handlers, la validación, las reglas de imagen y las dos suites existentes. Los 6 endpoints tienen
+  camino feliz y 403; lo que falta es el **401 anónimo en los 6**, el aislamiento cross-store de
+  GET/POST/order, y **todas** las reglas de borde de la tabla T10 salvo los defaults de marca.
+  Asimetrías y bordes no fijables quedaron anotados en "Descartado a propósito". Las filas 10.x de
+  la matriz son el contrato de T10 y T11.
+- **L12 (2026-11-04)** — **T10 y T11 HECHOS**, en dos workers **secuenciales** (build compartido, no
+  en paralelo, mismo criterio que L9): `Catalog/AdminBrandingEndpointRulesE2ETests.cs` (8 métodos,
+  9 casos) y `Catalog/AdminShowcaseEndpointRulesE2ETests.cs` (7 métodos + teoría de 7 casos = 14).
+  **23 casos nuevos**, los 6 endpoints con la matriz completa salvo lo declarado en Descartado.
+  Evidencia: spot check del padre tras los renombrados →
+  `dotnet test --filter "FullyQualifiedName~AdminBrandingEndpointRulesE2ETests|FullyQualifiedName~AdminShowcaseEndpointRulesE2ETests"`
+  = **23/23 verde**. `AdminWebCatalogCrudTests` corrió **4/4** como smoke en ambos workers: ningún
+  E2E existente tocado, ningún support file tocado, ningún archivo de producción modificado.
+  Dos hallazgos de la matriz, reportados y **no** parcheados: la conjunción `&&` de
+  `CatalogImageUploadRules.cs:23` (allowlist erosionable) y la asimetría del origen del `TenantId`
+  entre showcase y marca.
+  Nota de harness: el TestServer avisa "A request body size limit could not be applied", así que el
+  `RequestSizeLimit` de los controladores no actúa en el E2E — el 400 del validador es lo único
+  observable aquí, y así quedó comentado en la prueba de >2 MB.
+
 ## Deuda abierta
 
 **Sin deuda de revisión.** Los cuatro advisories que estuvieron anotados aquí se cerraron en
 `47eba5f3` (quinto slice) y el guard de límites se movió a `Application.Tests` en el sexto.
 
-Lo único pendiente son las dos superficies fuera del plan de 33 endpoints: **T8**
-(`AdminCatalogController`) y **T9** (`PublicCatalogEventsController`), descritas arriba.
+Lo único pendiente son las dos superficies fuera del plan de 33 endpoints — **T8**, **T9**, **T10** y
+**T11** — y las cuatro ya están cerradas. Lo que queda abierto son los dos hallazgos de código de
+producción anotados en "Descartado a propósito" (allowlist de `CatalogImageUploadRules` y asimetría
+del `TenantId` en showcase), que requieren autorización del Owner para tocarse.
