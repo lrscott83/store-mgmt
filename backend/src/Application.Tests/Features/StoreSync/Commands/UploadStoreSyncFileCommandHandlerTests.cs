@@ -29,8 +29,9 @@ namespace Application.Tests.Features.StoreSync.Commands;
 ///      ninguno de los dos deja fila ni blob.
 ///   4. El nombre se normaliza a un NOMBRE, no a una ruta: viaja en la cabecera de descarga.
 ///
-/// Y la ausencia: los bytes son opacos (S13) — la contraseña nunca llega aquí y este handler no
-/// inspecciona, descifra ni re-cifra nada.
+/// Y el límite exacto de la inspección: los bytes se guardan TAL CUAL (S13) — la contraseña nunca
+/// llega aquí y este handler no descifra ni re-cifra nada—, pero la CABECERA sí se mira para
+/// confirmar que el archivo es un ZIP. Ver <see cref="UploadStoreSyncFileArchiveTests"/>.
 /// </summary>
 public class UploadStoreSyncFileCommandHandlerTests
 {
@@ -114,12 +115,23 @@ public class UploadStoreSyncFileCommandHandlerTests
         _localizer.Object,
         _logger.Object);
 
+    /// <summary>Cabecera de fichero local de un ZIP: el handler mira los bytes, no la extensión.</summary>
+    private static readonly byte[] ZipSignature = { 0x50, 0x4B, 0x03, 0x04 };
+
     private UploadStoreSyncFileCommand Command(
         Guid? storeId = null,
         string fileName = "respaldo-tienda.zip",
         string contentType = "application/zip",
         long length = 2048)
-        => new(storeId ?? _storeId, new MemoryStream(new byte[16]), fileName, contentType, length);
+        => new(storeId ?? _storeId, ValidArchive(), fileName, contentType, length);
+
+    /// <summary>Archivo válido: un ZIP de verdad de 16 bytes.</summary>
+    private static Stream ValidArchive()
+    {
+        byte[] bytes = new byte[16];
+        ZipSignature.CopyTo(bytes, 0);
+        return new MemoryStream(bytes);
+    }
 
     private void GivenStoreUser(string storeId)
     {

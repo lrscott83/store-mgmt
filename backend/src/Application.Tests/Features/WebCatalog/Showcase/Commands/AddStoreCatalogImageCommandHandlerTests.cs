@@ -44,6 +44,9 @@ public class AddStoreCatalogImageCommandHandlerTests
 {
     private const string SavedKey = "tenant/store/catalog/carousel/new.png";
 
+    /// <summary>Cabecera PNG real: el handler mira los bytes, no la extensión.</summary>
+    private static readonly byte[] PngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
@@ -104,8 +107,17 @@ public class AddStoreCatalogImageCommandHandlerTests
         _localizer.Object,
         _logger.Object);
 
-    /// <summary>Archivo válido: png de 1 KB. Los bytes no se miran, solo la cabecera.</summary>
-    private static Stream ValidContent(int length = 1024) => new MemoryStream(new byte[length]);
+    /// <summary>
+    /// Archivo válido: un PNG de 1 KB. La cabecera es un PNG de VERDAD porque el handler mira los
+    /// bytes: un relleno de ceros con extensión `.png` ya no pasa por imagen.
+    /// </summary>
+    private static Stream ValidContent(int length = 1024)
+    {
+        int size = Math.Max(length, PngSignature.Length);
+        byte[] bytes = new byte[size];
+        PngSignature.CopyTo(bytes, 0);
+        return new MemoryStream(bytes[..size]);
+    }
 
     private AddStoreCatalogImageCommand Command(
         StoreCatalogImageKind kind = StoreCatalogImageKind.Carousel,

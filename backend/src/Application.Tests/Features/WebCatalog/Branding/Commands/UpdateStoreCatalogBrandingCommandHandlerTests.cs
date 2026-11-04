@@ -123,12 +123,23 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
             Times.Once);
     }
 
-    /// <summary>Archivo de marca válido: jpg de 1 KB. Los bytes no se miran, solo la cabecera.</summary>
+    /// <summary>Cabecera JPEG real: el handler mira los bytes, no la extensión ni el Content-Type.</summary>
+    private static readonly byte[] JpegSignature = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46 };
+
+    /// <summary>Archivo de marca válido: 1 KB con cabecera JPEG de verdad.</summary>
     private static CatalogImageUpload Logo(string fileName = "logo.jpg", string contentType = "image/jpeg", long length = 1024)
-        => new(new MemoryStream(new byte[length]), fileName, contentType, length);
+        => Image(fileName, contentType, length);
 
     private static CatalogImageUpload Banner(string fileName = "banner.jpg", string contentType = "image/jpeg", long length = 2048)
-        => new(new MemoryStream(new byte[length]), fileName, contentType, length);
+        => Image(fileName, contentType, length);
+
+    private static CatalogImageUpload Image(string fileName, string contentType, long length)
+    {
+        int size = (int)Math.Max(length, JpegSignature.Length);
+        byte[] bytes = new byte[size];
+        JpegSignature.CopyTo(bytes, 0);
+        return new CatalogImageUpload(new MemoryStream(bytes), fileName, contentType, length);
+    }
 
     /// <summary>
     /// Fila ya existente de la tienda: con la marca que el dueño configuró antes y las columnas de

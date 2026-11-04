@@ -117,15 +117,11 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             // lado justo antes de guardarlo dejaba el logo ya escrito cuando el banner era inválido, y
             // ese logo se quedaba en el disco como archivo huérfano por cada intento fallido.
             //
-            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
-            // 400 localizado. La marca no es una puerta distinta al contenido del catálogo.
-            if (request.Logo != null)
-                CatalogImageUploadRules.EnsureValid(
-                    request.Logo.FileName, request.Logo.ContentType, request.Logo.Length, _localizer);
-
-            if (request.Banner != null)
-                CatalogImageUploadRules.EnsureValid(
-                    request.Banner.FileName, request.Banner.ContentType, request.Banner.Length, _localizer);
+            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp, cabecera real y
+            // 2 MB), con el mismo 400 localizado. La marca no es una puerta distinta al contenido
+            // del catálogo.
+            CatalogImageUpload? logo = Prepare(request.Logo);
+            CatalogImageUpload? banner = Prepare(request.Banner);
 
             // F8-R2: los archivos que la fila va a dejar atrás se COLECCIONAN y se borran después de
             // persistir, nunca antes. Borrarlos aquí dejaría la fila apuntando a un archivo que ya no
@@ -145,9 +141,9 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 // subir un logo dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia
                 // aquí ES el comportamiento, no un olvido.
                 settings.LogoKey = await ResolveAsync(
-                    request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+                    logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
                 settings.BannerKey = await ResolveAsync(
-                    request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+                    banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
 
                 // Presentación (decisiones del owner, 2026-10-12): elementos por fila en móvil.
                 // `null` = no se toca (parche parcial, como logo/banner): cambiar el logo no debe
@@ -233,6 +229,27 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                     ? settings.MobileColumns
                     : StoreCatalogSettings.DefaultMobileColumns,
             });
+        }
+
+        /// <summary>
+        /// Valida UN lado de la marca con las reglas de las imágenes del catálogo y devuelve el
+        /// archivo listo para guardarse.
+        ///
+        /// Devuelve una copia del registro cuando la comprobación de la cabecera tuvo que rebobinar
+        /// un stream que no se podía rebobinar: guardar el original sería guardar un archivo al que
+        /// le faltan los primeros bytes, que es un archivo distinto del que se validó.
+        /// </summary>
+        private CatalogImageUpload? Prepare(CatalogImageUpload? upload)
+        {
+            if (upload is null)
+                return null;
+
+            Stream content = CatalogImageUploadRules.EnsureValid(
+                upload.Content, upload.FileName, upload.Length, _localizer);
+
+            return ReferenceEquals(content, upload.Content)
+                ? upload
+                : upload with { Content = content };
         }
 
         /// <summary>

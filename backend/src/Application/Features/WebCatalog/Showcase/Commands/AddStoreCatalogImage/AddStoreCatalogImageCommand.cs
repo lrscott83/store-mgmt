@@ -107,12 +107,14 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                     HttpStatusCode.BadRequest);
 
             // Valida ANTES de subir: un archivo inválido no puede dejar un archivo huérfano en disco.
-            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
-            // 400 localizado. El showcase no es una puerta distinta al contenido del catálogo.
-            CatalogImageUploadRules.EnsureValid(request.FileName, request.ContentType, request.Length, _localizer);
+            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp, cabecera real y
+            // 2 MB), con el mismo 400 localizado. El showcase no es una puerta distinta al contenido
+            // del catálogo. Devuelve el stream ya rebobinado.
+            Stream content = CatalogImageUploadRules.EnsureValid(
+                request.Content, request.FileName, request.Length, _localizer);
 
             string key = await _catalogImageStorage.SaveCatalogImageAsync(
-                new CatalogImageUpload(request.Content, request.FileName, request.ContentType, request.Length),
+                new CatalogImageUpload(content, request.FileName, request.ContentType, request.Length),
                 tenantId,
                 storeId,
                 FolderOf(request.Kind),
