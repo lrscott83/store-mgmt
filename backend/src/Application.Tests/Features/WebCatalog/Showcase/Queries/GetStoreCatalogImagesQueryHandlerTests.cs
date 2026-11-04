@@ -230,5 +230,23 @@ public class GetStoreCatalogImagesQueryHandlerTests
         _imageRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
     }
 
+    /// <summary>
+    /// S7.3 — una tienda que NO EXISTE es 404, no dos listas vacías. Es el borde que separa "sin
+    /// imágenes" de "petición mal dirigida": se rechaza antes de leer las imágenes.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound()
+    {
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync((Store?)null);
+
+        Func<Task> act = () => Handler().Handle(new GetStoreCatalogImagesQuery(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        _imageRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
     #endregion
 }

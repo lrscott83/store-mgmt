@@ -415,6 +415,35 @@ Reglas verificadas en el código, no en el plan:
   `Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound`.
   Evidencia: unit `WebCatalog` **397/397**; E2E de la suite `Catalog` completa **213/213** (S9).
   `ShowcaseStoreTenantNotResolved` queda sin uso en ese handler; el recurso se conserva.
+- **L16 (2026-11-04)** — RDD del slice `d7af7b7a`: lineage `review-3a86d3aff84ba144`, lentes
+  **risk+reliability**, riesgo elevado a `high` por el Owner de este flujo vía
+  `--escalate-item 2` (allowlist de seguridad) porque el assessor nativo lo dejaba en `medium`
+  `under_budget` → **APROBADO**, 0 bloqueantes, 5 advisories; `acknowledge-approved` quemó la
+  autoridad (`consumed_revision` `sha256:d0718725…`).
+  Cómo queda cada advisory:
+  - **`R1-tenant-filter-bypass-on-showcase-write`** (WARNING) — **respondido con evidencia
+    existente**: el `storeId` nunca lo elige el cliente. En las rutas admin lo publica
+    `AdminStoreScopeFilter` tras exigir SuperAdmin, y
+    `Catalog/AdminWebCatalogScopeProbes.cs:44` (`Owner_gets_403_on_all_13_admin_endpoints_for_another_store`)
+    ya prueba que un no-SuperAdmin recibe 403 en los 13 endpoints —incluidos los 6 de T10/T11— con
+    el id de otra tienda. En las rutas del dueño sale del claim, nunca del cuerpo. `IgnoreQueryFilters`
+    no tiene un id controlable por el usuario que explotar.
+  - **`R1-tenant-filter-bypass-on-branding-read`** (WARNING) — **respondido**: el oráculo
+    404-vs-200 exige poder elegir `storeId`. En admin solo lo elige un SuperAdmin, que ya puede
+    listar todas las tiendas (`GetAllStoresWithModulesAsync`), así que no revela nada nuevo; en la
+    ruta del dueño el id viene del claim.
+  - **`R3-404-unit-gap`** (WARNING) — **CERRADO**: el borde 404 de los dos GET tiene ahora test
+    unitario (`Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound` en ambas suites), y verifica
+    además que no se toca el repositorio de marca/imágenes.
+  - **`R3-allowlist-shared-gates`** (WARNING) — **respondido**: la regla endurecida también gobierna
+    las imágenes de producto, y la suite `Catalog` completa (**213/213**) incluye
+    `AdminCatalogImageRulesE2ETests` y `WebCatalogImagesTests`, que fijan el camino aceptado de
+    producto; ninguna subida legítima quedó rechazada.
+  - **`R3-logo-key-assumption`** (SUGGESTION) — **declinado**: la clave se regenera por subida, que
+    es el contrato del almacén, y comparar bytes exigiría una ruta de lectura del objeto almacenado
+    que el suite no tiene.
+  **Este slice de cierre NO se re-revisa** (no loop-until-clean). Evidencia: unit `WebCatalog`
+  **399/399**.
 
 ## Deuda abierta
 
