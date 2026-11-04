@@ -89,23 +89,44 @@
   preexistentes; el único hueco demostrado fue la ruta de sesión del showcase, cerrado con
   `Catalog/ShowcaseEndpointsE2ETests.cs`.
 
-## Fuera del alcance de este feature (pendiente, decidido 2026-11-04)
+## Fuera del alcance de este feature — mapa verificado 2026-11-04
 
-El plan de auditoría define **33 endpoints** en 9 unidades. Estos dos controladores quedan FUERA de
-esa cuenta y por eso no se tocaron aquí; se anotan para cubrirlos después, sin asumir que están a
-cero (ya hay suites previas que los ejercitan):
+El plan de auditoría define **33 endpoints** en 9 unidades; estos dos controladores quedan fuera de
+esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no con la documentación.
 
-- **T8 · `AdminCatalogController`** — 11 endpoints bajo `/api/v1/stores/{storeId}/catalog/...`:
-  `POST sync` · `GET status` · `GET|POST categories` · `GET|POST products` ·
-  `PUT products/{productId}` · `POST|DELETE products/{productId}/images` ·
-  `PUT products/{productId}/images/order` · `POST import`.
-  **Ya existen** `Catalog/AdminCatalogCreateTests.cs`, `Catalog/AdminCatalogImportTests.cs`,
-  `Catalog/AdminWebCatalogTests.cs`, `Catalog/AdminWebCatalogCrudTests.cs` y
-  `Catalog/AdminWebCatalogScopeProbes.cs`. Lo que falta es la **matriz endpoint por endpoint**
-  (camino feliz + guarda principal) para saber qué queda sin cubrir, no una suite desde cero.
-- **T9 · `PublicCatalogEventsController`** — 1 endpoint: `POST /api/v1/public/catalog/{storeSlug}/events`
-  (telemetría anónima). Existe `Catalog/CatalogTelemetryE2ETests.cs`; verificar si cubre límite de
-  tasa, cuerpo inválido y slug inexistente antes de añadir nada.
+**`AdminCatalogController`** — 11 acciones, `[HasPermission(SuperAdmin)]` + `[AdminStoreScope]`
+(`AdminCatalogController.cs:34-36`). Cobertura existente: **11/11 con camino feliz y guarda 403**
+(`AdminCatalogCreateTests`, `AdminCatalogImportTests`, `AdminWebCatalogTests`,
+`AdminWebCatalogCrudTests`, `AdminWebCatalogScopeProbes`).
+
+**`PublicCatalogEventsController`** — 1 acción anónima, `PublicCatalogPolicy` + 16 KB
+(`PublicCatalogEventsController.cs:18-26`). Camino feliz en `CatalogTelemetryE2ETests.cs:35-73`.
+
+### Gaps cerrados (2026-11-04)
+
+- **T8 — HECHO** · `Catalog/AdminCatalogImageRulesE2ETests.cs` (6 tests): 7º archivo → 400 con la
+  galería en 6; archivo >2 MB → 400 sin fila; tipo no permitido → 400 sin fila; reordenado con
+  subconjunto y con path duplicado → 400 **y** orden persistido intacto; `DELETE` de un path que no
+  está en la galería → 404 conservando la fila. Hallazgo al leer el handler: el tope de 6 se evalúa
+  **antes** de validar el archivo (`AddProductImageCommand.cs:68-71`), así que el 7º upload reporta
+  el límite aunque el archivo también fuera inválido — el test usa un JPEG válido por eso.
+- **T9 — HECHO** · `Catalog/CatalogTelemetryRulesE2ETests.cs` (6 tests): slug inexistente y UA de
+  bot → 204 sin escribir (con control positivo en el mismo slug); `name` fuera de la allowlist
+  ignorado; `productId` de otra tienda guardado **sin** atribución (y control de que ese GUID sí
+  publica en su tienda); lote de 12 → solo cuentan 10; cuerpo que no liga → **400** (el único
+  camino distinto de 204, lo produce el binding antes del handler). Cada caso lleva control
+  positivo para no pasar por vacío.
+  Hallazgos: `PageViews` cuenta solo `PageView`, mientras `Visits`/`Visitors` cuentan hashes
+  distintos de cualquier evento; el `Take(10)` se aplica **antes** del filtro de nulos.
+
+### Descartado a propósito, con motivo
+
+- **429 de telemetría**: `PublicCatalogPolicy` es un cubo de 120/min por IP **compartido por todo el
+  suite** (`RateLimitPolicies.cs:88-97`); un test de 429 contamina el resto. El repo ya lo evita
+  (`SiteTelemetryE2ETests.cs:22-24`).
+- **`GET /catalog/products|categories` con `storeId` inexistente**: devuelven 200 con lista vacía
+  (`GetCatalogProductsQuery.cs:40-44`). Es una asimetría frente al 404 de `status` que huele a
+  defecto; fijarla en un test bloquearía el arreglo.
 
 ## Log
 
@@ -182,6 +203,11 @@ cero (ya hay suites previas que los ejercitan):
   exacto → 200 y fila persistida). `R3-empty-ordering-scenario` **no requiere cambio**: la teoría
   de rechazo afirma 400 **y** que el orden del carrusel no cambió, así que un conjunto vaciado
   fallaría la igualdad. Evidencia: unit **1/1**; E2E `DeliveryDriverCreateE2ETests` **7/7**.
+
+- **L9 (2026-11-04)** — T8 y T9 HECHOS con dos workers en secuencia (build compartido, no en
+  paralelo): `Catalog/AdminCatalogImageRulesE2ETests.cs` y `Catalog/CatalogTelemetryRulesE2ETests.cs`,
+  **12 tests**. Evidencia: `dotnet test` con ambos filtros → **12/12**. Ningún test ni support file
+  existente tocado; ningún archivo de producción modificado. RDD pendiente al cierre de este log.
 
 ## Deuda abierta
 
