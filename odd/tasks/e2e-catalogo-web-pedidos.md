@@ -107,8 +107,9 @@
 Cuatro controladores quedan fuera del recuento de 33 endpoints del plan, pero **son superficie de
 catálogo web igual** y entran en el alcance de este feature (corrección del Owner, L11).
 
-El plan de auditoría define **33 endpoints** en 9 unidades; estos dos controladores quedan fuera de
-esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no con la documentación.
+El plan de auditoría define **33 endpoints** en 9 unidades; estos **cuatro** controladores quedan
+fuera de esa cuenta. El mapa se levantó con `codegraph_explore` + lectura dirigida, no con la
+documentación.
 
 **`AdminCatalogController`** — 11 acciones, `[HasPermission(SuperAdmin)]` + `[AdminStoreScope]`
 (`AdminCatalogController.cs:34-36`). Cobertura existente: **11/11 con camino feliz y guarda 403**
@@ -336,15 +337,40 @@ Reglas verificadas en el código, no en el plan:
   hallazgos de producción; `R2-doc-scope-label` → T10/T11 se rotulan como superficie de catálogo web
   dentro del alcance, y el encabezado de las superficies adicionales deja de decir "fuera del
   alcance".
-  **No** actionados, con motivo: `R2-dup-cleanup` / `R2-dup-tinyjpeg` / `R2-dup-seed-idiom`
-  (extraer un helper compartido exige **modificar** `WebCatalogSeed.cs`, un support file E2E, y eso
-  necesita autorización del Owner; además es el idioma ya establecido de `AdminWebCatalogCrudTests`);
-  `R2-field-name-abbrev` y `R2-hardcoded-limits` (nombrar los límites con las constantes de
-  producción haría que la prueba no pudiera detectar un cambio en la regla — es el motivo por el que
-  L7b ya marcó el acoplamiento a constantes como advisory a evitar); `R3-seed-leak` (idioma
-  preexistente de todo el suite: la siembra va antes del `try`; corregirlo solo aquí sería
-  inconsistente).
+  **Cerrados** (5):
+  - `R3-size-boundary` → 2 MB **exactos** aceptados (con relectura de la clave) antes del 2 MB+1
+    rechazado.
+  - `R3-caption-boundary` → `caption` de 200 aceptado y releído sin truncar.
+  - `R3-mobile-columns-range` → teoría del lado aceptado (1 y 2 persisten y se releen).
+  - `R2-doc-debt-contradiction` → la sección "Deuda abierta" ya no dice "sin deuda" y enumera tres
+    hallazgos de producción.
+  - `R2-doc-scope-label` → T10/T11 se rotulan como superficie de catálogo web dentro del alcance, y
+    el encabezado de las superficies adicionales deja de decir "fuera del alcance".
+
+  **Declinados a propósito** (6), con su motivo:
+  - `R2-dup-cleanup`, `R2-dup-tinyjpeg`, `R2-dup-seed-idiom` — extraer un helper compartido exige
+    **modificar** `WebCatalogSeed.cs`, un support file E2E, y eso necesita autorización del Owner;
+    además es el idioma ya establecido de `AdminWebCatalogCrudTests`.
+  - `R2-field-name-abbrev`, `R2-hardcoded-limits` — nombrar los límites con las constantes de
+    producción haría que la prueba no pudiera detectar un cambio en la regla; es el mismo motivo por
+    el que L7b marcó el acoplamiento a constantes como advisory a evitar.
+  - `R3-seed-leak` — idioma preexistente de todo el suite (la siembra va antes del `try`);
+    corregirlo solo en los dos archivos nuevos sería inconsistente con las 190 suites restantes.
   Evidencia: E2E de las dos suites nuevas + `AdminWebCatalogCrudTests` → **30/30 verde**.
+- **L14 (2026-11-04)** — RDD del slice `5ff21e37`: lineage `review-8d81e4ffd48a6740`, mismas dos
+  lentes → **APROBADO**, 0 bloqueantes, 9 advisories; `acknowledge-approved` quemó la autoridad
+  (`consumed_revision` `sha256:1602cd9c…`). Cerrados los tres con defecto demostrable:
+  `R2-doc-scope-count` y `R2-doc-coverage-count` (la sección decía "cuatro controladores" y "estos
+  dos", y "seis superficies" para cuatro — cifras falsas), `R2-doc-open-findings-referent`
+  ("en ninguno" sin referente), `R2-doc-bare-file-refs` (citas con nombre suelto, ahora
+  repo-relative), `R2-doc-declined-buried` (los declinados pasan a lista propia) y
+  `R3-size-limit-acceptance-not-persisted` (el caso de 2 MB exactos ahora **relee** la marca y exige
+  que la clave haya cambiado, no solo un 200).
+  Declinados con motivo: `R2-test-seed-duplication` (mismo trade-off ya documentado) y
+  `R3-inclusive-boundary-only-at-e2e` (el caso E2E prueba la **persistencia** del valor aceptado, que
+  un test del validador no puede probar; el predicado puro ya vive en `Application.Tests`).
+  **Este slice final NO se re-revisa**: el contrato nativo prohíbe loop-until-clean y los advisories
+  son posteriores, no bloqueantes. Evidencia: ambas suites + `AdminWebCatalogCrudTests` → **30/30**.
 
 ## Deuda abierta
 
@@ -353,18 +379,22 @@ Reglas verificadas en el código, no en el plan:
 quinto ciclo (`review-28614dc28ac92ae7`, T10+T11) cerró sin bloqueantes y sus advisories de borde se
 cerraron en el slice siguiente.
 
-**Cobertura:** T1–T11 cerradas. Las seis superficies de catálogo web que no entran en el recuento de
-33 endpoints del plan —`AdminCatalogController` (T8), `PublicCatalogEventsController` (T9),
-`AdminCatalogBrandingController` (T10) y `AdminCatalogShowcaseController` (T11)— tienen matriz
+**Cobertura:** T1–T11 cerradas. Las **cuatro** superficies de catálogo web que no entran en el
+recuento de 33 endpoints del plan —`AdminCatalogController` (T8), `PublicCatalogEventsController`
+(T9), `AdminCatalogBrandingController` (T10) y `AdminCatalogShowcaseController` (T11)— tienen matriz
 propia y sus huecos cerrados.
 
 **Abierto de verdad — código de producción, requiere autorización del Owner.** No son deuda de
-tests y por eso no se fijaron en ninguno:
+tests, y por eso ninguno de los tres se fijó en un test: hacerlo bloquearía el arreglo.
 
-1. `CatalogImageUploadRules.cs:23` usa `&&` en vez de `||`: un archivo con la extensión permitida y
-   el content type prohibido (o al revés) pasa la allowlist.
-2. `POST showcase` toma el `TenantId` del claim del llamador (`AddStoreCatalogImageCommand.cs:82`),
-   mientras `PUT branding` lo toma de la fila de la tienda — un SuperAdmin con otro tenant escribe
-   la clave bajo el prefijo equivocado.
-3. `GET branding|showcase` con un `storeId` inexistente responde 200 con defaults/listas vacías
-   (`AdminStoreScopeFilter` valida el GUID, no la existencia), mientras `PUT branding` responde 404.
+1. `backend/src/Application/Features/WebCatalog/Images/CatalogImageUploadRules.cs:23` usa `&&` en
+   vez de `||`: un archivo con la extensión permitida y el content type prohibido (o al revés) pasa
+   la allowlist.
+2. `backend/src/Application/Features/WebCatalog/Showcase/Commands/AddStoreCatalogImage/AddStoreCatalogImageCommand.cs:82`
+   toma el `TenantId` del claim del llamador, mientras
+   `backend/src/Application/Features/WebCatalog/Branding/Commands/UpdateStoreCatalogBranding/UpdateStoreCatalogBrandingCommand.cs:102-106`
+   lo toma de la fila de la tienda — un SuperAdmin con otro tenant escribe la clave bajo el prefijo
+   equivocado.
+3. `backend/src/SMCA.WebApi/Filters/AdminStoreScopeAttribute.cs:54-58`: `GET branding|showcase` con
+   un `storeId` inexistente responde 200 con defaults/listas vacías (el filtro valida el GUID, no la
+   existencia), mientras `PUT branding` responde 404.

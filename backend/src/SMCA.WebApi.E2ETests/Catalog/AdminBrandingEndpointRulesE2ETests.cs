@@ -231,6 +231,11 @@ public sealed class AdminBrandingEndpointRulesE2ETests
 
             (await CountSettingsRowsAsync(store.StoreId)).Should().Be(1);
 
+            var afterControl = await sa.GetFromJsonAsync<ApiResponse<BrandingDto>>(
+                BrandingUrl(store.StoreId), ApiResponse.Json);
+            string? controlKey = afterControl!.Data!.LogoKey;
+            controlKey.Should().NotBeNullOrWhiteSpace();
+
             // El borde ACEPTADO: exactamente 2 MB. Sin este caso, un validador que rechazara con
             // `>= MaxImageSizeInBytes` seguiría dando verde y el contrato "máximo 2 MB" quedaría a
             // medias (advisory R3-size-boundary del ciclo review-28614dc28ac92ae7).
@@ -243,6 +248,14 @@ public sealed class AdminBrandingEndpointRulesE2ETests
             }
 
             (await CountSettingsRowsAsync(store.StoreId)).Should().Be(1);
+
+            // Aceptar no basta: el payload tiene que haberse GUARDADO. La clave cambia en cada
+            // subida, así que una respuesta 200 que conservara el logo anterior no pasaría de aquí
+            // (advisory R3-size-limit-acceptance-not-persisted del ciclo review-8d81e4ffd48a6740).
+            var afterLimit = await sa.GetFromJsonAsync<ApiResponse<BrandingDto>>(
+                BrandingUrl(store.StoreId), ApiResponse.Json);
+            afterLimit!.Data!.LogoKey.Should().NotBeNullOrWhiteSpace()
+                .And.NotBe(controlKey, "el logo de 2 MB exactos reemplazó al del control");
 
             byte[] oversized = new byte[2 * 1024 * 1024 + 1];
             using var form = ImageForm("logo", "logo.jpg", oversized);
