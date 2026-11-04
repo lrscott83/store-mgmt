@@ -20,7 +20,12 @@ namespace Application.Features.WebCatalog.Images
             bool contentTypeAllowed = contentType != null
                 && ProductEntityLimits.AllowedImageContentTypes.Contains(contentType.ToLowerInvariant());
 
-            if (!extensionAllowed && !contentTypeAllowed)
+            // Un archivo tiene que ser VÁLIDO POR LAS DOS SEÑALES, no por una. Con `&&` bastaba
+            // con que la extensión estuviera en la lista para aceptar cualquier content type (y
+            // al revés), así que la allowlist se esquivaba declarando `foto.jpg` + `text/plain`.
+            // La extensión la controla el cliente y el content type también: la única lectura
+            // segura es rechazar si CUALQUIERA de los dos queda fuera.
+            if (!extensionAllowed || !contentTypeAllowed)
                 throw new ApiException(
                     localizer["CatalogImageTypeNotAllowed", ProductEntityLimits.AllowedImageFormatsLabel],
                     HttpStatusCode.BadRequest);

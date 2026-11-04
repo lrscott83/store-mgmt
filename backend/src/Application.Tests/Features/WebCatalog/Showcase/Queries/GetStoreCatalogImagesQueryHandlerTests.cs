@@ -4,6 +4,7 @@ using Application.Exceptions;
 using Application.Features.WebCatalog.Showcase.Queries.GetStoreCatalogImages;
 using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogImages;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -30,6 +31,7 @@ namespace Application.Tests.Features.WebCatalog.Showcase.Queries;
 public class GetStoreCatalogImagesQueryHandlerTests
 {
     private readonly Mock<IHttpContextService> _httpContextService = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
@@ -46,10 +48,17 @@ public class GetStoreCatalogImagesQueryHandlerTests
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
         _imageRepository.Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>())).ReturnsAsync([]);
+
+        // La tienda existe: el 404 es solo para una tienda inexistente, no para una sin imágenes.
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda de prueba", Guid.NewGuid(), true, _tenantId,
+                DateOnly.FromDateTime(DateTime.UtcNow), storePlanId: (int)StorePlanType.Superior));
     }
 
     private GetStoreCatalogImagesQueryHandler Handler() => new(
         _httpContextService.Object,
+        _storeRepository.Object,
         _imageRepository.Object,
         _localizer.Object);
 

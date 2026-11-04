@@ -6,6 +6,7 @@ using Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogImages;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -46,6 +47,7 @@ public class AddStoreCatalogImageCommandHandlerTests
 
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
@@ -73,6 +75,14 @@ public class AddStoreCatalogImageCommandHandlerTests
 
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
+
+        // La tienda de la ruta existe y su tenant coincide con el del contexto en este escenario:
+        // el tenant de la fila sale de la TIENDA, no del claim (S7.2).
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda de prueba", Guid.NewGuid(), true, _tenantId,
+                DateOnly.FromDateTime(DateTime.UtcNow), storePlanId: (int)StorePlanType.Superior));
+
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         // La comprobación del tope es transaccional: el handler abre una transacción y toma un lock
         // por (tienda, conjunto) antes de recontar. El mock devuelve un handle que no hace nada.
@@ -99,6 +109,7 @@ public class AddStoreCatalogImageCommandHandlerTests
     private AddStoreCatalogImageCommandHandler Handler() => new(
         _unitOfWork.Object,
         _httpContextService.Object,
+        _storeRepository.Object,
         _imageRepository.Object,
         _catalogImageStorage.Object,
         _localizer.Object,
@@ -447,19 +458,40 @@ public class AddStoreCatalogImageCommandHandlerTests
     }
 
     /// <summary>
-    /// Sin tenant en el contexto no se puede escribir el `TenantId` de la fila: un token sin ese claim
-    /// dejaría `Guid.Empty`, una fila que el filtro global resuelve a NULL —invisible para siempre— con
-    /// su archivo ya en disco. Se rechaza antes de subir un solo byte.
+    /// S7.2 — el `TenantId` de la fila sale de la TIENDA, no del claim del llamador. Antes, un token
+    /// sin ese claim se rechazaba con 400 porque habría escrito `Guid.Empty` (una fila invisible para
+    /// el filtro global) con el archivo ya en disco; ahora la ausencia del claim deja de importar y lo
+    /// que protege la fila es la tienda: se escribe SU tenant.
     /// </summary>
     [Fact]
-    public async Task Handle_WithoutATenantInContext_ShouldReportBadRequest()
+    public async Task Handle_WithoutATenantInTheClaim_ShouldTakeTheTenantFromTheStore()
     {
         _httpContextService.Setup(x => x.TenantId).Returns(string.Empty);
+
+        await Handler().Handle(Command(), CancellationToken.None);
+
+        _persisted.Should().NotBeNull();
+        _persisted!.TenantId.Should().Be(_tenantId, "el tenant de la fila es el de la tienda de la ruta");
+        _catalogImageStorage.Verify(
+            x => x.SaveCatalogImageAsync(It.IsAny<CatalogImageUpload>(), _tenantId, _storeId, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// S7.2 — y si la tienda de la ruta no existe, no hay tenant que escribir ni archivo que subir:
+    /// 404 antes de tocar el almacén.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound()
+    {
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync((Store?)null);
 
         Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ApiException>();
-        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
         _catalogImageStorage.Verify(
             x => x.SaveCatalogImageAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);

@@ -8,6 +8,26 @@
 
 ## Specs
 
+- **S7 (2026-11-04, corrección del Owner)** — Los tres hallazgos de producción anotados en
+  "Descartado a propósito" se arreglan, con autorización explícita del Owner
+  (*"dale con todos esos arreglos y despues rdd"*):
+  - **S7.1** — `CatalogImageUploadRules.EnsureValid` debe rechazar cuando **cualquiera** de las dos
+    señales (extensión, content type) está fuera de la allowlist. Hoy `if (!extensionAllowed &&
+    !contentTypeAllowed)` deja pasar `foto.jpg` + `text/plain`.
+  - **S7.2** — `AddStoreCatalogImageCommand` debe escribir el `TenantId` de la **tienda destino**,
+    no el del claim del llamador; tienda inexistente → 404 `StoreNotFound`.
+  - **S7.3** — `GET branding` y `GET showcase` deben responder 404 cuando la tienda **no existe**,
+    conservando el 200 con defaults/listas vacías cuando la tienda existe y no tiene fila
+    (decisión documentada en los propios handlers: `GetStoreCatalogBrandingQuery.cs:18-22`,
+    `GetStoreCatalogImagesQuery.cs:20-23`).
+- **S8** — La regla del repo sigue vigente: **solo se añaden** E2E; ningún test ni support file
+  existente se modifica. Los defectos se fijan en archivos nuevos, y se observa RED antes del
+  arreglo.
+- **S9** — Ningún cambio puede alterar el comportamiento observable del catálogo fuera de los tres
+  puntos de S7. Prueba: la suite `Catalog` completa debe quedarse verde.
+
+## Specs originales
+
 - **S1** — Cubrir con tests E2E de backend *"todo lo de los catálogos web y los pedidos"*:
   los 33 endpoints del plan `docs/plans/2026-10-11-api-endpoint-review-catalogo-pedidos.md`
   (9 unidades: `CatalogController`, `CatalogBrandingController`, `CatalogShowcaseController`,
@@ -101,6 +121,14 @@
   reordenado (vacío/subconjunto/duplicado/inventado/otro conjunto/otra tienda) con el orden
   persistido intacto. → `Catalog/AdminShowcaseEndpointRulesE2ETests.cs` (8 métodos + teoría de 7
   casos = 15 casos)
+- **T12** — HECHO · S7.1 — `CatalogImageUploadRules` rechaza si la extensión **o** el content type
+  están fuera (`||` en vez de `&&`). → `Catalog/CatalogImageAllowlistE2ETests.cs` (3 casos)
+- **T13** — HECHO · S7.2 — el `TenantId` del showcase sale de la tienda de la ruta (fila **y**
+  prefijo de la clave); tienda inexistente → 404. → `Catalog/ShowcaseImageTenantOwnershipE2ETests.cs`
+  (1 caso, con un segundo `Tenant` real y un SuperAdmin con claim divergente)
+- **T14** — HECHO · S7.3 — `GET branding|showcase` con tienda inexistente → 404, conservando el 200
+  con defaults cuando la tienda existe sin fila. →
+  `Catalog/CatalogStoreExistence404E2ETests.cs` (4 casos, 2 de ellos controles de supervivencia)
 
 ## Superficies adicionales de catálogo web — mapa verificado 2026-11-04
 
@@ -371,6 +399,22 @@ Reglas verificadas en el código, no en el plan:
   un test del validador no puede probar; el predicado puro ya vive en `Application.Tests`).
   **Este slice final NO se re-revisa**: el contrato nativo prohíbe loop-until-clean y los advisories
   son posteriores, no bloqueantes. Evidencia: ambas suites + `AdminWebCatalogCrudTests` → **30/30**.
+- **L15 (2026-11-04, verbatim)** — *"dale con todos esos arreglos y despues rdd"*
+- **L15b (2026-11-04)** — **T12, T13 y T14 HECHOS** con RED observado antes de cada arreglo.
+  Los tres defectos se fijaron en tres archivos nuevos (8 casos) y el RED fue exacto:
+  `Failed: 5, Passed: 3` — fallaban solo los cinco casos defectuosos; los tres controles de
+  supervivencia ya pasaban.
+  Arreglos: `CatalogImageUploadRules` `&&` → `||`; `AddStoreCatalogImageCommand` resuelve la tienda
+  con `GetStoreByIdIgnoreQueryFiltersAsync` y toma el tenant de ahí (404 si no existe), lo que corrige
+  a la vez la fila y el prefijo de la clave; los dos `GET` comprueban la existencia de la tienda y
+  responden 404 solo cuando no existe, conservando el 200 con defaults para una tienda sin fila.
+  Cambios de contrato unitario que el arreglo obliga: los tres constructores de handler ganan
+  `IStoreRepository`, `Handle_WithoutATenantInContext_ShouldReportBadRequest` se reescribió como
+  `Handle_WithoutATenantInTheClaim_ShouldTakeTheTenantFromTheStore` — la regla que protegía (no
+  escribir `TenantId` vacío) sigue viva, pero ahora la garantiza la tienda y no el claim — y se añadió
+  `Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound`.
+  Evidencia: unit `WebCatalog` **397/397**; E2E de la suite `Catalog` completa **213/213** (S9).
+  `ShowcaseStoreTenantNotResolved` queda sin uso en ese handler; el recurso se conserva.
 
 ## Deuda abierta
 
@@ -387,14 +431,22 @@ propia y sus huecos cerrados.
 **Abierto de verdad — código de producción, requiere autorización del Owner.** No son deuda de
 tests, y por eso ninguno de los tres se fijó en un test: hacerlo bloquearía el arreglo.
 
-1. `backend/src/Application/Features/WebCatalog/Images/CatalogImageUploadRules.cs:23` usa `&&` en
-   vez de `||`: un archivo con la extensión permitida y el content type prohibido (o al revés) pasa
-   la allowlist.
+> **CERRADO (T12–T14, 2026-11-04).** Los tres se arreglaron con autorización explícita del Owner.
+> Lo que sigue queda como registro del defecto y de su arreglo; ya no es deuda.
+
+1. `backend/src/Application/Features/WebCatalog/Images/CatalogImageUploadRules.cs:23` usaba `&&` en
+   vez de `||`: un archivo con la extensión permitida y el content type prohibido (o al revés) pasaba
+   la allowlist. **Arreglado**: ahora se rechaza si cualquiera de las dos señales queda fuera.
 2. `backend/src/Application/Features/WebCatalog/Showcase/Commands/AddStoreCatalogImage/AddStoreCatalogImageCommand.cs:82`
-   toma el `TenantId` del claim del llamador, mientras
+   tomaba el `TenantId` del claim del llamador, mientras
    `backend/src/Application/Features/WebCatalog/Branding/Commands/UpdateStoreCatalogBranding/UpdateStoreCatalogBrandingCommand.cs:102-106`
-   lo toma de la fila de la tienda — un SuperAdmin con otro tenant escribe la clave bajo el prefijo
-   equivocado.
+   lo tomaba de la fila de la tienda. **Arreglado**: la tienda de la ruta se resuelve con
+   `GetStoreByIdIgnoreQueryFiltersAsync` (el `storeId` ya es la decisión de autorización; el filtro
+   global aplicaría el tenant del llamador y escondería justo la tienda apuntada), su `TenantId` va a
+   la fila y al prefijo de la clave, y una tienda inexistente responde 404 antes de subir nada.
 3. `backend/src/SMCA.WebApi/Filters/AdminStoreScopeAttribute.cs:54-58`: `GET branding|showcase` con
-   un `storeId` inexistente responde 200 con defaults/listas vacías (el filtro valida el GUID, no la
-   existencia), mientras `PUT branding` responde 404.
+   un `storeId` inexistente respondía 200 con defaults/listas vacías, mientras `PUT branding`
+   respondía 404. **Arreglado** en los dos handlers: se comprueba la existencia de la tienda y se
+   responde 404; el 200 con defaults para una tienda **existente sin fila** se conserva, que era la
+   decisión documentada en los propios handlers (`GetStoreCatalogBrandingQuery.cs:18-22`,
+   `GetStoreCatalogImagesQuery.cs:20-23`).
