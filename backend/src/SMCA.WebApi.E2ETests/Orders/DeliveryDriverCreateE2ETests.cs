@@ -267,29 +267,4 @@ public sealed class DeliveryDriverCreateE2ETests
             await PublicOrderingSeed.CleanupAsync(_f, fixture);
         }
     }
-
-    /// <summary>
-    /// Los casos de borde de arriba usan las constantes del COMANDO como límite. Esta guarda
-    /// comprueba que coinciden con el ancho REAL de las columnas en el modelo EF: si divergen, el
-    /// caso "aceptado en el límite" se convertiría en un 500 del INSERT y el desvío quedaría
-    /// escondido detrás de un test que parecía de frontera.
-    /// </summary>
-    [Fact]
-    public async Task Command_length_limits_must_match_the_ef_column_metadata()
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var metadata = db.Model.FindEntityType(typeof(DeliveryDriver));
-
-        metadata.Should().NotBeNull("el modelo tiene que conocer la entidad");
-
-        metadata!.FindProperty(nameof(DeliveryDriver.Name))!.GetMaxLength()
-            .Should().Be(CreateDeliveryDriverCommand.NameMaxLength,
-                "el validador y la columna `Name` tienen que medir lo mismo");
-        metadata.FindProperty(nameof(DeliveryDriver.Phone))!.GetMaxLength()
-            .Should().Be(CreateDeliveryDriverCommand.PhoneMaxLength,
-                "el validador y la columna `Phone` tienen que medir lo mismo");
-
-        await Task.CompletedTask;
-    }
 }

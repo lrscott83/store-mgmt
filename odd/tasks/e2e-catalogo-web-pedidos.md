@@ -175,17 +175,18 @@ cero (ya hay suites previas que los ejercitan):
   (`consumed_revision` `sha256:790ff25a…`). Los cuatro son de estilo o de un borde barato: la
   revisión converge.
 
-## Deuda abierta (2026-11-03)
+- **L8 (2026-11-04)** — Sexto slice. `R2-1` y `R3-e2e-metadata-guard` cerrados juntos: la guarda
+  de límites sale del suite E2E y pasa a
+  `Application.Tests/Features/OnlineOrdering/DeliveryDriverColumnLimitsTests.cs`, sin fixtura, sin
+  base de datos y sin `async` de relleno; el E2E conserva la prueba observable (alta con el valor
+  exacto → 200 y fila persistida). `R3-empty-ordering-scenario` **no requiere cambio**: la teoría
+  de rechazo afirma 400 **y** que el orden del carrusel no cambió, así que un conjunto vaciado
+  fallaría la igualdad. Evidencia: unit **1/1**; E2E `DeliveryDriverCreateE2ETests` **7/7**.
 
-Advisories de RDD no resueltos. **Ninguno es bloqueante ni cambia comportamiento**; se cierran en
-un slice aparte si alguna vez molestan:
+## Deuda abierta
 
-- **R2-OPAQUE-DECISION-REF** — `OnlineOrderingSettingsE2ETests.cs`: la aserción de unicidad se
-  justifica con "(D19)", un id sin documento que lo resuelva. Sustituir por la regla explícita.
-- **R2-FLAG-ENUM-NAME** — `PublicOrderingConfigE2ETests.cs`: `SettingsFlag.Master` no nombra la
-  columna que escribe. Renombrar a `Enabled`.
-- **R3-LIMIT-CONSTANT-COUPLING** — `DeliveryDriverCreateE2ETests.cs`: los límites salen de las
-  constantes del comando, no del metadata EF. Si divergen, el caso "aceptado en el límite" se
-  convierte en un 500 silencioso.
-- **R3-REORDER-EMPTY-LIST** — `ShowcaseEndpointsE2ETests.cs`: falta el brazo de `orderedIds`
-  vacío en la teoría de rechazo.
+**Sin deuda de revisión.** Los cuatro advisories que estuvieron anotados aquí se cerraron en
+`47eba5f3` (quinto slice) y el guard de límites se movió a `Application.Tests` en el sexto.
+
+Lo único pendiente son las dos superficies fuera del plan de 33 endpoints: **T8**
+(`AdminCatalogController`) y **T9** (`PublicCatalogEventsController`), descritas arriba.
