@@ -1639,6 +1639,8 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"Code\" IS NOT NULL");
 
+                    b.HasIndex("StoreId", "Date");
+
                     b.ToTable("Order");
                 });
 
