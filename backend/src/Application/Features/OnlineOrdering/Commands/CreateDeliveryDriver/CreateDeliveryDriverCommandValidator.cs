@@ -1,3 +1,4 @@
+using Application.Common;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -12,13 +13,18 @@ namespace Application.Features.OnlineOrdering.Commands.CreateDeliveryDriver
     ///     `GetOnlineOrdersQuery` (F5) filtra por él.
     ///   * Los límites de longitud son los de las COLUMNAS
     ///     (`DeliveryDriverEntityTypeConfiguration`): convertirlos aquí en un 400 con mensaje evita
-    ///     un 500 en el INSERT.
+    ///     un 500 en el INSERT. Se miden sobre el valor RECORTADO, que es el que se persiste.
+    ///   * Sin caracteres de CONTROL: un salto de línea en el nombre parte la fila de la lista.
+    ///
+    /// Las reglas viven en <see cref="DeliveryDriverTextRules"/>, compartidas con el validador de la
+    /// edición: si el alta y la edición midieran distinto, el PATCH aceptaría lo que el POST rechaza.
     ///
     /// Lo que este validador NO decide:
     ///
-    ///   * El FORMATO del teléfono. Es texto para marcar en un móvil (D17), no un teléfono
-    ///     validable: `+53 5 123 4567` es tan válido como `5351234567`, y normalizarlo aquí
-    ///     rechazaría números que la gente escribe todos los días.
+    ///   * Un FORMATO concreto de teléfono. Es texto para marcar en un móvil (D17), no un teléfono
+    ///     normalizable: `+53 5 123 4567` es tan válido como `5351234567`, y normalizarlo aquí
+    ///     rechazaría números que la gente escribe todos los días. Lo único que se exige es que sea
+    ///     un teléfono: caracteres de teléfono y al menos 6 dígitos.
     ///   * Que el repartidor exista o sea de esta tienda: eso lo decide el handler contra la base
     ///     de datos, con el id y la tienda del contexto.
     ///   * Que el nombre sea ÚNICO. `DeliveryDriver` no lleva índice único por diseño — dos personas
@@ -34,15 +40,9 @@ namespace Application.Features.OnlineOrdering.Commands.CreateDeliveryDriver
     {
         public CreateDeliveryDriverCommandValidator(IStringLocalizer<I18n> localizer)
         {
-            RuleFor(x => x.Name)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(CreateDeliveryDriverCommand.NameMaxLength)
-                .WithMessage(localizer["DeliveryDriverNameTooLong", "{PropertyName}", CreateDeliveryDriverCommand.NameMaxLength]);
+            RuleFor(x => x.Name).DeliveryDriverName(localizer);
 
-            RuleFor(x => x.Phone)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(CreateDeliveryDriverCommand.PhoneMaxLength)
-                .WithMessage(localizer["DeliveryDriverPhoneTooLong", "{PropertyName}", CreateDeliveryDriverCommand.PhoneMaxLength]);
+            RuleFor(x => x.Phone).DeliveryDriverPhone(localizer);
         }
     }
 }

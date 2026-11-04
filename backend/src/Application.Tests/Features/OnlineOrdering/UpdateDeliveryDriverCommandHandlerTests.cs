@@ -47,7 +47,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         _driverRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<DeliveryDriver>()))
+            .Setup(x => x.UpdatePartialAsync(
+                It.IsAny<DeliveryDriver>(),
+                It.IsAny<DeliveryDriverChangedField>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
     }
 
@@ -87,10 +90,13 @@ public class UpdateDeliveryDriverCommandHandlerTests
         result.Data.Phone.Should().Be("+5352222222");
         result.Data.IsActive.Should().BeTrue();
 
-        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
-            d.Id == driver.Id
-            && d.Name == "Ana María"
-            && d.Phone == "+5352222222")), Times.Once);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.Is<DeliveryDriver>(d =>
+                d.Id == driver.Id
+                && d.Name == "Ana María"
+                && d.Phone == "+5352222222"),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -107,7 +113,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
         result.Data!.Id.Should().Be(driver.Id);
         result.Data.IsActive.Should().BeFalse();
 
-        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d => d.Id == driver.Id)), Times.Once);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.Is<DeliveryDriver>(d => d.Id == driver.Id),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Once);
         _driverRepository.Verify(x => x.SoftDeleteAsync(It.IsAny<DeliveryDriver>()), Times.Never);
         _driverRepository.Verify(x => x.DeleteAsync(It.IsAny<DeliveryDriver>()), Times.Never);
         _driverRepository.Verify(x => x.HardDeleteAsync(It.IsAny<DeliveryDriver>()), Times.Never);
@@ -193,11 +202,14 @@ public class UpdateDeliveryDriverCommandHandlerTests
         driver.IsActive.Should().BeTrue("la fila cargada conserva su estado");
 
         // El nombre y el teléfono SÍ se editan: omitir `IsActive` no cancela el resto del PATCH.
-        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
-            d.Id == driver.Id
-            && d.Name == "Ana María"
-            && d.Phone == "+5352222222"
-            && d.IsActive)), Times.Once);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.Is<DeliveryDriver>(d =>
+                d.Id == driver.Id
+                && d.Name == "Ana María"
+                && d.Phone == "+5352222222"
+                && d.IsActive),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -216,8 +228,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
             "un PATCH parcial no puede reactivar por accidente a un repartidor dado de baja");
         driver.IsActive.Should().BeFalse("la fila cargada conserva su estado");
 
-        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
-            d.Id == driver.Id && !d.IsActive)), Times.Once);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.Is<DeliveryDriver>(d => d.Id == driver.Id && !d.IsActive),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -238,8 +252,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
         result.Data!.IsActive.Should().Be(requested, "un valor explícito sigue mandando");
         driver.IsActive.Should().Be(requested);
 
-        _driverRepository.Verify(x => x.UpdateAsync(It.Is<DeliveryDriver>(d =>
-            d.Id == driver.Id && d.IsActive == requested)), Times.Once);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.Is<DeliveryDriver>(d => d.Id == driver.Id && d.IsActive == requested),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -259,7 +275,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
         Func<Task> act = () => Handler().Handle(Command(foreign.Id), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _driverRepository.Verify(x => x.UpdateAsync(It.IsAny<DeliveryDriver>()), Times.Never);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.IsAny<DeliveryDriver>(),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -284,7 +303,10 @@ public class UpdateDeliveryDriverCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
-        _driverRepository.Verify(x => x.UpdateAsync(It.IsAny<DeliveryDriver>()), Times.Never);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.IsAny<DeliveryDriver>(),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>

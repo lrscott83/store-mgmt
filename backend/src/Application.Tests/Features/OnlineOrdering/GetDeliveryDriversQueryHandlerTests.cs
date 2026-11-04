@@ -187,7 +187,10 @@ public class GetDeliveryDriversQueryHandlerTests
         await Handler().Handle(new GetDeliveryDriversQuery(), CancellationToken.None);
 
         _driverRepository.Verify(x => x.AddAsync(It.IsAny<DeliveryDriver>()), Times.Never);
-        _driverRepository.Verify(x => x.UpdateAsync(It.IsAny<DeliveryDriver>()), Times.Never);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.IsAny<DeliveryDriver>(),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>

@@ -124,7 +124,10 @@ public class CreateDeliveryDriverCommandHandlerTests
 
         _driverRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
         _driverRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
-        _driverRepository.Verify(x => x.UpdateAsync(It.IsAny<DeliveryDriver>()), Times.Never);
+        _driverRepository.Verify(x => x.UpdatePartialAsync(
+            It.IsAny<DeliveryDriver>(),
+            It.IsAny<DeliveryDriverChangedField>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

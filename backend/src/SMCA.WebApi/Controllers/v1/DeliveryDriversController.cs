@@ -42,6 +42,8 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpGet("~/api/v1/delivery-drivers")]
         [ProducesResponseType(typeof(ResponseResult<IEnumerable<DeliveryDriverDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> GetDriversAsync([FromQuery] bool activeOnly = false)
         {
             return Ok(await Sender.Send(new GetDeliveryDriversQuery(activeOnly)));
@@ -53,8 +55,11 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPost("~/api/v1/delivery-drivers")]
         [ProducesResponseType(typeof(ResponseResult<DeliveryDriverDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> CreateDriverAsync([FromBody] CreateDeliveryDriverCommand request)
         {
+            // Sigue devolviendo 200: `DeliveryDriverCreateE2ETests` lo fija y ese E2E no se toca.
             return Ok(await Sender.Send(request));
         }
 
@@ -63,8 +68,11 @@ namespace SMCA.WebApi.Controllers.v1
         /// 404 (no se distingue de uno inexistente). Apagar `IsActive` es baja LÓGICA: no borra la
         /// fila ni los pedidos que ya llevó.
         /// </summary>
-        [HttpPatch("~/api/v1/delivery-drivers/{id}")]
+        [HttpPatch("~/api/v1/delivery-drivers/{id:guid}")]
         [ProducesResponseType(typeof(ResponseResult<DeliveryDriverDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateDriverAsync(Guid id, [FromBody] UpdateDeliveryDriverCommand request)
         {
             // El id de la RUTA manda sobre el del cuerpo: un PATCH sin id en la URL no tiene a qué

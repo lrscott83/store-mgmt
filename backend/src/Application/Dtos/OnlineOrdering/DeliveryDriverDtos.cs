@@ -1,3 +1,5 @@
+using Domain.Entities.DeliveryDrivers;
+
 namespace Application.Dtos.OnlineOrdering
 {
     /// <summary>
@@ -31,5 +33,26 @@ namespace Application.Dtos.OnlineOrdering
         /// que ya llevó (criterio 3); solo lo esconde de las listas por defecto.
         /// </summary>
         public bool IsActive { get; set; }
+    }
+
+    /// <summary>
+    /// El ÚNICO mapeo de entidad a DTO del catálogo de repartidores, compartido por el alta, la
+    /// edición y el listado.
+    ///
+    /// Estaba copiado tres veces, y tres copias del mismo mapeo son tres sitios donde un campo nuevo
+    /// puede aparecer en una respuesta y no en otra. Es explícito (no un spread) para que `TenantId`
+    /// no salga de aquí por accidente: el aislamiento ya está resuelto en la consulta y la vista no
+    /// necesita el tenant de cada fila.
+    /// </summary>
+    public static class DeliveryDriverDtoExtensions
+    {
+        public static DeliveryDriverDto ToDto(this DeliveryDriver driver) => new()
+        {
+            Id = driver.Id,
+            StoreId = driver.StoreId,
+            Name = driver.Name,
+            Phone = driver.Phone,
+            IsActive = driver.IsActive,
+        };
     }
 }

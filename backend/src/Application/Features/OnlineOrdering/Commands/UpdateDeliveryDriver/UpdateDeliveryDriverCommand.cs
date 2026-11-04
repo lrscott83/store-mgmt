@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -30,11 +31,11 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
     /// </summary>
     public sealed class UpdateDeliveryDriverCommand : ICommand<DeliveryDriverDto>
     {
-        /// <summary>Límite de la COLUMNA `Name` (ver <c>DeliveryDriverEntityTypeConfiguration</c>).</summary>
-        public const int NameMaxLength = 200;
+        /// <summary>Límite de la COLUMNA `Name`, compartido con el alta (<see cref="DeliveryDriverLimits"/>).</summary>
+        public const int NameMaxLength = DeliveryDriverLimits.NameMaxLength;
 
-        /// <summary>Límite de la COLUMNA `Phone`.</summary>
-        public const int PhoneMaxLength = 32;
+        /// <summary>Límite de la COLUMNA `Phone`, compartido con el alta.</summary>
+        public const int PhoneMaxLength = DeliveryDriverLimits.PhoneMaxLength;
 
         /// <summary>Repartidor a editar. Viene de la ruta; el handler lo carga y lo filtra por tienda.</summary>
         public Guid Id { get; set; }
@@ -79,9 +80,7 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
         public async Task<ResponseResult<DeliveryDriverDto>> Handle(
             UpdateDeliveryDriverCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             DeliveryDriver? driver = await _deliveryDriverRepository.GetByIdAsync(request.Id);
 
@@ -91,29 +90,30 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
                 throw new ApiException(_localizer["DeliveryDriverNotFound"], HttpStatusCode.NotFound);
 
             // La fila conserva SU `Id` (no se toca) y SU tienda/tenant: el cuerpo no puede
-            // cambiarlos. `UpdateAsync` la marca explícitamente, que es lo que hace falta con un
-            // contexto `NoTracking` — mutar y guardar sin marcar escribiría NADA, sin error.
+            // cambiarlos.
             driver.Name = request.Name.Trim();
             driver.Phone = request.Phone.Trim();
 
             // Omitir el interruptor NO lo apaga (P0-3): el cuerpo no lo pidió, así que la fila
-            // conserva su estado. Solo un `true`/`false` explícito escribe el valor.
-            if (request.IsActive.HasValue)
-                driver.IsActive = request.IsActive.Value;
+            // conserva su estado. Solo un `true`/`false` explícito escribe el valor — y solo ese
+            // valor entra en el conjunto de columnas a persistir.
+            DeliveryDriverChangedField changedFields =
+                DeliveryDriverChangedField.Name | DeliveryDriverChangedField.Phone;
 
-            await _deliveryDriverRepository.UpdateAsync(driver);
+            if (request.IsActive.HasValue)
+            {
+                driver.IsActive = request.IsActive.Value;
+                changedFields |= DeliveryDriverChangedField.IsActive;
+            }
+
+            // Escritura PARCIAL: la fila entera NO viaja en el UPDATE. Con `EntityState.Modified` dos
+            // PATCH concurrentes se pisarían, porque el último escribiría los valores que leyó antes.
+            // El contexto es `NoTracking`, así que la fila cargada llega `Detached`, que es lo que
+            // esta puerta exige.
+            await _deliveryDriverRepository.UpdatePartialAsync(driver, changedFields, cancellationToken);
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(ToDto(driver));
+            return ResponseResult.Success(driver.ToDto());
         }
-
-        private static DeliveryDriverDto ToDto(DeliveryDriver driver) => new()
-        {
-            Id = driver.Id,
-            StoreId = driver.StoreId,
-            Name = driver.Name,
-            Phone = driver.Phone,
-            IsActive = driver.IsActive,
-        };
     }
 }

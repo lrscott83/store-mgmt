@@ -1,3 +1,4 @@
+using Application.Common;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -9,7 +10,9 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
     ///
     ///   * `Id` no puede venir vacío. Sin id no hay fila que actualizar, y el handler lo cargaría
     ///     para acabar en un 404 — más claro rechazarlo en el validador.
-    ///   * Nombre y teléfono: obligatorios y dentro de los límites de sus columnas.
+    ///   * Nombre y teléfono: las MISMAS reglas que el alta (<see cref="DeliveryDriverTextRules"/>):
+    ///     obligatorios, sin caracteres de control, dentro de los límites de sus columnas medidos
+    ///     sobre el valor recortado y, el teléfono, con al menos 6 dígitos.
     ///   * `IsActive` NO se valida: `false` es una baja legítima, no un dato inválido (criterio 3).
     ///
     /// Lo que NO valida: que el repartidor exista, sea de esta tienda o esté activo ya. Eso lo
@@ -28,15 +31,9 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
             RuleFor(x => x.Id)
                 .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"]);
 
-            RuleFor(x => x.Name)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(UpdateDeliveryDriverCommand.NameMaxLength)
-                .WithMessage(localizer["DeliveryDriverNameTooLong", "{PropertyName}", UpdateDeliveryDriverCommand.NameMaxLength]);
+            RuleFor(x => x.Name).DeliveryDriverName(localizer);
 
-            RuleFor(x => x.Phone)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(UpdateDeliveryDriverCommand.PhoneMaxLength)
-                .WithMessage(localizer["DeliveryDriverPhoneTooLong", "{PropertyName}", UpdateDeliveryDriverCommand.PhoneMaxLength]);
+            RuleFor(x => x.Phone).DeliveryDriverPhone(localizer);
         }
     }
 }
