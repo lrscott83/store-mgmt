@@ -92,14 +92,36 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
             // La fila conserva SU `Id` (no se toca) y SU tienda/tenant: el cuerpo no puede
             // cambiarlos.
             driver.Name = request.Name.Trim();
-            driver.Phone = request.Phone.Trim();
+
+            // Escritura PARCIAL: el teléfono solo viaja en el UPDATE si CAMBIA. Escribirlo siempre
+            // haría que un PATCH del nombre reenviara el teléfono que otro PATCH concurrente acaba
+            // de corregir — exactamente lo que `UpdatePartialAsync` evita.
+            DeliveryDriverChangedField changedFields = DeliveryDriverChangedField.Name;
+
+            // El teléfono se compara RECORTADO contra la fila guardada, también recortada: el
+            // cliente lo lee de la respuesta y lo devuelve tal cual, y un espacio heredado alrededor
+            // no es un cambio.
+            string phone = request.Phone.Trim();
+            string storedPhone = (driver.Phone ?? string.Empty).Trim();
+
+            if (!string.Equals(phone, storedPhone, StringComparison.Ordinal))
+            {
+                // CAMBIA el teléfono: aquí sí mandan las reglas estrictas (solo caracteres
+                // marcables, al menos seis dígitos). El validador de la edición no puede aplicarlas
+                // —no ve la fila guardada—, así que vive aquí. Se lanza el MISMO `ValidationException`
+                // con los MISMOS mensajes que el validador lanzaba, para que el cliente reciba el
+                // mismo 400 y el mismo `errors[]`.
+                var strictPhone = new DeliveryDriverPhoneStrictValidator(_localizer).Validate(request);
+                if (!strictPhone.IsValid)
+                    throw new ValidationException(strictPhone.Errors);
+
+                driver.Phone = phone;
+                changedFields |= DeliveryDriverChangedField.Phone;
+            }
 
             // Omitir el interruptor NO lo apaga (P0-3): el cuerpo no lo pidió, así que la fila
             // conserva su estado. Solo un `true`/`false` explícito escribe el valor — y solo ese
             // valor entra en el conjunto de columnas a persistir.
-            DeliveryDriverChangedField changedFields =
-                DeliveryDriverChangedField.Name | DeliveryDriverChangedField.Phone;
-
             if (request.IsActive.HasValue)
             {
                 driver.IsActive = request.IsActive.Value;

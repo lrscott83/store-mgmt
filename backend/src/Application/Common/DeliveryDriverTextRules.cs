@@ -26,6 +26,18 @@ namespace Application.Common
     /// el texto visible no cambia. Los dos mensajes nuevos no tienen clave en el catálogo de
     /// recursos y se escriben literales, como ya hacen los validadores de autenticación.
     ///
+    /// <b>Dos juegos de reglas para el teléfono, no uno</b> (R1-2). El teléfono ESTRICTO
+    /// (<see cref="DeliveryDriverPhone{T}"/>) es el de hoy: solo caracteres marcables y al menos
+    /// seis dígitos. El PERMISIVO (<see cref="DeliveryDriverPhonePermissive{T}"/>) exige
+    /// obligatoriedad, ausencia de caracteres de control y el límite de la columna, nada más.
+    ///
+    /// El PATCH usa el permisivo a propósito: valida el cuerpo en CADA petición, así que con las
+    /// reglas estrictas una fila heredada —un teléfono con letras, con `#` o con menos de seis
+    /// dígitos— no se podía editar NI para corregir solo el nombre: el 400 saltaba por un campo que
+    /// el cliente no había tocado. El handler de la edición aplica entonces las estrictas SOLO
+    /// cuando el teléfono cambia, con <c>DeliveryDriverPhoneStrictValidator</c>, y lanza el mismo
+    /// 400 con los mismos mensajes que antes lanzaba el validador.
+    ///
     /// Lo que estas reglas NO deciden: la existencia del repartidor ni de la tienda (eso lo decide
     /// el handler contra la base de datos), la unicidad del nombre (no hay índice único por diseño:
     /// dos personas pueden llamarse igual) y ningún formato concreto de teléfono (D17).
@@ -53,8 +65,12 @@ namespace Application.Common
                 .WithMessage(localizer["DeliveryDriverNameTooLong", "{PropertyName}", DeliveryDriverLimits.NameMaxLength]);
 
         /// <summary>
-        /// Reglas del teléfono: obligatorio, sin caracteres de control, solo caracteres de teléfono,
-        /// al menos <see cref="DeliveryDriverLimits.PhoneMinDigits"/> dígitos y dentro de la columna.
+        /// Reglas ESTRICTAS del teléfono: obligatorio, sin caracteres de control, solo caracteres de
+        /// teléfono, al menos <see cref="DeliveryDriverLimits.PhoneMinDigits"/> dígitos y dentro de
+        /// la columna.
+        ///
+        /// Son las del ALTA y las de una EDICIÓN que CAMBIA el teléfono. No se pueden usar como
+        /// único juego del PATCH: ver el comentario de la clase.
         /// </summary>
         internal static IRuleBuilderOptions<T, string> DeliveryDriverPhone<T>(
             this IRuleBuilder<T, string> rules, IStringLocalizer<I18n> localizer) =>
@@ -67,6 +83,25 @@ namespace Application.Common
                 .WithMessage(PhoneCharactersMessage)
                 .Must(HasEnoughDigits)
                 .WithMessage(PhoneDigitsMessage)
+                .Must(value => FitsWithin(value, DeliveryDriverLimits.PhoneMaxLength))
+                .WithMessage(localizer["DeliveryDriverPhoneTooLong", "{PropertyName}", DeliveryDriverLimits.PhoneMaxLength]);
+
+        /// <summary>
+        /// Reglas PERMISIVAS del teléfono: obligatorio, sin caracteres de control y dentro de la
+        /// columna. Nada sobre caracteres marcables ni sobre el mínimo de dígitos.
+        ///
+        /// Es el juego del VALIDADOR de la edición, cuya única misión es que el cuerpo traiga un
+        /// texto utilizable. Un valor heredado —letras, `#`, `/`, menos de seis dígitos— tiene que
+        /// poder viajar de vuelta sin cambios para que el dueño pueda corregir SOLO el nombre; el
+        /// juego estricto lo aplica el handler y solo cuando el teléfono cambia de verdad.
+        /// </summary>
+        internal static IRuleBuilderOptions<T, string> DeliveryDriverPhonePermissive<T>(
+            this IRuleBuilder<T, string> rules, IStringLocalizer<I18n> localizer) =>
+            rules
+                .Must(HasText)
+                .WithMessage(localizer["IsRequired", "{PropertyName}"])
+                .Must(IsFreeOfControlCharacters)
+                .WithMessage(ControlCharactersMessage)
                 .Must(value => FitsWithin(value, DeliveryDriverLimits.PhoneMaxLength))
                 .WithMessage(localizer["DeliveryDriverPhoneTooLong", "{PropertyName}", DeliveryDriverLimits.PhoneMaxLength]);
 

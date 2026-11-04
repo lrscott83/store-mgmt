@@ -57,15 +57,25 @@ public class DeliveryDriverPhoneFormatValidationTests
             "el fallo tiene que ser el de caracteres, no el de obligatoriedad");
     }
 
+    /// <summary>
+    /// R1-2: el validador de la edición ya NO rechaza el teléfono heredado, porque corre en cada
+    /// petición y no ve la fila guardada. Su trabajo es que el cuerpo traiga un texto utilizable;
+    /// las reglas estrictas las aplica el handler SOLO cuando el teléfono cambia (ver
+    /// <c>DeliveryDriverLegacyPhoneUpdateTests</c>, que fija el 400 con este mismo mensaje).
+    ///
+    /// Este caso era `..._ShouldFail` cuando el validador llevaba el juego estricto. Invertirlo es
+    /// la consecuencia directa del cambio, no un aflojamiento: el rechazo sigue existiendo, un paso
+    /// más abajo y con la misma respuesta.
+    /// </summary>
     [Theory]
     [InlineData("+53 5 ABC 4567")]
     [InlineData("llamar a Ana")]
-    public void Update_WithNonPhoneCharacters_ShouldFail(string phone)
+    public void Update_WithNonPhoneCharacters_ShouldBeDeferredToTheHandler(string phone)
     {
         var result = UpdateValidator().Validate(ValidUpdate(phone: phone));
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(error => error.ErrorMessage.Contains("only contain"));
+        result.IsValid.Should().BeTrue(
+            "un teléfono heredado tiene que poder viajar de vuelta sin cambios");
     }
 
     #endregion
