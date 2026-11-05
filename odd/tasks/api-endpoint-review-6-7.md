@@ -119,6 +119,22 @@ abiertos. X1 se reforzó (contenido real del archivo + reparto del límite del p
 X3 solo necesitó alinear el mensaje visible del 409 (`f41be3b3`, RDD `review-3243c0d83dee8f99`
 aprobado y quemado). Queda **X4** y **7.8**.
 
+L11 (2026-11-05, X4 por bloques): **Bloque 1 cerrado** (Auth, Users, StoreUsers, Ping,
+Notifications) en `7fe3e4c4`, RDD `review-fd93bc107673cd84` aprobado y quemado. Inventario real:
+37 controladores, 171 acciones; 11 sin declaración (Messages 8, Notifications 2, WeatherForecast 1) y
+83 solo con éxito. Bloques definidos: 1 auth/acceso (hecho), 2 stores/billing (Stores, Plans, Modules,
+Tenants, SalesCommissions, ProductSalesCommissions), 3 catálogo, 4 catálogo admin, 5 pedidos/reparto,
+6 público, 7 administración/sync, 8 mensajería/legado.
+
+L12 (2026-11-05, contratos arreglados antes de seguir con X4):
+- `29985987`: crear usuario de tienda devuelve el usuario creado (no `bool`) y el listado se tipa
+  como lista concreta; el cliente de notificaciones tipa "marcar todas" como número.
+  RDD `review-c448b9a31c92d792` aprobado y quemado.
+- `bbb78a0e`: `StoreUserDto.StoreName` vuelve a ser texto y `Id` lleva el id del usuario; el detalle
+  por id ahora carga usuario y tienda (antes devolvía nombre/login/teléfono/email vacíos — bug real).
+  RDD `review-a28d64bf82e77d4c` aprobado y quemado.
+- **Siguiente paso de la sesión**: bloque 2 de X4.
+
 L7 (2026-11-04, avisos de revisión, NO bloqueantes, pendientes de decisión):
 - `review-adecbd9e3044c26f` R1-2 (WARNING): las reglas de teléfono son más estrictas que la línea base,
   así que un repartidor ya guardado con `#`, `/` o menos de 6 dígitos **no se puede editar** (el PATCH
