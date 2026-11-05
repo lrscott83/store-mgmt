@@ -59,6 +59,14 @@ S14. `search` y el orden del listado deben apoyarse en índices: extensión `pg_
 
 S15. Toda unidad cierra con tests nuevos; ningún E2E existente se modifica.
 
+S16. **X4 bloque 2 (stores/billing)**: cada acción de `StoresController`, `PlansController`,
+     `ModulesController`, `TenantsController`, `SalesCommissionsController` y
+     `ProductSalesCommissionsController` declara con `[ProducesResponseType]` (a) el payload de éxito
+     tipado que realmente devuelve y (b) cada código no-éxito que realmente puede producir
+     (400 por validación/guard, 401/403 por `[HasPermission]`/`[Authorize]`, 404, 409), verificado
+     contra validadores, guards, filtros y `ErrorHandlerMiddleware`; nada inventado. Una guardia de
+     reflexión lo fija.
+
 ## Tasks
 
 | ID | Qué | Specs | Ruta | Estado |
@@ -66,6 +74,7 @@ S15. Toda unidad cierra con tests nuevos; ningún E2E existente se modifica.
 | T1 | Pedidos online: page acotado, search acotado, `driverId` requerido, existencia de repartidor, `[Authorize]`, guard y 404 compartidos, `CancellationToken`, `Include`s | S1, S2, S3, S4, S5, S6, S7, S8, S15 | delegado (worker) | hecho — `5d6e0d90`, RDD `review-3904c69fea54839c` aprobado y quemado |
 | T2 | Repartidores: update parcial, validación recortada, DTO/límites/guard únicos, `:guid` y `ProducesResponseType`, E2E cross-store | S5, S9, S10, S11, S12, S13, S15 | delegado (worker) | hecho — `3d607ddc`, RDD `review-adecbd9e3044c26f` aprobado y quemado (2 avisos) |
 | T3 | Índices: `pg_trgm` GIN en `Code`/`CustomerPhone`, `(StoreId, Date)`, migración + script | S14, S15 | delegado (worker) | hecho — `fac049c7`, RDD `review-451fa6a3fd6d7371` aprobado y quemado (1 aviso) |
+| T4 | X4 bloque 2: declaraciones reales en Stores, Plans, Modules, Tenants, SalesCommissions y ProductSalesCommissions + guardia de reflexión | S16, S15 | delegado (worker) | hecho — `427b6f6e`, RDD `review-b3aa354767e95c44` aprobado y quemado (4 avisos) |
 
 ## Log
 
@@ -144,4 +153,22 @@ L7 (2026-11-04, avisos de revisión, NO bloqueantes, pendientes de decisión):
   separadores U+2028/U+2029 y los bidi/zero-width (`Cf`) siguen pasando en el nombre.
 - `review-451fa6a3fd6d7371` R1-001 (SUGGESTION): `CREATE EXTENSION pg_trgm` sin `SCHEMA` explícito y con
   los privilegios del rol de migración; documentar el privilegio y fijar el esquema.
+
+L13 (2026-11-05, verbatim): «continua con la etapa 2 de los tests del backend». El Owner confirma que
+"etapa 2" = **bloque 2 de X4** (stores/billing: Stores, Plans, Modules, Tenants, SalesCommissions,
+ProductSalesCommissions). Autoriza implementarlo.
+
+L14 (2026-11-05, X4 bloque 2 cerrado): commit `427b6f6e`, RDD `review-b3aa354767e95c44` (lentes risk
+y readability) **aprobado y quemado**. Evidencia: guardia nueva en RED (5 de 6 controladores fallaban)
+y después en GREEN; `--filter FullyQualifiedName~ApiContractProducesResponseType` → 24/24 y
+`Application.Tests` → 1763/1763.
+- **Hueco real encontrado en las dos guardias**: `[ProducesResponseType(StatusCodes.Status200OK)]` sin
+  tipo reporta `Type == typeof(void)`, no `null`, así que `Type is not null` dejaba pasar un éxito sin
+  tipar. Las dos guardias ahora exigen que todo éxito **con cuerpo** declare su tipo y permiten 204/205
+  sin payload. Capturó un caso real: `StoresController.SetMyStoreIdAsync` (tipado como
+  `ResponseResult<bool>`); `AuthController.RevokeAsync` resultó legítimo (204 sin cuerpo).
+- Avisos de revisión (readability, NO bloqueantes, pendientes de decisión): el arnés de reflexión está
+  duplicado entre las dos guardias (WARNING; se podría unificar con más `MemberData`); contador del
+  bloque como número mágico; literales de status sin nombre; la referencia "X4, block 2" no resuelve
+  dentro del repo.
 
