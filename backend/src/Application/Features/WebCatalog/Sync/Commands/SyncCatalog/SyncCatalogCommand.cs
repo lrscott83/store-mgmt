@@ -51,6 +51,7 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
         private readonly IProductCategoryRepository _productCategoryRepository;
         private readonly IProductRepository _productRepository;
         private readonly IProductImageRepository _productImageRepository;
+        private readonly IProductWholesaleTierRepository _productWholesaleTierRepository;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
 
@@ -62,6 +63,7 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             IProductCategoryRepository productCategoryRepository,
             IProductRepository productRepository,
             IProductImageRepository productImageRepository,
+            IProductWholesaleTierRepository productWholesaleTierRepository,
             IStringLocalizer<I18n> localizer,
             ICatalogStaticPageRegenerator catalogPageRegenerator)
         {
@@ -72,6 +74,7 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             _productCategoryRepository = productCategoryRepository;
             _productRepository = productRepository;
             _productImageRepository = productImageRepository;
+            _productWholesaleTierRepository = productWholesaleTierRepository;
             _localizer = localizer;
             _catalogPageRegenerator = catalogPageRegenerator;
         }
@@ -143,6 +146,11 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
                 // daría instancias nuevas con la misma clave y chocaría el tracking del contexto.
                 await CatalogMirrorWriter.MirrorGalleriesAsync(snapshot, mirror.Products,
                     _productRepository, _productImageRepository);
+                // Tercera fase: los escalones mayoristas referencian el producto, que ya existe
+                // (fase 1 guardada). Se reusa `mirror.Products` por el mismo motivo que la galería:
+                // re-leer daría instancias nuevas con la misma clave y el contexto no trackea.
+                await CatalogMirrorWriter.MirrorWholesaleTiersAsync(snapshot, mirror.Products,
+                    _productWholesaleTierRepository);
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
                 categoriesCreated = counts.CategoriesCreated;

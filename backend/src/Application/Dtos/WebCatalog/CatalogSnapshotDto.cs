@@ -53,5 +53,43 @@ namespace Application.Dtos.WebCatalog
         /// vacía sí significa "sin imágenes" y la deja limpia.
         /// </summary>
         public List<string>? Images { get; set; }
+
+        // --- Configuración mayorista (hechos del POS, igual que el precio minorista) ---
+        //
+        // Viaja SIEMPRE, con o sin modo mayorista en el catálogo: el modo decide qué se publica,
+        // no qué se sincroniza. El POS es el dueño de estos datos (los edita en el producto), así
+        // que el espejo los escribe tal cual y NUNCA los inventa.
+
+        /// <summary>El producto se vende también por paquetes.</summary>
+        public bool WholesaleEnabled { get; set; }
+
+        /// <summary>Unidades por paquete/caja. 0 o ausente = sin configurar.</summary>
+        public int WholesalePackSize { get; set; }
+
+        /// <summary>Unidad de medida del dueño ("caja", "paquete"). null = la de por defecto.</summary>
+        public string? WholesaleUnitLabel { get; set; }
+
+        /// <summary>
+        /// Escalones de precio mayorista. Ausente o vacío = el producto no tiene escalones, y el
+        /// espejo deja la tabla limpia: a diferencia de la galería, estos datos SON del POS, así que
+        /// "no vienen" significa "no hay", nunca "no los toques".
+        /// </summary>
+        public List<CatalogSnapshotWholesaleTierDto>? WholesaleTiers { get; set; }
+    }
+
+    /// <summary>
+    /// Un escalón mayorista del producto en el snapshot. El precio es POR UNIDAD dentro del
+    /// paquete, igual que en el POS y en la tabla `ProductWholesaleTier`.
+    /// </summary>
+    public sealed class CatalogSnapshotWholesaleTierDto
+    {
+        /// <summary>Mínimo de paquetes a partir del cual aplica.</summary>
+        public int MinPacks { get; set; }
+
+        /// <summary>Precio de una unidad dentro del paquete.</summary>
+        public decimal PricePerUnit { get; set; }
+
+        /// <summary>Moneda del precio, por VALOR del enum `Currency`. Ausente = la del producto.</summary>
+        public int? Currency { get; set; }
     }
 }

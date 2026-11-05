@@ -336,6 +336,15 @@
   <data name="CatalogSnapshotProductRequired" xml:space="preserve">
     <value>Para publicar un producto que aún no está en el servidor se necesitan el nombre y la categoría</value>
   </data>
+  <data name="CatalogWholesaleTiersLimit" xml:space="preserve">
+    <value>El producto {0} no puede tener más de {1} escalones mayoristas</value>
+  </data>
+  <data name="CatalogWholesaleDuplicateMinPacks" xml:space="preserve">
+    <value>El producto {0} repite el mínimo de paquetes en dos escalones mayoristas</value>
+  </data>
+  <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
   <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
     <value>Al habilitar los pedidos hay que abrir al menos una modalidad: recogida en tienda o envío a domicilio</value>
   </data>

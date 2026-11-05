@@ -53,6 +53,9 @@ namespace Application.Features.WebCatalog.Sync
         public const int MaxCategories = 500;
         public const int MaxProducts = 5000;
 
+        /// <summary>Tope de escalones mayoristas por producto: un producto real no se acerca.</summary>
+        public const int MaxWholesaleTiers = 20;
+
         /// <summary>
         /// Primera fase: categorías y productos (hechos). El llamador guarda al terminar.
         ///
@@ -128,6 +131,7 @@ namespace Application.Features.WebCatalog.Sync
                     product.DiscountFromInventory = incoming.DiscountFromInventory;
                     if (!string.IsNullOrWhiteSpace(incoming.BusinessId))
                         product.BusinessId = incoming.BusinessId!;
+                    ApplyWholesaleFacts(product, incoming);
                     // Description / PercentDiscountPrice / DiscountPrice / IsNew / Image: NO se tocan.
                     await productRepository.UpdateAsync(product);
                     productsUpdated++;
@@ -140,6 +144,7 @@ namespace Application.Features.WebCatalog.Sync
                         incoming.Order, incoming.AvailableToSale, incoming.DiscountFromInventory,
                         incoming.BusinessId ?? string.Empty, tenantId);
                     created.Currency = ToCurrency(incoming.Currency);
+                    ApplyWholesaleFacts(created, incoming);
                     await productRepository.AddAsync(created);
                     createdProducts.Add(created);
                     productsCreated++;
@@ -225,6 +230,72 @@ namespace Application.Features.WebCatalog.Sync
 
                 await imageRepository.AddRangeAsync(rows);
             }
+        }
+
+        /// <summary>
+        /// Tercera fase: escalones mayoristas. Va después de la galería y con los productos ya
+        /// escritos, porque cada escalón referencia su producto.
+        ///
+        /// A diferencia de la galería, aquí "no vienen" SÍ significa "no hay": estos datos son del
+        /// POS, que es su dueño, así que un producto sin escalones en el snapshot deja la tabla
+        /// limpia. Solo se reescribe cuando el conjunto cambió — re-sincronizar no borra e inserta
+        /// lo mismo.
+        /// </summary>
+        public static async Task MirrorWholesaleTiersAsync(
+            CatalogSnapshotDto snapshot,
+            IList<Product> products,
+            IProductWholesaleTierRepository tierRepository)
+        {
+            var productsById = products.ToDictionary(product => product.Id);
+
+            foreach (CatalogSnapshotProductDto incoming in snapshot.Products)
+            {
+                if (!productsById.TryGetValue(incoming.Id, out Product? product))
+                    continue;
+
+                List<CatalogSnapshotWholesaleTierDto> desired = (incoming.WholesaleTiers ?? [])
+                    .Where(tier => tier.MinPacks > 0)
+                    .OrderBy(tier => tier.MinPacks)
+                    .ToList();
+
+                List<ProductWholesaleTier> stored = product.WholesaleTiers
+                    .OrderBy(tier => tier.MinPacks)
+                    .ToList();
+
+                bool unchanged = desired.Count == stored.Count
+                    && desired.Zip(stored).All(pair =>
+                        pair.First.MinPacks == pair.Second.MinPacks
+                        && pair.First.PricePerUnit == pair.Second.PricePerUnit
+                        && ToCurrency(pair.First.Currency ?? incoming.Currency) == pair.Second.Currency);
+
+                if (unchanged)
+                    continue;
+
+                await tierRepository.HardDeleteWhereAsync(tier => tier.ProductId == product.Id);
+
+                if (desired.Count == 0)
+                    continue;
+
+                IEnumerable<ProductWholesaleTier> rows = desired.Select(tier =>
+                    ProductWholesaleTier.Create(
+                        product.Id,
+                        tier.MinPacks,
+                        tier.PricePerUnit,
+                        ToCurrency(tier.Currency ?? incoming.Currency),
+                        product.TenantId));
+
+                await tierRepository.AddRangeAsync(rows);
+            }
+        }
+
+        /// <summary>Hechos mayoristas del producto (el precio de los escalones va en su propia fase).</summary>
+        private static void ApplyWholesaleFacts(Product product, CatalogSnapshotProductDto incoming)
+        {
+            product.WholesaleEnabled = incoming.WholesaleEnabled;
+            product.WholesalePackSize = incoming.WholesalePackSize;
+            product.WholesaleUnitLabel = string.IsNullOrWhiteSpace(incoming.WholesaleUnitLabel)
+                ? null
+                : incoming.WholesaleUnitLabel!.Trim();
         }
 
         /// <summary>Moneda del snapshot/respuesta por VALOR del enum; un valor raro cae a CUP.</summary>

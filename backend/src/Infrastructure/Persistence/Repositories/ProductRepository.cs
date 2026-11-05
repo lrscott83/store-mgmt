@@ -74,6 +74,7 @@ namespace Infrastructure.Persistence.Repositories
                 .Where(product => product.Category.StoreId == storeId)
                 .Include(product => product.Category)
                 .Include(product => product.Images)
+                .Include(product => product.WholesaleTiers)
                 .OrderBy(product => product.Category.Order)
                 .ThenBy(product => product.Order)
                 .ToListAsync();

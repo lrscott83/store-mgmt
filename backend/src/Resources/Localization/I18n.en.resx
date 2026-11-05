@@ -588,6 +588,15 @@
   <data name="CatalogSnapshotProductRequired" xml:space="preserve">
     <value>To publish a product that is not on the server yet, its name and category are required</value>
   </data>
+  <data name="CatalogWholesaleTiersLimit" xml:space="preserve">
+    <value>Product {0} cannot have more than {1} wholesale tiers</value>
+  </data>
+  <data name="CatalogWholesaleDuplicateMinPacks" xml:space="preserve">
+    <value>Product {0} repeats the minimum pack count across two wholesale tiers</value>
+  </data>
+  <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
+    <value>{0} cannot exceed {1} characters</value>
+  </data>
   <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
     <value>With orders enabled at least one delivery method must be open: store pickup or home delivery</value>
   </data>

@@ -147,6 +147,20 @@ export interface CatalogSnapshotProduct {
   isActive: boolean;
   businessId?: string;
   discountFromInventory: boolean;
+  /** Config mayorista del producto: viaja SIEMPRE, con o sin modo mayorista en el catálogo. */
+  wholesaleEnabled?: boolean;
+  wholesalePackSize?: number;
+  wholesaleUnitLabel?: string;
+  /** Escalones de precio mayorista. Array vacío = el producto no tiene (el servidor limpia). */
+  wholesaleTiers?: CatalogSnapshotWholesaleTier[];
+}
+
+/** Un escalón mayorista del producto. `pricePerUnit` es POR UNIDAD dentro del paquete. */
+export interface CatalogSnapshotWholesaleTier {
+  minPacks: number;
+  pricePerUnit: number;
+  /** Moneda de `pricePerUnit` por valor del enum `Currency`; ausente = la del producto. */
+  currency?: number;
 }
 
 export interface CatalogSnapshot {
