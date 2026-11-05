@@ -245,7 +245,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 return null;
 
             Stream content = CatalogImageUploadRules.EnsureValid(
-                upload.Content, upload.FileName, upload.Length, _localizer);
+                upload.Content, upload.FileName, upload.ContentType, upload.Length, _localizer);
 
             return ReferenceEquals(content, upload.Content)
                 ? upload

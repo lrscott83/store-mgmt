@@ -73,7 +73,7 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
             // Formato (extensión + cabecera real) y tamaño ANTES de subir nada: un archivo inválido
             // no puede dejar un archivo huérfano en disco. Devuelve el stream ya rebobinado.
             Stream content = CatalogImageUploadRules.EnsureValid(
-                request.Content, request.FileName, request.Length, _localizer);
+                request.Content, request.FileName, request.ContentType, request.Length, _localizer);
 
             Guid tenantId = _httpContextService.TenantId.ToGuid();
 

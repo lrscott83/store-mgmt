@@ -2,7 +2,9 @@ using Application.Abstractions.HttpContext;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBranding;
+using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -26,6 +28,7 @@ namespace Application.Tests.Features.WebCatalog.Branding.Queries;
 public class GetStoreCatalogBrandingQueryHandlerTests
 {
     private readonly Mock<IHttpContextService> _httpContextService = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
@@ -41,10 +44,17 @@ public class GetStoreCatalogBrandingQueryHandlerTests
 
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
+
+        // La tienda existe: el 404 es solo para una tienda inexistente, no para una sin marca.
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda de prueba", Guid.NewGuid(), true, _tenantId,
+                DateOnly.FromDateTime(DateTime.UtcNow), storePlanId: (int)StorePlanType.Superior));
     }
 
     private GetStoreCatalogBrandingQueryHandler Handler() => new(
         _httpContextService.Object,
+        _storeRepository.Object,
         _settingsRepository.Object,
         _localizer.Object);
 
@@ -210,6 +220,24 @@ public class GetStoreCatalogBrandingQueryHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        _settingsRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// S7.3 — una tienda que NO EXISTE es 404, no defaults. Es el borde que separa "sin marca" de
+    /// "petición mal dirigida": se rechaza antes de leer la fila.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreDoesNotExist_ShouldReportNotFound()
+    {
+        _storeRepository
+            .Setup(x => x.GetStoreByIdIgnoreQueryFiltersAsync(_storeId))
+            .ReturnsAsync((Store?)null);
+
+        Func<Task> act = () => Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
         _settingsRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
     }
 

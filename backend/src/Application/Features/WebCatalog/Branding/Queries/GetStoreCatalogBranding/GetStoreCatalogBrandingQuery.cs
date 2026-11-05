@@ -31,15 +31,18 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
         : IQueryHandler<GetStoreCatalogBrandingQuery, StoreCatalogBrandingDto>
     {
         private readonly IHttpContextService _httpContextService;
+        private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetStoreCatalogBrandingQueryHandler(
             IHttpContextService httpContextService,
+            IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
+            _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _localizer = localizer;
         }
@@ -50,6 +53,17 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
             Guid storeId = _httpContextService.StoreId.ToGuid();
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+
+            // "Sin fila" y "sin tienda" son dos cosas distintas y solo la segunda es un error. Una
+            // tienda recién sincronizada sin marca tiene que seguir leyendo defaults (es la decisión
+            // documentada arriba); una tienda que NO EXISTE es una petición mal dirigida y merece
+            // 404, igual que ya hace `PUT branding`.
+            //
+            // Se ignora el filtro por tenant a propósito: `storeId` es la decisión de autorización
+            // (ruta bajo `AdminStoreScope`+SuperAdmin, o claim del dueño) y el filtro global aplicaría
+            // el tenant del LLAMADOR, escondiendo la tienda que la ruta acaba de apuntar.
+            _ = await _storeRepository.GetStoreByIdIgnoreQueryFiltersAsync(storeId)
+                ?? throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
 
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
 

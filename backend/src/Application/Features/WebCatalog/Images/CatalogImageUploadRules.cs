@@ -11,11 +11,14 @@ namespace Application.Features.WebCatalog.Images
     /// Reglas de las imágenes del catálogo web (plan 2026-09-27, decisión D10):
     /// formatos jpg/jpeg/png/webp, máximo 2 MB por archivo y 6 por producto.
     ///
-    /// La extensión decide cuál es el FORMATO DECLARADO, y la cabecera decide si el archivo es de
-    /// verdad ese formato. Las dos cosas se exigen: antes bastaba con una, y una de las dos la
-    /// escribe quien sube. El `Content-Type` ya no cuenta como permiso —es la tercera cosa que
-    /// declara el cliente, no una prueba—, así que renombrar un archivo cualquiera a `.png` se
-    /// queda en el 400 localizado de siempre.
+    /// TRES señales, y las tres se exigen: la extensión declara el formato, el `Content-Type`
+    /// declara el tipo y la CABECERA del archivo decide si lo que llegó es de verdad una imagen.
+    /// Las dos primeras las escribe quien sube, así que por sí solas no prueban nada — la prueba
+    /// es la cabecera. Medir solo una de las tres (como se hacía antes) dejaba la allowlist
+    /// esquivable renombrando el archivo o mintiendo en el `Content-Type`.
+    ///
+    /// La cabecera se lee DESPUÉS del tamaño: un archivo de más se rechaza por su tamaño, que es lo
+    /// que la persona puede arreglar, en vez de por "no es una imagen" después de leer de más.
     /// </summary>
     internal static class CatalogImageUploadRules
     {
@@ -25,17 +28,26 @@ namespace Application.Features.WebCatalog.Images
         /// ya consumió bytes y devuelve una copia desde el principio.
         /// </summary>
         public static Stream EnsureValid(
-            Stream content, string? fileName, long length, IStringLocalizer<I18n> localizer)
+            Stream content,
+            string? fileName,
+            string? contentType,
+            long length,
+            IStringLocalizer<I18n> localizer)
         {
             string extension = Path.GetExtension(Path.GetFileName(fileName ?? string.Empty)).ToLowerInvariant();
 
-            // La extensión es la primera puerta: sin ella no hay formato declarado que comprobar.
             if (!ProductEntityLimits.AllowedImageExtensions.Contains(extension))
                 throw NotAllowed(localizer);
 
-            // El tamaño se comprueba ANTES de leer la cabecera: un archivo demasiado grande se
-            // rechaza por su tamaño, que es lo que el dueño puede arreglar, y no por "no es una
-            // imagen" —que además sería cierto— después de haber leído bytes de más.
+            // El `Content-Type` NO es una prueba por sí solo —lo declara el cliente— pero la
+            // allowlist de formatos está publicada y un tipo fuera de ella es un rechazo legítimo
+            // de la regla de negocio; la cabecera de abajo es la que decide de verdad.
+            if (contentType is null
+                || !ProductEntityLimits.AllowedImageContentTypes.Contains(contentType.ToLowerInvariant()))
+            {
+                throw NotAllowed(localizer);
+            }
+
             if (length <= 0)
                 throw NotAllowed(localizer);
 
