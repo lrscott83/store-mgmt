@@ -74,13 +74,31 @@ public sealed class ApiContractProducesResponseTypeTests
 
         foreach (var action in actions)
         {
-            var typedSuccess = GetDeclaredResponses(action)
-                .Where(r => r.StatusCode is >= 200 and < 300 && r.Type is not null)
+            // Every action answers with some success status; those that carry a body must type it.
+            // The parameterless [ProducesResponseType(StatusCodes.Status200OK)] overload reports
+            // typeof(void), not null, so a null-check alone would let a bare status through, and
+            // 204/205 are bodyless answers on purpose.
+            var successes = GetDeclaredResponses(action)
+                .Where(r => r.StatusCode is >= 200 and < 300)
                 .ToList();
 
-            typedSuccess.Should().NotBeEmpty(
-                $"{controller.Name}.{action.Name} must document its success status with a response payload type");
+            successes.Should().NotBeEmpty(
+                $"{controller.Name}.{action.Name} must document the success status it returns");
+
+            foreach (var success in successes.Where(s => CarriesBody(s.StatusCode)))
+            {
+                (success.Type is not null && success.Type != typeof(void)).Should().BeTrue(
+                    $"{controller.Name}.{action.Name} declares {success.StatusCode} with a body, so it must declare its payload type");
+            }
         }
+    }
+
+    /// <summary>
+    /// A success status that carries a body. 204 and 205 are answers with no payload on purpose.
+    /// </summary>
+    private static bool CarriesBody(int statusCode)
+    {
+        return statusCode is >= 200 and < 300 and not 204 and not 205;
     }
 
     /// <summary>

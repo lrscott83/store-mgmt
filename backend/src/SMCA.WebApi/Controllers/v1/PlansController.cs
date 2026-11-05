@@ -23,6 +23,9 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ResponseResult<List<PlanDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetPlansAsync([FromQuery] bool includeInactiveModules = false)
         {
             return Ok(await Sender.Send(new GetPlansQuery(includeInactiveModules)));

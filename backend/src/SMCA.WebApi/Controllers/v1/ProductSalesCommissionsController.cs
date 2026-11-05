@@ -21,6 +21,9 @@ namespace SMCA.WebApi.Controllers.v1
     {
         [HttpGet]
         [ProducesResponseType(typeof(ResponseResult<List<ProductSalesCommissionDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetAllAsync()
         {
             return Ok(await Sender.Send(new GetProductSalesCommissionsQuery()));
@@ -29,7 +32,10 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpPut("{productId}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> UpsertAsync(
             Guid productId,
             [FromBody] UpsertProductSalesCommissionRequest request)
@@ -40,6 +46,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpDelete("{productId}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteAsync(Guid productId)
         {

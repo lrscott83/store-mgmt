@@ -20,7 +20,9 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpGet("ToStore")]
         [ProducesResponseType(typeof(ResponseResult<List<ModuleDto>>), StatusCodes.Status200OK)]
-        
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetAvailableModulesToStoreQueryAsync()
         {
             return Ok(await Sender.Send(new GetAvailableModulesToStoreQuery()));

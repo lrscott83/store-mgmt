@@ -21,6 +21,8 @@ namespace SMCA.WebApi.Controllers.v1
     {
         [HttpGet("list")]
         [ProducesResponseType(typeof(ResponseResult<List<TenantDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetTenantsIncludingActiveFeaturesAsync()
         {
             return Ok(await Sender.Send(new GetTenantsIncludingActiveFeaturesQuery()));
@@ -28,6 +30,8 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("all/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<TenantDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetTenantsAsync(bool includeInactive)
         {
             return Ok(await Sender.Send(new GetAllTenantsQuery()));
@@ -35,6 +39,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPost("CreateTenant")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> CreateTenantAsync(CreateTenantCommand command)
         {
             return Ok(await Sender.Send(command));
@@ -44,7 +51,10 @@ namespace SMCA.WebApi.Controllers.v1
         /// Update My Tenant Id (only available for Super Admins)
         /// </summary>
         [HttpPut]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> SetMyTenantIdAsync([FromBody] SetMyTenantCommand command)
         {
 
@@ -57,6 +67,7 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpGet("GetTenantFeatures")]
         [ProducesResponseType(typeof(ResponseResult<List<string>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [AllowAnonymous]
         public async Task<IActionResult> GetTenantFeaturesAsync([FromQuery] GetStoreModulesQuery query)
         {
@@ -65,6 +76,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ResponseResult<TenantDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetTenantByIdAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetTenantByIdQuery(id)));
@@ -72,6 +86,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> UpdatedTenantAsync(Guid id, [FromBody] UpdateTenantCommand command)
         {
             return Ok(await Sender.Send(
@@ -83,6 +100,9 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> DeleteAsync(Guid id)
         {
             return Ok(await Sender.Send(new DeleteTenantCommand(id)));
