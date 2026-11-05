@@ -236,10 +236,13 @@ namespace Application.Features.WebCatalog.Sync
         /// Tercera fase: escalones mayoristas. Va después de la galería y con los productos ya
         /// escritos, porque cada escalón referencia su producto.
         ///
-        /// A diferencia de la galería, aquí "no vienen" SÍ significa "no hay": estos datos son del
-        /// POS, que es su dueño, así que un producto sin escalones en el snapshot deja la tabla
-        /// limpia. Solo se reescribe cuando el conjunto cambió — re-sincronizar no borra e inserta
-        /// lo mismo.
+        /// Tres estados, porque "ausente" y "vacío" no son lo mismo cuando el dato es del POS:
+        /// - `WholesaleTiers` null = el snapshot no habla de los escalones (bundle viejo, snapshot
+        ///   parcial): no se toca lo guardado. Tratarlo como vacío era R1-1: un cliente viejo
+        ///   borraba todos los escalones de la tienda y la respuesta decía "sincronizado".
+        /// - Lista vacía = "no hay escalones": se deja la tabla limpia.
+        /// - Lista con elementos = conjunto deseado; solo se reescribe cuando cambió, para que
+        ///   re-sincronizar no borre e inserte lo mismo.
         /// </summary>
         public static async Task MirrorWholesaleTiersAsync(
             CatalogSnapshotDto snapshot,
@@ -253,7 +256,12 @@ namespace Application.Features.WebCatalog.Sync
                 if (!productsById.TryGetValue(incoming.Id, out Product? product))
                     continue;
 
-                List<CatalogSnapshotWholesaleTierDto> desired = (incoming.WholesaleTiers ?? [])
+                // Ausente = el snapshot no habla de este producto: no se borra ni se inserta.
+                if (incoming.WholesaleTiers is null)
+                    continue;
+
+                List<CatalogSnapshotWholesaleTierDto> desired = incoming.WholesaleTiers
+                    .Where(tier => tier is not null)
                     .Where(tier => tier.MinPacks > 0)
                     .OrderBy(tier => tier.MinPacks)
                     .ToList();
@@ -288,14 +296,27 @@ namespace Application.Features.WebCatalog.Sync
             }
         }
 
-        /// <summary>Hechos mayoristas del producto (el precio de los escalones va en su propia fase).</summary>
+        /// <summary>
+        /// Hechos mayoristas del producto (el precio de los escalones va en su propia fase).
+        ///
+        /// Cada campo ausente (`null`) deja el valor guardado como está: un bundle viejo del POS
+        /// no habla de la config mayorista, y escribirlo con el default de .NET (false/0) borraría
+        /// la configuración del dueño. Una unidad en blanco SÍ es un valor: limpia la unidad.
+        /// </summary>
         private static void ApplyWholesaleFacts(Product product, CatalogSnapshotProductDto incoming)
         {
-            product.WholesaleEnabled = incoming.WholesaleEnabled;
-            product.WholesalePackSize = incoming.WholesalePackSize;
-            product.WholesaleUnitLabel = string.IsNullOrWhiteSpace(incoming.WholesaleUnitLabel)
-                ? null
-                : incoming.WholesaleUnitLabel!.Trim();
+            if (incoming.WholesaleEnabled.HasValue)
+                product.WholesaleEnabled = incoming.WholesaleEnabled.Value;
+
+            if (incoming.WholesalePackSize.HasValue)
+                product.WholesalePackSize = incoming.WholesalePackSize.Value;
+
+            if (incoming.WholesaleUnitLabel is not null)
+            {
+                product.WholesaleUnitLabel = string.IsNullOrWhiteSpace(incoming.WholesaleUnitLabel)
+                    ? null
+                    : incoming.WholesaleUnitLabel.Trim();
+            }
         }
 
         /// <summary>Moneda del snapshot/respuesta por VALOR del enum; un valor raro cae a CUP.</summary>

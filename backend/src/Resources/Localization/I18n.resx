@@ -345,6 +345,9 @@
   <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
     <value>{0} no puede superar los {1} caracteres</value>
   </data>
+  <data name="CatalogWholesaleTierRequired" xml:space="preserve">
+    <value>El producto {0} trae un escalón mayorista vacío</value>
+  </data>
   <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
     <value>Al habilitar los pedidos hay que abrir al menos una modalidad: recogida en tienda o envío a domicilio</value>
   </data>

@@ -597,6 +597,9 @@
   <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
     <value>{0} cannot exceed {1} characters</value>
   </data>
+  <data name="CatalogWholesaleTierRequired" xml:space="preserve">
+    <value>Product {0} contains an empty wholesale tier</value>
+  </data>
   <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
     <value>With orders enabled at least one delivery method must be open: store pickup or home delivery</value>
   </data>
