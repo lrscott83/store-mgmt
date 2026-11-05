@@ -17,6 +17,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet(Name = "ping")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Ping()
         {
             //var response = await Mediator.Send(command);

@@ -43,6 +43,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPost("refresh")]
         [ProducesResponseType(typeof(ResponseResult<AuthDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status401Unauthorized)]
         [AllowAnonymous]
         public async Task<IActionResult> RefreshAsync([FromBody] RefreshCommand command)
@@ -56,6 +57,8 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPost("revoke")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status401Unauthorized)]
         [Authorize]
         public async Task<IActionResult> RevokeAsync([FromBody] RevokeCommand command)
         {
@@ -65,6 +68,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("logout")]
         [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [AllowAnonymous]
         public async Task<IActionResult> Logout([FromQuery] LogoutQuery query)
         {
@@ -116,6 +120,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("ping")]
         [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [AllowAnonymous]
         public async Task<IActionResult> PingAsync()
         {

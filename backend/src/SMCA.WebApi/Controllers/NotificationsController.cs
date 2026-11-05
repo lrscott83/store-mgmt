@@ -20,18 +20,26 @@ public class NotificationsController : BaseApiController
 {
     [HttpGet]
     [ProducesResponseType(typeof(ResponseResult<NotificationsListDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetNotifications(CancellationToken cancellationToken)
     {
         return Ok(await Sender.Send(new GetNotificationsQuery(), cancellationToken));
     }
 
     [HttpPost("{id:guid}/read")]
+    [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> MarkAsRead(Guid id, CancellationToken cancellationToken)
     {
         return Ok(await Sender.Send(new MarkAsReadCommand(id), cancellationToken));
     }
 
     [HttpPost("mark-all-read")]
+    [ProducesResponseType(typeof(ResponseResult<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> MarkAllAsRead(CancellationToken cancellationToken)
     {
         return Ok(await Sender.Send(new MarkAllAsReadCommand(), cancellationToken));
