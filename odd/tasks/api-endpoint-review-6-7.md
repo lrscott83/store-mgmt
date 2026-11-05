@@ -113,6 +113,12 @@ L9 (2026-11-04, RDD bloqueado): la revisión de `61806a6f..642ceaf6` arrancó
 (`review-e5d44c316a76db4e`) pero el STATUS del proveedor devolvió `operation_timeout` dos veces al
 negociar la captura. Nada quedó aprobado ni quemado: hay que reintentar más tarde.
 
+L10 (2026-11-04/05): **X1 y X3 ya estaban implementados en el código**; el plan los daba por
+abiertos. X1 se reforzó (contenido real del archivo + reparto del límite del proxy: `642ceaf6`,
+`7933c0f5`, y el defecto de apuntar al nginx congelado se corrigió con verificación independiente).
+X3 solo necesitó alinear el mensaje visible del 409 (`f41be3b3`, RDD `review-3243c0d83dee8f99`
+aprobado y quemado). Queda **X4** y **7.8**.
+
 L7 (2026-11-04, avisos de revisión, NO bloqueantes, pendientes de decisión):
 - `review-adecbd9e3044c26f` R1-2 (WARNING): las reglas de teléfono son más estrictas que la línea base,
   así que un repartidor ya guardado con `#`, `/` o menos de 6 dígitos **no se puede editar** (el PATCH

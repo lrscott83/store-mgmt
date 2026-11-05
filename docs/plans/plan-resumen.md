@@ -41,13 +41,16 @@
     repartidor usan el teléfono para llamar al cliente). Hay que decidir entre dejar la PII visible
     para el personal autorizado, enmascararla, o auditar los accesos.
   - **7.8 · resto (LOW)** — `POST /delivery-drivers` sigue en 200 y no hay `GET /{id}`. Pasar a 201
-    exige cambiar `DeliveryDriverCreateE2ETests`, que lo fija; requiere autorización explícita.
-  - **Transversales X1** (multipart global sin tope real), **X3** (check-then-act → 500) y **X4**
-    (OpenAPI incompleto) siguen abiertos: tocan varios controladores, no solo pedidos.
-- **Propuestas:** 6.7 y 7.8 con una decisión del owner cada uno; X1/X4 como unidad propia de
-  infraestructura, X3 junto con la unidad que lo toque.
-- **Recomendación:** decidir 6.7 primero (es la única con impacto operativo diario), luego X1 → X4,
-  y dejar 7.8 para cuando se acepte tocar ese E2E.
+    exige cambiar `DeliveryDriverCreateE2ETests`, que lo fija; el owner ya autorizó tocarlo, así que
+    queda pendiente de ejecutar.
+  - **X4 · OpenAPI incompleto**: casi ninguna acción declara 400/401/403/404/409 que sí devuelve.
+    Aprobado por el owner, pendiente de ejecutar (sin asumir: verificar cada acción antes de
+    declararla).
+- **Cerrado sin trabajo de código:** **X1** ya estaba implementado en cada endpoint; se reforzó con
+  verificación del contenido real y el reparto del límite del proxy (`642ceaf6`, `7933c0f5`).
+  **X3** ya estaba implementado (mapeo `23505` → 409 en `ErrorHandlerMiddleware`); solo se alineó el
+  mensaje visible al inglés (`f41be3b3`). **6.7** queda como riesgo aceptado por el owner.
+
 
 #### [ ] P1-3 · SEO de la landing — solo queda el cuerpo estático (P1/P2)
 
