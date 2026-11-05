@@ -1585,6 +1585,11 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsOfflineOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("ItemsCount")
                         .HasColumnType("integer");
 
@@ -2196,6 +2201,20 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("UpdatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("WholesaleEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("WholesalePackSize")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("WholesaleUnitLabel")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
@@ -2249,6 +2268,54 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("ProductImage");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Products.ProductWholesaleTier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MinPacks")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PricePerUnit")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("ProductId", "MinPacks")
+                        .IsUnique();
+
+                    b.ToTable("ProductWholesaleTier");
                 });
 
             modelBuilder.Entity("Domain.Entities.ReSellerOwners.ReSellerOwner", b =>
@@ -2635,6 +2702,11 @@ namespace Infrastructure.Migrations
 
                     b.Property<bool>("PickupEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("PriceMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
@@ -3733,6 +3805,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Products.ProductWholesaleTier", b =>
+                {
+                    b.HasOne("Domain.Entities.Products.Product", "Product")
+                        .WithMany("WholesaleTiers")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Domain.Entities.ReSellerOwners.ReSellerOwner", b =>
                 {
                     b.HasOne("Domain.Entities.Owners.Owner", "Owner")
@@ -4029,6 +4112,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("InventoryEntries");
 
                     b.Navigation("OrderItems");
+
+                    b.Navigation("WholesaleTiers");
                 });
 
             modelBuilder.Entity("Domain.Entities.ReSellers.ReSeller", b =>

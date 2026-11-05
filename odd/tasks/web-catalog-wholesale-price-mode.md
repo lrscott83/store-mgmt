@@ -1,0 +1,67 @@
+# Web catalog — wholesale price mode
+
+Objective: let the web catalog publish per-unit prices or wholesale prices (packs + tiers), with the same cart behavior as the POS wholesale sale, and with the order priced, typed and messaged correctly.
+Branch: `feat/web-catalog-wholesale-price-mode` (base `test`). Delivery: work-unit commits, `ask-on-risk` if the branch exceeds ~400 authored lines. Runner: `dotnet test` (backend), `pnpm test` (frontend).
+
+## Specs
+
+- **S1** — The web catalog configuration defines whether the catalog prices are per unit or wholesale.
+  - User's words: "quiero por lo pronto que en el catalogo web se pueda definir si los precios de los productos son los de por unidad o los mayoristas".
+  - Acceptance: `StoreCatalogSettings.PriceMode` (`CatalogPriceMode.Unit = 1`, `CatalogPriceMode.Wholesale = 2`, default `Unit`) persisted per store; editable from the Catálogo Web view; a store without a settings row behaves as `Unit`.
+
+- **S2** — In wholesale mode, products without a wholesale price are hidden from the public catalog, exactly like the POS wholesale screen.
+  - User's words: "los que no tienen precio mayorista se ocultan como mismo en el POS".
+  - Acceptance: public list, detail, category counts and search exclude products without a valid wholesale config (`WholesaleEnabled` + `PackSize > 0` + at least one tier) when `PriceMode = Wholesale`. With `PriceMode = Unit` nothing changes.
+
+- **S3** — The wholesale price is persisted server-side and travels in the catalog sync; the sync carries **every** price, independent of the mode.
+  - User's words: "la idea es que viajen todos los precios, es decir, si pone mayorista se sincronizan los minoristas como hasta ahora y lo que hay que adicionar es la sincronizacion de los mayoristas".
+  - Acceptance: `Product.WholesaleEnabled`, `Product.WholesalePackSize`, `Product.WholesaleUnitLabel` and a `ProductWholesaleTier` table (`MinPacks`, `PricePerUnit`, `Currency`); the catalog snapshot accepts and persists them (tiers replaced as a set on every sync); the sync payload does not depend on `PriceMode`.
+
+- **S4** — The public cart behaves exactly like the POS wholesale sale, including minimum packs and removing the line when it drops below the minimum.
+  - User's words: "entonces si en la configuracion esta mayorista entnces en el catalogo web se debe hacer todo lo mismo que se hace en la venta mayorista cuando se adicionan los productos al carrito y se suman y se restan del carrito"; "las otras dos dudas es como mismo en el POS, todo se mantiene igual".
+  - Acceptance: the customer picks **packs**; the unit price is the tier with the highest `minPacks <= packs`; line total = `packs × packSize × unitPrice`; ± re-resolve the tier price for the new pack count; dropping below the first tier's `minPacks` removes the line; the logic reuses `sales/lib/wholesale.ts` (no second formula).
+
+- **S5** — The server prices the order at wholesale, and the order is registered with its real type plus an offline flag.
+  - User's words: "el pedido se manda correctamente con las cantidades y los precios al whatsapp y la orden se registra de igal forma y con modo mayorista y todo"; "101 pasa a Normal y el otro campo Order.IsOfflineOrder para que por defecto sea false y no haya que hacer nada en ese caso".
+  - Acceptance: `CreateOnlineOrderCommandHandler` resolves the wholesale price when the mode is wholesale, from **one** implementation of the formula shared with the public DTOs; `Order.OrderType` is `Mayorista` or `Normal`; `Order.IsOfflineOrder` is `bool` with default `false`; `OrderType.WhatsApp` is retired and historical rows `101` are migrated to `Normal`; the two conversion queries filter by `!IsOfflineOrder`.
+
+- **S6** — Every order line keeps the wholesale snapshot and the WhatsApp summary speaks in packs with the product's unit.
+  - User's words: "sobre la otra duda debe decir 12 cajas".
+  - Acceptance: `OrderItem` stores `WholesalePackSize`, `WholesalePacks`, `WholesaleTierMinPacks`, `WholesaleTierUnitPrice` (mirror of the POS local snapshot); the `wa.me` summary prints `12 cajas × Cerveza — $…` using packs + `unitLabel`, and the printed amounts come from the persisted server snapshot.
+
+- **S7** — Switching to wholesale is blocked until the server has wholesale data; a bad configuration is the owner's, and the app only warns.
+  - User's words: "1"; "con 2 pero eso es configuracion, si el owner configura mal y no hay productos o los precios son distintos o no sincroniza es su problema"; "SI hace cambios en la configuracion debe sincronizar para actualiza el catalogo web".
+  - Acceptance: enabling `Wholesale` is rejected server-side when the store has zero valid wholesale products; once enabled, if a later sync removes them all the mode stays enabled and the Catálogo Web view shows the warning; the system never auto-corrects or auto-disables the owner's choice.
+
+- **S8** — The EF migration is the source of truth and the VPS script is generated from it.
+  - Acceptance: EF migration applied against local `smca_test`; script generated with `dotnet ef migrations script <previous>` (never hand-written), with the `ON CONFLICT ("MigrationId") DO NOTHING` fix, header, post-`COMMIT` verification and the commented `ROLLBACK` block; sequential `NN-` naming.
+
+- **S9** — Legacy Angular (`frontend/`) is untouched, and existing E2E tests (backend and frontend) are not modified.
+  - Acceptance: the diff contains no `frontend/` change and no edit to existing `*.spec.ts` / backend E2E files; new coverage is added as new files.
+
+## Tasks
+
+| ID | Specs | Route | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| T1 | S1, S3, S5(flag) | inline | done | `CatalogPriceMode`; `Product.WholesaleEnabled/WholesalePackSize/WholesaleUnitLabel/WholesaleTiers`; `ProductWholesaleTier` + EF config (query filter, UNIQUE `(ProductId, MinPacks)`, `decimal(18,2)`); `StoreCatalogSettings.PriceMode` (default `Unit`, sentinel explicit); `Order.IsOfflineOrder` (default `false`); `WholesalePricing` (single formula). `dotnet build backend/src/SMCA.sln` → Build succeeded |
+| T2 | S8 | inline | done | Migration `20261105204049_Add-Wholesale-Pricing-And-Order-Channel`, applied to `smca_test` (`dotnet ef database update` → Done); script `45-20261105-Add-Wholesale-Pricing-And-Order-Channel.sql` generated with `-From 20261104172512_Add-Order-Search-Indexes`, then patched (header, `ON CONFLICT`, verification SELECTs, commented rollback) |
+| T3 | S3 | inline | pending | — |
+| T4 | S2, S4 | inline | pending | — |
+| T5 | S5, S6 | inline | pending | — |
+| T6 | S7 | inline | pending | — |
+| T7 | S9 | inline | pending | — |
+
+## Log
+
+- **L1** (user, verbatim): "quiero por lo pronto que en el catalogo web se pueda definir si los precios de los productos son los de por unidad o los mayoristas. Revisa si hay que adicionar tablas en la BD y debes hacer las migraciones y el script para correr en el VPS. Entonces si en la configuracion esta mayorista entnces en el catalogo web se debe hacer todo lo mismo que se hace en la venta mayorista cuando se adicionan los productos al carrito y se suman y se restan del carrito. Cualquier duda me preguntas para que no asumas nada de nada. Dime si entiendes el scope de lo que quiero?"
+- **L2**: Scope read — the web catalog is served from the server `Product` table (`/v1/public/catalog/{slug}`), and the POS product row has **no** wholesale fields in the backend (`CreateProductCommand`, `CatalogSnapshotProduct`). The wholesale config lives only in the POS device store (`packages/domain/src/models/product.ts`, `sales/lib/wholesale.ts`). So the server cannot price wholesale until the config is persisted and synced: that is why S3 exists.
+- **L3**: Decision (owner) — products without wholesale price are hidden in wholesale mode, same as the POS screen. Evidence: `/sales/wholesale` lists only products with a valid config.
+- **L4**: Decision (owner) — minimum packs and "below 1 pack" behave exactly like the POS: below the first tier the line leaves the cart.
+- **L5**: Decision (owner) — `OrderType.WhatsApp` is not a type but a channel. `Order.OrderType` becomes the real type (`Normal`/`Mayorista`), a new `Order.IsOfflineOrder` (default `false`) carries the channel, and historical `101` rows migrate to `Normal`. Verified blast radius of `OrderType.WhatsApp` in production: only `OrderRepository.cs:178` and `:191` (conversion metrics); every other reference is a test seed. `Order.Create` has zero production callers — `CreateOnlineOrderCommand.cs:240` is the only creator, so `IsOfflineOrder = false` needs no backfill.
+- **L6**: Decision (owner) — the WhatsApp summary says the packs and the configured unit ("12 cajas"), not the units. This forces the per-line wholesale snapshot in `OrderItem`, mirroring the POS local snapshot (`order-offline-service.ts:508-517`).
+- **L7**: Decision (owner) — switching to wholesale is blocked until the server holds at least one valid wholesale product; afterwards a bad configuration only warns, never auto-corrects.
+- **L8**: Verified — the WhatsApp message and the order total come from the **server** snapshot (`buildWhatsAppOrderLink` input is `OnlineOrderCreatedDto`), so server-side wholesale pricing is a correctness requirement, not a presentation one.
+- **L9**: Verified — `ApplicationDbContext` is `NoTracking`: sync updates must attach/update explicitly, and the tiers must be replaced as a set.
+- **L10**: T1/T2 shipped the schema only. Decisions taken there: `PriceMode` is stored as `int` with `HasDefaultValue(Unit)` **and an explicit sentinel** (without it EF warns that the CLR default `0` would trigger the DB default — `0` is not a valid enum value here); the tier price column is `decimal(18,2)` like the other money columns; `(ProductId, MinPacks)` is UNIQUE because two tiers with the same minimum are ambiguous for the pricing rule.
+- **L11**: The `OrderType = 101 → 1` backfill is deliberately NOT in migration 45: it ships in migration 46, together with the release that stops writing `101`. A backfill that lands before the code change would be undone by the next order created.
+- **L12**: Environment note — there is no local `psql` client (`Get-Command psql` → not found), so the generated script could not be executed standalone. Its SQL body is the generated one and is proven executable by `dotnet ef database update` against `smca_test`; the hand-written parts are the header, the `ON CONFLICT` on the history insert (same clause as scripts 08–44) and the verification SELECTs.

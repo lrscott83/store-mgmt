@@ -32,6 +32,11 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
             builder.HasKey(x => x.Id);
 
+            // Canal del pedido (offline/POS vs servidor). `HasDefaultValue(false)` rellena las filas
+            // existentes con `false`: todas son pedidos online, así que el backfill correcto es el
+            // default y la migración no tiene que escribir datos.
+            builder.Property(x => x.IsOfflineOrder).IsRequired().HasDefaultValue(false);
+
             // --- Pedidos online (pedidos-whatsapp-persistencia, F2) ---
             //
             // `Code` es el código público que la persona dicta por WhatsApp: tiene que ser ÚNICO

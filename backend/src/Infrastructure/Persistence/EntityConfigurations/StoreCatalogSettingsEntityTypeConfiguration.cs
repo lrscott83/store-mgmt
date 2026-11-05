@@ -1,4 +1,5 @@
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Common.Enums;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -44,6 +45,17 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.Property(x => x.MobileColumns)
                 .IsRequired()
                 .HasDefaultValue(StoreCatalogSettings.DefaultMobileColumns);
+
+            // Modo de PRECIO del catálogo (por unidad o mayorista). `HasDefaultValue` es lo que
+            // rellena las filas existentes con `Unit` — el comportamiento histórico — en vez del 0
+            // que EF pondría por defecto, que no es ningún valor del enum.
+            builder.Property(x => x.PriceMode)
+                .IsRequired()
+                .HasDefaultValue(CatalogPriceMode.Unit)
+                // El centinela evita que EF tome el 0 del CLR como "valor sin asignar": con
+                // `Unit` como centinela, el default de la base solo se usa cuando el valor ES
+                // `Unit`, que es exactamente lo que queremos (nunca se escribe un 0).
+                .HasSentinel(CatalogPriceMode.Unit);
 
             // D16: horarios y zonas son texto libre para el dueño, sin estructura que validar.
             builder.Property(x => x.BusinessHours).HasMaxLength(StoreCatalogSettings.BusinessHoursMaxLength);

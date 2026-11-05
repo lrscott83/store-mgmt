@@ -30,6 +30,22 @@ namespace Domain.Entities.Orders
         public DateTime Date { get; set; }
         public Guid TenantId { get; set; }
 
+        /// <summary>
+        /// CANAL del pedido: <c>true</c> = lo escribió el POS (venta offline), <c>false</c> = lo
+        /// creó el servidor.
+        ///
+        /// Nace en <c>false</c> porque la única vía de alta del servidor es el catálogo web
+        /// (<see cref="CreateOnline"/>), así que el caso normal es no tocar nada. El POS todavía NO
+        /// sincroniza sus ventas (D14), así que hoy nadie escribe <c>true</c>: la columna queda
+        /// preparada para el día que lo haga.
+        /// </summary>
+        /// <remarks>
+        /// Falla ABIERTO a propósito (una fila que olvide asignarla cuenta como online): el canal no
+        /// es un dato de negocio que se pueda deducir del total, y las métricas de conversión del
+        /// catálogo preguntan por "no offline".
+        /// </remarks>
+        public bool IsOfflineOrder { get; set; }
+
         // --- Pedidos ONLINE (pedidos-whatsapp-persistencia, F2) ---------------------------------
         //
         // D6/D14: el POS NO lee ni escribe estos pedidos (sigue con su almacén local cifrado), así
