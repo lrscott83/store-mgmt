@@ -83,10 +83,13 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
             // the state this handler just persisted. `Id` is the owner of the created store-user
             // relationship: the repository resolves a store user by `UserId`
             // (StoreUserRepository.GetStoreUserByIdAsync), so the id is the one a GET accepts.
+            // `StoreName` comes from the store this handler already loaded to build the entity, so
+            // the echo carries it without a second read; nothing else is re-queried.
             return ResponseResult.Success(new StoreUserDto
             {
                 Id = user.Id,
                 StoreId = store.Id,
+                StoreName = store.Name,
                 Login = user.Login,
                 FullName = user.FullName,
                 CellPhone = user.CellPhone,

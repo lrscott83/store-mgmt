@@ -58,6 +58,7 @@ public class CreateStoreUserCommandHandlerTests
         dto.CellPhone.Should().Be("+5491122334455");
         dto.Email.Should().Be("cashier@test.com");
         dto.StoreId.Should().Be(store.Id);
+        dto.StoreName.Should().Be(store.Name, "the echo names the store the handler already loaded");
         dto.IsActive.Should().BeTrue();
         dto.Id.Should().NotBe(Guid.Empty);
         dto.Id.Should().Be(persistedUser!.Id, "the DTO id is the id a GET /api/v1/StoreUsers/{id} resolves");

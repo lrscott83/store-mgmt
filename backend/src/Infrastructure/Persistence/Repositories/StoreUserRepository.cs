@@ -15,12 +15,21 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<StoreUser> GetStoreUserByIdAsync(Guid userId)
         {
-            return await _storeUsers.Where(u => u.UserId == userId).FirstOrDefaultAsync();
+            return await _storeUsers
+                .Where(u => u.UserId == userId)
+                .Include(su => su.User)
+                .Include(su => su.Store)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<StoreUser> GetStoreUserByIdIgnoreQueryFilterAsync(Guid userId)
         {
-            return await _storeUsers.Where(u => u.UserId == userId).IgnoreQueryFilters().FirstOrDefaultAsync();
+            return await _storeUsers
+                .Where(u => u.UserId == userId)
+                .Include(su => su.User)
+                .Include(su => su.Store)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync();
         }
 
         public async Task<StoreUser> GetStoreUserByUserIdAsync(Guid userId)
