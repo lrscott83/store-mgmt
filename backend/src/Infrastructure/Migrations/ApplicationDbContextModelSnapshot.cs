@@ -1323,6 +1323,22 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("UpdatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("WholesalePackSize")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WholesalePacks")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WholesaleTierMinPacks")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("WholesaleTierUnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("WholesaleUnitLabel")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
