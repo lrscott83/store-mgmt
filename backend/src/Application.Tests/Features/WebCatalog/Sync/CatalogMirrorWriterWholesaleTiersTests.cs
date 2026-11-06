@@ -143,6 +143,50 @@ public class CatalogMirrorWriterWholesaleTiersTests
 
     #endregion
 
+    #region Defensive skips (R3)
+
+    /// <summary>
+    /// Un producto que el snapshot lista pero que la fase 1 no resolvió no tiene filas que tocar:
+    /// el espejo lo SALTA en silencio. Es defensivo — ambas fases leen el mismo snapshot, así que
+    /// en el flujo normal no ocurre — pero un fallo aquí borraría escalones de un producto que la
+    /// sincronización ni siquiera reconoció.
+    /// </summary>
+    [Fact]
+    public async Task MirrorWholesaleTiersAsync_WhenTheProductWasNotResolved_SkipsItSilently()
+    {
+        Guid productId = Guid.NewGuid();
+        var snapshot = Snapshot(productId, new List<CatalogSnapshotWholesaleTierDto> { TierDto(2, 9m, null) });
+
+        await CatalogMirrorWriter.MirrorWholesaleTiersAsync(snapshot, Array.Empty<Product>(), _tierRepository.Object);
+
+        _added.Should().BeEmpty("no hay producto al que colgarle los escalones");
+        DeleteCalled().Should().BeFalse("no se borra nada de un producto que no se resolvió");
+    }
+
+    /// <summary>
+    /// Un escalón con <c>MinPacks</c> no positivo no es un escalón vendible: el validador ya lo
+    /// rechaza con un 400, y el escritor lo filtra igual para que una entrada que llegue por otra
+    /// vía no inserte una fila que la regla de precio nunca va a elegir.
+    /// </summary>
+    [Fact]
+    public async Task MirrorWholesaleTiersAsync_WhenATierHasNonPositiveMinPacks_IgnoresIt()
+    {
+        Guid productId = Guid.NewGuid();
+        Product product = ProductWithStoredTiers(productId);
+        var snapshot = Snapshot(productId, new List<CatalogSnapshotWholesaleTierDto>
+        {
+            TierDto(0, 5m, null),
+            TierDto(2, 9m, null),
+        });
+
+        await CatalogMirrorWriter.MirrorWholesaleTiersAsync(snapshot, new[] { product }, _tierRepository.Object);
+
+        _added.Should().ContainSingle("solo el escalón con mínimo positivo es vendible")
+            .Which.MinPacks.Should().Be(2);
+    }
+
+    #endregion
+
     private bool DeleteCalled()
     {
         try
