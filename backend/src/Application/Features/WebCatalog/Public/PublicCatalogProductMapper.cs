@@ -19,29 +19,45 @@ namespace Application.Features.WebCatalog.Public
     /// el cliente elige paquetes y el precio lo resuelve `WholesalePricing` con el número de
     /// paquetes de verdad. Por eso los tres números del "primer escalón" viajan aparte de la lista
     /// de escalones: son el mínimo vendible que la tarjeta necesita mostrar sin recorrer la lista.
+    ///
+    /// MINIMIZACIÓN DE DATOS (hallazgo R1-001): en modo `Unit` el DTO no lleva un solo número
+    /// mayorista. El catálogo público se sirve a visitantes anónimos y el JSON viaja completo aunque
+    /// la tienda no pinte la tarjeta de paquetes, así que publicar ahí `wholesaleUnitPrice` y
+    /// `wholesaleTiers` deja la lista de precios al por mayor al alcance de cualquiera que abra la
+    /// pestaña de red: el catálogo minorista no puede filtrar el mayorista. `priceMode` sí viaja,
+    /// porque es lo que le dice al cliente qué modo está mirando.
     /// </summary>
     internal static class PublicCatalogProductMapper
     {
         /// <param name="priceMode">
-        /// Modo de la tienda, solo para ETIQUETAR el DTO. El valor por defecto es `Unit` a
-        /// propósito: un llamador que no resolvió el modo publica lo de siempre, no mayorista.
+        /// Modo de la tienda con el que se publica este producto. Es OBLIGATORIO y sin valor por
+        /// defecto (hallazgo R3-default-mode-label): un llamador que no lo resolviera seguía
+        /// compilando y estampaba `Unit` en productos cuya cabecera decía `Wholesale`, así que el
+        /// cliente veía el modo de un catálogo y los números del otro. Sin defecto, el compilador
+        /// obliga a resolverlo.
         /// </param>
         public static PublicCatalogProductDto ToDto(
-            Product product, string storeSlug, CatalogPriceMode priceMode = CatalogPriceMode.Unit)
+            Product product, string storeSlug, CatalogPriceMode priceMode)
         {
             string? mediaUrl = string.IsNullOrWhiteSpace(product.Image)
                 ? null
                 : CatalogPublicUrls.Media(storeSlug, product.Image!);
 
+            // En modo unidad la config mayorista ni se lee: es el dato que no puede escapar.
+            bool publishesWholesale = priceMode == CatalogPriceMode.Wholesale;
+
             // Ordenar aquí y no confiar en el orden de la base: el contrato dice "ascendente por
             // MinPacks" y el índice único de la tabla no impone orden de lectura.
-            List<ProductWholesaleTier> tiers = (product.WholesaleTiers ?? [])
-                .OrderBy(tier => tier.MinPacks)
-                .ToList();
+            List<ProductWholesaleTier> tiers = publishesWholesale
+                ? (product.WholesaleTiers ?? [])
+                    .OrderBy(tier => tier.MinPacks)
+                    .ToList()
+                : [];
 
             // La MISMA puerta que usa el filtro SQL del catálogo mayorista: si el POS no vendería
             // esta config, el catálogo tampoco publica sus números (saldrían vacíos o sin sentido).
-            bool hasWholesaleConfig = WholesalePricing.HasConfig(
+            // El modo va DELANTE: en unidad no hay config publicable aunque la base la tenga.
+            bool hasWholesaleConfig = publishesWholesale && WholesalePricing.HasConfig(
                 product.WholesaleEnabled, product.WholesalePackSize, tiers.Count);
 
             ProductWholesaleTier? firstTier = hasWholesaleConfig ? tiers[0] : null;
@@ -66,11 +82,15 @@ namespace Application.Features.WebCatalog.Public
                 ImageUrl = mediaUrl,
                 ImageUrls = mediaUrl == null ? new List<string>() : new List<string> { mediaUrl },
                 PriceMode = PublicCatalogPriceModeWire.ToWire(priceMode),
-                WholesaleEnabled = product.WholesaleEnabled,
+                // En modo unidad el DTO no afirma nada sobre el otro modo: ni la bandera, ni la
+                // unidad, ni el paquete. La bandera en `false` es la verdad del modo publicado, no
+                // un borrado del dato guardado (la columna sigue ahí para el POS y el modo mayorista).
+                WholesaleEnabled = publishesWholesale && product.WholesaleEnabled,
                 WholesalePackSize = firstTier == null ? 0 : product.WholesalePackSize,
-                WholesaleUnitLabel = string.IsNullOrWhiteSpace(product.WholesaleUnitLabel)
-                    ? null
-                    : product.WholesaleUnitLabel,
+                WholesaleUnitLabel = publishesWholesale
+                    && !string.IsNullOrWhiteSpace(product.WholesaleUnitLabel)
+                        ? product.WholesaleUnitLabel
+                        : null,
                 WholesaleMinPacks = firstTier?.MinPacks,
                 WholesaleUnitPrice = firstTier?.PricePerUnit,
                 // Un paquete es una línea de UN paquete: se calcula con la misma fórmula del total

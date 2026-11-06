@@ -87,8 +87,12 @@ namespace Application.Dtos.WebCatalog
         // Los tres campos de precio de arriba (`Price`, `FinalPrice` y los descuentos) siguen siendo
         // el precio POR UNIDAD: el modo no los reinterpreta y el descuento del catálogo no se aplica
         // encima del mayorista (son dos números distintos, no uno derivado del otro). Lo que decide
-        // cuál usa el cliente es `PriceMode`; el resto viaja SIEMPRE, porque es una propiedad del
-        // producto y no del modo con el que se publica hoy.
+        // cuál usa el cliente es `PriceMode`.
+        //
+        // El bloque mayorista SOLO viaja en modo `Wholesale`. En `Unit` va vacío a propósito: la
+        // carta pública es anónima y estos son los precios que la tienda negocia con sus mayoristas,
+        // así que publicarlos en un catálogo de detal sería filtrar su lista de precios a cualquiera.
+        // `PriceMode` sí viaja siempre, porque es lo que le dice al cliente qué carta está mirando.
 
         /// <summary>Modo de precio de la tienda: <c>"Unit"</c> o <c>"Wholesale"</c> (mismo valor que el de la cabecera).</summary>
         public string PriceMode { get; set; } = nameof(CatalogPriceMode.Unit);

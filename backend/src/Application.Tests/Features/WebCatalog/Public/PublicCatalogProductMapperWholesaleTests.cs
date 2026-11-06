@@ -85,8 +85,12 @@ public class PublicCatalogProductMapperWholesaleTests
         dto.WholesaleUnitPrice.Should().Be(50m);
     }
 
-    /// <summary>En modo unidad nadie estorba: el precio es el de siempre y la config viaja igual,
-    /// porque es una propiedad del producto, no del modo.</summary>
+    /// <summary>
+    /// En modo unidad el precio es el de siempre y el DTO NO lleva números mayoristas (hallazgo
+    /// R1-001): el catálogo minorista se sirve a anónimos y no puede filtrar la lista al por mayor.
+    /// El detalle completo de lo que se retiene vive en
+    /// <see cref="PublicCatalogUnitModeDataMinimisationTests"/>.
+    /// </summary>
     [Fact]
     public void ToDto_WithUnitMode_ShouldKeepTheRetailFieldsAndLabelTheMode()
     {
@@ -98,8 +102,8 @@ public class PublicCatalogProductMapperWholesaleTests
         dto.Price.Should().Be(100m);
         dto.FinalPrice.Should().Be(100m);
         dto.HasDiscount.Should().BeFalse();
-        dto.WholesaleEnabled.Should().BeTrue();
-        dto.WholesaleMinPacks.Should().Be(1);
+        dto.WholesaleEnabled.Should().BeFalse();
+        dto.WholesaleMinPacks.Should().BeNull();
     }
 
     /// <summary>

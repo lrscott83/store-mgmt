@@ -130,7 +130,15 @@ export function StorefrontCart({
                   onChange={(event) => {
                     const raw = event.target.value.trim();
                     const quantity = Number(raw);
-                    if (raw === '' || !Number.isInteger(quantity) || quantity < 1) return;
+                    // The TYPED path never goes below the line's minimum, for the same reason it
+                    // never goes below 1: the store REMOVES a line below its minimum, so a
+                    // half-typed "1" of "12" would delete the customer's product. A per-unit line
+                    // has a minimum of 1, so this single guard keeps its old meaning. The − button
+                    // is deliberately excluded: it is an explicit action and it DOES let the line
+                    // leave the cart once it drops below the wholesale floor.
+                    if (raw === '' || !Number.isInteger(quantity) || quantity < lineMinPacks(line)) {
+                      return;
+                    }
                     onUpdateQuantity(line.productId, quantity);
                   }}
                   className={`${INPUT_CLASSES} w-16 text-center`}
