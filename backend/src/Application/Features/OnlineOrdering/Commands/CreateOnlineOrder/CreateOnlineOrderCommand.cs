@@ -230,7 +230,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
                 if (wholesale)
                 {
-                    WholesaleLinePricing pricing = await ResolveWholesalePricingAsync(product, line.Quantity);
+                    WholesaleLinePricing pricing = await ResolveWholesalePricingAsync(
+                        product, line.Quantity, tenantId, cancellationToken);
                     price = pricing.UnitPrice;
                     lineCurrency = pricing.Currency;
                     wholesalePackSize = pricing.PackSize;
@@ -487,13 +488,20 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         /// misma que el POS y que el catálogo público. Lo único que se resuelve aparte es QUÉ escalón
         /// fue el aplicado, y solo para leer su moneda: el importe siempre viene de
         /// <see cref="WholesalePricing.ResolveUnitPrice"/>.
+        ///
+        /// <paramref name="tenantId"/> es el de la TIENDA ya resuelta por el slug público. Se pasa
+        /// explícitamente porque la lectura de escalones es la variante para el pedido anónimo
+        /// (ignora los filtros globales, que sin sesión no pueden resolver nada): el tenant explícito
+        /// es lo que acota el resultado a la tienda del pedido y hace imposible leer otro tenant.
         /// </summary>
-        private async Task<WholesaleLinePricing> ResolveWholesalePricingAsync(Product product, int quantity)
+        private async Task<WholesaleLinePricing> ResolveWholesalePricingAsync(Product product,
+            int quantity, Guid tenantId, CancellationToken cancellationToken)
         {
             // Los escalones se leen por producto porque `GetPublishedByIdsAsync` no los trae: son una
             // tabla aparte y el carrito es corto. Traerlos por producto deja el precio del pedido
             // leyendo exactamente la misma fila que publica el catálogo.
-            IList<ProductWholesaleTier> tiers = await _productWholesaleTierRepository.GetByProductIdAsync(product.Id);
+            IList<ProductWholesaleTier> tiers = await _productWholesaleTierRepository
+                .GetForPublicOrderAsync(product.Id, tenantId, cancellationToken);
 
             if (!WholesalePricing.HasConfig(product.WholesaleEnabled, product.WholesalePackSize, tiers.Count))
                 throw new ApiException(

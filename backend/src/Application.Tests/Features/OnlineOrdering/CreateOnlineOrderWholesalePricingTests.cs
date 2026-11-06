@@ -77,8 +77,8 @@ public class CreateOnlineOrderWholesalePricingTests
             .ReturnsAsync([(int)ModuleType.PedidosWhatsApp]);
 
         _tierRepository
-            .Setup(x => x.GetByProductIdAsync(It.IsAny<Guid>()))
-            .Returns((Guid productId) => Task.FromResult<IList<ProductWholesaleTier>>(
+            .Setup(x => x.GetForPublicOrderAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns((Guid productId, Guid _, CancellationToken _) => Task.FromResult<IList<ProductWholesaleTier>>(
                 _tiers.TryGetValue(productId, out IList<ProductWholesaleTier>? tiers)
                     ? tiers
                     : []));
@@ -238,6 +238,30 @@ public class CreateOnlineOrderWholesalePricingTests
         result.Succeeded.Should().BeTrue();
         result.Data!.Lines.Single().Price.Should().Be(expected);
         result.Data.Total.Should().Be(expected * packs * 12);
+    }
+
+    /// <summary>
+    /// La lectura de escalones del pedido va por la variante ANÓNIMA y acotada por el tenant de la
+    /// TIENDA que el slug resolvió. Ese `tenantId` no es decoración: es lo único que acota un
+    /// `IgnoreQueryFilters` (sin sesión el filtro global devuelve cero filas). Si el handler pasara
+    /// el tenant del contexto —`Guid.Empty` en el camino anónimo— la lectura devolvería vacío y todo
+    /// pedido mayorista sería rechazado como "no configurado".
+    /// </summary>
+    [Fact]
+    public async Task Handle_InWholesaleMode_ShouldReadTheTiersForTheStoreTenant()
+    {
+        OpenStore(CatalogPriceMode.Wholesale);
+        Guid productId = PublishProduct();
+        WithTiers(productId, [(1, 90m)]);
+
+        await Handler().Handle(Command(productId, quantity: 12), CancellationToken.None);
+
+        _tierRepository.Verify(
+            x => x.GetForPublicOrderAsync(productId, _tenantId, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _tierRepository.Verify(
+            x => x.GetByProductIdAsync(It.IsAny<Guid>()), Times.Never,
+            "el pedido público no puede usar la lectura con sesión: sin sesión devolvería cero filas");
     }
 
     /// <summary>
@@ -432,8 +456,8 @@ public class CreateOnlineOrderWholesalePricingTests
 
         result.Succeeded.Should().BeTrue();
         result.Data!.Total.Should().Be(130m);
-        _tierRepository.Verify(x => x.GetByProductIdAsync(It.IsAny<Guid>()), Times.Never,
-            "el modo unidad no consulta escalones");
+        _tierRepository.Verify(x => x.GetForPublicOrderAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
+            It.IsAny<CancellationToken>()), Times.Never, "el modo unidad no consulta escalones");
     }
 
     #endregion

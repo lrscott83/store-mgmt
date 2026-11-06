@@ -74,6 +74,21 @@ public sealed class WholesaleCatalogE2ETests
     /// <summary>Cantidad que NO es múltiplo del paquete: 30 = 2 paquetes y 6 unidades sueltas.</summary>
     private const int NonPackMultipleUnits = 30;
 
+    /// <summary>
+    /// Unidades del SEGUNDO escalón: 120 = 10 paquetes de 12, que alcanzan el mínimo de 10 paquetes
+    /// y por tanto cobran 70 por unidad en vez de 80. Sin este caso, un handler que siempre aplicara
+    /// el primer escalón pasaría toda la suite.
+    /// </summary>
+    private const int SecondTierOrderedUnits = TierTwoMinPacks * PackSize;
+    private const int SecondTierOrderedPacks = TierTwoMinPacks;
+    private const decimal ExpectedSecondTierTotal = SecondTierOrderedUnits * TierTwoUnitPrice;
+
+    /// <summary>
+    /// Paquetes por DEBAJO del primer mínimo: 1 paquete de 12 unidades contra un mínimo de 3.
+    /// El POS saca la línea del carrito en este caso, así que el servidor tiene que rechazar.
+    /// </summary>
+    private const int BelowFirstTierUnits = PackSize;
+
     private readonly AppTestFactory _f;
 
     public WholesaleCatalogE2ETests(WebAppFixture fixture) => _f = fixture.Factory;
@@ -182,6 +197,106 @@ public sealed class WholesaleCatalogE2ETests
 
     // --- S5: el SERVIDOR cotiza, tipa y guarda el snapshot -------------------------------
 
+    /// <summary>
+    /// El pedido del SEGUNDO escalón. Con un fixture de paquete 12 y escalones `3 -> 80` y
+    /// `10 -> 70`, 10 paquetes tienen que cobrarse a 70 por unidad y congelar el escalón 10.
+    ///
+    /// Existe porque el caso del primer escalón (3 paquetes) NO distingue un handler correcto de uno
+    /// que siempre aplica el escalón más bajo: los dos dan el mismo precio ahí. El número 70 solo
+    /// aparece si el handler elige el escalón por el número de paquetes.
+    /// </summary>
+    [Fact]
+    public async Task Posting_a_second_tier_quantity_prices_the_order_at_the_second_tier()
+    {
+        var fixture = await SeedAsync(priceMode: CatalogPriceMode.Wholesale);
+        try
+        {
+            var client = _f.CreateClient();
+
+            var response = await client.PostAsJsonAsync(
+                $"/api/v1/public/ordering/{fixture.Slug}/orders",
+                OrderBody(fixture, SecondTierOrderedUnits));
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await response.Content
+                .ReadFromJsonAsync<ApiResponse<OnlineOrderCreatedDto>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            OnlineOrderCreatedDto created = body.Data!;
+
+            created.Subtotal.Should().Be(ExpectedSecondTierTotal,
+                "120 unidades × 70: el escalón de 10 paquetes, no el de 3");
+            created.Total.Should().Be(ExpectedSecondTierTotal);
+
+            OnlineOrderCreatedLineDto line = created.Lines.Should().ContainSingle().Subject;
+            line.Quantity.Should().Be(SecondTierOrderedUnits);
+            line.Price.Should().Be(TierTwoUnitPrice, "el precio es el del escalón alcanzado, no el del primero");
+            line.Packs.Should().Be(SecondTierOrderedPacks);
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            Order order = await db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.StoreId == fixture.StoreId);
+            order.Total.Should().Be(ExpectedSecondTierTotal);
+
+            OrderItem item = await db.Set<OrderItem>().IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.OrderId == order.Id);
+            item.Price.Should().Be(TierTwoUnitPrice);
+            item.Quantity.Should().Be(SecondTierOrderedUnits);
+            item.WholesaleTierMinPacks.Should().Be(TierTwoMinPacks,
+                "el snapshot tiene que nombrar el escalón APLICADO, no el primero");
+            item.WholesaleTierUnitPrice.Should().Be(TierTwoUnitPrice);
+            item.WholesalePacks.Should().Be(SecondTierOrderedPacks);
+        }
+        finally
+        {
+            await CleanupAsync(fixture);
+        }
+    }
+
+    /// <summary>
+    /// Por debajo del primer mínimo no hay precio mayorista que cobrar: 1 paquete contra un mínimo de
+    /// 3 es un 400 y NO deja fila. Es el otro borde que un handler "siempre el primer escalón"
+    /// también dejaría pasar, vendiendo al detal por la puerta de atrás.
+    /// </summary>
+    [Fact]
+    public async Task Posting_below_the_first_tier_is_rejected_and_writes_no_order()
+    {
+        var fixture = await SeedAsync(priceMode: CatalogPriceMode.Wholesale);
+        try
+        {
+            var client = _f.CreateClient();
+
+            var response = await client.PostAsJsonAsync(
+                $"/api/v1/public/ordering/{fixture.Slug}/orders",
+                OrderBody(fixture, BelowFirstTierUnits));
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            var body = await response.Content
+                .ReadFromJsonAsync<ApiResponse<OnlineOrderCreatedDto>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            (await db.Set<Order>().IgnoreQueryFilters()
+                .CountAsync(row => row.StoreId == fixture.StoreId))
+                .Should().Be(0, "un pedido rechazado no puede dejar fila");
+            List<Guid> orderIds = await db.Set<Order>().IgnoreQueryFilters()
+                .Where(row => row.StoreId == fixture.StoreId)
+                .Select(row => row.Id).ToListAsync();
+            (await db.Set<OrderItem>().IgnoreQueryFilters()
+                .CountAsync(row => orderIds.Contains(row.OrderId)))
+                .Should().Be(0);
+        }
+        finally
+        {
+            await CleanupAsync(fixture);
+        }
+    }
+
+
     [Fact]
     public async Task Posting_a_pack_quantity_prices_the_order_at_wholesale_and_persists_the_snapshot()
     {
@@ -265,10 +380,18 @@ public sealed class WholesaleCatalogE2ETests
             var body = await response.Content
                 .ReadFromJsonAsync<ApiResponse<OnlineOrderCreatedDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
-            // 30 no es múltiplo de 12: el mensaje nombra las 12 unidades del paquete, así que este
-            // 400 es la puerta del paquete y no otra validación cualquiera.
+            // 30 no es múltiplo de 12: el mensaje es la FRASE COMPLETA de
+            // `OnlineOrderWholesaleQuantityMustBeAPackMultiple`, con el id del producto y el tamaño
+            // del paquete interpolados. El contrato no expone un código de error estable, así que la
+            // frase es la única identidad disponible; buscar el número "12" dejaba pasar cualquier
+            // otro 400 que lo mencionara (un nombre de producto, un id, un límite).
+            // La cultura está FIJADA en español (`UseLocalizationExtension` solo admite "es" y no hay
+            // I18n.es.resx, así que se resuelve el resx neutro), por eso la frase se afirma en
+            // español y no por traducción.
             body.Errors.Should().ContainSingle()
-                .Which.Description.Should().Contain(PackSize.ToString());
+                .Which.Description.Should().Be(
+                    $"La cantidad del producto {fixture.ValidProductId} debe ser múltiplo de {PackSize} "
+                    + "unidades, que es el tamaño del paquete");
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -369,9 +492,13 @@ public sealed class WholesaleCatalogE2ETests
     /// <summary>
     /// REGRESIÓN del defecto que este archivo destapó: el alta del pedido público corre ANÓNIMA,
     /// así que `_context.TenantId` es null y el filtro global por tenant del escalón se traduce a
-    /// `= NULL` — CERO filas. `ProductWholesaleTierRepository.GetByProductIdAsync` sin
-    /// `IgnoreQueryFilters` devolvía una lista vacía, y el catálogo publicaba precios que el pedido
-    /// luego rechazaba como "no configurado".
+    /// `= NULL` — CERO filas. Una lectura sin bypass devolvía una lista vacía, y el catálogo
+    /// publicaba precios que el pedido luego rechazaba como "no configurado".
+    ///
+    /// El bypass vive ahora en `GetForPublicOrderAsync`, NO en `GetByProductIdAsync`: la lectura con
+    /// sesión conserva el filtro (es su razón de ser), y el pedido anónimo usa la variante que
+    /// ignora los filtros y acota por el tenant de la TIENDA que el slug resolvió. Este test fija el
+    /// camino real del request: el contexto anónimo más el tenant explícito.
     ///
     /// Se reproduce el contexto EXACTO del request: un scope del MISMO contenedor de servicios que
     /// atiende el `POST` público, con el contexto de tenant puesto en anónimo a mano
@@ -391,8 +518,8 @@ public sealed class WholesaleCatalogE2ETests
 
             var tierRepository = scope.ServiceProvider
                 .GetRequiredService<IProductWholesaleTierRepository>();
-            IList<ProductWholesaleTier> tiers =
-                await tierRepository.GetByProductIdAsync(fixture.ValidProductId);
+            IList<ProductWholesaleTier> tiers = await tierRepository.GetForPublicOrderAsync(
+                fixture.ValidProductId, fixture.TenantId, CancellationToken.None);
 
             tiers.Should().HaveCount(2,
                 "un contexto anónimo tiene que ver los escalones: si no, ningún pedido mayorista pasa");
@@ -401,6 +528,87 @@ public sealed class WholesaleCatalogE2ETests
             // más alto, así que una lectura desordenada cambiaría qué precio se cobra.
             tiers.Select(tier => tier.PricePerUnit).Should().Equal(TierOneUnitPrice, TierTwoUnitPrice);
             tiers.Should().OnlyContain(tier => tier.ProductId == fixture.ValidProductId);
+        }
+        finally
+        {
+            await CleanupAsync(fixture);
+        }
+    }
+
+    // --- El filtro por tenant sigue vivo en la lectura con sesión --------------------------
+
+    /// <summary>
+    /// `GetByProductIdAsync` es la lectura SEGURA por defecto: conserva el filtro global por tenant,
+    /// así que un llamador del tenant A que pide el producto del tenant B obtiene CERO filas aunque
+    /// las filas existan. Es exactamente lo que se pierde cuando el método ignora TODOS los filtros
+    /// (`IgnoreQueryFilters`) para que el pedido anónimo funcione.
+    ///
+    /// La segunda mitad de la prueba —el mismo tenant leyendo sus propios escalones— es la que
+    /// distingue "el filtro filtró" de "la tabla estaba vacía": sin ella, un repositorio roto que no
+    /// devolviera nunca nada también pasaría.
+    /// </summary>
+    [Fact]
+    public async Task Tenant_filtered_tiers_read_returns_nothing_for_another_tenants_product()
+    {
+        var fixture = await SeedAsync(priceMode: CatalogPriceMode.Wholesale);
+        try
+        {
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tierRepository = scope.ServiceProvider
+                .GetRequiredService<IProductWholesaleTierRepository>();
+
+            // El tenant DUEÑO: las filas están ahí.
+            db.SetTenantContext(tenantId: fixture.TenantId, isSuperAdmin: false);
+            IList<ProductWholesaleTier> own = await tierRepository.GetByProductIdAsync(fixture.ValidProductId);
+            own.Should().HaveCount(2, "el tenant dueño lee sus propios escalones");
+
+            // Otro tenant, el MISMO id de producto: las filas siguen existiendo, pero son ajenas.
+            db.SetTenantContext(tenantId: Guid.NewGuid(), isSuperAdmin: false);
+            IList<ProductWholesaleTier> foreign = await tierRepository.GetByProductIdAsync(fixture.ValidProductId);
+            foreign.Should().BeEmpty(
+                "una lectura con sesión no puede cruzar tenants: el filtro global tiene que seguir aplicando");
+        }
+        finally
+        {
+            await CleanupAsync(fixture);
+        }
+    }
+
+    // --- El bypass del pedido anónimo está acotado por el tenant de la tienda ---------------
+
+    /// <summary>
+    /// La lectura del pedido PÚBLICO sí ignora los filtros globales (sin sesión el filtro por tenant
+    /// devuelve cero filas), pero el tenant explícito va en el `WHERE`: con el tenant de la tienda
+    /// devuelve los escalones, con otro tenant devuelve NADA aunque el id de producto sea el correcto.
+    ///
+    /// La segunda mitad es la que importa: sin ella, el bypass sería exactamente el agujero que la
+    /// versión anterior dejaba abierto — "ignora todos los filtros y confía en que el llamador pase
+    /// un id bueno".
+    /// </summary>
+    [Fact]
+    public async Task Public_order_tiers_read_is_bounded_by_the_given_tenant()
+    {
+        var fixture = await SeedAsync(priceMode: CatalogPriceMode.Wholesale);
+        try
+        {
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            // El contexto del request anónimo, que es donde el bypass hace falta.
+            db.SetTenantContext(tenantId: null, isSuperAdmin: false);
+            var tierRepository = scope.ServiceProvider
+                .GetRequiredService<IProductWholesaleTierRepository>();
+
+            IList<ProductWholesaleTier> mine = await tierRepository.GetForPublicOrderAsync(
+                fixture.ValidProductId, fixture.TenantId, CancellationToken.None);
+            mine.Should().HaveCount(2, "el tenant de la tienda ve sus escalones desde un contexto anónimo");
+            mine.Select(tier => tier.MinPacks).Should().Equal(TierOneMinPacks, TierTwoMinPacks);
+            mine.Select(tier => tier.PricePerUnit).Should().Equal(TierOneUnitPrice, TierTwoUnitPrice);
+
+            IList<ProductWholesaleTier> otherTenant = await tierRepository.GetForPublicOrderAsync(
+                fixture.ValidProductId, Guid.NewGuid(), CancellationToken.None);
+            otherTenant.Should().BeEmpty(
+                "el bypass se acota por el tenant explícito, no por la confianza en el llamador");
         }
         finally
         {

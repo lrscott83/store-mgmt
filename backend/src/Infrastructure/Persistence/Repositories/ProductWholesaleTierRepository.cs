@@ -16,31 +16,46 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         /// <summary>
-        /// Escalones de UN producto, ordenados por <c>MinPacks</c>: el escalón aplicable es el de
-        /// mínimo más alto, así que el orden es parte de lo que el llamador espera leer.
+        /// Tiers of ONE product, ordered by <c>MinPacks</c>: the applicable tier is the one with the
+        /// highest minimum that does not exceed the packs ordered, so the order is part of what the
+        /// caller expects to read.
         ///
-        /// `IgnoreQueryFilters` es OBLIGATORIO aquí, y no un atajo: el camino que más usa este
-        /// método es el ALTA del pedido público, que corre ANÓNIMO. Sin sesión, `_context.TenantId`
-        /// es null y `_context.IsSuperAdmin` es false, así que el filtro global por tenant
-        /// (`x.TenantId == _context.TenantId`) se traduce a `= NULL` y devuelve CERO filas — el
-        /// catálogo mayorista publicaría los precios y el pedido los rechazaría como "no
-        /// configurado", sin error de base. Es el mismo motivo por el que las demás lecturas
-        /// anónimas de esta feature lo ignoran (`ProductRepository.GetPublishedByIdsAsync`,
-        /// `GetPublicPriceModeAsync`, `StoreCatalogSettingsRepository.GetPublicByStoreIdAsync`,
-        /// `StoreRepository.GetStoreByCatalogSlugAsync`).
-        ///
-        /// Lo que impide cruzar tenants no es el filtro, es la LLAVE: el llamador ya resolvió la
-        /// tienda (por su slug público) y pide los escalones por `ProductId`, un id GUID que solo
-        /// se obtiene del catálogo publicado de esa tienda. Un escalón de otra tienda exige acertar
-        /// un GUID ajeno.
+        /// The global tenant filter is DELIBERATELY kept here: this is the safe default, and any
+        /// session-scoped caller gets exactly the rows of its own tenant or nothing at all. The
+        /// anonymous order path needs a bypass and for that reason has its own method
+        /// (<see cref="GetForPublicOrderAsync"/>) instead of loosening this one — a bypass that every
+        /// caller inherits is a bypass nobody can audit.
         /// </summary>
         public async Task<IList<ProductWholesaleTier>> GetByProductIdAsync(Guid productId)
         {
             return await _tiers
-                .IgnoreQueryFilters()
                 .Where(tier => tier.ProductId == productId)
                 .OrderBy(tier => tier.MinPacks)
                 .ToListAsync();
+        }
+
+        /// <summary>
+        /// Same read, for the anonymous public-order path.
+        ///
+        /// `IgnoreQueryFilters` is REQUIRED and not a shortcut: the order POST runs WITHOUT a
+        /// session, so `_context.TenantId` is null, the global filter translates to `TenantId =
+        /// NULL` and returns ZERO rows. The catalog would then publish wholesale prices that the
+        /// order rejects as "not configured", silently.
+        ///
+        /// What makes the bypass safe is the SECOND predicate: the tenant is passed explicitly and
+        /// becomes part of the `WHERE`, so the query cannot return another tenant's rows even though
+        /// every global filter is off. The caller resolves the store by its public slug and passes
+        /// that store's `TenantId`; the bypass is then bounded by data the request already proved it
+        /// owns.
+        /// </summary>
+        public async Task<IList<ProductWholesaleTier>> GetForPublicOrderAsync(Guid productId,
+            Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            return await _tiers
+                .IgnoreQueryFilters()
+                .Where(tier => tier.ProductId == productId && tier.TenantId == tenantId)
+                .OrderBy(tier => tier.MinPacks)
+                .ToListAsync(cancellationToken);
         }
     }
 }
