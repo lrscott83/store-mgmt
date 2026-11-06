@@ -8,6 +8,10 @@ import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
 import { CatalogSeeProducts } from '~/catalog/components/catalog-see-products';
+import {
+  isWholesaleProduct,
+  wholesaleDisplayOf,
+} from '~/catalog/lib/catalog-wholesale';
 import type { CatalogTemplateProps } from '~/catalog/templates/catalog-template';
 import type { PublicCatalogProduct } from '~/sales/lib/services/catalog-http-service';
 
@@ -28,9 +32,12 @@ const NAV_LINK_CLASSES =
 /**
  * ¿La tarjeta lleva alguna etiqueta? El contenedor y el contenido usan el MISMO predicado, para
  * que nunca quede un hueco vacío cuando el producto no es nuevo ni tiene descuento.
+ *
+ * En modo mayorista el descuento minorista no cuenta: no se aplica encima del precio mayorista, así
+ * que anunciar "-12%" junto a un precio por paquete sería prometer un número que nadie va a pagar.
  */
 function hasBadges(product: PublicCatalogProduct): boolean {
-  return product.isNew || product.hasDiscount;
+  return product.isNew || (product.hasDiscount && !isWholesaleProduct(product));
 }
 
 /**
@@ -50,13 +57,54 @@ function ProductBadges({ product }: { readonly product: PublicCatalogProduct }) 
           {intl.formatMessage({ id: 'CATALOG_PUBLIC.NEW' })}
         </span>
       )}
-      {product.hasDiscount && (
+      {product.hasDiscount && !isWholesaleProduct(product) && (
         <span
           className="rounded-full bg-danger px-2 py-1 text-xs text-white"
           data-testid={`catalog-badge-discount-${product.id}`}
         >
           -{product.percentDiscount}%
         </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Price block of a card.
+ *
+ * Wholesale mode publishes the price of ONE PACK ("la caja a $X"), which is the number the customer
+ * actually buys, plus the unit and the minimum that makes it sellable. The struck-through retail
+ * price disappears with it: the hook is a mode of the whole catalog, not a promotion on top of the
+ * retail price, and showing both would invite the customer to compare two prices that are not
+ * alternatives.
+ */
+function ProductPrice({ product }: { readonly product: PublicCatalogProduct }) {
+  const intl = useIntl();
+  const wholesale = wholesaleDisplayOf(product);
+
+  return (
+    <>
+      <span className="block text-base font-bold text-primary">
+        {formatMoneyWithCurrency(
+          wholesale ? wholesale.packPrice : product.finalPrice,
+          currencyFromCode(product.currency),
+        )}
+      </span>
+      {wholesale ? (
+        <span
+          className="block text-xs text-text-muted"
+          data-testid={`catalog-card-wholesale-${product.id}`}
+        >
+          {wholesale.unit} ({wholesale.packSize}) ·{' '}
+          {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {wholesale.minPacks}{' '}
+          {wholesale.unitPlural}
+        </span>
+      ) : (
+        product.hasDiscount && (
+          <span className="block text-xs text-text-muted line-through">
+            {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
+          </span>
+        )
       )}
     </>
   );
@@ -369,17 +417,7 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
                       className="shrink-0 text-left"
                       data-testid={`catalog-card-price-${product.id}`}
                     >
-                      <span className="block text-base font-bold text-primary">
-                        {formatMoneyWithCurrency(
-                          product.finalPrice,
-                          currencyFromCode(product.currency),
-                        )}
-                      </span>
-                      {product.hasDiscount && (
-                        <span className="block text-xs text-text-muted line-through">
-                          {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
-                        </span>
-                      )}
+                      <ProductPrice product={product} />
                     </div>
                   </div>
                   {/* Descripción como TEXTO PLANO (D9) recortada a 3 líneas: la larga ya no
