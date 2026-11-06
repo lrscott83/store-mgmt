@@ -1,5 +1,6 @@
 using Application.Dtos.WebCatalog;
 using Domain.Common.Catalog;
+using Domain.Common.Enums;
 using Domain.Entities.Products;
 
 namespace Application.Features.WebCatalog.Public
@@ -13,14 +14,37 @@ namespace Application.Features.WebCatalog.Public
     /// `ProductImage` es una segunda fuente que podía publicar una foto fantasma —la imagen que la
     /// vista Catálogo Web ya había quitado pero cuya fila seguía activa—, así que la lectura pública
     /// no la enumera: `ImageUrls` es la MISMA clave que `ImageUrl`, o la lista vacía.
+    ///
+    /// El precio mayorista se publica como CONFIG (paquete + escalones) y no como un precio final:
+    /// el cliente elige paquetes y el precio lo resuelve `WholesalePricing` con el número de
+    /// paquetes de verdad. Por eso los tres números del "primer escalón" viajan aparte de la lista
+    /// de escalones: son el mínimo vendible que la tarjeta necesita mostrar sin recorrer la lista.
     /// </summary>
     internal static class PublicCatalogProductMapper
     {
-        public static PublicCatalogProductDto ToDto(Product product, string storeSlug)
+        /// <param name="priceMode">
+        /// Modo de la tienda, solo para ETIQUETAR el DTO. El valor por defecto es `Unit` a
+        /// propósito: un llamador que no resolvió el modo publica lo de siempre, no mayorista.
+        /// </param>
+        public static PublicCatalogProductDto ToDto(
+            Product product, string storeSlug, CatalogPriceMode priceMode = CatalogPriceMode.Unit)
         {
             string? mediaUrl = string.IsNullOrWhiteSpace(product.Image)
                 ? null
                 : CatalogPublicUrls.Media(storeSlug, product.Image!);
+
+            // Ordenar aquí y no confiar en el orden de la base: el contrato dice "ascendente por
+            // MinPacks" y el índice único de la tabla no impone orden de lectura.
+            List<ProductWholesaleTier> tiers = (product.WholesaleTiers ?? [])
+                .OrderBy(tier => tier.MinPacks)
+                .ToList();
+
+            // La MISMA puerta que usa el filtro SQL del catálogo mayorista: si el POS no vendería
+            // esta config, el catálogo tampoco publica sus números (saldrían vacíos o sin sentido).
+            bool hasWholesaleConfig = WholesalePricing.HasConfig(
+                product.WholesaleEnabled, product.WholesalePackSize, tiers.Count);
+
+            ProductWholesaleTier? firstTier = hasWholesaleConfig ? tiers[0] : null;
 
             return new PublicCatalogProductDto
             {
@@ -41,6 +65,32 @@ namespace Application.Features.WebCatalog.Public
                 CategorySlug = product.Category?.Slug ?? string.Empty,
                 ImageUrl = mediaUrl,
                 ImageUrls = mediaUrl == null ? new List<string>() : new List<string> { mediaUrl },
+                PriceMode = PublicCatalogPriceModeWire.ToWire(priceMode),
+                WholesaleEnabled = product.WholesaleEnabled,
+                WholesalePackSize = firstTier == null ? 0 : product.WholesalePackSize,
+                WholesaleUnitLabel = string.IsNullOrWhiteSpace(product.WholesaleUnitLabel)
+                    ? null
+                    : product.WholesaleUnitLabel,
+                WholesaleMinPacks = firstTier?.MinPacks,
+                WholesaleUnitPrice = firstTier?.PricePerUnit,
+                // Un paquete es una línea de UN paquete: se calcula con la misma fórmula del total
+                // de línea para que ambos números no puedan divergir en el redondeo.
+                WholesalePackPrice = firstTier == null
+                    ? null
+                    : WholesalePricing.LineTotal(1, product.WholesalePackSize, firstTier.PricePerUnit),
+                WholesaleTiers = hasWholesaleConfig
+                    ? tiers
+                        .Select(tier => new PublicCatalogWholesaleTierDto
+                        {
+                            MinPacks = tier.MinPacks,
+                            PricePerUnit = tier.PricePerUnit,
+                            // Sin `packSize` un paquete no tiene precio: por eso la lista sale
+                            // vacía cuando la config no es válida, en vez de con precios en cero.
+                            PackPrice = WholesalePricing.LineTotal(
+                                1, product.WholesalePackSize, tier.PricePerUnit),
+                        })
+                        .ToList()
+                    : new List<PublicCatalogWholesaleTierDto>(),
             };
         }
     }

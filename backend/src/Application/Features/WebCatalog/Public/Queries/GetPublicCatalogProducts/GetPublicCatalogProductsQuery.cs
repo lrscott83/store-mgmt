@@ -3,6 +3,7 @@ using Application.Dtos.WebCatalog;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -72,10 +73,15 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
             IList<Domain.Entities.Products.Product> products = await _productRepository.GetPublishedPageAsync(
                 store.Id, query.CategorySlug, query.Search, skip, pageSize, cancellationToken);
 
+            // El modo lo resuelve el repositorio porque es quien decide qué se publica: el handler
+            // solo lo ETIQUETA en los DTOs, y lo lee después de las lecturas para reutilizar la
+            // misma resolución (el repositorio la memoriza por petición).
+            CatalogPriceMode priceMode = await _productRepository.GetPublicPriceModeAsync(store.Id, cancellationToken);
+
             return ResponseResult.Success(new PublicCatalogPageDto
             {
                 Items = products
-                    .Select(product => PublicCatalogProductMapper.ToDto(product, storeSlug))
+                    .Select(product => PublicCatalogProductMapper.ToDto(product, storeSlug, priceMode))
                     .ToList(),
                 Total = total,
                 Page = page,

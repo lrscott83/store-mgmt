@@ -20,7 +20,7 @@ namespace Application.Dtos.WebCatalog
         /// <summary>Páginas vistas del catálogo.</summary>
         public int PageViews { get; init; }
 
-        /// <summary>Pedidos online (OrderType.WhatsApp) creados en el periodo.</summary>
+        /// <summary>Pedidos online (<c>!IsOfflineOrder</c>) creados en el periodo.</summary>
         public int Orders { get; init; }
 
         /// <summary>Pedidos / visitas. 0 cuando no hubo visitas.</summary>

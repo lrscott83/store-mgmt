@@ -1,4 +1,6 @@
-﻿using Domain.Entities.Products;
+﻿using Domain.Common.Enums;
+using Domain.Entities.Products;
+using Domain.Entities.StoreCatalogSettings;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +10,16 @@ namespace Infrastructure.Persistence.Repositories
     public class ProductRepository : GenericRepository<Product, Guid>, IProductRepository
     {
         private readonly DbSet<Product> _products;
+
+        /// <summary>
+        /// Memoria del modo de precio YA resuelto, por tienda. Un request público pregunta el modo
+        /// una vez para el conteo, otra para la página y otra para etiquetar los DTOs: sin esto
+        /// serían tres `SELECT` del mismo escalar por visita anónima. El repositorio es scoped, así
+        /// que el ámbito natural de la memoria ES la petición.
+        /// </summary>
+        private Guid? _priceModeStoreId;
+        private CatalogPriceMode? _priceMode;
+
         public ProductRepository(ApplicationDbContext dbContext) : base(dbContext)
         {
             _products = dbContext.Set<Product>();
@@ -104,12 +116,70 @@ namespace Infrastructure.Persistence.Repositories
         // --- Lecturas del catálogo público (publicación directa sobre esta tabla, decisión del
         // Owner 2026-09-28): activos y en venta, de categorías activas con slug público. ---
 
+        /// <summary>
+        /// Modo de precio publicado por la tienda. Sin fila de configuración no hay opinión: se
+        /// publica por unidad, que es lo que el catálogo hacía antes de que existiera el modo.
+        ///
+        /// `IgnoreQueryFilters` es obligatorio, igual que en `GetPublishedBy*`: una petición
+        /// anónima no tiene tenant en el contexto, y `StoreCatalogSettings` tiene filtro global por
+        /// tenant, así que la consulta respondería "sin fila" para TODAS las tiendas — un catálogo
+        /// mayorista publicado como unidad, sin error ni aviso.
+        /// </summary>
+        public async Task<CatalogPriceMode> GetPublicPriceModeAsync(Guid storeId,
+            CancellationToken cancellationToken = default)
+        {
+            if (_priceMode.HasValue && _priceModeStoreId == storeId)
+                return _priceMode.Value;
+
+            // `FirstOrDefaultAsync` sobre el selector devuelve `0` cuando la tienda no tiene fila:
+            // no es un modo válido, y solo `Wholesale` es mayorista, así que se normaliza.
+            CatalogPriceMode stored = await _dbContext.Set<StoreCatalogSettings>()
+                .IgnoreQueryFilters()
+                .Where(settings => settings.StoreId == storeId)
+                .Select(settings => settings.PriceMode)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            CatalogPriceMode mode = stored == CatalogPriceMode.Wholesale
+                ? CatalogPriceMode.Wholesale
+                : CatalogPriceMode.Unit;
+
+            _priceModeStoreId = storeId;
+            _priceMode = mode;
+
+            return mode;
+        }
+
+        /// <summary>
+        /// S7: ¿tiene la tienda algún producto con configuración mayorista válida?
+        ///
+        /// El predicado es EL MISMO que el de la puerta de publicación (`ApplyWholesaleGate`), no una
+        /// segunda copia: si el modo mayorista publica exactamente lo que pasa esa condición, el
+        /// control que autoriza el modo tiene que medir esa misma condición — una copia divergiría y
+        /// dejaría guardar un modo que publica una página vacía.
+        ///
+        /// `IgnoreQueryFilters` por el mismo motivo que en la lectura pública: la tienda puede ser la
+        /// de la RUTA (vista del SuperAdmin) y el filtro global aplicaría el tenant de quien llama.
+        /// `Any()` se traduce a `EXISTS`: no se materializa ni un producto.
+        /// </summary>
+        public async Task<bool> HasWholesalePricedProductsAsync(Guid storeId,
+            CancellationToken cancellationToken = default)
+            => await ApplyWholesaleGate(
+                    _products
+                        .IgnoreQueryFilters()
+                        .Where(product => product.Category.StoreId == storeId),
+                    CatalogPriceMode.Wholesale)
+                .AnyAsync(cancellationToken);
+
         public async Task<IList<Product>> GetPublishedPageAsync(Guid storeId, string? categorySlug, string? search,
             int skip, int take, CancellationToken cancellationToken = default)
         {
-            IQueryable<Product> query = ApplyPublishedFilters(PublishedQuery(storeId), categorySlug, search);
+            IQueryable<Product> query = ApplyPublishedFilters(
+                await PublishedQueryAsync(storeId, cancellationToken), categorySlug, search);
 
             return await query
+                // Los escalones se publican en la tarjeta (mínimo, precio por unidad y por paquete):
+                // sin este `Include` el DTO los daría por inexistentes.
+                .Include(product => product.WholesaleTiers)
                 .OrderBy(product => product.Category.Order)
                 .ThenBy(product => product.Order)
                 .ThenBy(product => product.Name)
@@ -120,12 +190,13 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<int> CountPublishedAsync(Guid storeId, string? categorySlug, string? search,
             CancellationToken cancellationToken = default)
-            => await ApplyPublishedFilters(PublishedQuery(storeId), categorySlug, search)
+            => await ApplyPublishedFilters(
+                    await PublishedQueryAsync(storeId, cancellationToken), categorySlug, search)
                 .CountAsync(cancellationToken);
 
         public async Task<IList<PublishedCategoryCount>> GetPublishedCategoryCountsAsync(Guid storeId,
             CancellationToken cancellationToken = default)
-            => await PublishedQuery(storeId)
+            => await (await PublishedQueryAsync(storeId, cancellationToken))
                 .GroupBy(product => new
                 {
                     product.CategoryId,
@@ -142,19 +213,46 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync(cancellationToken);
 
         /// <summary>
-        /// Universo PUBLICADO: activo, en venta, de categoría activa con slug público, de la tienda.
+        /// Universo PUBLICADO: activo, en venta, de categoría activa con slug público, de la tienda,
+        /// y con la puerta del modo de precio aplicada.
         /// Trae la categoría (el listado y la cabecera la usan) pero NO la galería: la imagen pública
         /// tiene una sola fuente, `Product.Image` (columna), así que `Include(Images)` era traer filas
         /// que nadie lee.
         /// </summary>
-        private IQueryable<Product> PublishedQuery(Guid storeId)
-            => _products
+        private async Task<IQueryable<Product>> PublishedQueryAsync(Guid storeId,
+            CancellationToken cancellationToken)
+        {
+            CatalogPriceMode priceMode = await GetPublicPriceModeAsync(storeId, cancellationToken);
+
+            IQueryable<Product> query = _products
                 .IgnoreQueryFilters()
                 .Include(product => product.Category)
                 .Where(product => product.Category.StoreId == storeId
                     && product.IsActive && product.AvailableToSale
                     && product.Category.IsActive
                     && product.Category.Slug != null);
+
+            return ApplyWholesaleGate(query, priceMode);
+        }
+
+        /// <summary>
+        /// S2: en modo mayorista el catálogo publica EXACTAMENTE lo que la venta mayorista del POS
+        /// puede vender, así que un producto sin config válida (activada, con paquete positivo y al
+        /// menos un escalón) desaparece — de la lista, del detalle, de la búsqueda y de los conteos
+        /// por categoría, porque todos salen de aquí.
+        ///
+        /// Es un predicado, no un filtro en memoria: `WholesaleTiers.Any()` se traduce a `EXISTS`, y
+        /// el `IgnoreQueryFilters` de arriba alcanza también a los escalones (que tienen su propio
+        /// filtro por tenant), así que un visitante anónimo no ve el catálogo mayorista vacío.
+        /// En modo unidad no se toca nada: la puerta no aplica.
+        /// </summary>
+        private static IQueryable<Product> ApplyWholesaleGate(IQueryable<Product> query,
+            CatalogPriceMode priceMode)
+            => priceMode == CatalogPriceMode.Wholesale
+                ? query.Where(product => product.WholesaleEnabled
+                    && product.WholesalePackSize > 0
+                    && product.WholesaleTiers.Any())
+                : query;
 
         /// <summary>
         /// Filtros del listado, aplicados en SQL. El slug de categoría viaja tal cual lo manda el
@@ -182,15 +280,12 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId)
         {
-            return await _products
-                .IgnoreQueryFilters()
-                .Where(product => product.Category.StoreId == storeId
-                    && product.Id == productId
-                    && product.IsActive && product.AvailableToSale
-                    && product.Category.IsActive
-                    && product.Category.Slug != null)
+            IQueryable<Product> query = await PublishedQueryAsync(storeId, CancellationToken.None);
+
+            return await query
+                .Where(product => product.Id == productId)
                 .Include(product => product.Images)
-                .Include(product => product.Category)
+                .Include(product => product.WholesaleTiers)
                 .FirstOrDefaultAsync();
         }
 

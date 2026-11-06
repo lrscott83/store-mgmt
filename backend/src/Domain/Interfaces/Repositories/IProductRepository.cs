@@ -1,4 +1,5 @@
-﻿using Domain.Common.Repositories;
+﻿using Domain.Common.Enums;
+using Domain.Common.Repositories;
 using Domain.Entities.Products;
 
 namespace Domain.Interfaces.Repositories
@@ -55,6 +56,27 @@ namespace Domain.Interfaces.Repositories
 
         /// <summary>Detalle público por id dentro de la tienda; null si no está publicado.</summary>
         Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId);
+
+        /// <summary>
+        /// Modo de precio con el que se publica HOY esta tienda: `Unit` si no tiene fila de
+        /// configuración (el comportamiento histórico) o `Wholesale` si el dueño lo puso.
+        ///
+        /// Vive en este repositorio y no en el handler porque es la MISMA decisión que aplican los
+        /// filtros de publicación: no se puede publicar en un modo y etiquetar los DTOs con otro.
+        /// La lectura es de la configuración de la tienda, UNA por petición, nunca por producto.
+        /// </summary>
+        Task<CatalogPriceMode> GetPublicPriceModeAsync(Guid storeId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// `true` si la tienda tiene AL MENOS un producto con configuración mayorista válida
+        /// (`WholesaleEnabled` + paquete positivo + al menos un escalón).
+        ///
+        /// Es la puerta de S7: guardar el catálogo en precio mayorista sin un solo producto que
+        /// pueda publicarse en ese modo dejaría la tienda publicando una página vacía, así que el
+        /// servidor se niega a guardar esa configuración. Se responde en SQL (`EXISTS`): mirar los
+        /// escalones exige contar, no traer el catálogo.
+        /// </summary>
+        Task<bool> HasWholesalePricedProductsAsync(Guid storeId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Varios productos publicados por id, de una sola consulta (carrito de un pedido online,
