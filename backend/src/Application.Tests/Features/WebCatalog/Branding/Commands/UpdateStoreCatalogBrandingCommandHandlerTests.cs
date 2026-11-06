@@ -51,6 +51,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
     private readonly Mock<ILogger<UpdateStoreCatalogBrandingCommandHandler>> _logger = new();
     private readonly Mock<ICatalogStaticPageRegenerator> _catalogPageRegenerator = new();
+    private readonly Mock<IProductRepository> _productRepository = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -98,7 +99,8 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _catalogImageStorage.Object,
         _localizer.Object,
         _logger.Object,
-        _catalogPageRegenerator.Object);
+        _catalogPageRegenerator.Object,
+        _productRepository.Object);
 
     /// <summary>
     /// El tenant de la CLAVE del archivo (y de la fila) sale de la TIENDA, no del claim. Si saliera del

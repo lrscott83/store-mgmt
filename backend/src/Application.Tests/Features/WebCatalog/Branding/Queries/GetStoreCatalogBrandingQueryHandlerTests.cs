@@ -31,6 +31,7 @@ public class GetStoreCatalogBrandingQueryHandlerTests
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
+    private readonly Mock<IProductRepository> _productRepository = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -56,7 +57,8 @@ public class GetStoreCatalogBrandingQueryHandlerTests
         _httpContextService.Object,
         _storeRepository.Object,
         _settingsRepository.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _productRepository.Object);
 
     #region Happy Path
 

@@ -36,6 +36,7 @@ import {
   type CatalogShowcaseImage,
   type CatalogShowcaseImages,
   type CatalogStatus,
+  type PublicCatalogPriceMode,
 } from '../lib/services/catalog-http-service';
 
 /**
@@ -580,6 +581,11 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
    * guardado (`branding.mobileColumns`) para saber si hay cambio pendiente.
    */
   const [mobileColumns, setMobileColumns] = useState<number | null>(null);
+  /**
+   * Modo de precio del catálogo (S1): "Unit" o "Wholesale". null = sin cargar todavía. Se compara con
+   * lo guardado (`branding.priceMode`) para saber si hay cambio pendiente, igual que las columnas.
+   */
+  const [priceMode, setPriceMode] = useState<PublicCatalogPriceMode | null>(null);
   const [isSavingBrand, setIsSavingBrand] = useState(false);
 
   /**
@@ -648,6 +654,9 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
       }
       setBranding(result.data);
       setMobileColumns(result.data.mobileColumns);
+      // Un backend anterior a este campo no lo manda, y ese silencio significa "por unidad": el modo
+      // que regía cuando el campo no existía. No se inventa un estado "sin configurar".
+      setPriceMode(result.data.priceMode ?? 'Unit');
       setBrandError('');
     } catch (err) {
       setBrandError(intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_LOAD_ERROR') }));
@@ -1115,7 +1124,8 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
 
   const hasBrandChanges =
     pendingLogo !== null ||
-    (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns);
+    (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns) ||
+    (priceMode !== null && branding !== null && priceMode !== (branding.priceMode ?? 'Unit'));
 
   async function handleSaveBrand() {
     if (!hasBrandChanges) return;
@@ -1126,14 +1136,22 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
     if (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns) {
       payload.mobileColumns = mobileColumns;
     }
+    // Mismo criterio con el modo: reenviarlo sin cambio solo haría que el servidor regenerase una
+    // página que no cambia.
+    if (priceMode !== null && branding !== null && priceMode !== (branding.priceMode ?? 'Unit')) {
+      payload.priceMode = priceMode;
+    }
 
     setIsSavingBrand(true);
     try {
       const result = await catalog.updateBranding(payload);
       if (!result.succeeded) {
+        // El backend explica el MOTIVO de un rechazo de negocio —activar mayorista sin ningún
+        // producto con precio mayorista—, así que su mensaje manda: un "no se pudo guardar" genérico
+        // dejaría al dueño sin saber qué corregir.
         showBlockingError(
           intl.formatMessage({ id: 'GENERAL.ERROR' }),
-          intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVE_ERROR' }),
+          result.message || intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVE_ERROR' }),
         );
         return;
       }
@@ -1442,7 +1460,50 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
               {intl.formatMessage({ id: 'WEB_CATALOG.BRAND_MOBILE_COLUMNS_HINT' })}
             </p>
           </div>
+
+          {/* Modo de precio del catálogo (S1): qué precio publica el catálogo público. Se guarda con
+              el MISMO botón de marca y en el mismo PUT parcial — es configuración de lo que se ve,
+              no una columna de ningún producto. */}
+          <div data-testid="brand-price-mode">
+            <label
+              className="mb-1 block text-xs font-medium text-text-muted"
+              htmlFor="brand-price-mode-select"
+            >
+              {intl.formatMessage({ id: 'WEB_CATALOG.PRICE_MODE' })}
+            </label>
+            <select
+              id="brand-price-mode-select"
+              value={priceMode ?? 'Unit'}
+              disabled={isSavingBrand || branding === null}
+              onChange={(event) => setPriceMode(event.target.value as PublicCatalogPriceMode)}
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              data-testid="brand-price-mode-select"
+            >
+              <option value="Unit">
+                {intl.formatMessage({ id: 'WEB_CATALOG.PRICE_MODE_UNIT' })}
+              </option>
+              <option value="Wholesale">
+                {intl.formatMessage({ id: 'WEB_CATALOG.PRICE_MODE_WHOLESALE' })}
+              </option>
+            </select>
+            <p className="mt-1 text-xs text-text-muted">
+              {intl.formatMessage({ id: 'WEB_CATALOG.PRICE_MODE_HINT' })}
+            </p>
+          </div>
         </div>
+
+        {/* S7: el modo guardado es mayorista y no queda un solo producto con precio mayorista (un
+            sync posterior los quitó). El catálogo no publica NADA. Es un AVISO, no una corrección:
+            el sistema nunca desactiva ni cambia solo la elección del dueño, y el texto dice qué
+            hace falta. `=== false` a propósito: un backend anterior no manda el dato y ahí no hay
+            nada que avisar. */}
+        {branding?.priceMode === 'Wholesale' && branding.hasWholesalePricedProducts === false && (
+          <InfoBox variant="danger" className="mt-3">
+            <span data-testid="catalog-wholesale-warning">
+              {intl.formatMessage({ id: 'WEB_CATALOG.PRICE_MODE_EMPTY_WARNING' })}
+            </span>
+          </InfoBox>
+        )}
       </Card>
 
       {/* Showcase: carrusel e imágenes del día (decisión C1). Dos bloques INDEPENDIENTES con
