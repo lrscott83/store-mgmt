@@ -277,6 +277,19 @@ public sealed class WholesaleCatalogE2ETests
             var body = await response.Content
                 .ReadFromJsonAsync<ApiResponse<OnlineOrderCreatedDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
+            // El 400 solo no identifica NADA: cualquier otro rechazo del endpoint (módulo apagado,
+            // producto no publicado, cantidad inválida) también es un 400 y también deja la base sin
+            // filas, así que sin el mensaje esta prueba pasaría aunque el borde bajo el primer
+            // escalón estuviera roto. Se afirma la frase de
+            // `OnlineOrderWholesaleBelowMinimumPacks` —el único identificador de ese rechazo, porque
+            // el contrato no expone un código estable— pero SIN el id del producto interpolado: el
+            // id es de un fixture nuevo en cada corrida, y una edición de copy tampoco cambia el
+            // comportamiento. El patrón fija la forma estable de la oración más el mínimo (3), que
+            // es el dato que el handler tiene que haber leído del escalón.
+            body.Errors.Should().ContainSingle()
+                .Which.Description.Should().MatchRegex(
+                    $"^La cantidad del producto .+ está por debajo del mínimo mayorista de {TierOneMinPacks} paquetes$",
+                    "otro 400 (p. ej. 'no configurado') satisfaría el status sin ejercer este borde");
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -380,18 +393,23 @@ public sealed class WholesaleCatalogE2ETests
             var body = await response.Content
                 .ReadFromJsonAsync<ApiResponse<OnlineOrderCreatedDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
-            // 30 no es múltiplo de 12: el mensaje es la FRASE COMPLETA de
+            // 30 no es múltiplo de 12: el mensaje es la FRASE de
             // `OnlineOrderWholesaleQuantityMustBeAPackMultiple`, con el id del producto y el tamaño
             // del paquete interpolados. El contrato no expone un código de error estable, así que la
             // frase es la única identidad disponible; buscar el número "12" dejaba pasar cualquier
             // otro 400 que lo mencionara (un nombre de producto, un id, un límite).
-            // La cultura está FIJADA en español (`UseLocalizationExtension` solo admite "es" y no hay
-            // I18n.es.resx, así que se resuelve el resx neutro), por eso la frase se afirma en
+            //
+            // El id interpolado NO se compara: es un GUID nuevo en cada corrida y no aporta
+            // comportamiento. Se afirma la forma estable de la oración con el tamaño del paquete,
+            // que es el otro dato que el handler tiene que haber leído del producto.
+            //
+            // La cultura está FIJADA en español (`UseLocalizationExtension` solo admite "es" y no
+            // hay I18n.es.resx, así que se resuelve el resx neutro), por eso la frase se afirma en
             // español y no por traducción.
             body.Errors.Should().ContainSingle()
-                .Which.Description.Should().Be(
-                    $"La cantidad del producto {fixture.ValidProductId} debe ser múltiplo de {PackSize} "
-                    + "unidades, que es el tamaño del paquete");
+                .Which.Description.Should().MatchRegex(
+                    $"^La cantidad del producto .+ debe ser múltiplo de {PackSize} unidades, "
+                    + "que es el tamaño del paquete$");
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

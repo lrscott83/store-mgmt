@@ -53,12 +53,18 @@ public class CreateOnlineOrderWholesalePricingTests
 
     private Guid _storeId;
     private readonly Guid _tenantId = Guid.NewGuid();
+    /// <summary>
+    /// Tenant de la TIENDA bajo prueba. Por defecto coincide con <see cref="_tenantId"/> (el
+    /// ambiental de la suite); el test del tenant de la tienda lo separa a propósito.
+    /// </summary>
+    private Guid _storeTenantId;
     private readonly Guid _categoryId = Guid.NewGuid();
     private readonly List<Product> _published = [];
     private readonly Dictionary<Guid, IList<ProductWholesaleTier>> _tiers = [];
 
     public CreateOnlineOrderWholesalePricingTests()
     {
+        _storeTenantId = _tenantId;
         // El localizador devuelve "Clave:args": así se puede afirmar QUÉ mensaje se eligió sin
         // depender del texto traducido.
         _localizer
@@ -98,14 +104,20 @@ public class CreateOnlineOrderWholesalePricingTests
 
     #region Scaffolding
 
-    private void OpenStore(CatalogPriceMode priceMode)
+    /// <summary>
+    /// Abre la tienda bajo la que corre el pedido. `tenantId` es el tenant de la TIENDA: nulo lo
+    /// deja igual al ambiental de la suite, y el test que prueba que el handler lee el de la TIENDA
+    /// pasa uno distinto a propósito.
+    /// </summary>
+    private void OpenStore(CatalogPriceMode priceMode, Guid? tenantId = null)
     {
-        Store store = Store.Create("Mayorista Ana", Guid.NewGuid(), true, _tenantId, null);
+        _storeTenantId = tenantId ?? _tenantId;
+        Store store = Store.Create("Mayorista Ana", Guid.NewGuid(), true, _storeTenantId, null);
         store.CatalogSlug = Slug;
         _storeRepository.Setup(x => x.GetStoreByCatalogSlugAsync(Slug)).ReturnsAsync(store);
         _storeId = store.Id;
 
-        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _storeTenantId);
         settings.Enabled = true;
         settings.PickupEnabled = true;
         settings.PriceMode = priceMode;
@@ -119,8 +131,8 @@ public class CreateOnlineOrderWholesalePricingTests
         bool wholesaleEnabled = true,
         Currency currency = Currency.CUP)
     {
-        Product product = Product.Create("Cerveza", _categoryId, price, 1, true, true, "B-1", _tenantId);
-        product.Category = ProductCategory.Create(_storeId, "General", 1, _tenantId, "general");
+        Product product = Product.Create("Cerveza", _categoryId, price, 1, true, true, "B-1", _storeTenantId);
+        product.Category = ProductCategory.Create(_storeId, "General", 1, _storeTenantId, "general");
         product.Currency = currency;
         product.WholesaleEnabled = wholesaleEnabled;
         product.WholesalePackSize = packSize;
@@ -139,7 +151,7 @@ public class CreateOnlineOrderWholesalePricingTests
         Currency currency = Currency.CUP)
     {
         _tiers[productId] = [.. tiers.Select(tier => ProductWholesaleTier.Create(
-            productId, tier.MinPacks, tier.UnitPrice, currency, _tenantId))];
+            productId, tier.MinPacks, tier.UnitPrice, currency, _storeTenantId))];
     }
 
     private static CreateOnlineOrderCommand Command(Guid productId, int quantity) => new()
@@ -246,19 +258,32 @@ public class CreateOnlineOrderWholesalePricingTests
     /// `IgnoreQueryFilters` (sin sesión el filtro global devuelve cero filas). Si el handler pasara
     /// el tenant del contexto —`Guid.Empty` en el camino anónimo— la lectura devolvería vacío y todo
     /// pedido mayorista sería rechazado como "no configurado".
+    ///
+    /// El tenant de la tienda es DISTINTO del tenant ambiental de esta suite a propósito: con el
+    /// mismo valor, la verificación pasaría igual aunque el handler leyera el tenant del contexto en
+    /// vez del que devolvió el slug, y la prueba no probaría la propiedad que anuncia. Esa
+    /// distinción es lo que aquí se puede fijar barato y en el E2E no: ahí la tienda sembrada vive
+    /// en el tenant por defecto, que es también el único que `SetTenantContext` puede ofrecer.
     /// </summary>
     [Fact]
     public async Task Handle_InWholesaleMode_ShouldReadTheTiersForTheStoreTenant()
     {
-        OpenStore(CatalogPriceMode.Wholesale);
+        Guid storeTenant = Guid.NewGuid();
+        storeTenant.Should().NotBe(_tenantId,
+            "si coincidieran, la verificación no distinguiría el tenant de la tienda del ambiental");
+
+        OpenStore(CatalogPriceMode.Wholesale, tenantId: storeTenant);
         Guid productId = PublishProduct();
         WithTiers(productId, [(1, 90m)]);
 
         await Handler().Handle(Command(productId, quantity: 12), CancellationToken.None);
 
         _tierRepository.Verify(
-            x => x.GetForPublicOrderAsync(productId, _tenantId, It.IsAny<CancellationToken>()),
+            x => x.GetForPublicOrderAsync(productId, storeTenant, It.IsAny<CancellationToken>()),
             Times.Once);
+        _tierRepository.Verify(
+            x => x.GetForPublicOrderAsync(productId, _tenantId, It.IsAny<CancellationToken>()), Times.Never,
+            "el tenant ambiental de la sesión no es el de la tienda resuelta por el slug");
         _tierRepository.Verify(
             x => x.GetByProductIdAsync(It.IsAny<Guid>()), Times.Never,
             "el pedido público no puede usar la lectura con sesión: sin sesión devolvería cero filas");
