@@ -53,7 +53,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
     private static Order Order()
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            Guid.NewGuid(), OrderType.WhatsApp, string.Empty, 0m, 0,
+            Guid.NewGuid(), OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         return order;

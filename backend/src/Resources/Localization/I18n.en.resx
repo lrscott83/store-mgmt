@@ -597,6 +597,15 @@
   <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
     <value>{0} cannot exceed {1} characters</value>
   </data>
+  <data name="OnlineOrderWholesaleNotConfigured" xml:space="preserve">
+    <value>Product {0} has no wholesale price configured</value>
+  </data>
+  <data name="OnlineOrderWholesaleQuantityMustBeAPackMultiple" xml:space="preserve">
+    <value>The quantity of product {0} must be a multiple of {1} units, the configured pack size</value>
+  </data>
+  <data name="OnlineOrderWholesaleBelowMinimumPacks" xml:space="preserve">
+    <value>The quantity of product {0} is below the wholesale minimum of {1} packs</value>
+  </data>
   <data name="CatalogWholesaleTierRequired" xml:space="preserve">
     <value>Product {0} contains an empty wholesale tier</value>
   </data>
@@ -626,6 +635,12 @@
   </data>
   <data name="BrandingInvalidTemplate" xml:space="preserve">
     <value>The template id {0} is not valid</value>
+  </data>
+  <data name="BrandingPriceModeInvalid" xml:space="preserve">
+    <value>{0} only accepts Unit or Wholesale (per unit or wholesale pricing)</value>
+  </data>
+  <data name="CatalogWholesaleModeWithoutProducts" xml:space="preserve">
+    <value>The catalog cannot be published with wholesale prices: the store has no product configured with a wholesale price. Configure wholesale prices and sync the catalog to enable this mode.</value>
   </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>The image type {0} is not valid</value>

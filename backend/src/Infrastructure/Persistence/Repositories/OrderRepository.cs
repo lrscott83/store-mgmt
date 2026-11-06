@@ -166,21 +166,22 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el NUMERADOR de la
-        /// conversión del catálogo (pedidos / visitas): no cuenta ventas del POS ni pedidos de otro
-        /// tipo. `IgnoreQueryFilters` porque el panel es SuperAdmin y el aislamiento lo da el
-        /// `storeId`.
+        /// Pedidos ONLINE de una tienda en un rango (<c>!IsOfflineOrder</c>). Es el NUMERADOR de la
+        /// conversión del catálogo (pedidos / visitas): no cuenta las ventas del POS. El canal es
+        /// <c>IsOfflineOrder</c> y no el tipo, porque el tipo dice QUÉ venta es (Normal/Mayorista) y
+        /// los dos pueden llegar por el catálogo. `IgnoreQueryFilters` porque el panel es SuperAdmin
+        /// y el aislamiento lo da el `storeId`.
         /// </summary>
         public async Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc)
             => await _orders
                 .IgnoreQueryFilters()
                 .CountAsync(o => o.StoreId == storeId
-                    && o.OrderType == OrderType.WhatsApp
+                    && !o.IsOfflineOrder
                     && o.Date >= fromUtc
                     && o.Date <= toUtc);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de TODAS las tiendas en un rango: el numerador de la
+        /// Pedidos ONLINE (!IsOfflineOrder) de TODAS las tiendas en un rango: el numerador de la
         /// conversión del panel general. Sin filtro por tienda. El filtro global por tenant queda
         /// ACTIVO: el endpoint es SuperAdmin y lo deja pasar, así que desactivar todos los filtros
         /// con `IgnoreQueryFilters` sería más de lo que hace falta.
@@ -188,7 +189,7 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<int> CountOnlineOrdersAsync(DateTime fromUtc, DateTime toUtc,
             CancellationToken cancellationToken = default)
             => await _orders
-                .CountAsync(o => o.OrderType == OrderType.WhatsApp
+                .CountAsync(o => !o.IsOfflineOrder
                     && o.Date >= fromUtc
                     && o.Date <= toUtc, cancellationToken);
 

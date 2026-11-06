@@ -97,7 +97,7 @@ public class UpdateOrderStatusCommandHandlerTests
     private Order OrderIn(OrderStatus status, OrderDeliveryType deliveryType = OrderDeliveryType.Delivery)
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
+            _storeId, OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         order.DeliveryType = deliveryType;

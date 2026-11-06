@@ -617,7 +617,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
     {
         Order order = Domain.Entities.Orders.Order.Create(
             storeId ?? _storeId,
-            OrderType.WhatsApp,
+            OrderType.Normal,
             string.Empty,
             total,
             1,

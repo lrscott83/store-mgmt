@@ -3,6 +3,7 @@ using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Catalog;
 using Domain.Common.Enums;
 using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.Orders;
@@ -145,6 +146,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly ISalesManagerRepository _salesManagerRepository;
         private readonly IOrderSalesManagerRepository _orderSalesManagerRepository;
+        private readonly IProductWholesaleTierRepository _productWholesaleTierRepository;
 
         public CreateOnlineOrderCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -155,7 +157,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             IStoreModuleRepository storeModuleRepository,
             IStringLocalizer<I18n> localizer,
             ISalesManagerRepository salesManagerRepository,
-            IOrderSalesManagerRepository orderSalesManagerRepository)
+            IOrderSalesManagerRepository orderSalesManagerRepository,
+            IProductWholesaleTierRepository productWholesaleTierRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeRepository = storeRepository;
@@ -166,6 +169,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             _localizer = localizer;
             _salesManagerRepository = salesManagerRepository;
             _orderSalesManagerRepository = orderSalesManagerRepository;
+            _productWholesaleTierRepository = productWholesaleTierRepository;
         }
 
         public async Task<ResponseResult<OnlineOrderCreatedDto>> Handle(CreateOnlineOrderCommand request,
@@ -200,6 +204,13 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             IList<Product> published = await _productRepository.GetPublishedByIdsAsync(storeId, requestedIds);
 
             Dictionary<Guid, Product> publishedById = published.ToDictionary(product => product.Id);
+
+            // El MODO de precio es configuración de la tienda y decide CÓMO se cobra el carrito. En
+            // mayorista la cantidad del cliente se interpreta en paquetes de la config del producto
+            // y el precio unitario sale del escalón aplicable; el tipo del pedido pasa a ser el real
+            // (`Mayorista`), no un valor de canal.
+            bool wholesale = settings.PriceMode == CatalogPriceMode.Wholesale;
+
             var resolvedLines = new List<OrderLine>(requestedLines.Count);
             foreach (CreateOnlineOrderLineRequest line in requestedLines)
             {
@@ -208,20 +219,51 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                 if (!publishedById.TryGetValue(line.ProductId, out Product? product))
                     throw new ApiException(_localizer["OnlineOrderProductNotAvailable", line.ProductId], HttpStatusCode.BadRequest);
 
+                // Valores del modo unidad; el modo mayorista los reemplaza con el escalón.
+                decimal price = product.FinalPrice;
+                Currency lineCurrency = product.Currency;
+                int wholesalePackSize = 0;
+                int wholesalePacks = 0;
+                int? wholesaleTierMinPacks = null;
+                decimal? wholesaleTierUnitPrice = null;
+                string? wholesaleUnitLabel = null;
+
+                if (wholesale)
+                {
+                    WholesaleLinePricing pricing = await ResolveWholesalePricingAsync(product, line.Quantity);
+                    price = pricing.UnitPrice;
+                    lineCurrency = pricing.Currency;
+                    wholesalePackSize = pricing.PackSize;
+                    wholesalePacks = pricing.Packs;
+                    wholesaleTierMinPacks = pricing.TierMinPacks;
+                    wholesaleTierUnitPrice = pricing.UnitPrice;
+                    wholesaleUnitLabel = product.WholesaleUnitLabel;
+                }
+
                 resolvedLines.Add(new OrderLine(
                     product.Id,
                     product.Name,
+                    // La cantidad sigue siendo UNIDADES: el paquete es la forma de COBRAR, no la
+                    // unidad de la línea, así que `Price × Quantity` es el importe en los dos modos.
                     line.Quantity,
                     // `FinalPrice` es el precio que el catálogo MUESTRA (con % y monto rebajado
                     // combinados, ver CatalogPricing): si el servidor calculara con `Price` crudo,
-                    // el total persistido no coincidiría con el que la persona vio.
-                    product.FinalPrice,
-                    product.Currency,
+                    // el total persistido no coincidiría con el que la persona vio. En mayorista el
+                    // precio es el de la UNIDAD del escalón, que es el que el catálogo publicó.
+                    price,
+                    lineCurrency,
                     // Snapshot del precio en ese momento (S11 del feature Gestores de Ventas):
                     // permite recalcular el precio final desde la línea y no depender del producto.
                     product.Price,
                     product.PercentDiscountPrice,
-                    product.DiscountPrice));
+                    product.DiscountPrice,
+                    // Snapshot mayorista: los paquetes y la unidad son lo que el resumen de WhatsApp
+                    // necesita decir ("12 cajas"), y no se pueden deducir después sin la config.
+                    wholesalePackSize,
+                    wholesalePacks,
+                    wholesaleTierMinPacks,
+                    wholesaleTierUnitPrice,
+                    wholesaleUnitLabel));
             }
 
             EnsureSingleCurrency(resolvedLines);
@@ -256,7 +298,10 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                 // guardar un dato que además puede ser de OTRA persona (el carrito es del cliente
                 // anónimo, no del POS).
                 deliveryAddress: deliveryType == OrderDeliveryType.Delivery ? request.DeliveryAddress : null,
-                notes: request.Notes);
+                notes: request.Notes,
+                // El tipo REAL de la venta: mayorista si el catálogo publica precios mayoristas. El
+                // canal no se pasa porque un pedido de esta vía es del servidor por definición.
+                orderType: wholesale ? OrderType.Mayorista : OrderType.Normal);
 
             // Alta nueva: `.AddAsync` marca la entidad como Added. `ApplicationDbContext` es
             // NoTracking, así que una entidad creada y mutada sin añadir NO se escribiría — sin
@@ -295,7 +340,14 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                 // tampoco decide lo que se le muestra a la tienda.
                 [.. order.OrderItems
                     .OrderBy(item => item.OrderIndex)
-                    .Select(item => new OnlineOrderCreatedLineDto(item.Name, item.Quantity, item.Price))],
+                    .Select(item => new OnlineOrderCreatedLineDto(
+                        item.Name,
+                        item.Quantity,
+                        item.Price,
+                        // Los paquetes son 0 en una línea al detal: ahí no hay paquete que anunciar
+                        // y el resumen habla en unidades.
+                        item.WholesalePacks > 0 ? item.WholesalePacks : null,
+                        item.WholesaleUnitLabel))],
                 // El número sale de la MISMA lectura de configuración que ya decidió que esta
                 // tienda acepta pedidos: una consulta menos y ninguna posibilidad de que el enlace
                 // se arme con un número de una versión distinta de la que el resto del pedido usó.
@@ -421,6 +473,62 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
             return items;
         }
+
+        /// <summary>
+        /// Precio de una línea en modo MAYORISTA: los paquetes salen de la cantidad y el precio por
+        /// unidad del escalón que aplica. Las tres salidas son 400 con mensaje propio en vez de una
+        /// venta silenciosa al detal:
+        ///
+        ///   * el producto no tiene config mayorista válida (no se publica en modo mayorista);
+        ///   * la cantidad no es múltiplo del paquete (no hay paquete que cobrar);
+        ///   * los paquetes quedan por debajo del primer escalón (el POS saca la línea del carrito).
+        ///
+        /// La regla de precios NO se repite aquí: la implementa <see cref="WholesalePricing"/>, la
+        /// misma que el POS y que el catálogo público. Lo único que se resuelve aparte es QUÉ escalón
+        /// fue el aplicado, y solo para leer su moneda: el importe siempre viene de
+        /// <see cref="WholesalePricing.ResolveUnitPrice"/>.
+        /// </summary>
+        private async Task<WholesaleLinePricing> ResolveWholesalePricingAsync(Product product, int quantity)
+        {
+            // Los escalones se leen por producto porque `GetPublishedByIdsAsync` no los trae: son una
+            // tabla aparte y el carrito es corto. Traerlos por producto deja el precio del pedido
+            // leyendo exactamente la misma fila que publica el catálogo.
+            IList<ProductWholesaleTier> tiers = await _productWholesaleTierRepository.GetByProductIdAsync(product.Id);
+
+            if (!WholesalePricing.HasConfig(product.WholesaleEnabled, product.WholesalePackSize, tiers.Count))
+                throw new ApiException(
+                    _localizer["OnlineOrderWholesaleNotConfigured", product.Id], HttpStatusCode.BadRequest);
+
+            // Un resto distinto de cero no se redondea a la baja: cobrar 1 paquete por 13 unidades
+            // sería regalar una unidad sin que nadie lo decidiera.
+            if (quantity % product.WholesalePackSize != 0)
+                throw new ApiException(
+                    _localizer["OnlineOrderWholesaleQuantityMustBeAPackMultiple", product.Id, product.WholesalePackSize],
+                    HttpStatusCode.BadRequest);
+
+            int packs = quantity / product.WholesalePackSize;
+
+            WholesaleTierPrice[] tierPrices =
+                [.. tiers.Select(tier => new WholesaleTierPrice(tier.MinPacks, tier.PricePerUnit, tier.Currency))];
+
+            decimal? unitPrice = WholesalePricing.ResolveUnitPrice(tierPrices, packs);
+            if (unitPrice is null)
+                throw new ApiException(
+                    _localizer["OnlineOrderWholesaleBelowMinimumPacks", product.Id, WholesalePricing.MinPacks(tierPrices)],
+                    HttpStatusCode.BadRequest);
+
+            // El escalón aplicado es el de `MinPacks` más alto que no supera los paquetes, que es el
+            // que acaba de elegir `ResolveUnitPrice`; se busca solo por la MONEDA. Un empate en
+            // `MinPacks` no existe: `(ProductId, MinPacks)` es único en la tabla.
+            ProductWholesaleTier applicableTier = tiers.Where(tier => tier.MinPacks <= packs).MaxBy(tier => tier.MinPacks)!;
+
+            return new WholesaleLinePricing(
+                product.WholesalePackSize, packs, applicableTier.MinPacks, unitPrice.Value, applicableTier.Currency);
+        }
+
+        /// <summary>Lo que una línea mayorista necesita del catálogo: formato del paquete y precio.</summary>
+        private readonly record struct WholesaleLinePricing(
+            int PackSize, int Packs, int TierMinPacks, decimal UnitPrice, Currency Currency);
 
         /// <summary>
         /// `Order.Currency` es UNA moneda para todo el pedido (y A3 eliminó la moneda configurable

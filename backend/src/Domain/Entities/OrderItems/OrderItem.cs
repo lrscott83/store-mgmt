@@ -34,6 +34,34 @@ namespace Domain.Entities.OrderItems
         /// </summary>
         public int? DiscountPrice { get; set; }
         public int OrderIndex { get; set; }
+
+        // --- Snapshot mayorista de la línea ---------------------------------------------------
+        //
+        // Una venta mayorista se cobra POR PAQUETES (packs) y el precio aplicado es el de la
+        // UNIDAD dentro del paquete, pero el resumen que la tienda lee por WhatsApp habla en
+        // paquetes ("12 cajas"). Con solo `Quantity` (unidades) y `Price` (por unidad) ese mensaje
+        // no se puede reconstruir: los paquetes son el resultado de dividir por la config del
+        // momento, y la config puede cambiar después. Por eso el hecho se congela aquí, igual que
+        // el snapshot de precio que ya existía.
+        //
+        // Todo queda en sus defaults (0/null) en los pedidos que NO son mayoristas, así que una
+        // venta al detal se lee exactamente como antes.
+
+        /// <summary>Unidades por paquete aplicadas al cobrar la línea. 0 = la línea no fue mayorista.</summary>
+        public int WholesalePackSize { get; set; }
+
+        /// <summary>Paquetes cobrados en la línea. 0 = la línea no fue mayorista.</summary>
+        public int WholesalePacks { get; set; }
+
+        /// <summary>Mínimo de paquetes del escalón que fijó el precio. null = sin snapshot mayorista.</summary>
+        public int? WholesaleTierMinPacks { get; set; }
+
+        /// <summary>Precio por UNIDAD del escalón aplicado (igual a <see cref="Price"/>). null = sin snapshot.</summary>
+        public decimal? WholesaleTierUnitPrice { get; set; }
+
+        /// <summary>Unidad de medida que usa el dueño ("caja", "fardo"). null = la de por defecto.</summary>
+        public string? WholesaleUnitLabel { get; set; }
+
         public ICollection<InventoryEntryCost> InventoryProductCosts { get; set; }
 
         public Guid TenantId { get; set; }
@@ -49,7 +77,12 @@ namespace Domain.Entities.OrderItems
             Guid tenantId,
             decimal? basePrice,
             int? percentDiscountPrice,
-            int? discountPrice
+            int? discountPrice,
+            int wholesalePackSize,
+            int wholesalePacks,
+            int? wholesaleTierMinPacks,
+            decimal? wholesaleTierUnitPrice,
+            string? wholesaleUnitLabel
         ) : base(id)
         {
             ProductId = productId;
@@ -62,6 +95,11 @@ namespace Domain.Entities.OrderItems
             BasePrice = basePrice;
             PercentDiscountPrice = percentDiscountPrice;
             DiscountPrice = discountPrice;
+            WholesalePackSize = wholesalePackSize;
+            WholesalePacks = wholesalePacks;
+            WholesaleTierMinPacks = wholesaleTierMinPacks;
+            WholesaleTierUnitPrice = wholesaleTierUnitPrice;
+            WholesaleUnitLabel = wholesaleUnitLabel;
             InventoryProductCosts = new List<InventoryEntryCost>();
         }
 
@@ -76,12 +114,19 @@ namespace Domain.Entities.OrderItems
             Guid tenantId,
             decimal? basePrice = null,
             int? percentDiscountPrice = null,
-            int? discountPrice = null
+            int? discountPrice = null,
+            int wholesalePackSize = 0,
+            int wholesalePacks = 0,
+            int? wholesaleTierMinPacks = null,
+            decimal? wholesaleTierUnitPrice = null,
+            string? wholesaleUnitLabel = null
         )
         {
             var orderItem = new OrderItem(
                 id, orderId, productId, name, quantity, price, orderIndex, tenantId,
-                basePrice, percentDiscountPrice, discountPrice);
+                basePrice, percentDiscountPrice, discountPrice,
+                wholesalePackSize, wholesalePacks, wholesaleTierMinPacks,
+                wholesaleTierUnitPrice, wholesaleUnitLabel);
             orderItem.Raise(new OrderItemCreatedDomainEvent(orderItem.Id, orderId));
             return orderItem;
         }
@@ -96,12 +141,19 @@ namespace Domain.Entities.OrderItems
             Guid tenantId,
             decimal? basePrice = null,
             int? percentDiscountPrice = null,
-            int? discountPrice = null
+            int? discountPrice = null,
+            int wholesalePackSize = 0,
+            int wholesalePacks = 0,
+            int? wholesaleTierMinPacks = null,
+            decimal? wholesaleTierUnitPrice = null,
+            string? wholesaleUnitLabel = null
         )
         {
             return Create(
                 Guid.NewGuid(), productId, name, quantity, price, orderIndex, orderId, tenantId,
-                basePrice, percentDiscountPrice, discountPrice);
+                basePrice, percentDiscountPrice, discountPrice,
+                wholesalePackSize, wholesalePacks, wholesaleTierMinPacks,
+                wholesaleTierUnitPrice, wholesaleUnitLabel);
         }
     }
 
