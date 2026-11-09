@@ -2,17 +2,25 @@ import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { Modal } from '~/shared/components/ui/modal';
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import type { StorefrontCartLine } from '~/catalog/lib/storefront-cart-store';
+import { wholesaleUnitPluralOf } from '~/catalog/lib/catalog-wholesale';
+import {
+  isWholesaleLine,
+  lineMinPacks,
+  linePackPrice,
+  linePacks,
+  type StorefrontCartLine,
+} from '~/catalog/lib/storefront-cart-store';
 
 interface StorefrontCartProps {
   readonly open: boolean;
   readonly onClose: () => void;
-  /** Líneas de ESTA tienda: el carrito ya viene aislado por slug. */
+  /** Lines of THIS store: the cart is already isolated by slug. */
   readonly lines: readonly StorefrontCartLine[];
   /** Subtotal de presentación. El total real lo fija el servidor al crear el pedido. */
   readonly subtotal: number;
   /** Moneda de la carta del catálogo (la del primer producto; `null` si el carrito está vacío). */
   readonly currency: string | null;
+  /** New amount of the line: PACKS on a wholesale line, UNITS on a per-unit one. */
   readonly onUpdateQuantity: (productId: string, quantity: number) => void;
   readonly onRemove: (productId: string) => void;
   readonly onClear: () => void;
@@ -71,17 +79,35 @@ export function StorefrontCart({
                 <p className="break-words text-sm font-medium text-text">{line.name}</p>
                 <p className="text-xs text-text-muted">
                   {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_SUBTOTAL' })}:{' '}
-                  {formatMoneyWithCurrency(
-                    line.unitPrice,
-                    currencyFromCode(line.currency),
-                  )}{' '}
-                  × {line.quantity}
+                  {isWholesaleLine(line) ? (
+                    // Wholesale: the customer thinks in packs, so the line says "2 cajas × $240"
+                    // (the pack price) instead of the per-unit price the server prices with.
+                    // Same "price × amount" shape as the legacy line, with the pack count first.
+                    <>
+                      {linePacks(line)} {wholesaleUnitPluralOf(line.unitLabel)} ×{' '}
+                      {formatMoneyWithCurrency(
+                        linePackPrice(line),
+                        currencyFromCode(line.currency),
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {formatMoneyWithCurrency(
+                        line.unitPrice,
+                        currencyFromCode(line.currency),
+                      )}{' '}
+                      × {line.quantity}
+                    </>
+                  )}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {/* ± move ONE PACK on a wholesale line and ONE UNIT otherwise: `linePacks` is the
+                    number the customer is actually changing, so the store receives the pack count
+                    and re-resolves the tier price itself. */}
                 <button
                   type="button"
-                  onClick={() => onUpdateQuantity(line.productId, line.quantity - 1)}
+                  onClick={() => onUpdateQuantity(line.productId, linePacks(line) - 1)}
                   className="h-8 w-8 rounded-md border border-border text-sm text-text hover:bg-surface-hover"
                   aria-label={intl.formatMessage(
                     { id: 'CATALOG_PUBLIC.CART_DECREASE' },
@@ -93,9 +119,9 @@ export function StorefrontCart({
                 </button>
                 <input
                   type="number"
-                  min={1}
+                  min={lineMinPacks(line)}
                   step={1}
-                  value={line.quantity}
+                  value={linePacks(line)}
                   // Un input VACIADO, o con algo que no sea un entero >= 1, NO toca el store: la
                   // cantidad manda sobre la línea, y `updateQuantity(<= 0)` la BORRA (F3-R4). Con
                   // `Number(v) || 0`, borrar el dígito para retocarlo se comía el producto entero
@@ -104,7 +130,15 @@ export function StorefrontCart({
                   onChange={(event) => {
                     const raw = event.target.value.trim();
                     const quantity = Number(raw);
-                    if (raw === '' || !Number.isInteger(quantity) || quantity < 1) return;
+                    // The TYPED path never goes below the line's minimum, for the same reason it
+                    // never goes below 1: the store REMOVES a line below its minimum, so a
+                    // half-typed "1" of "12" would delete the customer's product. A per-unit line
+                    // has a minimum of 1, so this single guard keeps its old meaning. The − button
+                    // is deliberately excluded: it is an explicit action and it DOES let the line
+                    // leave the cart once it drops below the wholesale floor.
+                    if (raw === '' || !Number.isInteger(quantity) || quantity < lineMinPacks(line)) {
+                      return;
+                    }
                     onUpdateQuantity(line.productId, quantity);
                   }}
                   className={`${INPUT_CLASSES} w-16 text-center`}
@@ -113,7 +147,7 @@ export function StorefrontCart({
                 />
                 <button
                   type="button"
-                  onClick={() => onUpdateQuantity(line.productId, line.quantity + 1)}
+                  onClick={() => onUpdateQuantity(line.productId, linePacks(line) + 1)}
                   className="h-8 w-8 rounded-md border border-border text-sm text-text hover:bg-surface-hover"
                   aria-label={intl.formatMessage(
                     { id: 'CATALOG_PUBLIC.CART_INCREASE' },

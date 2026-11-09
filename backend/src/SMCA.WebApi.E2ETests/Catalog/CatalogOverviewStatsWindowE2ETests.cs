@@ -77,11 +77,12 @@ public sealed class CatalogOverviewStatsWindowE2ETests
             await SeedEventAsync(one, DateTime.UtcNow.AddMinutes(-5), "o-visita-1");
             await SeedEventAsync(two, DateTime.UtcNow.AddMinutes(-5), "o-visita-2");
 
-            // Un pedido ONLINE por tienda: el total general tiene que ver los dos.
-            await SeedOrderAsync(one, OrderType.WhatsApp);
-            await SeedOrderAsync(two, OrderType.WhatsApp);
+            // Un pedido ONLINE por tienda: el total general tiene que ver los dos. El canal es
+            // `IsOfflineOrder`, no el tipo: los dos son pedidos del servidor y de tipo Normal.
+            await SeedOrderAsync(one, OrderType.Normal, isOffline: false);
+            await SeedOrderAsync(two, OrderType.Normal, isOffline: false);
             // Un pedido del POS: NO es online y no puede sumar en la conversión del catálogo.
-            await SeedOrderAsync(one, OrderType.Normal);
+            await SeedOrderAsync(one, OrderType.Normal, isOffline: true);
 
             var admin = await AdminClientAsync();
             CatalogStatsOverviewDto overview = await GetOverviewAsync(admin, 7);
@@ -138,18 +139,22 @@ public sealed class CatalogOverviewStatsWindowE2ETests
         await db.SaveChangesAsync();
     }
 
-    private async Task SeedOrderAsync(WebCatalogSeed.StoreFixture fixture, OrderType type)
+    private async Task SeedOrderAsync(WebCatalogSeed.StoreFixture fixture, OrderType type, bool isOffline)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        db.Set<Order>().Add(Order.Create(
+        Order order = Order.Create(
             fixture.StoreId,
             type,
             description: "e2e-catalog-overview",
             total: 50m,
             itemsCount: 1,
             date: DateTime.UtcNow.AddMinutes(-2),
-            fixture.TenantId));
+            fixture.TenantId);
+        // The channel is what the conversion metric asks about: a POS sale must be marked offline
+        // or it would count as a catalog order.
+        order.IsOfflineOrder = isOffline;
+        db.Set<Order>().Add(order);
         await db.SaveChangesAsync();
     }
 

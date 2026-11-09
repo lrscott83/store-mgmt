@@ -493,6 +493,17 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_MOBILE_COLUMNS_HINT':
     'Cuántos productos muestra cada fila en el teléfono. En pantallas grandes se siguen viendo 2 o 3.',
 
+  // Modo de precio del catálogo (S1/S7): qué precio publica el catálogo, por unidad o mayorista.
+  // El aviso no es un error de la aplicación: es la consecuencia de una configuración del dueño
+  // (un sync posterior puede dejar la tienda sin productos con precio mayorista).
+  'WEB_CATALOG.PRICE_MODE': 'Modo de precio',
+  'WEB_CATALOG.PRICE_MODE_UNIT': 'Precio por unidad',
+  'WEB_CATALOG.PRICE_MODE_WHOLESALE': 'Precio mayorista',
+  'WEB_CATALOG.PRICE_MODE_HINT':
+    'En modo mayorista el catálogo muestra los precios mayoristas y oculta los productos que no los tienen configurados.',
+  'WEB_CATALOG.PRICE_MODE_EMPTY_WARNING':
+    'El catálogo no está publicando ningún producto: está en modo mayorista y la tienda no tiene productos con precio mayorista. Configure los precios mayoristas y sincronice el catálogo.',
+
   // Nombres de las plantillas del catálogo público. La plantilla la fija SOLO el SuperAdmin
   // (/admin/stores); el dueño ya no la elige, así que estos textos los muestra el selector del
   // SuperAdmin, no la config del catálogo web.

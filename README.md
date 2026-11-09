@@ -378,6 +378,11 @@ pnpm turbo run typecheck lint test
 
 > ⚠️ En PowerShell 5.1 **no funciona** `pnpm typecheck && pnpm lint && pnpm test` (el shell no soporta `&&`); ese es el reemplazo correcto de un comando. Si una tarea falla, turbo corta ahí y muestra qué tarea/fue — el resto ya ejecutándose termina su corrida.
 
+### Si fallan los tests del frontend
+
+- **Fallan los tests de `precache-built-invariants`** → reconstruir el app antes de volver a correr: `pnpm --filter @store-mgmt/web-store-pos build`.
+- **Falla `messages.test.tsx > thread scroll` solo en la corrida completa** → es flaky; correr ese archivo solo: `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/admin/messages/routes/__tests__/messages.test.tsx`.
+
 ### 6. Frontend React — tests E2E (Playwright)
 
 **Paso 1 — levantar el backend para E2E** (terminal aparte, desde la **raíz del repo**):

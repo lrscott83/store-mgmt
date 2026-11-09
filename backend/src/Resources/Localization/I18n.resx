@@ -336,6 +336,27 @@
   <data name="CatalogSnapshotProductRequired" xml:space="preserve">
     <value>Para publicar un producto que aún no está en el servidor se necesitan el nombre y la categoría</value>
   </data>
+  <data name="CatalogWholesaleTiersLimit" xml:space="preserve">
+    <value>El producto {0} no puede tener más de {1} escalones mayoristas</value>
+  </data>
+  <data name="CatalogWholesaleDuplicateMinPacks" xml:space="preserve">
+    <value>El producto {0} repite el mínimo de paquetes en dos escalones mayoristas</value>
+  </data>
+  <data name="CatalogWholesaleUnitLabelTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OnlineOrderWholesaleNotConfigured" xml:space="preserve">
+    <value>El producto {0} no tiene precio mayorista configurado</value>
+  </data>
+  <data name="OnlineOrderWholesaleQuantityMustBeAPackMultiple" xml:space="preserve">
+    <value>La cantidad del producto {0} debe ser múltiplo de {1} unidades, que es el tamaño del paquete</value>
+  </data>
+  <data name="OnlineOrderWholesaleBelowMinimumPacks" xml:space="preserve">
+    <value>La cantidad del producto {0} está por debajo del mínimo mayorista de {1} paquetes</value>
+  </data>
+  <data name="CatalogWholesaleTierRequired" xml:space="preserve">
+    <value>El producto {0} trae un escalón mayorista vacío</value>
+  </data>
   <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
     <value>Al habilitar los pedidos hay que abrir al menos una modalidad: recogida en tienda o envío a domicilio</value>
   </data>
@@ -362,6 +383,12 @@
   </data>
   <data name="BrandingInvalidTemplate" xml:space="preserve">
     <value>El id de la plantilla {0} no es válido</value>
+  </data>
+  <data name="BrandingPriceModeInvalid" xml:space="preserve">
+    <value>{0} solo admite los valores Unit o Wholesale (precio por unidad o mayorista)</value>
+  </data>
+  <data name="CatalogWholesaleModeWithoutProducts" xml:space="preserve">
+    <value>No se puede publicar el catálogo con precios mayoristas: la tienda no tiene ningún producto con precio mayorista configurado. Configure los precios mayoristas y sincronice el catálogo para activar este modo.</value>
   </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>El tipo de imagen {0} no es válido</value>

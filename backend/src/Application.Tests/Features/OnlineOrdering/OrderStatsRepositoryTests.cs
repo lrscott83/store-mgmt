@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Services.Tenants;
 using Domain.Common.Enums;
 using Domain.Entities.Orders;
@@ -72,7 +72,7 @@ public class OrderStatsRepositoryTests
         Currency currency = Currency.CUP)
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            storeId, OrderType.WhatsApp, string.Empty, total, 1, date, tenantId);
+            storeId, OrderType.Normal, string.Empty, total, 1, date, tenantId);
         order.ChangePaymentStatus(paymentStatus);
         order.Status = status;
         order.DeliveryType = deliveryType;

@@ -47,14 +47,16 @@ namespace SMCA.WebApi.Controllers.v1
             IFormFile? banner,
             [FromForm] bool removeLogo,
             [FromForm] bool removeBanner,
-            [FromForm] int? mobileColumns)
+            [FromForm] int? mobileColumns,
+            [FromForm] string? priceMode)
         {
             return Ok(await Sender.Send(new UpdateStoreCatalogBrandingCommand(
                 ToUpload(logo),
                 removeLogo,
                 ToUpload(banner),
                 removeBanner,
-                mobileColumns)));
+                mobileColumns,
+                priceMode)));
         }
 
         private static CatalogImageUpload? ToUpload(IFormFile? file)

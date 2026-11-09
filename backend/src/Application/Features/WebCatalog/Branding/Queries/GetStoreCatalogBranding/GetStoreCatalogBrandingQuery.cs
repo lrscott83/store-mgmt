@@ -2,7 +2,9 @@ using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Branding;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Interfaces.Repositories;
@@ -33,18 +35,21 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
         private readonly IHttpContextService _httpContextService;
         private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
+        private readonly IProductRepository _productRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetStoreCatalogBrandingQueryHandler(
             IHttpContextService httpContextService,
             IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            IProductRepository productRepository)
         {
             _httpContextService = httpContextService;
             _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _localizer = localizer;
+            _productRepository = productRepository;
         }
 
         public async Task<ResponseResult<StoreCatalogBrandingDto>> Handle(
@@ -67,35 +72,60 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
 
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
 
-            return ResponseResult.Success(settings is null ? Default() : Map(settings));
+            CatalogPriceMode priceMode = ReadPriceMode(settings);
+
+            // Se responde SIEMPRE, también en modo unidad: es un hecho de la tienda, y la vista no
+            // debería deducirlo de otro endpoint. Cuesta un `EXISTS` en SQL, no el catálogo.
+            bool hasWholesalePricedProducts =
+                await _productRepository.HasWholesalePricedProductsAsync(storeId, cancellationToken);
+
+            return ResponseResult.Success(settings is null
+                ? Default(priceMode, hasWholesalePricedProducts)
+                : Map(settings, priceMode, hasWholesalePricedProducts));
         }
+
+        /// <summary>
+        /// Modo guardado, normalizado: `Wholesale` solo si la fila dice exactamente eso. Una tienda
+        /// sin fila —y una fila con un valor que ningún valor del enum representa— se lee como
+        /// `Unit`, que es como el catálogo se publicaba antes de que el modo existiera.
+        /// </summary>
+        private static CatalogPriceMode ReadPriceMode(StoreCatalogSettings? settings)
+            => settings?.PriceMode == CatalogPriceMode.Wholesale
+                ? CatalogPriceMode.Wholesale
+                : CatalogPriceMode.Unit;
 
         /// <summary>
         /// Sin marca: sin logo, sin banner y la paleta que el catálogo ya usa hoy. Es explícita en
         /// vez de <c>new DTO()</c> para que un campo nuevo de la entidad no se olvide aquí.
         /// </summary>
-        private static StoreCatalogBrandingDto Default() => new()
-        {
-            LogoKey = null,
-            BannerKey = null,
-            PaletteId = StoreCatalogSettings.DefaultPaletteId,
-            MobileColumns = StoreCatalogSettings.DefaultMobileColumns,
-        };
+        private static StoreCatalogBrandingDto Default(
+            CatalogPriceMode priceMode, bool hasWholesalePricedProducts) => new()
+            {
+                LogoKey = null,
+                BannerKey = null,
+                PaletteId = StoreCatalogSettings.DefaultPaletteId,
+                MobileColumns = StoreCatalogSettings.DefaultMobileColumns,
+                PriceMode = CatalogPriceModeWire.ToWire(priceMode),
+                HasWholesalePricedProducts = hasWholesalePricedProducts,
+            };
 
-        private static StoreCatalogBrandingDto Map(StoreCatalogSettings settings) => new()
-        {
-            LogoKey = settings.LogoKey,
-            BannerKey = settings.BannerKey,
-            // Una fila con la paleta en blanco (vacía o solo espacios) es una fila rota: el
-            // storefront tiene que pintar algo, así que cae a la paleta por defecto en vez de
-            // devolver una cadena que no corresponde a ninguna paleta.
-            PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
-                ? StoreCatalogSettings.DefaultPaletteId
-                : settings.PaletteId,
-            // Una fila con un valor fuera de rango (una migración futura, un dato a mano) no puede
-            // dejar la vista sin una opción válida seleccionada: se normaliza al default.
-            MobileColumns = NormalizeMobileColumns(settings.MobileColumns),
-        };
+        private static StoreCatalogBrandingDto Map(
+            StoreCatalogSettings settings, CatalogPriceMode priceMode, bool hasWholesalePricedProducts) => new()
+            {
+                LogoKey = settings.LogoKey,
+                BannerKey = settings.BannerKey,
+                // Una fila con la paleta en blanco (vacía o solo espacios) es una fila rota: el
+                // storefront tiene que pintar algo, así que cae a la paleta por defecto en vez de
+                // devolver una cadena que no corresponde a ninguna paleta.
+                PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
+                    ? StoreCatalogSettings.DefaultPaletteId
+                    : settings.PaletteId,
+                // Una fila con un valor fuera de rango (una migración futura, un dato a mano) no puede
+                // dejar la vista sin una opción válida seleccionada: se normaliza al default.
+                MobileColumns = NormalizeMobileColumns(settings.MobileColumns),
+                PriceMode = CatalogPriceModeWire.ToWire(priceMode),
+                HasWholesalePricedProducts = hasWholesalePricedProducts,
+            };
 
         /// <summary>
         /// Solo 1 y 2 son valores válidos de "elementos por fila en móvil". Cualquier otro valor

@@ -43,7 +43,7 @@ namespace Application.Tests.Features.OnlineOrdering.CreateOnlineOrder;
 /// activo en la tienda. Con solo "Pedidos WhatsApp" el pedido se arma y se manda por `wa.me` en
 /// cliente, sin pasar por aquí.
 ///
-/// Y la mitad positiva: se persiste con `Code`, `OrderType = WhatsApp`, `New` y `Pending`, con el
+/// Y la mitad positiva: se persiste con `Code`, `OrderType = Normal`, `New` y `Pending`, con el
 /// snapshot de los items leído en servidor.
 /// </summary>
 public class CreateOnlineOrderCommandHandlerTests
@@ -66,6 +66,7 @@ public class CreateOnlineOrderCommandHandlerTests
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
     private readonly Mock<ISalesManagerRepository> _salesManagerRepository = new();
     private readonly Mock<IOrderSalesManagerRepository> _orderSalesManagerRepository = new();
+    private readonly Mock<IProductWholesaleTierRepository> _productWholesaleTierRepository = new();
 
     private readonly string _slug = "tienda-ana";
     private Guid _storeId;
@@ -107,7 +108,8 @@ public class CreateOnlineOrderCommandHandlerTests
         _moduleRepository.Object,
         _localizer.Object,
         _salesManagerRepository.Object,
-        _orderSalesManagerRepository.Object);
+        _orderSalesManagerRepository.Object,
+        _productWholesaleTierRepository.Object);
 
     /// <summary>
     /// La tienda NO tiene activo "Pedidos WhatsApp" (19): no hay carrito ni pedidos nuevos, así que
@@ -216,7 +218,7 @@ public class CreateOnlineOrderCommandHandlerTests
 
         _orderRepository.Verify(
             x => x.AddAsync(It.Is<Order>(o =>
-                o.OrderType == OrderType.WhatsApp
+                o.OrderType == OrderType.Normal
                 && o.Status == OrderStatus.Creado
                 && o.PaymentStatus == OrderPaymentStatus.Pending
                 && o.StoreId == _storeId

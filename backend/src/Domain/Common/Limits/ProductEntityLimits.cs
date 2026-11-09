@@ -26,5 +26,11 @@ namespace Domain.Common.Limits
             { "image/jpeg", "image/png", "image/webp" };
 
         public const string AllowedImageFormatsLabel = "jpg, png o webp";
+
+        /// <summary>
+        /// Longitud máxima de la unidad mayorista que escribe el dueño ("caja", "paquete", "fardo").
+        /// Es texto de presentación: el mensaje de WhatsApp y la carta lo muestran tal cual.
+        /// </summary>
+        public const int WholesaleUnitLabelMaxLength = 32;
     }
 }

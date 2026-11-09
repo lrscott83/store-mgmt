@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Domain.Common.Limits;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -62,6 +63,19 @@ public sealed class AdminBrandingEndpointRulesE2ETests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.Set<Domain.Entities.StoreCatalogSettings.StoreCatalogSettings>().IgnoreQueryFilters()
             .CountAsync(settings => settings.StoreId == storeId);
+    }
+
+    /// <summary>
+    /// JPEG del peso exacto pedido: la firma real del formato en la cabecera y relleno hasta
+    /// <paramref name="length"/> bytes. El inspector solo mira la cabecera, así que el cuerpo no
+    /// necesita ser una foto decodificable —lo que hace válido al archivo es la firma—, y así el
+    /// único motivo posible de rechazo es el tamaño.
+    /// </summary>
+    private static byte[] JpegOfSize(int length)
+    {
+        var bytes = new byte[length];
+        TinyJpeg.CopyTo(bytes, 0);
+        return bytes;
     }
 
     private static ByteArrayContent Jpeg(byte[]? bytes = null, string contentType = "image/jpeg")
@@ -204,7 +218,10 @@ public sealed class AdminBrandingEndpointRulesE2ETests
 
     /// <summary>
     /// Fila 10.2 — el tope de 2 MB. El JPEG pequeño va primero como CONTROL POSITIVO con el mismo
-    /// nombre y content type, así que la única diferencia entre el 200 y el 400 es el tamaño.
+    /// nombre y content type, y los dos cuerpos del borde llevan la firma JPEG real, así que la
+    /// única diferencia entre el 200 y el 400 es UN BYTE de tamaño. Un cuerpo de ceros no sirve:
+    /// el validador mira la firma DESPUÉS del tamaño y lo rechazaría por no ser imagen, dejando el
+    /// tope sin medir.
     ///
     /// En producción el <c>RequestSizeLimit</c> del controlador (~4.3 MB) deja llegar el archivo al
     /// validador, por eso la respuesta es 400 y no 413; en el TestServer de este harness ese límite
@@ -239,7 +256,7 @@ public sealed class AdminBrandingEndpointRulesE2ETests
             // El borde ACEPTADO: exactamente 2 MB. Sin este caso, un validador que rechazara con
             // `>= MaxImageSizeInBytes` seguiría dando verde y el contrato "máximo 2 MB" quedaría a
             // medias (advisory R3-size-boundary del ciclo review-28614dc28ac92ae7).
-            byte[] exactlyTwoMegabytes = new byte[2 * 1024 * 1024];
+            byte[] exactlyTwoMegabytes = JpegOfSize(ProductEntityLimits.MaxImageSizeInBytes);
             using (var atTheLimit = ImageForm("logo", "logo.jpg", exactlyTwoMegabytes))
             {
                 var acceptedAtLimit = await sa.PutAsync(BrandingUrl(store.StoreId), atTheLimit);
@@ -257,7 +274,7 @@ public sealed class AdminBrandingEndpointRulesE2ETests
             afterLimit!.Data!.LogoKey.Should().NotBeNullOrWhiteSpace()
                 .And.NotBe(controlKey, "el logo de 2 MB exactos reemplazó al del control");
 
-            byte[] oversized = new byte[2 * 1024 * 1024 + 1];
+            byte[] oversized = JpegOfSize(ProductEntityLimits.MaxImageSizeInBytes + 1);
             using var form = ImageForm("logo", "logo.jpg", oversized);
             var rejected = await sa.PutAsync(BrandingUrl(store.StoreId), form);
 

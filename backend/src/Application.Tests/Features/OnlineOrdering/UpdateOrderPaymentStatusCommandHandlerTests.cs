@@ -60,7 +60,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
     private Order OrderWith(OrderPaymentStatus paymentStatus, OrderStatus status = OrderStatus.Creado)
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
+            _storeId, OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         order.ChangePaymentStatus(paymentStatus);

@@ -101,14 +101,15 @@ namespace Domain.Interfaces.Repositories
             Guid storeId, OrderStatsFilter filter, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el numerador de la
-        /// conversión del catálogo: no cuenta ventas del POS ni pedidos de otro tipo.
+        /// Pedidos ONLINE de una tienda en un rango: los que creó el SERVIDOR, es decir
+        /// <c>!Order.IsOfflineOrder</c>. Es el numerador de la conversión del catálogo: no cuenta
+        /// ventas del POS, que es lo único que el canal offline marca.
         /// </summary>
         Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de TODAS las tiendas en un rango. Numerador de la
-        /// conversión del panel general; mismo criterio que la sobrecarga por tienda. El filtro
+        /// Pedidos ONLINE (<c>!Order.IsOfflineOrder</c>) de TODAS las tiendas en un rango. Numerador
+        /// de la conversión del panel general; mismo criterio que la sobrecarga por tienda. El filtro
         /// global por tenant queda ACTIVO: el endpoint es SuperAdmin (lo deja pasar) y desactivar
         /// todos los filtros sería más de lo que hace falta.
         /// </summary>

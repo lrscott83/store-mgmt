@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
@@ -65,7 +65,7 @@ public class GetOnlineOrdersQueryHandlerTests
     private static Order Order(DateTime? date = null, string? code = "A-1")
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            Guid.NewGuid(), OrderType.WhatsApp, string.Empty, 0m, 0,
+            Guid.NewGuid(), OrderType.Normal, string.Empty, 0m, 0,
             date ?? new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = code;
         return order;

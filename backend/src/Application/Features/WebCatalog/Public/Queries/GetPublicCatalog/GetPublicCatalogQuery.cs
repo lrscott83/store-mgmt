@@ -3,6 +3,7 @@ using Application.Dtos.WebCatalog;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -53,11 +54,16 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalog
             IList<PublishedCategoryCount> categories = await _productRepository
                 .GetPublishedCategoryCountsAsync(store.Id, cancellationToken);
 
+            // El modo decide qué productos entraron en esos conteos, así que la cabecera lo publica:
+            // el cliente no tiene otra forma de saber si el detalle de un producto muestra paquetes.
+            CatalogPriceMode priceMode = await _productRepository.GetPublicPriceModeAsync(store.Id, cancellationToken);
+
             return ResponseResult.Success(new PublicCatalogDto
             {
                 StoreId = store.Id,
                 StoreName = store.Name,
                 StoreSlug = storeSlug,
+                PriceMode = PublicCatalogPriceModeWire.ToWire(priceMode),
                 Categories = categories
                     .OrderBy(category => category.Order)
                     .ThenBy(category => category.Name)

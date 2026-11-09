@@ -38,6 +38,25 @@ namespace Domain.Entities.Products
         /// <summary>Galería del catálogo (el images[] del contrato HTTP), ordenada por Order.</summary>
         public ICollection<ProductImage> Images { get; set; }
 
+        // --- Configuración mayorista (catálogo web con precios mayoristas) ---
+        //
+        // Espejo de la config que el POS ya guarda en el dispositivo (`wholesaleEnabled`,
+        // `wholesalePackSize`, `wholesaleTiers`, `wholesaleUnitLabel`). Vive en el SERVIDOR porque
+        // el catálogo público se sirve de esta tabla y el precio del pedido lo fija el servidor:
+        // sin estas columnas el catálogo no puede publicar ni cobrar mayorista.
+
+        /// <summary>El producto se vende también por paquetes (config mayorista válida).</summary>
+        public bool WholesaleEnabled { get; set; }
+
+        /// <summary>Unidades por paquete/caja. 0 = sin configurar.</summary>
+        public int WholesalePackSize { get; set; }
+
+        /// <summary>Unidad de medida que entiende el dueño ("caja", "paquete", "fardo"). Null = la de por defecto.</summary>
+        public string? WholesaleUnitLabel { get; set; }
+
+        /// <summary>Escalones de precio mayorista, ordenados por <c>MinPacks</c> ascendente al publicarse.</summary>
+        public ICollection<ProductWholesaleTier> WholesaleTiers { get; set; }
+
         public ICollection<InventoryEntry> InventoryEntries { get; set; }
         public ICollection<OrderItem> OrderItems { get; set; }
 
@@ -80,6 +99,7 @@ namespace Domain.Entities.Products
             InventoryEntries = new List<InventoryEntry>();
             OrderItems = new List<OrderItem>();
             Images = new List<ProductImage>();
+            WholesaleTiers = new List<ProductWholesaleTier>();
         }
 
         /// <summary>
