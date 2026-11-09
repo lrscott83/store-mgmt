@@ -98,6 +98,45 @@ export const KNOWN_DEV_ONLY_VIOLATIONS = [
       '(@react-router/dev/dist/vite.js). The production build resolves these at bundle time and ' +
       'emits no inline import.',
   },
+  // 2026-11-09 (known-issues 2026-10-28-e2e-verification/09): `/` alone is served with a
+  // pending suspense boundary, so the dev SSR emits four inline scripts the allowlist above
+  // never covered. `/login` and `/register` emit none of them and still pass. Each entry is
+  // pinned to its own literal prefix, so a fifth inline script from a future change still fails
+  // the sweep — the point of the allowlist stays intact.
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^\(\(storageKey2, restoreKey\) =>/,
+    reason:
+      "React Router's inline <ScrollRestoration /> script, rendered by app/root.tsx. Dev-only " +
+      'shape of that component: the build emits it as an external module instead.',
+  },
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^requestAnimationFrame\(function\(\)\{\$RT=per/,
+    reason:
+      'react-dom 19.2.6 Fizz runtime, inlined for the streamed document on `/` (the `<script ' +
+      'id="_R_">` scheduler shim). Present only while dev SSR streams a pending boundary. Anchored ' +
+      'to the truncated sample the browser reports (~40 chars), not the full script.',
+  },
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^\$RB=\[\];\$RV=function\(a\)\{\$RT=performance\.n/,
+    reason:
+      'react-dom 19.2.6 Fizz inline runtime for the same streamed document (`$RB`/`$RV` boundary ' +
+      'bootstrap). Verified in react-dom/cjs/react-dom-server.node.development.js, not inferred. ' +
+      'Anchored to the truncated sample the browser reports (~40 chars).',
+  },
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^\$RC\("B:1","S:1"\)/,
+    reason:
+      'react-dom 19.2.6 Fizz completeBoundary call that reveals boundary B:1 of `/`. Same streamed ' +
+      'document as the two entries above; the static build has no pending boundary to reveal.',
+  },
 ];
 
 /**
