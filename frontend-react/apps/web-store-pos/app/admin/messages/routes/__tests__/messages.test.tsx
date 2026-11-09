@@ -629,6 +629,48 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
     });
   });
 
+  it('acusa un mensaje más alto que la caja en cuanto asoma, no solo si cabe entero', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-tall')]),
+    );
+    // Un mensaje de 600px dentro de una caja visible de 100px: nunca cabe
+    // entero, pero el operador lo ve y lo lee mientras hace scroll.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const testId = this.getAttribute('data-testid');
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-tall') return rect(-200, 400);
+        return rect(0, 0);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-tall', {
+          background: true,
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('manda cada acuse una sola vez aunque el polling relea las mismas filas', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
     vi.mocked(messagesHttpService.getMessages).mockResolvedValue(

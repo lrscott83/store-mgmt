@@ -183,7 +183,10 @@ export function MessageShell() {
         const element = itemRefs.current.get(message.id);
         if (!element) return false;
         const rect = element.getBoundingClientRect();
-        return rect.top >= box.top && rect.bottom <= box.bottom;
+        // Intersection, never full containment: a message taller than the box can
+        // never satisfy `top >= box.top && bottom <= box.bottom`, so it would stay
+        // unread forever however much the user reads it. Touching the box is enough.
+        return rect.bottom >= box.top && rect.top <= box.bottom;
       })
       .map((message) => message.id)
       .filter((id) => !receiptedRef.current.has(id));
