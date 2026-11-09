@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -30,11 +31,15 @@ namespace Application.Features.OnlineOrdering.Commands.CreateDeliveryDriver
         /// Límite de la COLUMNA `Name` (<c>DeliveryDriverEntityTypeConfiguration</c>), no una
         /// decisión estética: un valor más largo revienta el INSERT con un 500. Aquí se convierte
         /// en un 400 con mensaje (ver el validador).
+        ///
+        /// El número vive en <see cref="DeliveryDriverLimits"/> junto al del teléfono, porque el
+        /// alta y la edición tienen que medir lo mismo. El nombre público se conserva: hay tests y
+        /// llamadores que lo referencian así.
         /// </summary>
-        public const int NameMaxLength = 200;
+        public const int NameMaxLength = DeliveryDriverLimits.NameMaxLength;
 
         /// <summary>Límite de la COLUMNA `Phone`; 32 como <c>Order.CustomerPhone</c>.</summary>
-        public const int PhoneMaxLength = 32;
+        public const int PhoneMaxLength = DeliveryDriverLimits.PhoneMaxLength;
 
         /// <summary>Nombre por el que la tienda lo conoce.</summary>
         public string Name { get; set; } = string.Empty;
@@ -74,9 +79,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateDeliveryDriver
         public async Task<ResponseResult<DeliveryDriverDto>> Handle(
             CreateDeliveryDriverCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             // Tienda y tenant salen del CONTEXTO, nunca del cuerpo (ver la nota del comando).
             DeliveryDriver driver = DeliveryDriver.Create(
@@ -89,16 +92,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateDeliveryDriver
             await _deliveryDriverRepository.AddAsync(driver);
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(ToDto(driver));
+            return ResponseResult.Success(driver.ToDto());
         }
-
-        private static DeliveryDriverDto ToDto(DeliveryDriver driver) => new()
-        {
-            Id = driver.Id,
-            StoreId = driver.StoreId,
-            Name = driver.Name,
-            Phone = driver.Phone,
-            IsActive = driver.IsActive,
-        };
     }
 }

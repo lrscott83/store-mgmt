@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
@@ -48,7 +48,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _orderRepository
-            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedOrders(new List<Order>(), 0));
     }
 
@@ -59,13 +59,13 @@ public class GetOnlineOrdersQueryHandlerTests
 
     private void Returns(params Order[] orders)
         => _orderRepository
-            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedOrders(orders, orders.Length));
 
     private static Order Order(DateTime? date = null, string? code = "A-1")
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            Guid.NewGuid(), OrderType.WhatsApp, string.Empty, 0m, 0,
+            Guid.NewGuid(), OrderType.Normal, string.Empty, 0m, 0,
             date ?? new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = code;
         return order;
@@ -83,8 +83,8 @@ public class GetOnlineOrdersQueryHandlerTests
     {
         OrderListFilter? captured = null;
         _orderRepository
-            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
-            .Callback<Guid, OrderListFilter, int, int>((storeId, filter, skip, take) => captured = filter)
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, OrderListFilter, int, int, CancellationToken>((storeId, filter, skip, take, _) => captured = filter)
             .ReturnsAsync(new PagedOrders(new List<Order>(), 0));
 
         await Handler().Handle(query, CancellationToken.None);
@@ -175,7 +175,7 @@ public class GetOnlineOrdersQueryHandlerTests
     public async Task Handle_WithAFullPage_ShouldReturnTheRepositoryTotalNotTheItemCount()
     {
         _orderRepository
-            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedOrders(new List<Order> { Order(), Order() }, 57));
 
         var result = await Handler().Handle(new GetOnlineOrdersQuery(Page: 1, PageSize: 2), CancellationToken.None);
@@ -194,7 +194,7 @@ public class GetOnlineOrdersQueryHandlerTests
         await Handler().Handle(new GetOnlineOrdersQuery(), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -213,7 +213,7 @@ public class GetOnlineOrdersQueryHandlerTests
         await act.Should().ThrowAsync<ApiException>()
             .Where(ex => ex.StatusCode == HttpStatusCode.BadRequest);
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()),
+            x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -244,7 +244,7 @@ public class GetOnlineOrdersQueryHandlerTests
                     && f.From == null
                     && f.To == null
                     && f.Search == null),
-                It.IsAny<int>(), It.IsAny<int>()),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -255,7 +255,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.Status == OrderStatus.Preparado), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.Status == OrderStatus.Preparado), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -266,7 +266,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.PaymentStatus == OrderPaymentStatus.Paid), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.PaymentStatus == OrderPaymentStatus.Paid), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -277,7 +277,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.DeliveryType == OrderDeliveryType.Pickup), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.DeliveryType == OrderDeliveryType.Pickup), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -290,7 +290,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.DriverId == driverId), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.DriverId == driverId), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -341,7 +341,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.Search == "A-1"), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.Search == "A-1"), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -361,7 +361,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.Search == null), It.IsAny<int>(), It.IsAny<int>()),
+                _storeId, It.Is<OrderListFilter>(f => f.Search == null), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -395,7 +395,7 @@ public class GetOnlineOrdersQueryHandlerTests
                     && f.From == new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc)
                     && f.To == EndOfDay(2026, 10, 7)
                     && f.Search == "+34611"),
-                It.IsAny<int>(), It.IsAny<int>()),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -520,8 +520,8 @@ public class GetOnlineOrdersQueryHandlerTests
     {
         OrderListFilter? captured = null;
         _orderRepository
-            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
-            .Callback<Guid, OrderListFilter, int, int>((storeId, filter, skip, take) => captured = filter)
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, OrderListFilter, int, int, CancellationToken>((storeId, filter, skip, take, _) => captured = filter)
             .ReturnsAsync(new PagedOrders(new List<Order>(), 0));
 
         var result = await Handler().Handle(
@@ -641,7 +641,7 @@ public class GetOnlineOrdersQueryHandlerTests
         await Handler().Handle(new GetOnlineOrdersQuery(Page: 3, PageSize: 10), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 20, 10),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 20, 10, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -658,7 +658,7 @@ public class GetOnlineOrdersQueryHandlerTests
         var result = await Handler().Handle(new GetOnlineOrdersQuery(Page: page), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, It.IsAny<int>()),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
         result.Data!.Page.Should().Be(1);
     }
@@ -673,7 +673,7 @@ public class GetOnlineOrdersQueryHandlerTests
         var result = await Handler().Handle(new GetOnlineOrdersQuery(Page: 2, PageSize: 5000), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 100, 100),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 100, 100, It.IsAny<CancellationToken>()),
             Times.Once);
         result.Data!.PageSize.Should().Be(100);
     }
@@ -688,7 +688,7 @@ public class GetOnlineOrdersQueryHandlerTests
         result.Succeeded.Should().BeTrue();
         result.Data!.PageSize.Should().Be(20);
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, 20),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, 20, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -699,7 +699,7 @@ public class GetOnlineOrdersQueryHandlerTests
 
         result.Data!.PageSize.Should().Be(50);
         _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, 50),
+            x => x.GetPagedByStoreIdAsync(_storeId, It.IsAny<OrderListFilter>(), 0, 50, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

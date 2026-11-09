@@ -36,8 +36,12 @@ export const notificationsHttpService = {
     return response.data;
   },
 
-  async markAllAsRead(): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/notifications/mark-all-read');
+  /**
+   * The backend reports HOW MANY notifications it flipped
+   * (`ResponseResult<int>` from MarkAllAsReadCommandHandler), not a boolean.
+   */
+  async markAllAsRead(): Promise<BaseResponseModel<number>> {
+    const response = await apiClient.post<BaseResponseModel<number>>('/v1/notifications/mark-all-read');
     return response.data;
   },
 };

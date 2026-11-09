@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpenseType } from '@store-mgmt/domain';
 import {
   BONIFICACION_PRONTO_PAGO,
+  ESCALAS_ISR,
   MINIMO_EXENTO_ANUAL,
   TASA_CUOTA,
   TASA_FUERZA_TRABAJO,
   TASA_VENTAS,
+  ULTIMO_ANIO_ESCALA,
   UMBRAL_CUOTA_MENSUAL,
   cierreAnual,
   cuotaMensual,
+  escalaDelAnio,
   fuerzaTrabajo,
   impuestoEscala,
   impuestoVentas,
@@ -52,6 +55,36 @@ describe('constantes fiscales', () => {
     expect(TASA_CUOTA).toBe(0.05);
     expect(TASA_FUERZA_TRABAJO).toBe(0.05);
     expect(BONIFICACION_PRONTO_PAGO).toBe(0.05);
+  });
+});
+
+describe('escala por año', () => {
+  it('la escala de 2025 tiene diez tramos y termina en 50 %', () => {
+    const escala = escalaDelAnio(2025);
+
+    expect(escala).toHaveLength(10);
+    expect(escala[0]).toEqual({ hasta: 25_000, tasa: 0.05 });
+    expect(escala[9]).toEqual({ hasta: Number.POSITIVE_INFINITY, tasa: 0.5 });
+  });
+
+  it('un año sin escala propia usa la última publicada', () => {
+    expect(escalaDelAnio(2026)).toEqual(escalaDelAnio(ULTIMO_ANIO_ESCALA));
+    expect(escalaDelAnio(2030)).toEqual(escalaDelAnio(ULTIMO_ANIO_ESCALA));
+  });
+
+  it('declara la escala por año en el mapa, no como constante suelta', () => {
+    expect(Object.keys(ESCALAS_ISR)).toEqual(['2025']);
+  });
+
+  it('calcula el mismo impuesto para 2026 que para 2025', () => {
+    expect(impuestoEscala(100_880, 2026)).toBe(impuestoEscala(100_880, 2025));
+  });
+
+  it('el cierre anual respeta el año recibido', () => {
+    const base = makeCierre({ year: 2026 });
+    const sinAnio = makeCierre({});
+
+    expect(cierreAnual(base)).toEqual(cierreAnual(sinAnio));
   });
 });
 

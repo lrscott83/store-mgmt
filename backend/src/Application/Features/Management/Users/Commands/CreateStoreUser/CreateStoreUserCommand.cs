@@ -1,6 +1,7 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Dtos.Management.StoreUsers;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -17,10 +18,10 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
 {
     public sealed record CreateStoreUserCommand(Guid StoreId, string Login, string Password, string FullName, string? CellPhone, string? Email,
         IEnumerable<int> RoleIds)
-        : ICommand<bool>
+        : ICommand<StoreUserDto>
     { }
 
-    public class CreateStoreUserCommandHandler : ICommandHandler<CreateStoreUserCommand, bool>
+    public class CreateStoreUserCommandHandler : ICommandHandler<CreateStoreUserCommand, StoreUserDto>
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IStoreRepository _storeRepository;
@@ -54,7 +55,7 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
             _preHashProtector = preHashProtector;
         }
 
-        public async Task<ResponseResult<bool>> Handle(CreateStoreUserCommand request, CancellationToken cancellationToken)
+        public async Task<ResponseResult<StoreUserDto>> Handle(CreateStoreUserCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
@@ -76,7 +77,25 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
                 await _userRoleRepository.AddAsync(userRole);
             }
 
-            return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+            // The action declares a StoreUserDto, so it must return the created user, built from
+            // the state this handler just persisted. `Id` is the owner of the created store-user
+            // relationship: the repository resolves a store user by `UserId`
+            // (StoreUserRepository.GetStoreUserByIdAsync), so the id is the one a GET accepts.
+            // `StoreName` comes from the store this handler already loaded to build the entity, so
+            // the echo carries it without a second read; nothing else is re-queried.
+            return ResponseResult.Success(new StoreUserDto
+            {
+                Id = user.Id,
+                StoreId = store.Id,
+                StoreName = store.Name,
+                Login = user.Login,
+                FullName = user.FullName,
+                CellPhone = user.CellPhone,
+                Email = user.Email,
+                IsActive = storeUser.IsActive,
+            });
         }
     }
 }

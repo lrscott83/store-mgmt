@@ -1,5 +1,6 @@
 using Domain.Common.Entities;
 using Domain.Common.Events;
+using Domain.Common.Enums;
 using Domain.Entities.Stores;
 
 namespace Domain.Entities.StoreCatalogSettings
@@ -111,6 +112,16 @@ namespace Domain.Entities.StoreCatalogSettings
         /// de aspecto al migrar.
         /// </summary>
         public int MobileColumns { get; set; } = DefaultMobileColumns;
+
+        /// <summary>
+        /// MODO DE PRECIO del catálogo público: por unidad o mayorista (configuración del dueño).
+        /// Nace en <see cref="CatalogPriceMode.Unit"/> — el comportamiento histórico — para que una
+        /// tienda existente no cambie de precios al migrar.
+        ///
+        /// Decide QUÉ se publica, no qué se sincroniza: la sincronización lleva siempre los dos
+        /// precios de cada producto.
+        /// </summary>
+        public CatalogPriceMode PriceMode { get; set; } = CatalogPriceMode.Unit;
 
         // --- Comunes ---
 

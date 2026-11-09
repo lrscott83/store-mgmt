@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
 import { ownerModuleLoader, ownerOnlyLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
-  getOnatConfig,
-  saveOnatConfig,
-  type OnatActivity,
-  type OnatConfig,
-} from '~/onat/lib/onat-storage';
+  crearVectorVacio,
+  getOnatVector,
+  saveOnatVector,
+  type OnatActividad,
+  type OnatIdentidad,
+  type OnatVector,
+} from '~/onat/lib/onat-vector';
 
 /**
  * S2: la configuración fiscal es del Owner — `isOwnerAdmin` y NO `isSuperAdmin`.
@@ -26,23 +28,22 @@ export async function clientLoader() {
   return ownerModuleLoader(EModules.Onat)();
 }
 
-/**
- * La forma del formulario es la configuración guardada sin el Owner: se deriva
- * del tipo persistido para no repetir la lista de campos fiscales.
- */
-type OnatConfigForm = Omit<OnatConfig, 'ownerId'>;
+const YEAR_RANGE = 5;
 
-type TextField = Exclude<keyof OnatConfigForm, 'actividades'>;
+type TextField = keyof OnatIdentidad;
 
 interface FieldDefinition {
   field: TextField;
   messageId: string;
   autoComplete?: string;
+  inputMode?: 'numeric';
+  maxLength?: number;
 }
 
 const FIELDS: readonly FieldDefinition[] = [
   { field: 'nombre', messageId: 'ONAT.NAME', autoComplete: 'organization' },
   { field: 'nit', messageId: 'ONAT.NIT' },
+  { field: 'rc05', messageId: 'ONAT.RC05', inputMode: 'numeric', maxLength: 16 },
   { field: 'domicilioFiscal', messageId: 'ONAT.FISCAL_ADDRESS', autoComplete: 'street-address' },
   { field: 'domicilioLegal', messageId: 'ONAT.LEGAL_ADDRESS', autoComplete: 'street-address' },
   { field: 'municipio', messageId: 'ONAT.MUNICIPALITY', autoComplete: 'address-level2' },
@@ -52,6 +53,8 @@ const FIELDS: readonly FieldDefinition[] = [
 const LABEL_CLASSES = 'mb-1 block text-xs font-medium text-text';
 const INPUT_CLASSES =
   'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary';
+const SELECT_CLASSES =
+  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary';
 const PRIMARY_BUTTON_CLASSES =
   'inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-primary-hover';
 const SECONDARY_BUTTON_CLASSES =
@@ -59,80 +62,86 @@ const SECONDARY_BUTTON_CLASSES =
 const OUTLINE_BUTTON_CLASSES =
   'inline-flex items-center justify-center rounded-md border border-primary bg-transparent px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-light';
 
-function createEmptyForm(): OnatConfigForm {
-  return {
-    nombre: '',
-    nit: '',
-    domicilioFiscal: '',
-    domicilioLegal: '',
-    municipio: '',
-    provincia: '',
-    actividades: [],
-  };
+function currentYear(): number {
+  return new Date().getFullYear();
+}
+
+function createEmptyVector(): OnatVector {
+  return crearVectorVacio('', currentYear());
 }
 
 /**
- * S11: formulario fiscal del Owner — nombre, NIT, domicilios, municipio,
- * provincia y actividades (nombre + código). Los datos se guardan por Owner en
- * `onat-storage`; la pantalla solo los edita.
+ * S1/S8: la configuración es por Owner y por año. Cada ejercicio se llena de
+ * nuevo — identidad (con el código de barras del RC-05) y actividades — y el
+ * resto del vector de ese año (obligaciones, bonificaciones, gastos sin
+ * comprobante y correcciones) se conserva al guardar.
  *
  * SSR: en el servidor no hay `window`, así que el primer render es el formulario
- * vacío y el efecto carga lo guardado al hidratar — mismo patrón que el resto de
- * pantallas que leen configuración de localStorage.
+ * vacío y el efecto carga el vector del año al hidratar — mismo patrón que el
+ * resto de pantallas que leen configuración de localStorage.
  */
 export function OnatConfigurationsPage() {
   const intl = useIntl();
   const ownerId = useAuthStore((state) => state.user?.id ?? '');
 
-  const [form, setForm] = useState<OnatConfigForm>(createEmptyForm);
+  const [year, setYear] = useState(currentYear);
+  const [vector, setVector] = useState<OnatVector>(createEmptyVector);
+  const [identidad, setIdentidad] = useState<OnatIdentidad>(() => createEmptyVector().identidad);
+  const [actividades, setActividades] = useState<OnatActividad[]>([]);
   const [savedMessage, setSavedMessage] = useState('');
   const [saveFailed, setSaveFailed] = useState(false);
+
+  const years = useMemo(() => {
+    const current = currentYear();
+    return Array.from({ length: YEAR_RANGE }, (_, index) => current - index);
+  }, []);
 
   useEffect(() => {
     if (!ownerId) {
       return;
     }
-    setForm((current) => ({ ...current, ...getOnatConfig(ownerId) }));
-  }, [ownerId]);
+    const loaded = getOnatVector(ownerId, year);
+    setVector(loaded);
+    setIdentidad(loaded.identidad);
+    setActividades(loaded.actividades);
+  }, [ownerId, year]);
 
   const clearStatus = () => {
     setSavedMessage('');
     setSaveFailed(false);
   };
 
-  const updateField = (field: TextField, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const changeYear = (value: string) => {
+    setYear(Number(value));
     clearStatus();
   };
 
-  const updateActivity = (index: number, field: keyof OnatActivity, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      actividades: prev.actividades.map((actividad, position) =>
+  const updateField = (field: TextField, value: string) => {
+    setIdentidad((prev) => ({ ...prev, [field]: value }));
+    clearStatus();
+  };
+
+  const updateActivity = (index: number, field: keyof OnatActividad, value: string) => {
+    setActividades((prev) =>
+      prev.map((actividad, position) =>
         position === index ? { ...actividad, [field]: value } : actividad,
       ),
-    }));
+    );
     clearStatus();
   };
 
   const addActivity = () => {
-    setForm((prev) => ({
-      ...prev,
-      actividades: [...prev.actividades, { nombre: '', codigo: '' }],
-    }));
+    setActividades((prev) => [...prev, { nombre: '', codigo: '' }]);
     clearStatus();
   };
 
   const removeActivity = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      actividades: prev.actividades.filter((_, position) => position !== index),
-    }));
+    setActividades((prev) => prev.filter((_, position) => position !== index));
     clearStatus();
   };
 
   const save = () => {
-    const result = saveOnatConfig({ ...form, ownerId });
+    const result = saveOnatVector({ ...vector, ownerId, year, identidad, actividades });
     if (!result.succeeded) {
       // Nunca un éxito falso: el almacenamiento rechazó la escritura.
       setSavedMessage('');
@@ -154,8 +163,26 @@ export function OnatConfigurationsPage() {
         </p>
       </div>
 
+      <div className="flex items-center gap-3">
+        <label className={LABEL_CLASSES} htmlFor="onat-year">
+          {intl.formatMessage({ id: 'ONAT.YEAR' })}
+        </label>
+        <select
+          id="onat-year"
+          className={SELECT_CLASSES}
+          value={String(year)}
+          onChange={(event) => changeYear(event.target.value)}
+        >
+          {years.map((candidate) => (
+            <option key={candidate} value={String(candidate)}>
+              {candidate}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
-        {FIELDS.map(({ field, messageId, autoComplete }) => (
+        {FIELDS.map(({ field, messageId, autoComplete, inputMode, maxLength }) => (
           <div key={field}>
             <label className={LABEL_CLASSES} htmlFor={`onat-${field}`}>
               {intl.formatMessage({ id: messageId })}
@@ -165,7 +192,9 @@ export function OnatConfigurationsPage() {
               className={INPUT_CLASSES}
               type="text"
               autoComplete={autoComplete}
-              value={form[field]}
+              inputMode={inputMode}
+              maxLength={maxLength}
+              value={identidad[field]}
               onChange={(event) => updateField(field, event.target.value)}
             />
           </div>
@@ -177,15 +206,15 @@ export function OnatConfigurationsPage() {
           {intl.formatMessage({ id: 'ONAT.ACTIVITIES' })}
         </h2>
 
-        {form.actividades.length === 0 && (
+        {actividades.length === 0 && (
           <p className="text-sm text-text-muted">
             {intl.formatMessage({ id: 'ONAT.ACTIVITIES_EMPTY' })}
           </p>
         )}
 
-        {form.actividades.length > 0 && (
+        {actividades.length > 0 && (
           <ul className="space-y-3">
-            {form.actividades.map((actividad, index) => (
+            {actividades.map((actividad, index) => (
               <li
                 key={index}
                 className="flex flex-col gap-3 border-b border-border pb-3 last:border-b-0 last:pb-0 lg:flex-row lg:items-end"

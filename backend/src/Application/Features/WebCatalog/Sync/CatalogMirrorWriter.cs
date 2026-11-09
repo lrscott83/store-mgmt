@@ -53,6 +53,9 @@ namespace Application.Features.WebCatalog.Sync
         public const int MaxCategories = 500;
         public const int MaxProducts = 5000;
 
+        /// <summary>Tope de escalones mayoristas por producto: un producto real no se acerca.</summary>
+        public const int MaxWholesaleTiers = 20;
+
         /// <summary>
         /// Primera fase: categorías y productos (hechos). El llamador guarda al terminar.
         ///
@@ -128,6 +131,7 @@ namespace Application.Features.WebCatalog.Sync
                     product.DiscountFromInventory = incoming.DiscountFromInventory;
                     if (!string.IsNullOrWhiteSpace(incoming.BusinessId))
                         product.BusinessId = incoming.BusinessId!;
+                    ApplyWholesaleFacts(product, incoming);
                     // Description / PercentDiscountPrice / DiscountPrice / IsNew / Image: NO se tocan.
                     await productRepository.UpdateAsync(product);
                     productsUpdated++;
@@ -140,6 +144,7 @@ namespace Application.Features.WebCatalog.Sync
                         incoming.Order, incoming.AvailableToSale, incoming.DiscountFromInventory,
                         incoming.BusinessId ?? string.Empty, tenantId);
                     created.Currency = ToCurrency(incoming.Currency);
+                    ApplyWholesaleFacts(created, incoming);
                     await productRepository.AddAsync(created);
                     createdProducts.Add(created);
                     productsCreated++;
@@ -224,6 +229,93 @@ namespace Application.Features.WebCatalog.Sync
                     .Select((path, index) => ProductImage.Create(product.Id, path, index, product.TenantId));
 
                 await imageRepository.AddRangeAsync(rows);
+            }
+        }
+
+        /// <summary>
+        /// Tercera fase: escalones mayoristas. Va después de la galería y con los productos ya
+        /// escritos, porque cada escalón referencia su producto.
+        ///
+        /// Tres estados, porque "ausente" y "vacío" no son lo mismo cuando el dato es del POS:
+        /// - `WholesaleTiers` null = el snapshot no habla de los escalones (bundle viejo, snapshot
+        ///   parcial): no se toca lo guardado. Tratarlo como vacío era R1-1: un cliente viejo
+        ///   borraba todos los escalones de la tienda y la respuesta decía "sincronizado".
+        /// - Lista vacía = "no hay escalones": se deja la tabla limpia.
+        /// - Lista con elementos = conjunto deseado; solo se reescribe cuando cambió, para que
+        ///   re-sincronizar no borre e inserte lo mismo.
+        /// </summary>
+        public static async Task MirrorWholesaleTiersAsync(
+            CatalogSnapshotDto snapshot,
+            IList<Product> products,
+            IProductWholesaleTierRepository tierRepository)
+        {
+            var productsById = products.ToDictionary(product => product.Id);
+
+            foreach (CatalogSnapshotProductDto incoming in snapshot.Products)
+            {
+                if (!productsById.TryGetValue(incoming.Id, out Product? product))
+                    continue;
+
+                // Ausente = el snapshot no habla de este producto: no se borra ni se inserta.
+                if (incoming.WholesaleTiers is null)
+                    continue;
+
+                List<CatalogSnapshotWholesaleTierDto> desired = incoming.WholesaleTiers
+                    .Where(tier => tier is not null)
+                    .Where(tier => tier.MinPacks > 0)
+                    .OrderBy(tier => tier.MinPacks)
+                    .ToList();
+
+                List<ProductWholesaleTier> stored = product.WholesaleTiers
+                    .OrderBy(tier => tier.MinPacks)
+                    .ToList();
+
+                bool unchanged = desired.Count == stored.Count
+                    && desired.Zip(stored).All(pair =>
+                        pair.First.MinPacks == pair.Second.MinPacks
+                        && pair.First.PricePerUnit == pair.Second.PricePerUnit
+                        && ToCurrency(pair.First.Currency ?? incoming.Currency) == pair.Second.Currency);
+
+                if (unchanged)
+                    continue;
+
+                await tierRepository.HardDeleteWhereAsync(tier => tier.ProductId == product.Id);
+
+                if (desired.Count == 0)
+                    continue;
+
+                IEnumerable<ProductWholesaleTier> rows = desired.Select(tier =>
+                    ProductWholesaleTier.Create(
+                        product.Id,
+                        tier.MinPacks,
+                        tier.PricePerUnit,
+                        ToCurrency(tier.Currency ?? incoming.Currency),
+                        product.TenantId));
+
+                await tierRepository.AddRangeAsync(rows);
+            }
+        }
+
+        /// <summary>
+        /// Hechos mayoristas del producto (el precio de los escalones va en su propia fase).
+        ///
+        /// Cada campo ausente (`null`) deja el valor guardado como está: un bundle viejo del POS
+        /// no habla de la config mayorista, y escribirlo con el default de .NET (false/0) borraría
+        /// la configuración del dueño. Una unidad en blanco SÍ es un valor: limpia la unidad.
+        /// </summary>
+        private static void ApplyWholesaleFacts(Product product, CatalogSnapshotProductDto incoming)
+        {
+            if (incoming.WholesaleEnabled.HasValue)
+                product.WholesaleEnabled = incoming.WholesaleEnabled.Value;
+
+            if (incoming.WholesalePackSize.HasValue)
+                product.WholesalePackSize = incoming.WholesalePackSize.Value;
+
+            if (incoming.WholesaleUnitLabel is not null)
+            {
+                product.WholesaleUnitLabel = string.IsNullOrWhiteSpace(incoming.WholesaleUnitLabel)
+                    ? null
+                    : incoming.WholesaleUnitLabel.Trim();
             }
         }
 

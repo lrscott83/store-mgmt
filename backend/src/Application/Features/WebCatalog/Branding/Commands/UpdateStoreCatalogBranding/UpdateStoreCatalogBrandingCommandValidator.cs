@@ -1,3 +1,4 @@
+using Application.Features.WebCatalog.Branding;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -31,9 +32,24 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         public UpdateStoreCatalogBrandingCommandValidator(IStringLocalizer<I18n> localizer)
         {
             RuleFor(x => x)
-                .Must(x => x.Logo != null || x.RemoveLogo || x.Banner != null || x.RemoveBanner || x.MobileColumns.HasValue)
+                .Must(x => x.Logo != null || x.RemoveLogo || x.Banner != null || x.RemoveBanner
+                    || x.MobileColumns.HasValue || x.PriceMode != null)
                 .WithMessage(localizer["BrandingNothingToUpdate", "{PropertyName}"])
                 .OverridePropertyName("Logo/Banner");
+
+            // Modo de precio del catálogo (S1): el CONTRATO son dos nombres, "Unit" o "Wholesale".
+            // `null` = no se toca (parche parcial). Un valor desconocido —incluido el número del
+            // enum, que es almacenamiento y no contrato— se rechaza aquí con un 400 localizado en vez
+            // de llegar al handler y que este tenga que defender el contrato por su cuenta.
+            //
+            // Lo que NO decide esta regla es si el modo es APLICABLE (S7: hace falta al menos un
+            // producto con precio mayorista): eso depende de los datos de la tienda y vive en el
+            // handler, que es quien puede preguntarlos.
+            RuleFor(x => x.PriceMode)
+                .Must(value => CatalogPriceModeWire.TryParse(value).HasValue)
+                .When(x => x.PriceMode is not null)
+                .WithMessage(localizer["BrandingPriceModeInvalid", nameof(UpdateStoreCatalogBrandingCommand.PriceMode)])
+                .OverridePropertyName(nameof(UpdateStoreCatalogBrandingCommand.PriceMode));
 
             // Elementos por fila en MÓVIL (decisión del owner, 2026-10-12): solo 1 o 2. El `When`
             // deja pasar el `null` (parche parcial: no se toca). Un valor fuera de rango se rechaza

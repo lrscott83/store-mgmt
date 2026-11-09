@@ -1,10 +1,10 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
-using Domain.Common.Extensions;
 using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -35,13 +35,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus
     public class UpdateOrderPaymentStatusCommandHandler
         : ICommandHandler<UpdateOrderPaymentStatusCommand, bool>
     {
-        /// <summary>
-        /// Mensaje del 404. Va literal, no por `IStringLocalizer`, por la misma razón que en
-        /// `UpdateOrderStatusCommandHandler`: la clave equivalente en `Resources/Localization/*.resx`
-        /// no existe y añadirla es un cambio de Resources, fuera de la superficie de esta unidad.
-        /// </summary>
-        private const string OrderNotFoundMessage = "Online order not found.";
-
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IOrderRepository _orderRepository;
@@ -62,31 +55,38 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus
         public async Task<ResponseResult<bool>> Handle(
             UpdateOrderPaymentStatusCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             // El `storeId` va en el MISMO predicado que el id: pedir el pedido primero y comprobar
             // la tienda después dejaría una ventana con el pedido ajeno ya cargado.
-            Order? order = await _orderRepository.GetByIdWithItemsAsync(storeId, request.Id);
-            if (order is null)
-                throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
+            //
+            // La FILA, sin `Include`s: este comando solo escribe `PaymentStatus`/`PaidAt`, así que
+            // traer las líneas y el repartidor serían dos `JOIN` por petición para un resultado que
+            // nadie lee.
+            Order order = await OnlineOrderAccess.GetRowAsync(
+                _orderRepository, storeId, request.Id, cancellationToken);
 
             // El pago no tiene máquina de estados —un pedido en `Creado` puede estar pagado por
             // adelantado—, pero SÍ tiene una invariante: un pedido entregado ya está pagado. La
             // puerta es `ChangePaymentStatus`, que es la que la hace cumplir.
+            OrderChangedField changed;
+
             try
             {
-                order.ChangePaymentStatus(request.PaymentStatus);
+                changed = order.ChangePaymentStatus(request.PaymentStatus);
             }
             catch (DeliveredOrderCannotBeUnpaidException exception)
             {
                 throw new ApiException(exception.Message, HttpStatusCode.BadRequest);
             }
 
-            // `ApplicationDbContext` es NoTracking: mutar la fila cargada y llamar a `SaveChanges`
-            // sin marcar NO escribiría nada — sin error y sin aviso.
-            await _orderRepository.UpdateAsync(order);
+            // Actualización PARCIAL: el dominio ya dijo qué campos mutó (el pago y, cuando
+            // corresponde, su fecha). La fila la comparten el estado y el repartidor, que son de
+            // otras acciones y pueden estar cambiándose en este mismo instante: escribir la fila
+            // entera reescribiría sus valores leídos antes y los borraría.
+            // `ApplicationDbContext` es NoTracking: sin marcar columnas, `SaveChanges` no
+            // escribiría NADA — sin error y sin aviso.
+            await _orderRepository.UpdatePartialAsync(order, changed, cancellationToken);
 
             return ResponseResult.Success(
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

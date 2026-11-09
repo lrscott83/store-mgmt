@@ -14,7 +14,7 @@ export interface PwaInstall {
   promptInstall: () => Promise<void>;
 }
 
-function isRunningStandalone(): boolean {
+export function isRunningStandalone(): boolean {
   const displayStandalone =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -36,7 +36,7 @@ function getServerSnapshot(): null {
  * (which only happens when the app is NOT installed) so it self-heals after an
  * uninstall. Shared across all tabs of the origin.
  */
-const INSTALLED_FLAG_KEY = 'pwa-installed';
+export const INSTALLED_FLAG_KEY = 'pwa-installed';
 
 function readInstalledFlag(): boolean {
   try {

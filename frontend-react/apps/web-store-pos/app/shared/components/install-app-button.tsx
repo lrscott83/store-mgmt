@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
 import { usePwaInstall } from '~/shared/lib/hooks/use-pwa-install';
+import { getDeferredPrompt } from '~/shared/lib/pwa/pwa-install-prompt';
+import {
+  DISABLED_OBSERVATION_MS,
+  recordObservedInstallState,
+  resolveObservedInstallState,
+} from '~/shared/lib/pwa/pwa-install-diagnostics';
 
 /**
  * Floating "Instalar App" button, mirroring Angular's global `pwa-install-btn`
@@ -16,6 +22,24 @@ export function InstallAppButton() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Diagnostics only: report a button that STAYED visibly disabled, i.e. the
+  // install prompt never arrived within a window longer than the deferred
+  // service-worker registration. Rendering is untouched.
+  useEffect(() => {
+    if (!mounted || !canInstall || canPrompt) return;
+    const id = setTimeout(() => {
+      // Re-read the live store: the closure's canPrompt is stale by now.
+      if (getDeferredPrompt() === null) recordObservedInstallState('awaiting-prompt');
+    }, DISABLED_OBSERVATION_MS);
+    return () => clearTimeout(id);
+  }, [mounted, canInstall, canPrompt]);
+
+  // A prompt eventually arrived, so any observation of the disabled gap is
+  // superseded — never report a cause the device has disproved.
+  useEffect(() => {
+    if (mounted && canInstall && canPrompt) resolveObservedInstallState();
+  }, [mounted, canInstall, canPrompt]);
 
   if (!mounted || !canInstall) return null;
 

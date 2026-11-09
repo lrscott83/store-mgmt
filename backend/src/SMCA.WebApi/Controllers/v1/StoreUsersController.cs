@@ -19,6 +19,9 @@ namespace SMCA.WebApi.Controllers.v1
     {
         [HttpGet("list/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<StoreUserDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreUsersAsync(bool includeInactive = true)
         {
             return Ok(await Sender.Send(new GetStoreUsersQuery(includeInactive)));
@@ -26,6 +29,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ResponseResult<StoreUserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreUserByIdAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetStoreUserByIdQuery(id)));
@@ -33,6 +39,10 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPost("")]
         [ProducesResponseType(typeof(ResponseResult<StoreUserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> CreateStoreUserAsync(CreateStoreUserCommand command)
         {
             return Ok(await Sender.Send(command));
@@ -40,6 +50,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("{storeId}/offline-roster")]
         [ProducesResponseType(typeof(ResponseResult<OfflineRosterDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> ExportOfflineRosterAsync(Guid storeId)
         {
             return Ok(await Sender.Send(new ExportOfflineRosterQuery(storeId)));

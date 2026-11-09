@@ -52,6 +52,22 @@ const messages: Record<string, string> = {
   'DIAGNOSTICS.LEVEL_ALL': 'Todos',
   'DIAGNOSTICS.SEARCH': 'Buscar',
   'DIAGNOSTICS.EMPTY': 'No hay eventos registrados en este dispositivo.',
+  // PWA install diagnostics — why the floating "Instalar App" button is
+  // disabled on this device, and the raw browser signals behind it.
+  'DIAGNOSTICS.PWA_STATE': 'Estado de instalación',
+  'DIAGNOSTICS.PWA_LAST_OBSERVED': 'Último estado del botón',
+  'DIAGNOSTICS.PWA_RESOLVED_AT': 'resuelto a las',
+  'DIAGNOSTICS.PWA_SERVICE_WORKER': 'Service worker',
+  'DIAGNOSTICS.PWA_DISPLAY_MODE': 'Modo de visualización',
+  'DIAGNOSTICS.PWA_SW_NONE': 'Sin registro de service worker',
+  'DIAGNOSTICS.PWA_DISPLAY_STANDALONE': 'App instalada (ventana propia)',
+  'DIAGNOSTICS.PWA_DISPLAY_BROWSER': 'Navegador (pestaña)',
+  'DIAGNOSTICS.PWA_AVAILABILITY_READY': 'Listo para instalar',
+  'DIAGNOSTICS.PWA_AVAILABILITY_AWAITING_PROMPT': 'Sin aviso de instalación del navegador',
+  'DIAGNOSTICS.PWA_AVAILABILITY_NO_SERVICE_WORKER': 'Navegador sin soporte de service worker',
+  'DIAGNOSTICS.PWA_AVAILABILITY_STANDALONE': 'Ejecutándose como app instalada',
+  'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_FLAG': 'Marcada como instalada en este dispositivo',
+  'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_RELATED_APP': 'Detectada como app web instalada',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
   'GENERAL.LOGOUT': 'Salir',
   // The user-popup's icon-only logout button (dropdown header) — distinct from the
@@ -476,6 +492,17 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_MOBILE_COLUMNS_TWO': '2 productos por fila',
   'WEB_CATALOG.BRAND_MOBILE_COLUMNS_HINT':
     'Cuántos productos muestra cada fila en el teléfono. En pantallas grandes se siguen viendo 2 o 3.',
+
+  // Modo de precio del catálogo (S1/S7): qué precio publica el catálogo, por unidad o mayorista.
+  // El aviso no es un error de la aplicación: es la consecuencia de una configuración del dueño
+  // (un sync posterior puede dejar la tienda sin productos con precio mayorista).
+  'WEB_CATALOG.PRICE_MODE': 'Modo de precio',
+  'WEB_CATALOG.PRICE_MODE_UNIT': 'Precio por unidad',
+  'WEB_CATALOG.PRICE_MODE_WHOLESALE': 'Precio mayorista',
+  'WEB_CATALOG.PRICE_MODE_HINT':
+    'En modo mayorista el catálogo muestra los precios mayoristas y oculta los productos que no los tienen configurados.',
+  'WEB_CATALOG.PRICE_MODE_EMPTY_WARNING':
+    'El catálogo no está publicando ningún producto: está en modo mayorista y la tienda no tiene productos con precio mayorista. Configure los precios mayoristas y sincronice el catálogo.',
 
   // Nombres de las plantillas del catálogo público. La plantilla la fija SOLO el SuperAdmin
   // (/admin/stores); el dueño ya no la elige, así que estos textos los muestra el selector del
@@ -2284,6 +2311,8 @@ const messages: Record<string, string> = {
     'Completa los datos fiscales de tu negocio y las actividades que realizas. Con esta información se calcula el Vector Fiscal.',
   'ONAT.NAME': 'Nombre',
   'ONAT.NIT': 'NIT',
+  // S8: código de barras del RC-05, 16 dígitos sin guiones.
+  'ONAT.RC05': 'RC-05',
   'ONAT.FISCAL_ADDRESS': 'Domicilio fiscal',
   'ONAT.LEGAL_ADDRESS': 'Domicilio legal',
   'ONAT.MUNICIPALITY': 'Municipio',
@@ -2340,6 +2369,38 @@ const messages: Record<string, string> = {
   'ONAT.LOAD_ERROR':
     'No se pudo cargar el Vector Fiscal. Revisa el almacenamiento del navegador e inténtalo de nuevo.',
   'ONAT.RETRY': 'Reintentar',
+
+  // Vector Fiscal — agenda de obligaciones (S2, S4, S5): las filas del vector del
+  // año, su importe calculado y la marca de pago con el canal.
+  'ONAT.AGENDA': 'Agenda de obligaciones',
+  'ONAT.AGENDA_HINT':
+    'Obligaciones del año según tu Vector Fiscal. Marca cada una cuando la pagues.',
+  'ONAT.AGENDA_EMPTY':
+    'Todavía no hay obligaciones para este año. Importa el CSV del Vector Fiscal para crearlas.',
+  'ONAT.DUE_DATE': 'Fecha límite',
+  'ONAT.CODE': 'Código',
+  'ONAT.AMOUNT': 'Importe',
+  'ONAT.RC04A': 'RC-04A',
+  'ONAT.STATUS': 'Estado',
+  'ONAT.ACTIONS': 'Acciones',
+  'ONAT.PAID': 'Pagado',
+  'ONAT.UNPAID': 'Pendiente',
+  'ONAT.PENDING_DECLARATION': 'Pendiente de declarar',
+  'ONAT.MARK_PAID': 'Marcar pagada',
+  'ONAT.MARK_UNPAID': 'Marcar pendiente',
+  'ONAT.MARK_PAID_FOR': 'Marcar pagada la obligación {codigo} de {periodo}',
+  'ONAT.MARK_UNPAID_FOR': 'Marcar pendiente la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_QUESTION': '¿Cómo pagaste esta obligación?',
+  'ONAT.CHANNEL_CASH': 'Efectivo',
+  'ONAT.CHANNEL_ELECTRONIC': 'Electrónico',
+  'ONAT.CHANNEL_CASH_FOR':
+    'Registrar pago en efectivo de la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_ELECTRONIC_FOR':
+    'Registrar pago electrónico de la obligación {codigo} de {periodo}',
+  'ONAT.CHANNEL_NOTE':
+    'El 3 % de descuento solo aplica a los pagos por Transfermóvil, Telebanca, banca remota o cajero. Pagar en efectivo en el banco no tiene descuento, por eso la aplicación necesita saber cómo pagaste.',
+  'ONAT.PAID_CASH': 'Pagado en efectivo',
+  'ONAT.PAID_ELECTRONIC': 'Pagado electrónicamente',
 };
 
 export default messages;

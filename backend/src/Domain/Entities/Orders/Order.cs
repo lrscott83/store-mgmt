@@ -30,6 +30,22 @@ namespace Domain.Entities.Orders
         public DateTime Date { get; set; }
         public Guid TenantId { get; set; }
 
+        /// <summary>
+        /// CANAL del pedido: <c>true</c> = lo escribió el POS (venta offline), <c>false</c> = lo
+        /// creó el servidor.
+        ///
+        /// Nace en <c>false</c> porque la única vía de alta del servidor es el catálogo web
+        /// (<see cref="CreateOnline"/>), así que el caso normal es no tocar nada. El POS todavía NO
+        /// sincroniza sus ventas (D14), así que hoy nadie escribe <c>true</c>: la columna queda
+        /// preparada para el día que lo haga.
+        /// </summary>
+        /// <remarks>
+        /// Falla ABIERTO a propósito (una fila que olvide asignarla cuenta como online): el canal no
+        /// es un dato de negocio que se pueda deducir del total, y las métricas de conversión del
+        /// catálogo preguntan por "no offline".
+        /// </remarks>
+        public bool IsOfflineOrder { get; set; }
+
         // --- Pedidos ONLINE (pedidos-whatsapp-persistencia, F2) ---------------------------------
         //
         // D6/D14: el POS NO lee ni escribe estos pedidos (sigue con su almacén local cifrado), así
@@ -115,6 +131,12 @@ namespace Domain.Entities.Orders
         /// cliente, y por eso no puede "inventar" un total. El precio de cada <see cref="OrderItem"/>
         /// es el snapshot histórico, así que un cambio posterior del catálogo no altera el pedido.
         ///
+        /// <paramref name="orderType"/> es el TIPO real del pedido (<see cref="OrderType.Mayorista"/>
+        /// o <see cref="OrderType.Normal"/>) y lo resuelve el llamador: aquí no se puede deducir,
+        /// porque el modo de precio es configuración de la tienda y esta factoría no la lee. El CANAL
+        /// no se pide como parámetro: un pedido creado por esta vía es del servidor por definición, y
+        /// <see cref="IsOfflineOrder"/> nace en <c>false</c>.
+        ///
         /// Es una vía SEPARADA de <see cref="Create(...)"/> a propósito: la del POS no cambia de
         /// firma ni de comportamiento (criterio de aceptación 1).
         /// </summary>
@@ -131,10 +153,11 @@ namespace Domain.Entities.Orders
             string? description = null,
             string? deliveryAddress = null,
             string? notes = null,
-            DateTime? date = null)
+            DateTime? date = null,
+            OrderType orderType = OrderType.Normal)
         {
             var order = new Order(
-                Guid.NewGuid(), storeId, OrderType.WhatsApp,
+                Guid.NewGuid(), storeId, orderType,
                 description ?? string.Empty, total,
                 lines.Sum(line => line.Quantity),
                 date ?? DateTime.UtcNow, tenantId);
@@ -154,7 +177,9 @@ namespace Domain.Entities.Orders
             {
                 OrderItem item = OrderItem.Create(
                     order.Id, line.ProductId, line.Name, line.Quantity, line.Price, orderIndex++, tenantId,
-                    line.BasePrice, line.PercentDiscountPrice, line.DiscountPrice);
+                    line.BasePrice, line.PercentDiscountPrice, line.DiscountPrice,
+                    line.WholesalePackSize, line.WholesalePacks, line.WholesaleTierMinPacks,
+                    line.WholesaleTierUnitPrice, line.WholesaleUnitLabel);
                 item.Currency = line.Currency;
                 order.OrderItems.Add(item);
             }
@@ -191,7 +216,11 @@ namespace Domain.Entities.Orders
         /// Reloj con el que se sella <see cref="PaidAt"/> al entregar. null = reloj del sistema; los
         /// tests pasan uno fijo para que la fecha sea afirmable sin ventanas de tiempo real.
         /// </param>
-        public void ChangeStatus(
+        /// <returns>
+        /// Los campos que la transición mutó, para que la persistencia escriba SOLO esas columnas
+        /// (una fila que comparten estado, pago y repartidor no se guarda entera).
+        /// </returns>
+        public OrderChangedField ChangeStatus(
             OrderStatus next,
             Guid? driverId = null,
             string? cancellationReason = null,
@@ -199,6 +228,8 @@ namespace Domain.Entities.Orders
         {
             if (!AllowedTransitionsFrom(Status, DeliveryType).Contains(next))
                 throw new InvalidOrderStatusTransitionException(Status, next);
+
+            OrderChangedField changed = OrderChangedField.Status;
 
             if (next != OrderStatus.Cancelado && cancellationReason is not null)
                 throw new UnexpectedStatusOptionException(next, nameof(cancellationReason));
@@ -213,6 +244,7 @@ namespace Domain.Entities.Orders
                     throw new MissingCancellationReasonException(Status);
 
                 CancellationReason = reason;
+                changed |= OrderChangedField.CancellationReason;
             }
 
             if (next == OrderStatus.Transportando)
@@ -221,6 +253,7 @@ namespace Domain.Entities.Orders
                     throw new MissingDeliveryDriverException(Status);
 
                 DriverId = driverId;
+                changed |= OrderChangedField.DriverId;
             }
 
             Status = next;
@@ -229,7 +262,9 @@ namespace Domain.Entities.Orders
             // dejar en Pending por descuido. Pasa por la MISMA puerta que el pago manual, así que
             // el cobro deja también su constancia (`PaidAt`).
             if (next == OrderStatus.Entregado)
-                ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
+                changed |= ChangePaymentStatus(OrderPaymentStatus.Paid, clock);
+
+            return changed;
         }
 
         /// <summary>
@@ -267,22 +302,34 @@ namespace Domain.Entities.Orders
         /// <param name="clock">
         /// Reloj con el que se sella la fecha. null = reloj del sistema; los tests pasan uno fijo.
         /// </param>
-        public void ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
+        /// <returns>
+        /// Los campos que la operación mutó: siempre el pago, y la fecha solo cuando se sella o se
+        /// borra. Sin esto la persistencia tendría que adivinar qué columnas escribir.
+        /// </returns>
+        public OrderChangedField ChangePaymentStatus(OrderPaymentStatus next, TimeProvider? clock = null)
         {
             if (Status == OrderStatus.Entregado && next == OrderPaymentStatus.Pending)
                 throw new DeliveredOrderCannotBeUnpaidException();
 
+            OrderChangedField changed = OrderChangedField.PaymentStatus;
+
             if (next == OrderPaymentStatus.Paid)
             {
                 if (PaymentStatus != OrderPaymentStatus.Paid)
+                {
                     PaidAt = (clock ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+                    changed |= OrderChangedField.PaidAt;
+                }
             }
             else if (next == OrderPaymentStatus.Pending)
             {
                 PaidAt = null;
+                changed |= OrderChangedField.PaidAt;
             }
 
             PaymentStatus = next;
+
+            return changed;
         }
     }
 
@@ -296,6 +343,12 @@ namespace Domain.Entities.Orders
     /// Línea ya resuelta por el servidor. `Price` es el precio final cobrado; los tres campos
     /// opcionales son el snapshot del precio del producto en ese momento (base, % de descuento
     /// escalado y descuento fijo escalado), que permite recalcularlo desde la línea.
+    ///
+    /// Los cinco campos `Wholesale*` congelan el hecho mayorista de la línea (paquete, paquetes,
+    /// escalón y unidad). `Price` sigue siendo el precio POR UNIDAD y `Quantity` las UNIDADES, así
+    /// que `Price × Quantity` es el total de la línea en los dos modos; los paquetes viajan aparte
+    /// porque son lo que el resumen de WhatsApp necesita decir ("12 cajas") y no se pueden deducir
+    /// después sin la config del momento.
     /// </summary>
     public sealed record OrderLine(
         Guid ProductId,
@@ -305,7 +358,12 @@ namespace Domain.Entities.Orders
         Currency Currency,
         decimal? BasePrice = null,
         int? PercentDiscountPrice = null,
-        int? DiscountPrice = null);
+        int? DiscountPrice = null,
+        int WholesalePackSize = 0,
+        int WholesalePacks = 0,
+        int? WholesaleTierMinPacks = null,
+        decimal? WholesaleTierUnitPrice = null,
+        string? WholesaleUnitLabel = null);
 
     /// <summary>
     /// Transición de estado no permitida por la tabla de <see cref="Order.AllowedTransitionsFrom"/>.

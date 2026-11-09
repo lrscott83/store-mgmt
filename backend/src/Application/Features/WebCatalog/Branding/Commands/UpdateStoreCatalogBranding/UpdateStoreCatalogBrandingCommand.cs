@@ -8,6 +8,7 @@ using Application.Features.WebCatalog.Images;
 using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
@@ -35,8 +36,15 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     /// dueño escribiera la marca de la tienda de otro.
     ///
     /// NO lleva `PaletteId` (las paletas se cancelaron, 2026-10-07) NI `TemplateId` (la plantilla
-    /// pasó a ser SuperAdmin-only en `/v1/stores/{storeId}/catalog-template`): esta feature escribe
-    /// únicamente `LogoKey` y `BannerKey`.
+    /// pasó a ser SuperAdmin-only en `/v1/stores/{storeId}/catalog-template`). Lo que esta feature
+    /// escribe es la MARCA (`LogoKey`, `BannerKey`) y la PRESENTACIÓN del catálogo: elementos por
+    /// fila en móvil y el modo de precio (`Unit` / `Wholesale`, S1/S7).
+    ///
+    /// El modo de precio trae dos reglas propias, y las dos son del servidor:
+    ///   * guardarlo en `Wholesale` cuando la tienda no tiene ningún producto con precio mayorista
+    ///     es un 400 localizado — la vista no es la puerta (S7);
+    ///   * un CAMBIO de modo regenera la página estática del catálogo, porque cambia lo que se
+    ///     publica; reenviar el mismo modo no.
     ///
     /// Dos órdenes gobiernan el handler, y los dos nacieron de hallazgos (F8-R1 y F8-R2, revisión
     /// nativa 2026-10-07):
@@ -54,7 +62,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         bool RemoveLogo,
         CatalogImageUpload? Banner,
         bool RemoveBanner,
-        int? MobileColumns = null) : ICommand<StoreCatalogBrandingDto>;
+        int? MobileColumns = null,
+        string? PriceMode = null) : ICommand<StoreCatalogBrandingDto>;
 
     public class UpdateStoreCatalogBrandingCommandHandler
         : ICommandHandler<UpdateStoreCatalogBrandingCommand, StoreCatalogBrandingDto>
@@ -67,6 +76,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly ILogger<UpdateStoreCatalogBrandingCommandHandler> _logger;
         private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
+        private readonly IProductRepository _productRepository;
 
         public UpdateStoreCatalogBrandingCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -76,7 +86,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer,
             ILogger<UpdateStoreCatalogBrandingCommandHandler> logger,
-            ICatalogStaticPageRegenerator catalogPageRegenerator)
+            ICatalogStaticPageRegenerator catalogPageRegenerator,
+            IProductRepository productRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -86,6 +97,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             _localizer = localizer;
             _logger = logger;
             _catalogPageRegenerator = catalogPageRegenerator;
+            _productRepository = productRepository;
         }
 
         public async Task<ResponseResult<StoreCatalogBrandingDto>> Handle(
@@ -113,19 +125,46 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             bool exists = settings is not null;
             settings ??= StoreCatalogSettings.Create(storeId, tenantId);
 
+            // --- Modo de precio del catálogo (S1/S7) ---
+            //
+            // Se resuelve ANTES de escribir nada: la puerta tiene que rechazar la petición sin que un
+            // archivo llegue a disco. El valor que entra es el NOMBRE del contrato ("Unit"/
+            // "Wholesale"), nunca el número del enum: el número es almacenamiento.
+            CatalogPriceMode? requestedPriceMode = null;
+            if (request.PriceMode is not null)
+            {
+                requestedPriceMode = CatalogPriceModeWire.TryParse(request.PriceMode)
+                    ?? throw new ApiException(
+                        _localizer["BrandingPriceModeInvalid", nameof(UpdateStoreCatalogBrandingCommand.PriceMode)],
+                        HttpStatusCode.BadRequest);
+            }
+
+            // Una sola lectura del hecho de la tienda: la usan la puerta y la respuesta.
+            bool hasWholesalePricedProducts =
+                await _productRepository.HasWholesalePricedProductsAsync(storeId, cancellationToken);
+
+            // S7: publicar en mayorista sin un solo producto que pueda publicarse deja el catálogo
+            // vacío, así que el servidor se niega a GUARDAR ese modo. La comprobación vive aquí y no
+            // en la vista: la vista no es la puerta. Y nunca "corrige": un rechazo no escribe, y un
+            // modo ya guardado sobrevive aunque un sync posterior deje la tienda sin esos productos —
+            // avisar de eso es cosa de la vista, no de una desactivación automática.
+            if (requestedPriceMode == CatalogPriceMode.Wholesale && !hasWholesalePricedProducts)
+                throw new ApiException(_localizer["CatalogWholesaleModeWithoutProducts"], HttpStatusCode.BadRequest);
+
+            // El modo guardado, normalizado igual que en la lectura: solo `Wholesale` es mayorista.
+            CatalogPriceMode storedPriceMode = settings.PriceMode == CatalogPriceMode.Wholesale
+                ? CatalogPriceMode.Wholesale
+                : CatalogPriceMode.Unit;
+
             // F8-R1: los DOS archivos se validan ANTES de que ninguno toque el disco. Validar cada
             // lado justo antes de guardarlo dejaba el logo ya escrito cuando el banner era inválido, y
             // ese logo se quedaba en el disco como archivo huérfano por cada intento fallido.
             //
-            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
-            // 400 localizado. La marca no es una puerta distinta al contenido del catálogo.
-            if (request.Logo != null)
-                CatalogImageUploadRules.EnsureValid(
-                    request.Logo.FileName, request.Logo.ContentType, request.Logo.Length, _localizer);
-
-            if (request.Banner != null)
-                CatalogImageUploadRules.EnsureValid(
-                    request.Banner.FileName, request.Banner.ContentType, request.Banner.Length, _localizer);
+            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp, cabecera real y
+            // 2 MB), con el mismo 400 localizado. La marca no es una puerta distinta al contenido
+            // del catálogo.
+            CatalogImageUpload? logo = Prepare(request.Logo);
+            CatalogImageUpload? banner = Prepare(request.Banner);
 
             // F8-R2: los archivos que la fila va a dejar atrás se COLECCIONAN y se borran después de
             // persistir, nunca antes. Borrarlos aquí dejaría la fila apuntando a un archivo que ya no
@@ -145,15 +184,20 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 // subir un logo dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia
                 // aquí ES el comportamiento, no un olvido.
                 settings.LogoKey = await ResolveAsync(
-                    request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+                    logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
                 settings.BannerKey = await ResolveAsync(
-                    request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+                    banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
 
                 // Presentación (decisiones del owner, 2026-10-12): elementos por fila en móvil.
                 // `null` = no se toca (parche parcial, como logo/banner): cambiar el logo no debe
                 // resetear este ajuste. El validador ya garantiza 1 o 2 cuando viene.
                 if (request.MobileColumns.HasValue)
                     settings.MobileColumns = request.MobileColumns.Value;
+
+                // El modo también es un parche parcial: sin esta guarda, guardar la marca devolvería
+                // a `Unit` el modo que el dueño eligió.
+                if (requestedPriceMode.HasValue)
+                    settings.PriceMode = requestedPriceMode.Value;
 
                 // El upsert escribe SOLO las columnas de marca: la fila la comparten los pedidos
                 // (D19), así que un UPDATE de fila completa revertiría un cambio de pedidos
@@ -162,7 +206,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 await _storeCatalogSettingsRepository.UpsertAsync(settings, exists,
                     nameof(StoreCatalogSettings.LogoKey),
                     nameof(StoreCatalogSettings.BannerKey),
-                    nameof(StoreCatalogSettings.MobileColumns));
+                    nameof(StoreCatalogSettings.MobileColumns),
+                    nameof(StoreCatalogSettings.PriceMode));
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch
@@ -220,7 +265,17 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             // public-catalog-static-pages (T4): la marca cambió (logo/banner), así que se regenera la
             // página estática del catálogo. Best-effort: la fila y los archivos ya están persistidos;
             // un fallo aquí no puede tumbar el guardado (el SPA sigue sirviendo el catálogo).
-            await _catalogPageRegenerator.RegenerateAsync(storeId, cancellationToken);
+            //
+            // El MODO cambia lo que la página publica, así que un cambio de modo también obliga a
+            // regenerarla — pero solo si cambió de verdad: reenviar el modo que ya estaba no cambia
+            // nada publicado, y regenerar por nada es una escritura en disco gratuita (S7).
+            bool brandingChanged = request.Logo is not null || request.RemoveLogo
+                || request.Banner is not null || request.RemoveBanner
+                || request.MobileColumns.HasValue;
+            bool priceModeChanged = requestedPriceMode.HasValue && requestedPriceMode.Value != storedPriceMode;
+
+            if (brandingChanged || priceModeChanged)
+                await _catalogPageRegenerator.RegenerateAsync(storeId, cancellationToken);
 
             return ResponseResult.Success(new StoreCatalogBrandingDto
             {
@@ -232,7 +287,30 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 MobileColumns = settings.MobileColumns is 1 or 2
                     ? settings.MobileColumns
                     : StoreCatalogSettings.DefaultMobileColumns,
+                PriceMode = CatalogPriceModeWire.ToWire(settings.PriceMode),
+                HasWholesalePricedProducts = hasWholesalePricedProducts,
             });
+        }
+
+        /// <summary>
+        /// Valida UN lado de la marca con las reglas de las imágenes del catálogo y devuelve el
+        /// archivo listo para guardarse.
+        ///
+        /// Devuelve una copia del registro cuando la comprobación de la cabecera tuvo que rebobinar
+        /// un stream que no se podía rebobinar: guardar el original sería guardar un archivo al que
+        /// le faltan los primeros bytes, que es un archivo distinto del que se validó.
+        /// </summary>
+        private CatalogImageUpload? Prepare(CatalogImageUpload? upload)
+        {
+            if (upload is null)
+                return null;
+
+            Stream content = CatalogImageUploadRules.EnsureValid(
+                upload.Content, upload.FileName, upload.ContentType, upload.Length, _localizer);
+
+            return ReferenceEquals(content, upload.Content)
+                ? upload
+                : upload with { Content = content };
         }
 
         /// <summary>

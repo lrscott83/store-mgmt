@@ -10,6 +10,7 @@ using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogImages;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Localization;
@@ -47,6 +48,7 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
+        private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogImageRepository _imageRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
@@ -55,6 +57,7 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
         public AddStoreCatalogImageCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
+            IStoreRepository storeRepository,
             IStoreCatalogImageRepository imageRepository,
             ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer,
@@ -62,6 +65,7 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
+            _storeRepository = storeRepository;
             _imageRepository = imageRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
@@ -75,13 +79,22 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
 
-            // El tenant se escribe en la fila, así que también tiene que existir: un token sin claim de
-            // tenant dejaría `TenantId = Guid.Empty`, una fila que el filtro global resuelve a NULL y
-            // que por tanto nadie vería ni podría quitar — invisible para siempre, con su archivo en
-            // disco. Mismo guard que la tienda, antes de subir nada.
-            Guid tenantId = _httpContextService.TenantId.ToGuid();
-            if (tenantId == Guid.Empty)
-                throw new ApiException(_localizer["ShowcaseStoreTenantNotResolved"], HttpStatusCode.BadRequest);
+            // El tenant se escribe en la fila Y en la clave del archivo, así que tiene que ser el de
+            // la TIENDA destino, no el del claim del llamador.
+            //
+            // Un SuperAdmin administra tiendas de otros tenants (es justo lo que hace
+            // `AdminStoreScope`), así que su claim apunta a SU tenant: usarlo escribiría la fila y
+            // el archivo bajo un prefijo al que ni la tienda ni sus usuarios pueden llegar — el
+            // archivo se sirve por `{tenant}/{store}/...`, y `BelongsToStore` lo rechazaría.
+            //
+            // La lectura ignora el filtro por tenant A PROPÓSITO: el `storeId` ya es la decisión de
+            // autorización (viene de la ruta bajo `AdminStoreScope`+SuperAdmin, o del claim del
+            // dueño), y el filtro global lo aplicaría el tenant del LLAMADOR, escondiendo
+            // exactamente la tienda que la ruta acaba de apuntar.
+            Store store = await _storeRepository.GetStoreByIdIgnoreQueryFiltersAsync(storeId)
+                ?? throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
+
+            Guid tenantId = store.TenantId;
 
             // Un conjunto que no existe en el enum no se valida solo: el validador lo rechaza, pero el
             // handler no confía en eso porque el comando también se puede enviar por otra vía. Escribir
@@ -107,12 +120,14 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                     HttpStatusCode.BadRequest);
 
             // Valida ANTES de subir: un archivo inválido no puede dejar un archivo huérfano en disco.
-            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
-            // 400 localizado. El showcase no es una puerta distinta al contenido del catálogo.
-            CatalogImageUploadRules.EnsureValid(request.FileName, request.ContentType, request.Length, _localizer);
+            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp, cabecera real y
+            // 2 MB), con el mismo 400 localizado. El showcase no es una puerta distinta al contenido
+            // del catálogo. Devuelve el stream ya rebobinado.
+            Stream content = CatalogImageUploadRules.EnsureValid(
+                request.Content, request.FileName, request.ContentType, request.Length, _localizer);
 
             string key = await _catalogImageStorage.SaveCatalogImageAsync(
-                new CatalogImageUpload(request.Content, request.FileName, request.ContentType, request.Length),
+                new CatalogImageUpload(content, request.FileName, request.ContentType, request.Length),
                 tenantId,
                 storeId,
                 FolderOf(request.Kind),

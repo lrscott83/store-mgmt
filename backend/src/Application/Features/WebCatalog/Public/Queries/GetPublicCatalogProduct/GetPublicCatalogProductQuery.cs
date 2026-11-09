@@ -3,6 +3,7 @@ using Application.Dtos.WebCatalog;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -48,7 +49,12 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
             if (product == null || product.Category == null || !product.Category.IsActive)
                 throw new ApiException(_localizer["ProductNotFound", nameof(query.ProductId)], HttpStatusCode.NotFound);
 
-            return ResponseResult.Success(PublicCatalogProductMapper.ToDto(product, store.CatalogSlug));
+            // El modo de la tienda se etiqueta en el DTO; la ocultación en modo mayorista ya la aplicó
+            // el repositorio (un producto sin config válida no llega hasta aquí: es un 404).
+            CatalogPriceMode priceMode = await _productRepository.GetPublicPriceModeAsync(store.Id, cancellationToken);
+
+            return ResponseResult.Success(
+                PublicCatalogProductMapper.ToDto(product, store.CatalogSlug, priceMode));
         }
     }
 }

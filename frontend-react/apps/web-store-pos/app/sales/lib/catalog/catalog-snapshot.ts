@@ -49,5 +49,16 @@ function toSnapshotProduct(product: Product): CatalogSnapshotProduct {
     isActive: product.isActive,
     ...(product.businessId ? { businessId: product.businessId } : {}),
     discountFromInventory: product.discountFromInvantory,
+    // Config mayorista: el POS es su dueño, así que viaja completa en cada sincronización.
+    // `wholesaleTiers` va SIEMPRE (array, posiblemente vacío): el servidor reemplaza el conjunto,
+    // así que omitirlo dejaría escalones viejos publicados.
+    wholesaleEnabled: product.wholesaleEnabled === true,
+    wholesalePackSize: product.wholesalePackSize ?? 0,
+    ...(product.wholesaleUnitLabel ? { wholesaleUnitLabel: product.wholesaleUnitLabel } : {}),
+    wholesaleTiers: (product.wholesaleTiers ?? []).map((tier) => ({
+      minPacks: tier.minPacks,
+      pricePerUnit: tier.pricePerUnit,
+      ...(tier.currency !== undefined ? { currency: tier.currency } : {}),
+    })),
   };
 }

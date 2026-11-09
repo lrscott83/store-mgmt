@@ -1,4 +1,5 @@
 using Application.Features.WebCatalog.Public;
+using Domain.Common.Enums;
 using Domain.Entities.Products;
 using FluentAssertions;
 
@@ -30,7 +31,7 @@ public class PublicCatalogProductMapperTests
     {
         var product = MakeProduct("tenant/store/product/main.jpg");
 
-        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug);
+        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug, CatalogPriceMode.Unit);
 
         var expected = $"/api/v1/public/catalog/{StoreSlug}/media/tenant/store/product/main.jpg";
         dto.ImageUrl.Should().Be(expected);
@@ -48,7 +49,7 @@ public class PublicCatalogProductMapperTests
         product.Images.Add(ProductImage.Create(product.Id, "tenant/store/product/ghost.jpg", 0, _tenantId));
         product.Images.Add(ProductImage.Create(product.Id, "tenant/store/product/second.jpg", 1, _tenantId));
 
-        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug);
+        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug, CatalogPriceMode.Unit);
 
         dto.ImageUrl.Should().BeNull();
         dto.ImageUrls.Should().BeEmpty();
@@ -60,7 +61,7 @@ public class PublicCatalogProductMapperTests
     [InlineData("   ")]
     public void ToDto_WithBlankMainImage_ShouldNotPublishAnyUrl(string? image)
     {
-        var dto = PublicCatalogProductMapper.ToDto(MakeProduct(image), StoreSlug);
+        var dto = PublicCatalogProductMapper.ToDto(MakeProduct(image), StoreSlug, CatalogPriceMode.Unit);
 
         dto.ImageUrl.Should().BeNull();
         dto.ImageUrls.Should().BeEmpty();
@@ -76,7 +77,7 @@ public class PublicCatalogProductMapperTests
         var product = MakeProduct("tenant/store/product/main.jpg");
         product.Images.Add(ProductImage.Create(product.Id, "tenant/store/product/other.jpg", 0, _tenantId));
 
-        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug);
+        var dto = PublicCatalogProductMapper.ToDto(product, StoreSlug, CatalogPriceMode.Unit);
 
         dto.ImageUrls.Should().ContainSingle()
             .Which.Should().Be($"/api/v1/public/catalog/{StoreSlug}/media/tenant/store/product/main.jpg");

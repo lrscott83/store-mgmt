@@ -22,6 +22,11 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
   })),
 }));
 
+vi.mock('~/shared/lib/diagnostics/client-log', () => ({
+  logClientError: vi.fn(),
+}));
+
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { OrderOfflineService } from '../order-offline-service';
 
 const S1 = 's1';
@@ -151,6 +156,103 @@ describe('OrderOfflineService read — revive + backfill sale snapshot (2026-10-
     expect(order.orderItems[0].conversionRateEffectiveFrom).toBeInstanceOf(Date);
     expect(order.payments?.[0].rateEffectiveFrom).toBeInstanceOf(Date);
     expect(order.payments?.[0].targetRateEffectiveFrom).toBeInstanceOf(Date);
+  });
+
+  it('returns the healed orders even when the repair cannot be persisted (R3-READ-WRITE-BACK)', () => {
+    seed([legacyOrder()]);
+    const service = new OrderOfflineService(S1);
+    // A full quota throws from `setItem`; before the fix that exception escaped the READ
+    // and the whole history became unreadable.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    try {
+      const order = service.getStorageOrders().find((o) => o.id === 'legacy-1') as Order;
+      expect(order).toBeDefined();
+      expect(order.orderItems[0].originalPrice).toBe(5);
+      expect(order.orderItems[0].conversionRate).toBe(1);
+      // The fix is only meaningful if the write was actually attempted (R3-WRITE-ATTEMPT-UNPROVED).
+      expect(setItem).toHaveBeenCalledTimes(1);
+      // ...and the failure must not disappear: it is reported as a warning (R4-QUOTA-SILENT-CATCH).
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          message: 'orders.backfill-persist-failed',
+          context: { errorName: 'QuotaExceededError' },
+        }),
+      );
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('reports an unexpected persist failure as an error (R3-ERROR-BRANCH-UNTESTED)', () => {
+    seed([legacyOrder()]);
+    const bug = new Error('boom');
+    bug.name = 'UnexpectedWriteBug';
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw bug;
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'error',
+          message: 'orders.backfill-persist-failed',
+          context: { errorName: 'UnexpectedWriteBug' },
+        }),
+      );
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('falls back to UnknownError when the thrown value has no name (R3-ERROR-BRANCH-UNTESTED)', () => {
+    seed([legacyOrder()]);
+    class PlainFailure {}
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new PlainFailure();
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(logClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'error', context: { errorName: 'UnknownError' } }),
+      );
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it('retries the repair on the next read after a failed persist (R3-RETRY-AFTER-FAILURE-UNTESTED)', () => {
+    seed([legacyOrder()]);
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+    } finally {
+      setItem.mockRestore();
+    }
+
+    // The failed write left the legacy order unhealed on disk, so a later read repairs it.
+    const service = new OrderOfflineService(S1);
+    service.getStorageOrders();
+    const stored = JSON.parse(service.getOrdersJson()) as Array<Record<string, unknown>>;
+    expect(stored[0]['saleCurrencyRateApplied']).toBe(1);
+  });
+
+  it('a second read of an already-healed store does not write again (R3-BACKFILL-IDEMPOTENCE)', () => {
+    seed([legacyOrder()]);
+    new OrderOfflineService(S1).getStorageOrders();
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    try {
+      new OrderOfflineService(S1).getStorageOrders();
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it('leaves an already-complete snapshot untouched (no overwrite)', () => {

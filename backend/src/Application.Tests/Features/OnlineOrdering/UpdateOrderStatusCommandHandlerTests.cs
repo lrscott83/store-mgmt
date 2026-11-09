@@ -26,8 +26,11 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      500: una transición inválida es un error del cliente, no del servidor.
 ///   3. El pedido se pide YA con el `storeId` de la sesión. Un id de otra tienda es un 404
 ///      indistinguible de "no existe" (criterio 7), no una mutación.
-///   4. Como `ApplicationDbContext` es `NoTracking`, el guardado exige `UpdateAsync` explícito:
-///      mutar la fila cargada y llamar a `SaveChanges` sin marcar no escribiría NADA.
+///   4. Como `ApplicationDbContext` es `NoTracking`, el guardado exige un `Update*` explícito:
+///      mutar la fila cargada y llamar a `SaveChanges` sin marcar no escribiría NADA. Y como
+///      estado, pago y repartidor son tres EJES de la MISMA fila que dos puestos tocan a la vez,
+///      el guardado marca solo las columnas de la operación (`UpdatePartialAsync`), nunca la fila
+///      entera: eso es lo que impide que "aceptar" pise un "pagado" concurrente.
 ///
 /// El handler además transporta los dos datos que la máquina exige: la razón de la cancelación y
 /// el repartidor del reparto.
@@ -58,7 +61,8 @@ public class UpdateOrderStatusCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         // T6 defaults: sin módulo 21 activo y sin atribución no se genera ninguna comisión.
         // Los tests de comisión sobreescriben estos setups.
@@ -93,7 +97,7 @@ public class UpdateOrderStatusCommandHandlerTests
     private Order OrderIn(OrderStatus status, OrderDeliveryType deliveryType = OrderDeliveryType.Delivery)
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
+            _storeId, OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         order.DeliveryType = deliveryType;
@@ -107,7 +111,7 @@ public class UpdateOrderStatusCommandHandlerTests
     /// </summary>
     private void Returns(Order? order)
         => _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
 
     #region Happy Path
@@ -223,20 +227,92 @@ public class UpdateOrderStatusCommandHandlerTests
     #region Integration / Dependencies
 
     /// <summary>
-    /// `ApplicationDbContext` es `NoTracking`: sin `UpdateAsync` la fila cargada se muta en memoria
-    /// y `SaveChanges` no escribe NADA — sin error y sin aviso. Por eso el `Update` es explícito.
+    /// `ApplicationDbContext` es `NoTracking`: sin marcar la fila, `SaveChanges` no escribe NADA —
+    /// sin error y sin aviso. Y `Preparado` solo mueve el estado: el pago y el repartidor de la
+    /// fila siguen siendo de otra acción que puede estar escribiéndolos en este mismo instante.
     /// </summary>
     [Fact]
-    public async Task Handle_WithAValidTransition_ShouldMarkTheOrderAsModifiedBeforeSaving()
+    public async Task Handle_WithAValidTransition_ShouldMarkOnlyTheStatusColumn()
     {
         Order order = OrderIn(OrderStatus.Creado);
         Returns(order);
 
-        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
+        using var cts = new CancellationTokenSource();
 
-        _orderRepository.Verify(x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Preparado)), Times.Once);
+        await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), cts.Token);
+
+        _orderRepository.Verify(
+            x => x.UpdatePartialAsync(
+                It.Is<Order>(o => o.Id == order.Id && o.Status == OrderStatus.Preparado),
+                OrderChangedField.Status,
+                It.Is<CancellationToken>(token => token == cts.Token)),
+            Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Cancelar mueve el estado Y escribe su razón. Esas dos columnas, y ninguna más: el pago y el
+    /// repartidor no los tocó esta operación.
+    ///
+    /// El conjunto EXACTO se afirma por igualdad a propósito: "contiene Status" también lo
+    /// cumpliría un guardado de la fila entera, que es justo el defecto que hay que impedir.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ToCancelado_ShouldMarkOnlyTheStatusAndTheCancellationReason()
+    {
+        Order order = OrderIn(OrderStatus.Preparado);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Cancelado, CancellationReason: Reason),
+            CancellationToken.None);
+
+        _orderRepository.Verify(
+            x => x.UpdatePartialAsync(
+                It.IsAny<Order>(),
+                OrderChangedField.Status | OrderChangedField.CancellationReason, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>Pasar a reparto mueve el estado y asigna el repartidor: esas dos columnas, y ninguna más.</summary>
+    [Fact]
+    public async Task Handle_ToTransportando_ShouldMarkOnlyTheStatusAndTheDriver()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Delivery);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Transportando, DriverId),
+            CancellationToken.None);
+
+        _orderRepository.Verify(
+            x => x.UpdatePartialAsync(
+                It.IsAny<Order>(),
+                OrderChangedField.Status | OrderChangedField.DriverId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Entregar mueve el estado y deja el pago con su constancia. `PaidAt` viaja junto a
+    /// `PaymentStatus` porque `ChangeStatus` pasa por `ChangePaymentStatus`, que sella la fecha:
+    /// marcar solo el enum dejaría el cobro sin fecha en la base, y la vista la mostraría vacía.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ToEntregado_ShouldMarkTheStatusThePaymentAndThePaidMoment()
+    {
+        Order order = OrderIn(OrderStatus.Preparado, OrderDeliveryType.Pickup);
+        Returns(order);
+
+        await Handler().Handle(
+            new UpdateOrderStatusCommand(order.Id, OrderStatus.Entregado),
+            CancellationToken.None);
+
+        _orderRepository.Verify(
+            x => x.UpdatePartialAsync(
+                It.IsAny<Order>(),
+                OrderChangedField.Status | OrderChangedField.PaymentStatus | OrderChangedField.PaidAt, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     /// <summary>
@@ -251,9 +327,9 @@ public class UpdateOrderStatusCommandHandlerTests
 
         await Handler().Handle(new UpdateOrderStatusCommand(order.Id, OrderStatus.Preparado), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _orderRepository.Verify(
-            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
+            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>Una transición que no entrega NO toca el pago.</summary>
@@ -370,7 +446,7 @@ public class UpdateOrderStatusCommandHandlerTests
 
         await act.Should().ThrowAsync<ApiException>();
         order.Status.Should().Be(OrderStatus.Creado);
-        _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -397,7 +473,7 @@ public class UpdateOrderStatusCommandHandlerTests
         Func<Task> act = () => Handler().Handle(new UpdateOrderStatusCommand(Guid.NewGuid(), OrderStatus.Preparado), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -414,7 +490,7 @@ public class UpdateOrderStatusCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

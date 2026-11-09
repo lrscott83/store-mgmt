@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats;
@@ -59,7 +59,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
 
     private void Returns(OrderAggregateStats stats)
         => _orderRepository
-            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>()))
+            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stats);
 
     /// <summary>El agregado de una tienda que no vendió nada: todo en cero, moneda por defecto.</summary>
@@ -128,7 +128,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
         await Handler().Handle(new GetOnlineOrderStatsQuery(), CancellationToken.None);
 
         _orderRepository.Verify(
-            x => x.GetStatsByStoreIdAsync(_storeId, It.IsAny<OrderStatsFilter>()),
+            x => x.GetStatsByStoreIdAsync(_storeId, It.IsAny<OrderStatsFilter>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -147,7 +147,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
         await act.Should().ThrowAsync<ApiException>()
             .Where(ex => ex.StatusCode == HttpStatusCode.BadRequest);
         _orderRepository.Verify(
-            x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>()),
+            x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -172,7 +172,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
                     && f.PaymentStatus == null
                     && f.DeliveryType == null
                     && f.From == null
-                    && f.To == null)),
+                    && f.To == null), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -183,7 +183,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetStatsByStoreIdAsync(
-                _storeId, It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Preparado)),
+                _storeId, It.Is<OrderStatsFilter>(f => f.Status == OrderStatus.Preparado), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -195,7 +195,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetStatsByStoreIdAsync(
-                _storeId, It.Is<OrderStatsFilter>(f => f.PaymentStatus == OrderPaymentStatus.Paid)),
+                _storeId, It.Is<OrderStatsFilter>(f => f.PaymentStatus == OrderPaymentStatus.Paid), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -207,7 +207,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
 
         _orderRepository.Verify(
             x => x.GetStatsByStoreIdAsync(
-                _storeId, It.Is<OrderStatsFilter>(f => f.DeliveryType == OrderDeliveryType.Delivery)),
+                _storeId, It.Is<OrderStatsFilter>(f => f.DeliveryType == OrderDeliveryType.Delivery), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -228,7 +228,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
                     && f.PaymentStatus == OrderPaymentStatus.Pending
                     && f.DeliveryType == OrderDeliveryType.Pickup
                     && f.From == new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc)
-                    && f.To == EndOfDay(2026, 10, 7))),
+                    && f.To == EndOfDay(2026, 10, 7)), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -318,8 +318,8 @@ public class GetOnlineOrderStatsQueryHandlerTests
     {
         OrderStatsFilter? captured = null;
         _orderRepository
-            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>()))
-            .Callback<Guid, OrderStatsFilter>((storeId, filter) => captured = filter)
+            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, OrderStatsFilter, CancellationToken>((storeId, filter, _) => captured = filter)
             .ReturnsAsync(Zero());
 
         var result = await Handler().Handle(
@@ -617,7 +617,7 @@ public class GetOnlineOrderStatsQueryHandlerTests
     {
         Order order = Domain.Entities.Orders.Order.Create(
             storeId ?? _storeId,
-            OrderType.WhatsApp,
+            OrderType.Normal,
             string.Empty,
             total,
             1,
@@ -639,8 +639,8 @@ public class GetOnlineOrderStatsQueryHandlerTests
     {
         OrderStatsFilter? captured = null;
         _orderRepository
-            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>()))
-            .Callback<Guid, OrderStatsFilter>((storeId, filter) => captured = filter)
+            .Setup(x => x.GetStatsByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderStatsFilter>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, OrderStatsFilter, CancellationToken>((storeId, filter, _) => captured = filter)
             .ReturnsAsync(Zero());
 
         await Handler().Handle(query, CancellationToken.None);

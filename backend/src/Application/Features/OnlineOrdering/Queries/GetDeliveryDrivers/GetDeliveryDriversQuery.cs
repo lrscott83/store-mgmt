@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -45,9 +46,7 @@ namespace Application.Features.OnlineOrdering.Queries.GetDeliveryDrivers
         public async Task<ResponseResult<IEnumerable<DeliveryDriverDto>>> Handle(
             GetDeliveryDriversQuery query, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             // El filtro por tienda va EN LA CONSULTA, no en un `Where` de memoria: filtrar después
             // significaría haber leído ya las filas de otras tiendas. `ActiveOnly` se traduce a
@@ -55,20 +54,9 @@ namespace Application.Features.OnlineOrdering.Queries.GetDeliveryDrivers
             IReadOnlyCollection<DeliveryDriver> drivers =
                 await _deliveryDriverRepository.GetByStoreIdAsync(storeId, includeInactive: query.ActiveOnly);
 
-            return ResponseResult.Success<IEnumerable<DeliveryDriverDto>>(drivers.Select(ToDto).ToList());
+            // El mapeo es el MISMO que usan el alta y la edición (`DeliveryDriverDtoExtensions`):
+            // una respuesta de la lista y una del PATCH no pueden describir la misma fila distinto.
+            return ResponseResult.Success<IEnumerable<DeliveryDriverDto>>(drivers.Select(driver => driver.ToDto()).ToList());
         }
-
-        /// <summary>
-        /// Mapeo explícito (no un spread) para que un campo nuevo de la entidad no aparezca en el
-        /// DTO por accidente: `TenantId` no debe salir de aquí.
-        /// </summary>
-        private static DeliveryDriverDto ToDto(DeliveryDriver driver) => new()
-        {
-            Id = driver.Id,
-            StoreId = driver.StoreId,
-            Name = driver.Name,
-            Phone = driver.Phone,
-            IsActive = driver.IsActive,
-        };
     }
 }

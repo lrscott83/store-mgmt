@@ -70,12 +70,15 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
                     _localizer["CatalogImagesLimitReached", ProductEntityLimits.MaxImagesPerProduct],
                     HttpStatusCode.BadRequest);
 
-            CatalogImageUploadRules.EnsureValid(request.FileName, request.ContentType, request.Length, _localizer);
+            // Formato (extensión + cabecera real) y tamaño ANTES de subir nada: un archivo inválido
+            // no puede dejar un archivo huérfano en disco. Devuelve el stream ya rebobinado.
+            Stream content = CatalogImageUploadRules.EnsureValid(
+                request.Content, request.FileName, request.ContentType, request.Length, _localizer);
 
             Guid tenantId = _httpContextService.TenantId.ToGuid();
 
             string key = await _catalogImageStorage.SaveAsync(
-                new CatalogImageUpload(request.Content, request.FileName, request.ContentType, request.Length),
+                new CatalogImageUpload(content, request.FileName, request.ContentType, request.Length),
                 tenantId,
                 storeId,
                 request.ProductId,

@@ -13,10 +13,10 @@ using System.Net;
 namespace Application.Features.Management.Users.Queries.GetStoreUsers
 {
     public sealed record GetStoreUsersQuery(bool IncludeInactive)
-        : IQuery<IEnumerable<StoreUserDto>>
+        : IQuery<List<StoreUserDto>>
     { }
 
-    public class GetStoreUsersQueryHandler : IQueryHandler<GetStoreUsersQuery, IEnumerable<StoreUserDto>>
+    public class GetStoreUsersQueryHandler : IQueryHandler<GetStoreUsersQuery, List<StoreUserDto>>
     {
         private readonly IHttpContextService _httpContextService;
         private readonly IStoreUserRepository _storeUserRepository;
@@ -32,7 +32,7 @@ namespace Application.Features.Management.Users.Queries.GetStoreUsers
             _localizer = localizer;
         }
 
-        public async Task<ResponseResult<IEnumerable<StoreUserDto>>> Handle(GetStoreUsersQuery query, CancellationToken cancellationToken)
+        public async Task<ResponseResult<List<StoreUserDto>>> Handle(GetStoreUsersQuery query, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
@@ -40,7 +40,7 @@ namespace Application.Features.Management.Users.Queries.GetStoreUsers
             IEnumerable<StoreUser> storeUsers = _httpContextService.IsSuperAdmin
                 ? await _storeUserRepository.GetStoreUsersIgnoreQueryFiltersAsync(query.IncludeInactive)
                 : await _storeUserRepository.GetStoreUsersAsync(query.IncludeInactive);
-            IEnumerable<StoreUserDto> storeUserDtos = _mapper.Map<IEnumerable<StoreUserDto>>(storeUsers).ToList();
+            List<StoreUserDto> storeUserDtos = _mapper.Map<IEnumerable<StoreUserDto>>(storeUsers).ToList();
             return ResponseResult.Success(storeUserDtos);
         }
     }

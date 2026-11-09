@@ -44,15 +44,39 @@ namespace Domain.UnitTests.Entities
             order.DeliveryType.Should().Be(OrderDeliveryType.Pickup);
         }
 
+        /// <summary>
+        /// El pedido nace con su TIPO REAL, no con un tipo de canal: la vía online no tiene valor
+        /// propio en el enum (el canal es <c>IsOfflineOrder</c>), así que sin tipo explícito se
+        /// guarda <see cref="OrderType.Normal"/> y con tipo explícito se respeta el que decide el
+        /// handler (Mayorista cuando el catálogo publica precios mayoristas).
+        /// </summary>
         [Fact]
-        public void CreateOnline_ShouldBeAWhatsAppOrder()
+        public void CreateOnline_ShouldStoreTheRealOrderType()
         {
             Order.CreateOnline(
                 Guid.NewGuid(), Guid.NewGuid(), "AB12CD", OrderDeliveryType.Pickup,
                 "Ana", "+5350000000", 150m, Currency.CUP,
                 [new OrderLine(Guid.NewGuid(), "Azúcar", 3, 50m, Currency.CUP)],
                 null, null, null)
-                .OrderType.Should().Be(OrderType.WhatsApp);
+                .OrderType.Should().Be(OrderType.Normal);
+
+            Order.CreateOnline(
+                Guid.NewGuid(), Guid.NewGuid(), "AB12CE", OrderDeliveryType.Pickup,
+                "Ana", "+5350000001", 150m, Currency.CUP,
+                [new OrderLine(Guid.NewGuid(), "Azúcar", 3, 50m, Currency.CUP)],
+                orderType: OrderType.Mayorista)
+                .OrderType.Should().Be(OrderType.Mayorista);
+        }
+
+        /// <summary>
+        /// El canal NO es un tipo: un pedido creado por esta vía es del servidor, así que
+        /// <c>IsOfflineOrder</c> queda en <c>false</c> sin que nadie lo escriba. Es lo que usan las
+        /// métricas de conversión del catálogo.
+        /// </summary>
+        [Fact]
+        public void CreateOnline_ShouldStayAnOnlineOrder()
+        {
+            CreateOnline().IsOfflineOrder.Should().BeFalse();
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -30,11 +31,11 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
     /// </summary>
     public sealed class UpdateDeliveryDriverCommand : ICommand<DeliveryDriverDto>
     {
-        /// <summary>Límite de la COLUMNA `Name` (ver <c>DeliveryDriverEntityTypeConfiguration</c>).</summary>
-        public const int NameMaxLength = 200;
+        /// <summary>Límite de la COLUMNA `Name`, compartido con el alta (<see cref="DeliveryDriverLimits"/>).</summary>
+        public const int NameMaxLength = DeliveryDriverLimits.NameMaxLength;
 
-        /// <summary>Límite de la COLUMNA `Phone`.</summary>
-        public const int PhoneMaxLength = 32;
+        /// <summary>Límite de la COLUMNA `Phone`, compartido con el alta.</summary>
+        public const int PhoneMaxLength = DeliveryDriverLimits.PhoneMaxLength;
 
         /// <summary>Repartidor a editar. Viene de la ruta; el handler lo carga y lo filtra por tienda.</summary>
         public Guid Id { get; set; }
@@ -48,8 +49,13 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
         /// <summary>
         /// Interruptor de alta. `false` = baja lógica: deja de salir en las listas, no se borra.
         /// Los pedidos ya asignados NO se reasignan aquí (es una decisión de F5, y manual).
+        ///
+        /// NULABLE A PROPÓSITO (P0-3): `null` = el cuerpo OMITIÓ el campo, y omitir significa "no
+        /// cambiar", no "apagar". Con un `bool` no nulable el binding convertía la omisión en
+        /// `false` y el handler la escribía: un PATCH que solo corregía el nombre daba de baja al
+        /// repartidor sin que nadie lo hubiera pedido. Mandar `true` o `false` sigue mandando.
         /// </summary>
-        public bool IsActive { get; set; }
+        public bool? IsActive { get; set; }
     }
 
     public class UpdateDeliveryDriverCommandHandler : ICommandHandler<UpdateDeliveryDriverCommand, DeliveryDriverDto>
@@ -74,9 +80,7 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
         public async Task<ResponseResult<DeliveryDriverDto>> Handle(
             UpdateDeliveryDriverCommand request, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             DeliveryDriver? driver = await _deliveryDriverRepository.GetByIdAsync(request.Id);
 
@@ -86,25 +90,52 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
                 throw new ApiException(_localizer["DeliveryDriverNotFound"], HttpStatusCode.NotFound);
 
             // La fila conserva SU `Id` (no se toca) y SU tienda/tenant: el cuerpo no puede
-            // cambiarlos. `UpdateAsync` la marca explícitamente, que es lo que hace falta con un
-            // contexto `NoTracking` — mutar y guardar sin marcar escribiría NADA, sin error.
+            // cambiarlos.
             driver.Name = request.Name.Trim();
-            driver.Phone = request.Phone.Trim();
-            driver.IsActive = request.IsActive;
 
-            await _deliveryDriverRepository.UpdateAsync(driver);
+            // Escritura PARCIAL: el teléfono solo viaja en el UPDATE si CAMBIA. Escribirlo siempre
+            // haría que un PATCH del nombre reenviara el teléfono que otro PATCH concurrente acaba
+            // de corregir — exactamente lo que `UpdatePartialAsync` evita.
+            DeliveryDriverChangedField changedFields = DeliveryDriverChangedField.Name;
+
+            // El teléfono se compara RECORTADO contra la fila guardada, también recortada: el
+            // cliente lo lee de la respuesta y lo devuelve tal cual, y un espacio heredado alrededor
+            // no es un cambio.
+            string phone = request.Phone.Trim();
+            string storedPhone = (driver.Phone ?? string.Empty).Trim();
+
+            if (!string.Equals(phone, storedPhone, StringComparison.Ordinal))
+            {
+                // CAMBIA el teléfono: aquí sí mandan las reglas estrictas (solo caracteres
+                // marcables, al menos seis dígitos). El validador de la edición no puede aplicarlas
+                // —no ve la fila guardada—, así que vive aquí. Se lanza el MISMO `ValidationException`
+                // con los MISMOS mensajes que el validador lanzaba, para que el cliente reciba el
+                // mismo 400 y el mismo `errors[]`.
+                var strictPhone = new DeliveryDriverPhoneStrictValidator(_localizer).Validate(request);
+                if (!strictPhone.IsValid)
+                    throw new ValidationException(strictPhone.Errors);
+
+                driver.Phone = phone;
+                changedFields |= DeliveryDriverChangedField.Phone;
+            }
+
+            // Omitir el interruptor NO lo apaga (P0-3): el cuerpo no lo pidió, así que la fila
+            // conserva su estado. Solo un `true`/`false` explícito escribe el valor — y solo ese
+            // valor entra en el conjunto de columnas a persistir.
+            if (request.IsActive.HasValue)
+            {
+                driver.IsActive = request.IsActive.Value;
+                changedFields |= DeliveryDriverChangedField.IsActive;
+            }
+
+            // Escritura PARCIAL: la fila entera NO viaja en el UPDATE. Con `EntityState.Modified` dos
+            // PATCH concurrentes se pisarían, porque el último escribiría los valores que leyó antes.
+            // El contexto es `NoTracking`, así que la fila cargada llega `Detached`, que es lo que
+            // esta puerta exige.
+            await _deliveryDriverRepository.UpdatePartialAsync(driver, changedFields, cancellationToken);
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(ToDto(driver));
+            return ResponseResult.Success(driver.ToDto());
         }
-
-        private static DeliveryDriverDto ToDto(DeliveryDriver driver) => new()
-        {
-            Id = driver.Id,
-            StoreId = driver.StoreId,
-            Name = driver.Name,
-            Phone = driver.Phone,
-            IsActive = driver.IsActive,
-        };
     }
 }

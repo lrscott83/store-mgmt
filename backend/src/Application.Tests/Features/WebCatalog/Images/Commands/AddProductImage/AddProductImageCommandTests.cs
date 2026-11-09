@@ -24,6 +24,9 @@ public class AddProductImageCommandTests
 {
     private const string UploadedKey = "tenant/store/product/uploaded.jpg";
 
+    /// <summary>Cabecera JPEG real: el handler mira los bytes, no la extensión.</summary>
+    private static readonly byte[] JpegSignature = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46 };
+
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IProductRepository> _productRepository = new();
@@ -75,10 +78,18 @@ public class AddProductImageCommandTests
 
     private AddProductImageCommand Command() => new(
         _product.Id,
-        new MemoryStream(new byte[1024]),
+        ValidContent(),
         "camisa.jpg",
         "image/jpeg",
         1024);
+
+    /// <summary>Archivo válido: 1 KB con cabecera JPEG de verdad — el handler mira los bytes.</summary>
+    private static Stream ValidContent()
+    {
+        byte[] bytes = new byte[1024];
+        JpegSignature.CopyTo(bytes, 0);
+        return new MemoryStream(bytes);
+    }
 
     [Fact]
     public async Task Handle_WhenItIsTheFirstImage_ShouldSetTheMainImageAndKeepTheGalleryRow()

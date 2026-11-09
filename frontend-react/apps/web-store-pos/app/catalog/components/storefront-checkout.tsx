@@ -5,6 +5,12 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { Modal } from '~/shared/components/ui/modal';
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import type { StorefrontCartLine } from '~/catalog/lib/storefront-cart-store';
+import {
+  isWholesaleLine,
+  linePacks,
+  lineTotal,
+} from '~/catalog/lib/storefront-cart-store';
+import { wholesaleUnitPluralOf } from '~/catalog/lib/catalog-wholesale';
 import { buildWhatsAppOrderLink } from '~/catalog/lib/whatsapp-order-link';
 import { catalogHttpService } from '~/sales/lib/services/catalog-http-service';
 import type {
@@ -198,6 +204,8 @@ export function StorefrontCheckout({
       deliveryType,
       ...(deliverySelected ? { deliveryAddress: deliveryAddress.trim() } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      // `quantity` is always UNITS, also on a wholesale line (`packs × packSize`): the server is
+      // the one that turns units back into packs and resolves the tier price (S5).
       items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
     };
 
@@ -296,11 +304,18 @@ export function StorefrontCheckout({
                 name: line.name,
                 quantity: line.quantity,
                 unitPrice: line.price,
+                // Wholesale snapshot: the persisted packs and the configured unit, so the message
+                // says "12 cajas" instead of "288". Both are nullable on the wire and a per-unit
+                // order sends them empty, which is what makes the summary keep its old wording.
+                packs: line.packs ?? null,
+                unitLabel: line.unitLabel ?? null,
               }))
             : lines.map((line) => ({
                 name: line.name,
                 quantity: line.quantity,
                 unitPrice: line.unitPrice,
+                packs: isWholesaleLine(line) ? (line.packs ?? null) : null,
+                unitLabel: isWholesaleLine(line) ? (line.unitLabel ?? null) : null,
               })),
           subtotal: created ? created.subtotal : subtotal,
           total: created ? created.total : subtotal,
@@ -365,7 +380,9 @@ export function StorefrontCheckout({
     else onSentWithoutOrder?.();
   }
 
-  const subtotal = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+  // Line amounts come from `lineTotal`, the same helper the cart and the server-side rule use:
+  // wholesale is `packs × packSize × unitPrice`, per-unit stays `unitPrice × quantity`.
+  const subtotal = lines.reduce((sum, line) => sum + lineTotal(line), 0);
   const currency = lines[0]?.currency;
 
   return (
@@ -387,11 +404,16 @@ export function StorefrontCheckout({
               {lines.map((line) => (
                 <li key={line.productId} className="flex justify-between gap-2 text-sm text-text">
                   <span className="min-w-0 break-words">
-                    {line.name} × {line.quantity}
+                    {/* Wholesale speaks in packs, like the cart and the WhatsApp summary; the
+                        amount beside it is the same line total either way. */}
+                    {line.name} ×{' '}
+                    {isWholesaleLine(line)
+                      ? `${linePacks(line)} ${wholesaleUnitPluralOf(line.unitLabel)}`
+                      : line.quantity}
                   </span>
                   <span className="shrink-0 text-text-muted">
                     {formatMoneyWithCurrency(
-                      line.unitPrice * line.quantity,
+                      lineTotal(line),
                       currencyFromCode(line.currency),
                     )}
                   </span>

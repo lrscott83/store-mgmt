@@ -44,7 +44,7 @@ public class SalesManagerPortalQueryTests
         _store = Store.Create("Tienda del Owner", _ownerId, true, _tenantId);
         _store.CatalogSlug = "tienda-owner";
 
-        _order = Order.Create(_store.Id, OrderType.WhatsApp, "Pedido gestor", 100m, 2, _orderDate, _tenantId);
+        _order = Order.Create(_store.Id, OrderType.Normal, "Pedido gestor", 100m, 2, _orderDate, _tenantId);
         _order.Code = "PED-001";
         _order.Status = OrderStatus.Entregado;
         _order.Currency = Currency.CUP;
@@ -101,7 +101,7 @@ public class SalesManagerPortalQueryTests
     [Fact]
     public async Task Orders_are_sorted_newest_first()
     {
-        Order older = Order.Create(_store.Id, OrderType.WhatsApp, "Viejo", 10m, 1, _orderDate.AddDays(-1), _tenantId);
+        Order older = Order.Create(_store.Id, OrderType.Normal, "Viejo", 10m, 1, _orderDate.AddDays(-1), _tenantId);
         older.Code = "PED-000";
         older.Store = _store;
         OrderSalesManager a1 = OrderSalesManager.Create(older.Id, _manager.Id, _ownerId, _store.Id, _tenantId);
@@ -200,7 +200,7 @@ public class SalesManagerPortalQueryTests
     {
         var otherManager = SalesManager.Create(Guid.NewGuid(), _ownerId, _tenantId);
         Order otherOrder = Order.Create(
-            _store.Id, OrderType.WhatsApp, "Otro", 10m, 1, _orderDate.AddDays(-1), _tenantId);
+            _store.Id, OrderType.Normal, "Otro", 10m, 1, _orderDate.AddDays(-1), _tenantId);
         otherOrder.Code = "PED-999";
         otherOrder.Store = _store;
         OrderSalesManager otherAttribution = OrderSalesManager.Create(

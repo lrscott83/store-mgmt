@@ -17,6 +17,7 @@ namespace Application.Mappings.Management
         {
             CreateMap<StoreUser, StoreUserDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.UserId))
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Store.Name))
                 .ForMember(dest => dest.Login, opt => opt.MapFrom(src => src.User.Login))
                 .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))

@@ -1,3 +1,4 @@
+using Application.Common;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -9,7 +10,14 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
     ///
     ///   * `Id` no puede venir vacío. Sin id no hay fila que actualizar, y el handler lo cargaría
     ///     para acabar en un 404 — más claro rechazarlo en el validador.
-    ///   * Nombre y teléfono: obligatorios y dentro de los límites de sus columnas.
+    ///   * Nombre y teléfono: obligatorios, sin caracteres de control y dentro de los límites de sus
+    ///     columnas medidos sobre el valor recortado.
+    ///   * El teléfono usa las reglas PERMISIVAS a propósito (R1-2). Este validador corre en CADA
+    ///     petición, incluidas las que solo cambian el nombre: exigir aquí el formato marcable y el
+    ///     mínimo de dígitos rechazaba una fila heredada —letras, `#`, `/`, menos de seis dígitos—
+    ///     por un campo que el cliente NO había tocado. Las reglas estrictas siguen mandando cuando
+    ///     el teléfono cambia de verdad, y las aplica el handler
+    ///     (`DeliveryDriverPhoneStrictValidator`) con el MISMO 400 y los MISMOS mensajes.
     ///   * `IsActive` NO se valida: `false` es una baja legítima, no un dato inválido (criterio 3).
     ///
     /// Lo que NO valida: que el repartidor exista, sea de esta tienda o esté activo ya. Eso lo
@@ -28,15 +36,9 @@ namespace Application.Features.OnlineOrdering.Commands.UpdateDeliveryDriver
             RuleFor(x => x.Id)
                 .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"]);
 
-            RuleFor(x => x.Name)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(UpdateDeliveryDriverCommand.NameMaxLength)
-                .WithMessage(localizer["DeliveryDriverNameTooLong", "{PropertyName}", UpdateDeliveryDriverCommand.NameMaxLength]);
+            RuleFor(x => x.Name).DeliveryDriverName(localizer);
 
-            RuleFor(x => x.Phone)
-                .NotEmpty().WithMessage(localizer["IsRequired", "{PropertyName}"])
-                .MaximumLength(UpdateDeliveryDriverCommand.PhoneMaxLength)
-                .WithMessage(localizer["DeliveryDriverPhoneTooLong", "{PropertyName}", UpdateDeliveryDriverCommand.PhoneMaxLength]);
+            RuleFor(x => x.Phone).DeliveryDriverPhonePermissive(localizer);
         }
     }
 }

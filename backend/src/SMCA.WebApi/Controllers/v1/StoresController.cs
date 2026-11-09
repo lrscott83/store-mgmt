@@ -46,7 +46,7 @@ namespace SMCA.WebApi.Controllers.v1
         /// Update My Store Id (only available for Super Admins and Admins)
         /// </summary>
         [HttpPut]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -200,6 +200,9 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpPut("{storeId}/payment-date")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> SetStorePaymentDateAsync(Guid storeId, [FromBody] SetStorePaymentDateCommand command)
         {
             return Ok(await Sender.Send(new SetStorePaymentDateCommand(storeId, command.PaymentStartDate)));
@@ -258,6 +261,9 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpPost("{storeId}/payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> RegisterStorePaymentAsync(
             Guid storeId,
             [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RegisterStorePaymentCommand? command)
@@ -341,6 +347,7 @@ namespace SMCA.WebApi.Controllers.v1
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogTemplateDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> UpdateStoreCatalogTemplateAsync(
             Guid storeId, [FromBody] UpdateStoreCatalogTemplateCommand command)
@@ -356,6 +363,7 @@ namespace SMCA.WebApi.Controllers.v1
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogSlugDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> UpdateStoreCatalogSlugAsync(
@@ -369,6 +377,8 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpGet("{storeId}/catalog-template")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogTemplateDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreCatalogTemplateAsync(Guid storeId)
             => Ok(await Sender.Send(new GetStoreCatalogTemplateQuery(storeId)));
@@ -381,6 +391,7 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpGet("catalog-stats")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<CatalogStatsOverviewDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetCatalogStatsOverviewAsync(
             [FromQuery] int days = GetCatalogStatsOverviewQuery.DefaultDays)
@@ -394,6 +405,7 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpGet("{storeId}/catalog-stats")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<CatalogStatsDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetCatalogStatsAsync(Guid storeId,
             [FromQuery] int days = GetCatalogStatsQuery.DefaultDays)
@@ -402,12 +414,18 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
         [ProducesResponseType(typeof(ResponseResult<IEnumerable<StoreToCollectDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoresToCollectAsync()
             => Ok(await Sender.Send(new GetStoresToCollectQuery()));
 
         [HttpGet("reseller-commissions")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
         [ProducesResponseType(typeof(ResponseResult<IEnumerable<ReSellerCommissionDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetReSellerCommissionsAsync()
             => Ok(await Sender.Send(new GetReSellerCommissionsQuery()));
     }

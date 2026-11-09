@@ -32,15 +32,18 @@ namespace Application.Features.WebCatalog.Showcase.Queries.GetStoreCatalogImages
         : IQueryHandler<GetStoreCatalogImagesQuery, StoreCatalogImagesDto>
     {
         private readonly IHttpContextService _httpContextService;
+        private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogImageRepository _imageRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetStoreCatalogImagesQueryHandler(
             IHttpContextService httpContextService,
+            IStoreRepository storeRepository,
             IStoreCatalogImageRepository imageRepository,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
+            _storeRepository = storeRepository;
             _imageRepository = imageRepository;
             _localizer = localizer;
         }
@@ -51,6 +54,16 @@ namespace Application.Features.WebCatalog.Showcase.Queries.GetStoreCatalogImages
             Guid storeId = _httpContextService.StoreId.ToGuid();
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+
+            // "Sin imágenes" y "sin tienda" son dos cosas distintas y solo la segunda es un error.
+            // Una tienda recién sincronizada sin showcase tiene que seguir leyendo las dos listas
+            // vacías (decisión documentada arriba); una tienda que NO EXISTE merece 404.
+            //
+            // Se ignora el filtro por tenant a propósito: `storeId` es la decisión de autorización
+            // (ruta bajo `AdminStoreScope`+SuperAdmin, o claim del dueño) y el filtro global aplicaría
+            // el tenant del LLAMADOR, escondiendo la tienda que la ruta acaba de apuntar.
+            _ = await _storeRepository.GetStoreByIdIgnoreQueryFiltersAsync(storeId)
+                ?? throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
 
             // Los dos conjuntos de una sola lectura: quien publica y quien gestiona necesitan ambos, y
             // partirlo en dos métodos duplicaría el filtro por tienda y el bypass público.

@@ -93,6 +93,7 @@ namespace Infrastructure
             services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductImageRepository, ProductImageRepository>();
+            services.AddScoped<IProductWholesaleTierRepository, ProductWholesaleTierRepository>();
             services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();

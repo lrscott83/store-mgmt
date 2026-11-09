@@ -92,7 +92,7 @@ public class UpdateOrderStatusCommissionTests
     private void Setup(Order order, bool moduleActive, OrderSalesManager? attribution)
     {
         _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(_storeId, order.Id))
+            .Setup(x => x.GetByIdWithItemsAsync(_storeId, order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
         _storeModuleRepository
             .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))

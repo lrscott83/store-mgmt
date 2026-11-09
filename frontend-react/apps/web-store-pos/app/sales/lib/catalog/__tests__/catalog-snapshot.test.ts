@@ -75,6 +75,12 @@ describe('buildCatalogSnapshot — catálogo local del POS', () => {
         isActive: true,
         businessId: 'BIZ',
         discountFromInventory: false,
+        // Un producto sin config mayorista viaja igual, con la config vacía explícita: el
+        // servidor reemplaza el conjunto de escalones, así que "ausente" no puede significar
+        // "no los toques".
+        wholesaleEnabled: false,
+        wholesalePackSize: 0,
+        wholesaleTiers: [],
       },
     ]);
   });
@@ -134,6 +140,41 @@ describe('buildCatalogSnapshot — catálogo local del POS', () => {
     productRepository.addProduct(categoryId, 'Camisa', 100, '', 1, true, true, true);
 
     expect(buildCatalogSnapshot(STORE_ID).products[0]).not.toHaveProperty('images');
+  });
+
+  it('SNAP-7: la config mayorista viaja completa, con su unidad y sus escalones', () => {
+    const { categoryRepository, productRepository } = repositories();
+    const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+    productRepository.addProduct(
+      categoryId,
+      'Cerveza',
+      700,
+      '',
+      1,
+      true,
+      true,
+      true,
+      undefined,
+      {
+        packSize: 24,
+        unitLabel: 'caja',
+        tiers: [
+          { minPacks: 5, pricePerUnit: 660 },
+          { minPacks: 1, pricePerUnit: 680 },
+        ],
+      },
+    );
+
+    const [product] = buildCatalogSnapshot(STORE_ID).products;
+
+    expect(product.wholesaleEnabled).toBe(true);
+    expect(product.wholesalePackSize).toBe(24);
+    expect(product.wholesaleUnitLabel).toBe('caja');
+    // El orden del dispositivo se respeta tal cual: el servidor ordena al publicar, no aquí.
+    // `currency` puede venir relleno por el repositorio (la del producto) y entonces viaja.
+    expect(product.wholesaleTiers).toHaveLength(2);
+    expect(product.wholesaleTiers?.[0]).toEqual(expect.objectContaining({ minPacks: 5, pricePerUnit: 660 }));
+    expect(product.wholesaleTiers?.[1]).toEqual(expect.objectContaining({ minPacks: 1, pricePerUnit: 680 }));
   });
 
   it('SNAP-6: lee SOLO la tienda pedida (catálogos por dispositivo no se mezclan)', () => {

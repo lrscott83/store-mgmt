@@ -74,7 +74,9 @@ namespace Infrastructure.Persistence.Repositories
         /// (criterio 7), y que no dependa de ningún otro filtro significa que ni un `skip`/`take`
         /// descuidado ni un filtro mal formado pueden dejar ver un pedido de otra tienda.
         /// </summary>
-        public async Task<PagedOrders> GetPagedByStoreIdAsync(Guid storeId, OrderListFilter filter, int skip, int take)
+        public async Task<PagedOrders> GetPagedByStoreIdAsync(
+            Guid storeId, OrderListFilter filter, int skip, int take,
+            CancellationToken cancellationToken = default)
         {
             IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
 
@@ -116,7 +118,7 @@ namespace Infrastructure.Persistence.Repositories
             // El `Include` del repartidor va AQUÍ y no en la consulta de arriba a propósito: cargarlo
             // también en el `Count` añadiría su `LEFT JOIN` a la consulta que más filas cuenta sin
             // usar ninguna columna suya.
-            int total = await query.CountAsync();
+            int total = await query.CountAsync(cancellationToken);
 
             // El repartidor se carga para el LISTADO porque el DTO lleva su nombre, y porque el
             // contexto es `NoTracking` por omisión (`ApplicationDbContext`) sin ningún `AutoInclude`
@@ -129,7 +131,7 @@ namespace Infrastructure.Persistence.Repositories
                 .ThenByDescending(o => o.Id)
                 .Skip(skip)
                 .Take(take)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return new PagedOrders(items, total);
         }
@@ -140,29 +142,46 @@ namespace Infrastructure.Persistence.Repositories
         /// una ventana en la que el pedido ajeno ya está cargado, y "lo borro si no es mío" es
         /// exactamente el patrón que produce una fuga entre tiendas.
         /// </summary>
-        public async Task<Order?> GetByIdWithItemsAsync(Guid storeId, Guid orderId)
+        public async Task<Order?> GetByIdWithItemsAsync(
+            Guid storeId, Guid orderId, CancellationToken cancellationToken = default)
             => await _orders
                 .Where(o => o.StoreId == storeId && o.Id == orderId)
                 .Include(o => o.OrderItems)
                 .Include(o => o.Driver)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de una tienda en un rango. Es el NUMERADOR de la
-        /// conversión del catálogo (pedidos / visitas): no cuenta ventas del POS ni pedidos de otro
-        /// tipo. `IgnoreQueryFilters` porque el panel es SuperAdmin y el aislamiento lo da el
-        /// `storeId`.
+        /// La FILA del pedido, sin `Include`s (ver la nota del contrato): los `PATCH` de pago y de
+        /// repartidor solo mutan columnas suyas, así que traer líneas y repartidor sería dos `JOIN`
+        /// por petición sobre la tabla que más crece sin que nada la acote, para tirar el resultado.
+        ///
+        /// El `storeId` va en el MISMO predicado que el id, igual que en
+        /// <see cref="GetByIdWithItemsAsync"/>: un pedido de otra tienda es null y no un "lo cargué
+        /// y luego lo descarté".
+        /// </summary>
+        public async Task<Order?> GetByIdAsync(
+            Guid storeId, Guid orderId, CancellationToken cancellationToken = default)
+            => await _orders
+                .Where(o => o.StoreId == storeId && o.Id == orderId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        /// <summary>
+        /// Pedidos ONLINE de una tienda en un rango (<c>!IsOfflineOrder</c>). Es el NUMERADOR de la
+        /// conversión del catálogo (pedidos / visitas): no cuenta las ventas del POS. El canal es
+        /// <c>IsOfflineOrder</c> y no el tipo, porque el tipo dice QUÉ venta es (Normal/Mayorista) y
+        /// los dos pueden llegar por el catálogo. `IgnoreQueryFilters` porque el panel es SuperAdmin
+        /// y el aislamiento lo da el `storeId`.
         /// </summary>
         public async Task<int> CountOnlineOrdersAsync(Guid storeId, DateTime fromUtc, DateTime toUtc)
             => await _orders
                 .IgnoreQueryFilters()
                 .CountAsync(o => o.StoreId == storeId
-                    && o.OrderType == OrderType.WhatsApp
+                    && !o.IsOfflineOrder
                     && o.Date >= fromUtc
                     && o.Date <= toUtc);
 
         /// <summary>
-        /// Pedidos ONLINE (OrderType.WhatsApp) de TODAS las tiendas en un rango: el numerador de la
+        /// Pedidos ONLINE (!IsOfflineOrder) de TODAS las tiendas en un rango: el numerador de la
         /// conversión del panel general. Sin filtro por tienda. El filtro global por tenant queda
         /// ACTIVO: el endpoint es SuperAdmin y lo deja pasar, así que desactivar todos los filtros
         /// con `IgnoreQueryFilters` sería más de lo que hace falta.
@@ -170,7 +189,7 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<int> CountOnlineOrdersAsync(DateTime fromUtc, DateTime toUtc,
             CancellationToken cancellationToken = default)
             => await _orders
-                .CountAsync(o => o.OrderType == OrderType.WhatsApp
+                .CountAsync(o => !o.IsOfflineOrder
                     && o.Date >= fromUtc
                     && o.Date <= toUtc, cancellationToken);
 
@@ -208,7 +227,8 @@ namespace Infrastructure.Persistence.Repositories
         /// RECIENTE del rango, con desempate por id para que dos pedidos del mismo instante no
         /// dejen la moneda al azar. Sin ninguno, sale el default del dominio, <see cref="Currency.CUP"/>.
         /// </summary>
-        public async Task<OrderAggregateStats> GetStatsByStoreIdAsync(Guid storeId, OrderStatsFilter filter)
+        public async Task<OrderAggregateStats> GetStatsByStoreIdAsync(
+            Guid storeId, OrderStatsFilter filter, CancellationToken cancellationToken = default)
         {
             IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
 
@@ -252,7 +272,7 @@ namespace Infrastructure.Persistence.Repositories
                     PendingAmount = g.Sum(o => o.Status != OrderStatus.Cancelado
                         && o.PaymentStatus == OrderPaymentStatus.Pending ? o.Total : 0m),
                 })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             // Rango sin pedidos: no hay grupo, así que no hay fila. Se devuelve el agregado vacío
             // con la moneda por defecto en vez de un `null` que el handler tendría que distinguir
@@ -271,7 +291,7 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderByDescending(o => o.Date)
                 .ThenByDescending(o => o.Id)
                 .Select(o => (Currency?)o.Currency)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             // Los dos desgloses CUENTAN cancelados: son el único sitio donde se ven, y es lo que
             // explica por qué `OrdersCount` no cuadra con `NonCancelledCount`. Se traen solo los
@@ -280,12 +300,12 @@ namespace Infrastructure.Persistence.Repositories
             var statusRows = await query
                 .GroupBy(o => o.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             var deliveryRows = await query
                 .GroupBy(o => o.DeliveryType)
                 .Select(g => new { DeliveryType = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return new OrderAggregateStats
             {
@@ -300,6 +320,92 @@ namespace Infrastructure.Persistence.Repositories
                 ByStatus = statusRows.ToDictionary(row => row.Status, row => row.Count),
                 ByDeliveryType = deliveryRows.ToDictionary(row => row.DeliveryType, row => row.Count),
             };
+        }
+
+        /// <summary>
+        /// Actualización PARCIAL por columnas: el pedido es el MISMO documento para tres puestos
+        /// (recepción mueve el estado, caja marca el pago, reparto asigna el repartidor), así que
+        /// guardar la fila entera desde una acción reescribe lo que la otra leyó antes de su
+        /// cambio. Marcar SOLO lo que la operación tocó es lo que impide que la última en guardar
+        /// pise a la primera.
+        ///
+        /// `EntityState.Unchanged` + `IsModified` por columna NO es opcional:
+        /// `ApplicationDbContext` es NoTracking, así que una entidad cargada y mutada por el
+        /// handler sigue en `Detached` y `SaveChanges` no escribiría NADA — sin excepción y sin
+        /// aviso. Es el mismo patrón aprobado en `StoreCatalogSettingsRepository.UpsertAsync`.
+        ///
+        /// No hay consulta ni `SaveChanges` aquí: el handler ya leyó la fila y la unidad de trabajo
+        /// del request es la que guarda. Igual que `UpdateAsync`, devuelve `true` porque el
+        /// contrato del genérico reporta "marcado", no "filas afectadas".
+        ///
+        /// Falla en voz alta en los dos casos en que antes perdía trabajo en silencio: una entidad
+        /// YA trackeada (resetearla a `Unchanged` descartaría sus cambios pendientes) y un conjunto
+        /// de campos vacío (no escribiría nada y aun así devolvería `true`).
+        /// </summary>
+        public Task<bool> UpdatePartialAsync(
+            Order order, OrderChangedField changedFields, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (changedFields == OrderChangedField.None)
+                throw new ArgumentException(
+                    "A partial order update needs at least one changed field.", nameof(changedFields));
+
+            var entry = _dbContext.Entry(order);
+            if (entry.State != EntityState.Detached)
+                throw new InvalidOperationException(
+                    "The order is already tracked by this context; resetting it to Unchanged would discard its " +
+                    "pending changes. Pass a NoTracking instance, or persist the tracked changes with UpdateAsync.");
+
+            IReadOnlyList<string> columns = ToColumnNames(changedFields);
+
+            entry.State = EntityState.Unchanged;
+            foreach (string column in columns)
+                entry.Property(column).IsModified = true;
+
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// El ÚNICO mapeo de campo de dominio a propiedad de EF. Usa `nameof` a propósito: renombrar
+        /// una propiedad rompe la compilación en vez de romper la escritura en producción.
+        ///
+        /// Valida el conjunto ANTES de marcar nada, para que un valor no mapeado no deje la entrada
+        /// medio marcada; y el `throw` del final es la razón de existir de este método: añadir un
+        /// miembro a <see cref="OrderChangedField"/> sin mapearlo aquí falla en voz alta.
+        /// </summary>
+        private static IReadOnlyList<string> ToColumnNames(OrderChangedField changedFields)
+        {
+            const OrderChangedField all =
+                OrderChangedField.Status
+                | OrderChangedField.CancellationReason
+                | OrderChangedField.DriverId
+                | OrderChangedField.PaymentStatus
+                | OrderChangedField.PaidAt;
+
+            if ((changedFields & ~all) != 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(changedFields), changedFields,
+                    "Unmapped order field: add it to the partial-update column map.");
+
+            List<string> columns = new(5);
+
+            if (changedFields.HasFlag(OrderChangedField.Status))
+                columns.Add(nameof(Order.Status));
+
+            if (changedFields.HasFlag(OrderChangedField.CancellationReason))
+                columns.Add(nameof(Order.CancellationReason));
+
+            if (changedFields.HasFlag(OrderChangedField.DriverId))
+                columns.Add(nameof(Order.DriverId));
+
+            if (changedFields.HasFlag(OrderChangedField.PaymentStatus))
+                columns.Add(nameof(Order.PaymentStatus));
+
+            if (changedFields.HasFlag(OrderChangedField.PaidAt))
+                columns.Add(nameof(Order.PaidAt));
+
+            return columns;
         }
     }
 }

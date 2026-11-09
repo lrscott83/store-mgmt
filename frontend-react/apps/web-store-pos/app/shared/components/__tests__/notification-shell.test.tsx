@@ -167,7 +167,7 @@ describe('NotificationShell — list', () => {
   });
 
   it('marks all as read from the panel header', async () => {
-    markAllAsReadMock.mockResolvedValue(success(true));
+    markAllAsReadMock.mockResolvedValue(success(2));
 
     renderShell();
     await waitFor(() => expect(getNotificationsMock).toHaveBeenCalled());

@@ -12,6 +12,10 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
 import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
+import {
+  publishedWholesaleConfigOf,
+  wholesaleDisplayOf,
+} from '~/catalog/lib/catalog-wholesale';
 import { trackCatalogEvent, type CatalogTelemetryEvent } from '~/catalog/lib/catalog-telemetry';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import { isCatalogStoreStaff } from '~/catalog/lib/catalog-staff';
@@ -152,8 +156,15 @@ export function PublicCatalogPage() {
       id: product.id,
       name: product.name,
       currency: product.currency,
+      // Per-unit presentation price. In wholesale mode the store takes the tier price from
+      // `wholesale` and ignores this as soon as it starts counting packs, but it stays as the
+      // fallback for a product the server published without a usable config.
       unitPrice: product.finalPrice,
       imageUrl: product.imageUrl,
+      // The MODE is decided here, once: the cart never re-reads the store-wide price mode, so a
+      // product that arrives with a wholesale config is a pack product even if the header mode
+      // changed between two loads of the catalog.
+      wholesale: publishedWholesaleConfigOf(product),
     });
     trackCustomerEvent({ name: 'add_to_cart', productId: product.id });
     // El aviso va al TOAST global, no a un `<p>` en la cabecera (decisión del owner,
@@ -265,6 +276,10 @@ export function PublicCatalogPage() {
 
   const total = page?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Wholesale presentation of the open detail (null when the product is sold by the unit). Kept in
+  // the container because the modal lives here, not in the template.
+  const detailWholesale = detail ? wholesaleDisplayOf(detail) : null;
 
   if (state === 'loading') {
     return (
@@ -392,7 +407,7 @@ export function PublicCatalogPage() {
                   {intl.formatMessage({ id: 'CATALOG_PUBLIC.NEW' })}
                 </span>
               )}
-              {detail.hasDiscount && (
+              {detail.hasDiscount && !detailWholesale && (
                 <span className="rounded-full bg-danger px-2 py-1 text-xs text-white">
                   -{detail.percentDiscount}%
                 </span>
@@ -400,19 +415,66 @@ export function PublicCatalogPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold text-primary">
-                {formatMoneyWithCurrency(detail.finalPrice, currencyFromCode(detail.currency))}
+              <span
+                className="text-2xl font-bold text-primary"
+                data-testid="catalog-detail-price"
+              >
+                {/* Wholesale mode publishes the price of ONE PACK: it is the number the customer
+                    buys ("la caja a $X"), and the lines under it spell out how many units that is.
+                    The retail discount is not shown because it is not applied on top of the
+                    wholesale price — the server's tier price is the whole story. */}
+                {formatMoneyWithCurrency(
+                  detailWholesale ? detailWholesale.packPrice : detail.finalPrice,
+                  currencyFromCode(detail.currency),
+                )}
               </span>
-              {detail.hasDiscount && (
+              {!detailWholesale && detail.hasDiscount && (
                 <span className="text-lg text-text-muted line-through">
                   {formatMoneyWithCurrency(detail.price, currencyFromCode(detail.currency))}
                 </span>
               )}
             </div>
 
+            {detailWholesale && (
+              <p className="text-xs text-text-muted" data-testid="catalog-detail-wholesale">
+                {detailWholesale.unit} ({detailWholesale.packSize} x{' '}
+                {formatMoneyWithCurrency(
+                  detailWholesale.entryUnitPrice,
+                  currencyFromCode(detail.currency),
+                )}) ·{' '}
+                {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {detailWholesale.minPacks}{' '}
+                {detailWholesale.unitPlural}
+              </p>
+            )}
+
             <p className="whitespace-pre-line text-sm text-text" data-testid="catalog-detail-description">
               {detail.description}
             </p>
+
+            {detailWholesale && detailWholesale.tiers.length > 0 && (
+              <div data-testid="catalog-detail-wholesale-tiers">
+                <span className="text-xs font-medium text-text-muted">
+                  {intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' })}
+                </span>
+                <ul className="mt-1 space-y-1 text-xs text-text-muted">
+                  {detailWholesale.tiers.map((tier) => (
+                    <li key={tier.minPacks}>
+                      {intl.formatMessage(
+                        { id: 'SALES.WHOLESALE.TIERS_POPUP_FROM' },
+                        {
+                          min: tier.minPacks,
+                          price: formatMoneyWithCurrency(
+                            tier.pricePerUnit,
+                            currencyFromCode(detail.currency),
+                          ),
+                          unit: detailWholesale.unitPlural,
+                        },
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {orderingEnabled && (
               <Button

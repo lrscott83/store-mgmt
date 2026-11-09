@@ -1,8 +1,10 @@
 # Ejemplo de vector fiscal — RC-04A, año 2021
 
-> **Origen:** `pdf/Ejemplo-Vector-Fiscal.pdf` — 3 páginas, con capa de texto.
+> **Origen:** `Ejemplo-Vector-Fiscal.pdf` — 3 páginas, con capa de texto. **El PDF no se versiona**:
+> contiene datos personales y vive fuera del repositorio. Esta transcripción es la fuente de consulta.
 > Transcripción estructurada (no es la extracción cruda: el PDF desordena las columnas al extraer).
-> **NIT y carné de identidad enmascarados**; el nombre ya venía como `XXXXXXXX` en el original.
+> **Datos personales sustituidos:** NIT, carné de identidad y código RC-05 son ficticios; el nombre ya
+> venía como `XXXXXXXX` en el original.
 
 ---
 
@@ -11,11 +13,11 @@
 | Campo | Valor |
 |---|---|
 | Título | `RC-04A Vector fiscal de persona natural` |
-| NIT | `00•••••••23` |
-| Carné de identidad | `71•••••••23` |
+| NIT | `00021399999` |
+| Carné de identidad | `71021399999` |
 | Nombre y apellidos | `XXXXXXXX` (así en el original) |
 | Municipio | `3507- San Antonio del Sur` |
-| Código de barras del RC-05 (DPA, NIT) | `3828 - 3200 - 0312 - 7053` |
+| Código de barras del RC-05 (DPA, NIT) | `4501 - 2200 - 7788 - 9900` |
 | Año | `2021` |
 
 ---

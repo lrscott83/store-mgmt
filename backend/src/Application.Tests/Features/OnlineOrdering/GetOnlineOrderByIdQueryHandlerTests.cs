@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrderById;
@@ -53,7 +53,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
     private static Order Order()
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            Guid.NewGuid(), OrderType.WhatsApp, string.Empty, 0m, 0,
+            Guid.NewGuid(), OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         return order;
@@ -67,7 +67,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
     }
 
     private void Returns(Order? order)
-        => _orderRepository.Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>())).ReturnsAsync(order);
+        => _orderRepository.Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(order);
 
     #region Happy Path
 
@@ -201,7 +201,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
 
         await Handler().Handle(new GetOnlineOrderByIdQuery(order.Id), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -237,7 +237,7 @@ public class GetOnlineOrderByIdQueryHandlerTests
 
         await act.Should().ThrowAsync<ApiException>()
             .Where(ex => ex.StatusCode == HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

@@ -1,6 +1,6 @@
 # Plan — Revisar E2E backend: la expectativa se calibra contra la BD viva, no contra el seed
 
-**Fecha:** 2026-09-24 · **Rama:** qa · **Estado:** **resuelto en BD locales 2026-09-25** (catálogo corregido, enum 44 añadido, E2E recalibrados); **pendiente:** confirmar estado del VPS.
+**Fecha:** 2026-09-24 · **Rama:** qa · **Estado:** **CERRADO.** BD locales resueltas el 2026-09-25 (catálogo corregido, enum 44 añadido, E2E recalibrados) y **producción confirmada por el owner el 2026-11-03**. No es trabajo de código.
 
 ## Resolución (2026-09-25) — el drift se corrigió y los E2E se recalibraron
 
@@ -13,7 +13,7 @@ El plan original se ejecutó el 2026-09-25 bajo el feature `e2e-drift-canary-hel
 3. **E2E recalibrados** (commit `41a039fc`): `PlanChangeMatrixTests` (Inventory +Egress 33, MultiPayments `[44]`, lectura DB filtrada por `RoleId == OwnerAdmin` para excluir 91 del universo del owner — 91 es SuperAdmin/ReSeller y **debe** seguir en la BD, ver nota abajo) y los 3 helpers `FeaturesForModule` re-incluyen 33. Resultado: filtered set `Failed: 0, Passed: 38, Total: 38` (9 matrix + 1 canary + 28 helpers); el canary `FeatureSeedCoherenceTests` pasa porque ya no hay drift seed↔BD.
 4. **Nota sobre 91 (StorePayment)**: aunque el mapa del test no la lista (el owner no la recibe), 91 **sí** existe en la BD y el enum `StorePaymentAdmin` (SuperAdmin/ReSeller) la materializa para ReSeller/SuperAdmin — es el comportamiento correcto. El filtro `OwnerAdmin` de la lectura DB del matrix solo alinea la expectativa del test con lo que `/me` del owner ve; no elimina ni desactiva nada.
 
-**Queda pendiente del plan original:** verificar el VPS (punto 2 de Acciones) — las BD locales ya no son la "BD rota" descrita abajo; el análisis histórico se conserva tal cual se verificó el 2026-09-24.
+**Sin pendientes.** El estado del VPS (punto 2 de Acciones) lo confirmó el owner el 2026-11-03: producción ya tiene aplicado el catálogo. Las BD locales ya no son la "BD rota" descrita abajo; el análisis histórico se conserva tal cual se verificó el 2026-09-24.
 
 ## Hallazgo (verificado 2026-09-24)
 
@@ -38,11 +38,11 @@ Evidencia concreta:
 
 - Los tests **pin el drift como comportamiento esperado**: si `smca_test` se regenerara desde el seed completo (33/91 presentes) o el enum ganara entrada para MultiPayments(44), estos tests **fallarían** hasta actualizar el mapa estático.
 - La suite E2E **no puede detectar** que la BD produzca menos de lo que el catálogo debería; valida el contrato de cambio de plan **contra el estado actual**, no contra el catálogo correcto.
-- La BD de producción (VPS) parece estar en un estado de migración anterior (módulos 15/16/17 ausentes, 91 ausente): un cambio de plan a Superior/VIP en prod materializaría menos features de las anunciadas (riesgo distinto que la suite no detecta porque corre contra `smca_test`).
+- **HISTÓRICO — refutado el 2026-11-03:** este supuesto (producción en un estado de migración anterior) ya no aplica; el owner confirmó que producción tiene el catálogo aplicado. Se conserva como registro de lo que se creía el 2026-09-24.
 
 ## Acciones pendientes (estado tras resolución 2026-09-25)
 
 1. ~~Definir la **fuente autoritativa** del catálogo de features (seed/migraciones vs BD) y alinear las tres BD locales/test/VPS.~~ → **RESUELTO para BD locales** (2026-09-25): catálogo completo 17 módulos/42 features en `smca` y `smca_test`; el canary `FeatureSeedCoherenceTests` valida seed↔BD. La fuente autoritativa de cara a los E2E queda en la BD viva.
-2. **Confirmar el estado real del VPS** con la consulta podman completa (módulos 1–17 + features por módulo). — **PENDIENTE** (requiere acceso/confirmación del usuario; si el VPS está en estado de migración anterior, aplicar el mismo backfill tras validar).
+2. ~~Confirmar el estado real del VPS con la consulta podman completa (módulos 1–17 + features por módulo).~~ → **CERRADO (2026-11-03):** el owner confirma que producción ya tiene el catálogo aplicado. No requiere acción.
 3. ~~Revisar **todos** los E2E del backend que calibren expectativas contra la BD viva (matriz de planes, `MeAfterOwnerPlanChangeTests`, `ToggleStorePlanTests`, `StoreModuleLifecycleTests`, etc.) y decidir cómo evolucionan al corregir el catálogo.~~ → **PARCIAL**: la matriz de planes y los 3 helpers (`AuthMePlanModulesTests`, `ExportOfflineRosterPlanTests`, `StorePlanChangeTests`) fueron recalibrados en `41a039fc`. Los demás archivos listados quedan por revisar si ejercitan features 33/91/44.
 4. Cualquier cambio en E2E existentes o en backend de producción requiere **aprobación explícita del usuario** (reglas innegociables del repo).

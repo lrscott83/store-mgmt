@@ -244,8 +244,17 @@ namespace Application.Dtos.OnlineOrdering
     /// con ESTOS datos y no con los de su carrito, el mensaje que la tienda recibe en WhatsApp
     /// dice exactamente lo que el servidor guardó (D6), aunque el carrito viniera manipulado o el
     /// precio del producto cambiara entre la carga del catálogo y el alta.
+    ///
+    /// <see cref="Packs"/> y <see cref="UnitLabel"/> son el hecho MAYORISTA del snapshot: con ellos
+    /// el resumen dice "12 cajas" en vez de 144 unidades. Son null en un pedido al detal, donde la
+    /// cantidad ya se lee en unidades y no hay paquete que mencionar.
     /// </summary>
-    public sealed record OnlineOrderCreatedLineDto(string Name, int Quantity, decimal Price);
+    public sealed record OnlineOrderCreatedLineDto(
+        string Name,
+        int Quantity,
+        decimal Price,
+        int? Packs = null,
+        string? UnitLabel = null);
 
     // --- Lecturas de gestión de pedidos (F5, vista "Pedidos") ---------------------------------
 

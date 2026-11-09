@@ -103,15 +103,18 @@ namespace SMCA.WebApi.Middlewares
                         response.StatusCode = (int)HttpStatusCode.NotFound;
                         responseModel.ActionCode = (int)HttpStatusCode.NotFound;
                         break;
-                    case DbUpdateException when IsUniqueViolation(error):
-                        // Dos altas concurrentes sobre el mismo índice único: es un CONFLICTO de
-                        // cliente (reintentable), no un fallo del servidor. Sin esto salía un 500
-                        // opaco — el caso que dejó abierto el alta de la configuración de pedidos.
+                    case DbUpdateException e when IsUniqueViolation(e):
+                        // Two concurrent inserts racing for the same unique index: this is a
+                        // CLIENT conflict (retryable), not a server fault. Without this it surfaced
+                        // as an opaque 500 — the case left open by the order-settings endpoint.
+                        // The message is deliberately generic: table, constraint and SQL text must
+                        // never reach the client.
                         response.StatusCode = (int)HttpStatusCode.Conflict;
                         responseModel.ActionCode = (int)HttpStatusCode.Conflict;
                         responseModel.Errors = new List<Error>
                         {
-                            new Error("App.Conflict", "El recurso ya existe; vuelve a intentarlo."),
+                            new Error("App.Conflict",
+                                "The record already exists or was created by another request. Please retry."),
                         };
                         break;
                     default:
@@ -127,16 +130,16 @@ namespace SMCA.WebApi.Middlewares
         }
 
         /// <summary>
-        /// ¿El error es un fallo de guardado por violación de índice único de PostgreSQL (SQLSTATE
-        /// 23505)? Dos cuidados:
+        /// Is this a save failure caused by a PostgreSQL unique-index violation (SQLSTATE 23505)?
+        /// Two constraints on purpose:
         ///
-        ///   * Se ancla en <see cref="DbUpdateException"/> —lo que EF lanza al guardar— para NO ampliar
-        ///     el mapeo a una violación que llegue por otro camino: esa sigue siendo un 500.
-        ///   * Recorre TODA la cadena de <c>InnerException</c> (incluidas las internas múltiples de un
-        ///     <see cref="AggregateException"/>), porque la excepción de PostgreSQL puede venir anidada
-        ///     a más de un nivel (envoltorios de batch/retry).
+        ///   * It anchors on <see cref="DbUpdateException"/> — what EF throws on save — so a unique
+        ///     violation that arrives by any other path is NOT reclassified and still answers 500.
+        ///   * It walks the WHOLE <c>InnerException</c> chain (including the multiple inners of an
+        ///     <see cref="AggregateException"/>), because the PostgreSQL exception can be nested more
+        ///     than one level deep (batch/retry wrappers).
         ///
-        /// Es un conflicto de cliente, no un fallo del servidor.
+        /// This is a client conflict, not a server fault.
         /// </summary>
         private static bool IsUniqueViolation(Exception error)
         {

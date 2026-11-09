@@ -43,7 +43,7 @@ public class OwnerSalesCommissionsQueryTests
         _manager.User = user;
 
         _store = Store.Create("Tienda", _owner.Id, true, _tenantId);
-        _order = Order.Create(_store.Id, OrderType.WhatsApp, "Pedido", 100m, 2, _orderDate, _tenantId);
+        _order = Order.Create(_store.Id, OrderType.Normal, "Pedido", 100m, 2, _orderDate, _tenantId);
         _order.Code = "PED-100";
         _order.Store = _store;
         _item = OrderItem.Create(_order.Id, Guid.NewGuid(), "Camisa", 2, 50m, 1, _tenantId);

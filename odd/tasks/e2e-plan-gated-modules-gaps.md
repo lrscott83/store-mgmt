@@ -27,11 +27,18 @@ Agregar las 3 filas que la matriz del plan declara y hoy no existen en la suite 
 
 ## Tareas
 
-- [ ] **G1** Verificar por búsqueda que E1-6/E1-7/E2-5 no existen ya (evitar duplicados).
-- [ ] **G2** Nuevo `Auth/AuthMePlanModulesGapTests.cs` con E1-6 y E1-7.
-- [ ] **G3** Nuevo `Users/ExportOfflineRosterPlanGapTests.cs` con E2-5.
+> **Reconciliado 2026-11-03:** G1-G3 estaban hechos y sin marcar. G4 (la corrida) se deja abierta a
+> propósito: no se repitió en esta reconciliación.
+
+- [x] **G1** Verificar por búsqueda que E1-6/E1-7/E2-5 no existen ya (evitar duplicados). **HECHO**:
+  los tres viven hoy en los dos archivos nuevos de G2/G3; no hay homónimos en la suite.
+- [x] **G2** Nuevo `Auth/AuthMePlanModulesGapTests.cs` con E1-6 y E1-7. **HECHO**:
+  `Me_inactive_storeuser_not_in_roles` y `Me_superuser_sees_full_module_list` presentes.
+- [x] **G3** Nuevo `Users/ExportOfflineRosterPlanGapTests.cs` con E2-5. **HECHO**:
+  `Roster_warehouse_wholesale_multistores_in_paid_roster` presente.
 - [ ] **G4** `dotnet build backend/src/SMCA.sln` + `dotnet test` de los tests nuevos (PostgreSQL
-  `smca_test` en localhost:5432, disponible).
+  `smca_test` en localhost:5432, disponible). **Pendiente**: los 3 tests existen en el proyecto; la
+  corrida no se repitió el 2026-11-03. Ejecutarla cuando el backend E2E esté levantado.
 
 ## Verificación
 

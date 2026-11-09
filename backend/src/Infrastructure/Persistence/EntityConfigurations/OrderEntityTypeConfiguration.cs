@@ -20,7 +20,22 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasIndex(x => x.TenantId);
             builder.HasIndex(x => x.StoreId);
 
+            // El listado de pedidos de la tienda ordena por `Date` DESC (y desempata por `Id`) SIEMPRE
+            // dentro de un `StoreId`: sin este índice compuesto la consulta filtra por tienda y luego
+            // ordena el resultado entero, que es la tabla que más crece sin que nada la acote. El
+            // índice de `StoreId` solo no sirve para el `ORDER BY`, porque el plan tiene que ordenar
+            // después de filtrar.
+            //
+            // El nombre lo pone EF (`IX_Order_StoreId_Date`), igual que los dos índices de arriba:
+            // este archivo no nombra índices a mano.
+            builder.HasIndex(x => new { x.StoreId, x.Date });
+
             builder.HasKey(x => x.Id);
+
+            // Canal del pedido (offline/POS vs servidor). `HasDefaultValue(false)` rellena las filas
+            // existentes con `false`: todas son pedidos online, así que el backfill correcto es el
+            // default y la migración no tiene que escribir datos.
+            builder.Property(x => x.IsOfflineOrder).IsRequired().HasDefaultValue(false);
 
             // --- Pedidos online (pedidos-whatsapp-persistencia, F2) ---
             //

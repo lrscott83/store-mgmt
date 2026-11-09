@@ -1,4 +1,8 @@
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import {
+  WHOLESALE_DEFAULT_UNIT_LABEL,
+  wholesaleUnitPlural,
+} from '~/sales/lib/wholesale';
 
 /**
  * Enlace `wa.me` con el resumen del pedido (F4, decisión D2).
@@ -27,11 +31,22 @@ const WA_ME_BASE_URL = 'https://wa.me';
  */
 export type WhatsAppDeliveryType = 'pickup' | 'delivery';
 
-/** Una línea del resumen: nombre y precio UNITARIO (el total de la línea se calcula aquí). */
+/**
+ * Una línea del resumen: nombre y precio UNITARIO (el total de la línea se calcula aquí).
+ *
+ * In wholesale mode the server line also carries `packs` and `unitLabel`: the shop speaks in packs
+ * ("12 cajas"), and the unit is whatever the owner configured. Both are nullable because a per-unit
+ * order (or one saved before wholesale pricing existed) has no packs at all, and the summary must
+ * fall back to the historical `{quantity} × {name}` instead of inventing them.
+ */
 export interface WhatsAppOrderLine {
   readonly name: string;
   readonly quantity: number;
   readonly unitPrice: number;
+  /** Packs of a wholesale line, straight from the persisted server snapshot. */
+  readonly packs?: number | null;
+  /** Configured unit of the product ("caja"), straight from the server snapshot. */
+  readonly unitLabel?: string | null;
 }
 
 export interface WhatsAppOrderLinkInput {
@@ -83,6 +98,28 @@ function collapse(value?: string | null): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Una línea del resumen.
+ *
+ * Wholesale lines speak in PACKS ("12 cajas × Cerveza — …") because that is what the shop ordered
+ * and the unit is whatever the owner configured. The amount does not change with the wording:
+ * `unitPrice × quantity` is still the line total, because `quantity` stays in units and `unitPrice`
+ * is the per-unit tier price the server persisted. Per-unit (or older) lines keep the historical
+ * `{quantity} × {name}`.
+ */
+function formatOrderLine(line: WhatsAppOrderLine, currency: number): string {
+  const amount = formatMoneyWithCurrency(line.unitPrice * line.quantity, currency);
+  const name = collapse(line.name);
+  const packs = line.packs;
+  if (packs == null || packs <= 0) return `${line.quantity} × ${name} — ${amount}`;
+
+  // The POS pluralizer appends an "s" and is the ONLY one in the app ("Desde 1 paquetes" is the
+  // wording pinned by its E2E), so the summary does not grow a second grammar rule that would
+  // disagree with the cart.
+  const unit = wholesaleUnitPlural(collapse(line.unitLabel) || WHOLESALE_DEFAULT_UNIT_LABEL);
+  return `${packs} ${unit} × ${name} — ${amount}`;
+}
+
 /** Resumen del pedido en texto plano, tal cual lo lee la tienda en WhatsApp. */
 function buildWhatsAppOrderSummary(input: WhatsAppOrderLinkInput): string {
   const currency = input.currency;
@@ -109,13 +146,7 @@ function buildWhatsAppOrderSummary(input: WhatsAppOrderLinkInput): string {
   const body: string[] = [
     // Importe de la LÍNEA (unitario × cantidad), no el unitario: es lo que hace que sumar las
     // líneas dé el subtotal que va justo debajo.
-    ...input.lines.map(
-      (line) =>
-        `${line.quantity} × ${collapse(line.name)} — ${formatMoneyWithCurrency(
-          line.unitPrice * line.quantity,
-          currency,
-        )}`,
-    ),
+    ...input.lines.map((line) => formatOrderLine(line, currency)),
     `Subtotal: ${formatMoneyWithCurrency(input.subtotal, currency)}`,
   ];
 

@@ -1,15 +1,13 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
-using Application.Exceptions;
 using Application.ResponseModels;
-using Domain.Common.Extensions;
 using Domain.Entities.OrderItems;
 using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
-using System.Net;
 
 namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderById
 {
@@ -26,14 +24,6 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderById
 
     public class GetOnlineOrderByIdQueryHandler : IQueryHandler<GetOnlineOrderByIdQuery, OnlineOrderDetailDto>
     {
-        /// <summary>
-        /// Mensaje del 404. Va literal, no por `IStringLocalizer`, porque la clave equivalente en
-        /// `Resources/Localization/*.resx` no existe todavía: preferimos un texto en inglés claro a
-        /// una clave sin traducir que el cliente recibiría tal cual. Añadir la clave localizada es
-        /// un cambio de Resources, fuera de la superficie de esta unidad.
-        /// </summary>
-        private const string OrderNotFoundMessage = "Online order not found.";
-
         private readonly IHttpContextService _httpContextService;
         private readonly IOrderRepository _orderRepository;
         private readonly IStringLocalizer<I18n> _localizer;
@@ -51,13 +41,10 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderById
         public async Task<ResponseResult<OnlineOrderDetailDto>> Handle(
             GetOnlineOrderByIdQuery query, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
-            Order? order = await _orderRepository.GetByIdWithItemsAsync(storeId, query.Id);
-            if (order is null)
-                throw new ApiException(OrderNotFoundMessage, HttpStatusCode.NotFound);
+            Order order = await OnlineOrderAccess.GetWithItemsAsync(
+                _orderRepository, storeId, query.Id, cancellationToken);
 
             return ResponseResult.Success(Map(order));
         }

@@ -1,14 +1,12 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
-using Application.Exceptions;
 using Application.ResponseModels;
 using Domain.Common.Enums;
-using Domain.Common.Extensions;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
-using System.Net;
 
 namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats
 {
@@ -64,9 +62,7 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats
         public async Task<ResponseResult<OnlineOrderStatsDto>> Handle(
             GetOnlineOrderStatsQuery query, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
             OrderAggregateStats stats = await _orderRepository.GetStatsByStoreIdAsync(
                 storeId,
@@ -75,7 +71,8 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats
                     query.PaymentStatus,
                     query.DeliveryType,
                     NormalizeFrom(query.From),
-                    NormalizeTo(query.To)));
+                    NormalizeTo(query.To)),
+                cancellationToken);
 
             return ResponseResult.Success(Map(stats));
         }

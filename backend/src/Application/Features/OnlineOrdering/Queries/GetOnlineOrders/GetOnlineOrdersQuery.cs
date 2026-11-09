@@ -1,10 +1,10 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Common;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Domain.Common.Enums;
-using Domain.Common.Extensions;
 using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -31,6 +31,26 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
         /// paginado viene a evitar.
         /// </summary>
         public const int MaxPageSize = 100;
+
+        /// <summary>
+        /// Tope de página. Sin él, `?page=2147483647` hacía `(page - 1) * pageSize` en `int` y el
+        /// producto desbordaba a un `Skip` NEGATIVO, que PostgreSQL rechaza con un 500. El tope es
+        /// holgado a propósito: ninguna tienda real llega ahí, así que acotar no le quita nada a
+        /// nadie y convierte una entrada absurda en la última página en vez de en un error.
+        /// </summary>
+        public const int MaxPage = 10_000;
+    }
+
+    /// <summary>
+    /// Límites de la búsqueda (S2). El término se recorta y se acota ANTES de llegar a la base: un
+    /// `search` de megabytes acabaría en un `LIKE '%…%'` gigante sobre la tabla que más crece, y el
+    /// coste lo pagaría cada petición. No se trunca en silencio — eso devolvería resultados que el
+    /// cliente no pidió sin decírselo: por encima del tope es un 400.
+    /// </summary>
+    internal static class OnlineOrderSearch
+    {
+        /// <summary>Longitud máxima del término de búsqueda, ya recortado.</summary>
+        public const int MaxLength = 64;
     }
 
     /// <summary>
@@ -83,13 +103,19 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
         public async Task<ResponseResult<OnlineOrderPageDto>> Handle(
             GetOnlineOrdersQuery query, CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            Guid storeId = StoreContextGuard.RequireStoreId(_httpContextService, _localizer);
 
-            int page = query.Page < 1 ? 1 : query.Page;
+            int page = NormalizePage(query.Page);
             int pageSize = NormalizePageSize(query.PageSize);
 
+            // El salto se calcula en `long` y se acota ANTES de convertirlo a `int`: la página ya
+            // viene acotada, pero la aritmética no puede depender de que lo esté — un `(page - 1) *
+            // pageSize` en `int` es exactamente el desbordamiento que devolvía un `Skip` negativo y
+            // un 500 con `?page=2147483647`.
+            int skip = (int)Math.Clamp(((long)page - 1) * pageSize, 0L, int.MaxValue);
+
+            // `NormalizeSearch` lanza el 400 del término desmedido ANTES de esta llamada: los
+            // argumentos se evalúan primero, así que un `search` de megabytes no llega al repositorio.
             PagedOrders result = await _orderRepository.GetPagedByStoreIdAsync(
                 storeId,
                 new OrderListFilter(
@@ -100,8 +126,9 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
                     query.ExactRange ? query.From : NormalizeFrom(query.From),
                     query.ExactRange ? query.To : NormalizeTo(query.To),
                     NormalizeSearch(query.Search)),
-                (page - 1) * pageSize,
-                pageSize);
+                skip,
+                pageSize,
+                cancellationToken);
 
             return ResponseResult.Success(new OnlineOrderPageDto
             {
@@ -122,6 +149,17 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
             => pageSize < 1 ? OnlineOrderPaging.DefaultPageSize
                 : pageSize > OnlineOrderPaging.MaxPageSize ? OnlineOrderPaging.MaxPageSize
                 : pageSize;
+
+        /// <summary>
+        /// Acota la página por los dos lados: por debajo, 1 (una página 0 o negativa no existe); por
+        /// arriba, <see cref="OnlineOrderPaging.MaxPage"/>. `Math.Clamp` cubre además `int.MinValue`,
+        /// que restarle uno convertiría en otro desbordamiento.
+        ///
+        /// La página que se devuelve en el DTO es la YA NORMALIZADA, por la misma razón que
+        /// `PageSize`: la vista necesita saber qué página está leyendo de verdad, no la que pidió.
+        /// </summary>
+        private static int NormalizePage(int page)
+            => Math.Clamp(page, 1, OnlineOrderPaging.MaxPage);
 
         /// <summary>
         /// Los dos extremos del rango son DÍAS, no instantes, y el filtro por rango es el que la
@@ -170,9 +208,27 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
         /// El recorte es de AQUÍ y no solo del repositorio para que el filtro que el handler
         /// construye sea el que se ejecuta; el repositorio vuelve a recortar porque no puede dar
         /// por hecho quién lo llama.
+        ///
+        /// Por encima de <see cref="OnlineOrderSearch.MaxLength"/> el término es un 400 y NO se
+        /// trunca: truncar devolvería resultados de una búsqueda que nadie pidió, sin decirlo, y el
+        /// cliente creería que filtró por el texto completo. Se comprueba sobre el valor YA
+        /// recortado, así que los espacios de alrededor no convierten un término válido en inválido.
         /// </summary>
         private static string? NormalizeSearch(string? search)
-            => string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        {
+            if (string.IsNullOrWhiteSpace(search))
+                return null;
+
+            string term = search.Trim();
+            if (term.Length > OnlineOrderSearch.MaxLength)
+            {
+                throw new ApiException(
+                    $"The search term cannot exceed {OnlineOrderSearch.MaxLength} characters.",
+                    HttpStatusCode.BadRequest);
+            }
+
+            return term;
+        }
 
         /// <summary>
         /// Mapeo explícito (no un `select *` ni un spread) por la misma razón que en la

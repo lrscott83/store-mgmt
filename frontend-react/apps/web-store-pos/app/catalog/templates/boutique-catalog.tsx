@@ -6,7 +6,55 @@ import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-m
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
+import { WholesaleTiersInfo } from '~/catalog/components/wholesale-tiers-info';
+import {
+  isWholesaleProduct,
+  wholesaleDisplayOf,
+} from '~/catalog/lib/catalog-wholesale';
 import type { CatalogTemplateProps } from '~/catalog/templates/catalog-template';
+import type { PublicCatalogProduct } from '~/sales/lib/services/catalog-http-service';
+
+/**
+ * Price block of the boutique card, with the price as the protagonist.
+ *
+ * Same rule as the default template: wholesale mode shows the price of ONE PACK plus the unit and
+ * the minimum, and the retail discount is not advertised because it is not applied on top of the
+ * wholesale tier. Duplicated on purpose — the two templates size their prices differently and a
+ * shared component would have to carry a `size` knob for two call sites.
+ */
+function BoutiqueProductPrice({ product }: { readonly product: PublicCatalogProduct }) {
+  const intl = useIntl();
+  const wholesale = wholesaleDisplayOf(product);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-baseline gap-2">
+      <span className="inline-flex items-baseline gap-1 text-xl font-bold text-primary">
+        {formatMoneyWithCurrency(
+          wholesale ? wholesale.packPrice : product.finalPrice,
+          currencyFromCode(product.currency),
+        )}
+        {wholesale && <WholesaleTiersInfo product={product} className="text-xs font-normal" />}
+      </span>
+      {wholesale ? (
+        <span
+          className="text-xs text-text-muted"
+          data-testid={`catalog-card-wholesale-${product.id}`}
+        >
+          {wholesale.unit} ({wholesale.packSize} x{' '}
+          {formatMoneyWithCurrency(wholesale.entryUnitPrice, currencyFromCode(product.currency))}) ·{' '}
+          {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {wholesale.minPacks}{' '}
+          {wholesale.unitPlural}
+        </span>
+      ) : (
+        product.hasDiscount && (
+          <span className="text-sm text-text-muted line-through">
+            {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
+          </span>
+        )
+      )}
+    </div>
+  );
+}
 
 /**
  * Plantilla `boutique`: una VITRINA centrada en la marca de la tienda.
@@ -105,7 +153,7 @@ export function BoutiqueCatalogTemplate(props: CatalogTemplateProps) {
           >
             <CartIcon />
             <span
-              className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+              className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white"
               data-testid="catalog-cart-badge"
             >
               {cartCount > 99 ? '99+' : cartCount}
@@ -252,7 +300,7 @@ export function BoutiqueCatalogTemplate(props: CatalogTemplateProps) {
                         {intl.formatMessage({ id: 'CATALOG_PUBLIC.NEW' })}
                       </span>
                     )}
-                    {product.hasDiscount && (
+                    {product.hasDiscount && !isWholesaleProduct(product) && (
                       <span className="rounded-full bg-danger px-2 py-0.5 text-xs text-white">
                         -{product.percentDiscount}%
                       </span>
@@ -264,19 +312,7 @@ export function BoutiqueCatalogTemplate(props: CatalogTemplateProps) {
                       {product.description}
                     </p>
                   )}
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-primary">
-                      {formatMoneyWithCurrency(
-                        product.finalPrice,
-                        currencyFromCode(product.currency),
-                      )}
-                    </span>
-                    {product.hasDiscount && (
-                      <span className="text-sm text-text-muted line-through">
-                        {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
-                      </span>
-                    )}
-                  </div>
+                  <BoutiqueProductPrice product={product} />
                 </div>
               </button>
               {orderingEnabled && (

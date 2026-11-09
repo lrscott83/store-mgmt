@@ -1,3 +1,4 @@
+using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogSettings;
 
 namespace Application.Dtos.WebCatalog
@@ -40,5 +41,25 @@ namespace Application.Dtos.WebCatalog
         /// <see cref="StoreCatalogSettings.DefaultMobileColumns"/> (2, el comportamiento actual).
         /// </summary>
         public int MobileColumns { get; set; } = StoreCatalogSettings.DefaultMobileColumns;
+
+        /// <summary>
+        /// Modo de precio con el que se publica el catálogo, por NOMBRE de `CatalogPriceMode`
+        /// ("Unit" / "Wholesale"). El número del enum es almacenamiento, no contrato — el mismo
+        /// criterio que el catálogo público, para que un renumerado del enum no cambie la API.
+        ///
+        /// Una tienda sin fila se lee como <c>Unit</c>, que es como se publicaba el catálogo antes de
+        /// que el modo existiera.
+        /// </summary>
+        public string PriceMode { get; set; } = nameof(CatalogPriceMode.Unit);
+
+        /// <summary>
+        /// La tienda tiene al menos un producto con configuración mayorista válida.
+        ///
+        /// Viaja en la LECTURA para que la vista pueda avisar sin una segunda petición: con el modo en
+        /// `Wholesale` y esto en <c>false</c> el catálogo no publica NADA hasta que el dueño
+        /// sincronice productos con precio mayorista (S7). El sistema avisa; nunca corrige ni
+        /// desactiva solo la elección del dueño.
+        /// </summary>
+        public bool HasWholesalePricedProducts { get; set; }
     }
 }

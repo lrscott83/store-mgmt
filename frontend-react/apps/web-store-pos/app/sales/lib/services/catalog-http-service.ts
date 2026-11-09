@@ -147,6 +147,20 @@ export interface CatalogSnapshotProduct {
   isActive: boolean;
   businessId?: string;
   discountFromInventory: boolean;
+  /** Config mayorista del producto: viaja SIEMPRE, con o sin modo mayorista en el catálogo. */
+  wholesaleEnabled?: boolean;
+  wholesalePackSize?: number;
+  wholesaleUnitLabel?: string;
+  /** Escalones de precio mayorista. Array vacío = el producto no tiene (el servidor limpia). */
+  wholesaleTiers?: CatalogSnapshotWholesaleTier[];
+}
+
+/** Un escalón mayorista del producto. `pricePerUnit` es POR UNIDAD dentro del paquete. */
+export interface CatalogSnapshotWholesaleTier {
+  minPacks: number;
+  pricePerUnit: number;
+  /** Moneda de `pricePerUnit` por valor del enum `Currency`; ausente = la del producto. */
+  currency?: number;
 }
 
 export interface CatalogSnapshot {
@@ -166,12 +180,35 @@ export interface PublicCatalogCategory {
   productsCount: number;
 }
 
+/**
+ * Modo de precio con el que se publica el catálogo, por NOMBRE del enum `CatalogPriceMode`.
+ *
+ * El backend lo manda como cadena ("Unit" / "Wholesale"), no como número: el número es
+ * almacenamiento, no contrato. Aquí es opcional en todo el árbol de tipos porque una respuesta
+ * anterior a esta funcionalidad no lo trae, y ese silencio tiene que significar "precio por
+ * unidad", que es como se publicaba el catálogo antes de que existiera el modo.
+ */
+export type PublicCatalogPriceMode = 'Unit' | 'Wholesale';
+
 /** Cabecera del catálogo público: la tienda y sus categorías activas. */
 export interface PublicCatalog {
   storeId: string;
   storeName: string;
   storeSlug: string;
+  /** Modo de precio de TODA la tienda; el producto lo repite por si llega solo. */
+  priceMode?: PublicCatalogPriceMode;
   categories: PublicCatalogCategory[];
+}
+
+/**
+ * Escalón mayorista publicado: a partir de `minPacks` paquetes, cada UNIDAD dentro del paquete
+ * cuesta `pricePerUnit`. `packPrice` viaja ya calculado por el servidor (`pricePerUnit × packSize`)
+ * porque es lo que el cliente ve —"la caja a $X"— y así el cliente no rearma la cuenta del dinero.
+ */
+export interface PublicCatalogWholesaleTier {
+  minPacks: number;
+  pricePerUnit: number;
+  packPrice: number;
 }
 
 /** Producto publicado tal como lo ve el cliente final. */
@@ -195,6 +232,29 @@ export interface PublicCatalogProduct {
   categorySlug: string;
   imageUrl: string | null;
   imageUrls: string[];
+
+  // --- Precio mayorista ---
+  //
+  // TODO opcional a propósito: una respuesta anterior a esta funcionalidad no trae ninguno de
+  // estos campos, y ese silencio tiene que leerse como "producto por unidad" en vez de romper el
+  // type-check de cada consumidor. El modo lo decide `priceMode`; los demás campos son datos del
+  // producto y viajan SIEMPRE, se publique en el modo que se publique.
+
+  /** Modo de precio de la tienda (el mismo que trae la cabecera). Ausente = "Unit". */
+  priceMode?: PublicCatalogPriceMode;
+  wholesaleEnabled?: boolean;
+  /** Unidades por paquete. 0 cuando el producto no tiene config mayorista válida. */
+  wholesalePackSize?: number;
+  /** Unidad de medida que escribió el dueño ("caja", "paquete"). null = no la configuró. */
+  wholesaleUnitLabel?: string | null;
+  /** Menor `minPacks` de la config: la cantidad mínima vendible. null = sin config. */
+  wholesaleMinPacks?: number | null;
+  /** Precio por UNIDAD del escalón de menor `minPacks`. null = sin config. */
+  wholesaleUnitPrice?: number | null;
+  /** Precio de UN paquete en ese primer escalón. null = sin config. */
+  wholesalePackPrice?: number | null;
+  /** Escalones ordenados por `minPacks` ascendente. Vacío = sin config. */
+  wholesaleTiers?: PublicCatalogWholesaleTier[];
 }
 
 /** Página de resultados del catálogo público. */
@@ -231,6 +291,22 @@ export interface CatalogBranding {
    * `StoreCatalogBrandingDto.MobileColumns` (decisión del owner, 2026-10-12).
    */
   mobileColumns: number;
+  /**
+   * Modo de precio con el que se publica el catálogo, por NOMBRE del enum `CatalogPriceMode`.
+   *
+   * Opcional porque es un campo nuevo: una respuesta anterior a esta funcionalidad no lo trae, y
+   * ese silencio tiene que significar "por unidad", que es como se publicaba antes de que el modo
+   * existiera — no un error.
+   */
+  priceMode?: PublicCatalogPriceMode;
+  /**
+   * La tienda tiene al menos un producto con precio mayorista configurado.
+   *
+   * Es lo que decide el AVISO de S7: con el modo en `Wholesale` y esto en `false` el catálogo no
+   * publica nada hasta que el dueño configure precios mayoristas y sincronice. También opcional: una
+   * respuesta anterior no lo trae y ahí no había modo mayorista que avisar.
+   */
+  hasWholesalePricedProducts?: boolean;
 }
 
 /**
@@ -244,6 +320,15 @@ export interface CatalogBrandingUpdate {
   removeBanner?: boolean;
   /** Elementos por fila en móvil (1 o 2). Ausente = no se toca. */
   mobileColumns?: number;
+  /**
+   * Modo de precio del catálogo ("Unit" o "Wholesale"). Ausente = no se toca, igual que el resto
+   * del parche: guardar el logo no puede resetear el modo que eligió el dueño.
+   *
+   * Con `Wholesale` el servidor RECHAZA el guardado (400) si la tienda no tiene ningún producto con
+   * precio mayorista: la vista no es la puerta, así que el error hay que mostrarlo — el mensaje del
+   * backend dice exactamente qué falta.
+   */
+  priceMode?: PublicCatalogPriceMode;
 }
 
 /**
@@ -444,6 +529,17 @@ export interface PublicOrderCreatedLine {
   name: string;
   quantity: number;
   price: number;
+  /**
+   * Paquetes de una línea MAYORISTA, tal como quedaron en el snapshot del `OrderItem`.
+   * `quantity` sigue siendo la cantidad en UNIDADES (`packs × packSize`) y `price` el precio por
+   * unidad del escalón, así que `price × quantity` es el importe de la línea en los dos modos.
+   *
+   * Nullable/opcional: un pedido por unidad (o guardado antes de esta funcionalidad) no tiene
+   * paquetes, y el resumen de WhatsApp tiene que poder decirlo sin inventarlos.
+   */
+  packs?: number | null;
+  /** Unidad de medida configurada ("caja"). Null cuando la línea no es mayorista. */
+  unitLabel?: string | null;
 }
 
 /** Lo que devuelve el alta (`OnlineOrderCreatedDto`): el código con el que se consulta el pedido. */
@@ -651,6 +747,10 @@ function createCatalogConfigClient(basePath: string) {
       // Ausente = "no toco el ajuste": el backend lo lee como null.
       if (payload.mobileColumns !== undefined) {
         formData.append('mobileColumns', String(payload.mobileColumns));
+      }
+      // Ausente = "no toco el modo": el backend lo lee como null.
+      if (payload.priceMode !== undefined) {
+        formData.append('priceMode', payload.priceMode);
       }
       const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
         `${basePath}/branding`,

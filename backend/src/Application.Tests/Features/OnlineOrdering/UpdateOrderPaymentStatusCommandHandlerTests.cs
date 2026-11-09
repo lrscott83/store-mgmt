@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus;
 using Application.UnitOfWorks;
@@ -22,8 +22,10 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      cobrar en la puerta). Por eso este comando NO pasa por la máquina de `ChangeStatus` y por
 ///      eso el handler no le pregunta al dominio nada.
 ///   2. Solo hay dos valores, y en los dos sentidos: `Pending ⇄ Paid`. No hay "Reembolsado".
-///   3. El aislamiento por tienda y el `UpdateAsync` explícito son los mismos que en T3 —
+///   3. El aislamiento por tienda y el guardado explícito son los mismos que en T3 —
 ///      `ApplicationDbContext` es `NoTracking`, así que sin marcar la entidad no se escribe nada.
+///      Pero aquí solo se marcan `PaymentStatus` y `PaidAt`: el estado y el repartidor de la MISMA
+///      fila son de otras acciones, y guardarlos también borraría su trabajo concurrente.
 /// </summary>
 public class UpdateOrderPaymentStatusCommandHandlerTests
 {
@@ -45,7 +47,8 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         _httpContextService.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
 
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _orderRepository.Setup(x => x.UpdateAsync(It.IsAny<Order>())).ReturnsAsync(true);
+        _orderRepository.Setup(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
     }
 
     private UpdateOrderPaymentStatusCommandHandler Handler() => new(
@@ -57,7 +60,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
     private Order OrderWith(OrderPaymentStatus paymentStatus, OrderStatus status = OrderStatus.Creado)
     {
         Order order = Domain.Entities.Orders.Order.Create(
-            _storeId, OrderType.WhatsApp, string.Empty, 0m, 0,
+            _storeId, OrderType.Normal, string.Empty, 0m, 0,
             new DateTime(2026, 10, 7, 10, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
         order.Code = "PED-42";
         order.ChangePaymentStatus(paymentStatus);
@@ -67,7 +70,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
 
     private void Returns(Order? order)
         => _orderRepository
-            .Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
 
     #region Happy Path
@@ -196,20 +199,29 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
     #region Integration / Dependencies
 
     /// <summary>
-    /// `ApplicationDbContext` es `NoTracking`: sin `UpdateAsync` el cambio se queda en memoria y
+    /// `ApplicationDbContext` es `NoTracking`: sin marcar la fila, el cambio se queda en memoria y
     /// `SaveChanges` no escribe NADA — sin error y sin aviso.
+    ///
+    /// El conjunto EXACTO de campos se afirma por igualdad: marcar `Status` o `DriverId` además de
+    /// estas dos compilaría y pasaría un "contiene", y es exactamente lo que pisaría un cambio de
+    /// estado o de reparto concurrente.
     /// </summary>
     [Fact]
-    public async Task Handle_WithAValidPaymentStatus_ShouldMarkTheOrderAsModifiedBeforeSaving()
+    public async Task Handle_WithAValidPaymentStatus_ShouldMarkOnlyThePaymentColumns()
     {
         Order order = OrderWith(OrderPaymentStatus.Pending);
         Returns(order);
 
+        using var cts = new CancellationTokenSource();
+
         await Handler().Handle(
-            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
+            new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), cts.Token);
 
         _orderRepository.Verify(
-            x => x.UpdateAsync(It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid)),
+            x => x.UpdatePartialAsync(
+                It.Is<Order>(o => o.Id == order.Id && o.PaymentStatus == OrderPaymentStatus.Paid),
+                OrderChangedField.PaymentStatus | OrderChangedField.PaidAt,
+                It.Is<CancellationToken>(token => token == cts.Token)),
             Times.Once);
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -224,9 +236,9 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
         await Handler().Handle(
             new UpdateOrderPaymentStatusCommand(order.Id, OrderPaymentStatus.Paid), CancellationToken.None);
 
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(_storeId, order.Id), Times.Once);
+        _orderRepository.Verify(x => x.GetByIdAsync(_storeId, order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _orderRepository.Verify(
-            x => x.GetByIdWithItemsAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>()), Times.Never);
+            x => x.GetByIdAsync(It.Is<Guid>(id => id != _storeId), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>La asignación de repartidor es de T5: este comando no la toca.</summary>
@@ -269,7 +281,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
             new UpdateOrderPaymentStatusCommand(Guid.NewGuid(), OrderPaymentStatus.Paid), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.UpdateAsync(It.IsAny<Order>()), Times.Never);
+        _orderRepository.Verify(x => x.UpdatePartialAsync(It.IsAny<Order>(), It.IsAny<OrderChangedField>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -283,7 +295,7 @@ public class UpdateOrderPaymentStatusCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        _orderRepository.Verify(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
