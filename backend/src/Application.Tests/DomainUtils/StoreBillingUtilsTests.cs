@@ -105,6 +105,18 @@ namespace Application.Tests.DomainUtils
                 .Should().Be(StoreBillingStatusType.NoAplica);
         }
 
+        // ── OwesMoney (statuses offered for collection) ────────────────────────────
+        [Theory]
+        [InlineData(StoreBillingStatusType.NoAplica, false)]
+        [InlineData(StoreBillingStatusType.AlDia, false)]
+        [InlineData(StoreBillingStatusType.PorVencer, true)]
+        [InlineData(StoreBillingStatusType.EnGracia, true)]
+        [InlineData(StoreBillingStatusType.Vencido, true)]
+        public void OwesMoney_isTrueOnlyForDueSoonInGraceOrOverdue(StoreBillingStatusType status, bool expected)
+        {
+            StoreBillingUtils.OwesMoney(status).Should().Be(expected);
+        }
+
         // ── IsPaidPlanActive ───────────────────────────────────────────────────────
         [Fact]
         public void IsPaidPlanActive_withinGrace_true()

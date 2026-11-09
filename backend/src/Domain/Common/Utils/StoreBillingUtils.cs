@@ -48,6 +48,15 @@ namespace Domain.Common.Utils
         public static bool IsPaidPlanActive(DateOnly? paymentStartDate, DateOnly? nextDueDate, DateOnly today, int graceDays)
             => paymentStartDate is not null && nextDueDate is not null && today <= nextDueDate.Value.AddDays(graceDays);
 
+        /// <summary>
+        /// True when a store with this status still owes money and must be offered for
+        /// collection: due soon, in the grace period, or already overdue.
+        /// </summary>
+        public static bool OwesMoney(StoreBillingStatusType status) =>
+            status is StoreBillingStatusType.PorVencer
+                or StoreBillingStatusType.EnGracia
+                or StoreBillingStatusType.Vencido;
+
         public static bool IsInTrial(DateOnly? paymentStartDate, int trialMonths, DateOnly today)
             => paymentStartDate is not null && today <= paymentStartDate.Value.AddMonths(trialMonths);
 

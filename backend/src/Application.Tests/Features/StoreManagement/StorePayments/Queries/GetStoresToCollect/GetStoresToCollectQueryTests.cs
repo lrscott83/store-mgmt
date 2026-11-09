@@ -108,6 +108,9 @@ public class GetStoresToCollectQueryHandlerTests
     private static StoreModule CreatePaidStoreModule(int moduleId, float price)
         => StoreModule.Create(Guid.Empty, moduleId, price, false, price, 0, 0, Guid.Empty);
 
+    private static StoreModule CreatePriceIncludedStoreModule(int moduleId)
+        => StoreModule.Create(Guid.Empty, moduleId, 0f, true, 0f, 0, 0, Guid.Empty);
+
     #region Authorization
 
     [Fact]
@@ -191,6 +194,10 @@ public class GetStoresToCollectQueryHandlerTests
         data.Should().HaveCount(2);
         data.Should().NotContain(d => d.StoreId == store2Id);
 
+        // The sort contract is ascending NextDueDate; the positional assertions below
+        // follow from it rather than from incidental insertion order.
+        data.Select(d => d.NextDueDate).Should().BeInAscendingOrder();
+
         // Store3 (Vencido) owes the most and has the oldest due date → first row.
         data[0].StoreId.Should().Be(store3Id);
         data[0].StoreName.Should().Be("Store Vencido");
@@ -241,6 +248,39 @@ public class GetStoresToCollectQueryHandlerTests
         // Assert
         result.Succeeded.Should().BeTrue();
         result.Data.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_superAdmin_includesVencidoStoreWithOnlyPriceIncludedModules_amountZero()
+    {
+        // Arrange
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        var owner = CreateOwnerWithUser("Owner");
+        var storeId = Guid.NewGuid();
+        // Free-only store: started long ago, never paid, every module price-included.
+        var store = CreateStoreWithId(storeId, "Free Vencido Store", owner, Today.AddMonths(-6));
+        store.StoreModules.Add(CreatePriceIncludedStoreModule(1));
+
+        _mockStoreRepository
+            .Setup(x => x.GetPaidStoresAsync())
+            .ReturnsAsync(new[] { store });
+
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(storeId))
+            .ReturnsAsync((StorePayment?)null);
+
+        // Act
+        var result = await _handler.Handle(new GetStoresToCollectQuery(), CancellationToken.None);
+
+        // Assert
+        // Accepted product rule: a free-only store MAY appear in to-collect with Amount = 0.
+        result.Succeeded.Should().BeTrue();
+        var row = result.Data.Should().ContainSingle().Subject;
+        row.StoreId.Should().Be(storeId);
+        row.Status.Should().Be("Vencido");
+        row.Amount.Should().Be(0f);
     }
 
     #endregion

@@ -200,13 +200,22 @@ export interface OwnerStoreWithPlan {
   planCurrentPrice: number | null;
 }
 
+/**
+ * The statuses the to-collect endpoint can return, as the single source of truth for
+ * the union below. Add a status here and the completeness test fails until its
+ * `BILLING.STATUS.<status>` translation exists, instead of the UI rendering a raw key.
+ */
+export const STORE_TO_COLLECT_STATUSES = ['PorVencer', 'EnGracia', 'Vencido'] as const;
+
+export type StoreToCollectStatus = (typeof STORE_TO_COLLECT_STATUSES)[number];
+
 export interface StoreToCollect {
   storeId: string;
   storeName: string;
   ownerName: string;
   amount: number;
   nextDueDate: string | null;
-  status: 'PorVencer' | 'EnGracia' | 'Vencido';
+  status: StoreToCollectStatus;
 }
 
 /**
