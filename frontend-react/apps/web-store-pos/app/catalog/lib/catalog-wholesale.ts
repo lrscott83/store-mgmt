@@ -52,6 +52,10 @@ export interface CatalogWholesaleDisplay {
   readonly minPacks: number;
   /** Precio de UN paquete en el escalón de entrada. */
   readonly packPrice: number;
+  /** Precio por UNIDAD en el escalón de entrada (para "caja (12 x 8 CUP)"). */
+  readonly entryUnitPrice: number;
+  /** Escalones ordenados por `minPacks`, para el popup y la ficha del producto. */
+  readonly tiers: readonly CatalogWholesaleTier[];
 }
 
 /**
@@ -162,5 +166,7 @@ export function wholesaleDisplayOf(product: PublicCatalogProduct): CatalogWholes
     unitPlural: wholesaleUnitPluralOf(config.unitLabel),
     minPacks,
     packPrice,
+    entryUnitPrice,
+    tiers: [...config.tiers].sort((a, b) => a.minPacks - b.minPacks),
   };
 }

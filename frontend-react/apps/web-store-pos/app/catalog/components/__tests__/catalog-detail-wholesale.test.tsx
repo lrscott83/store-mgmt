@@ -193,7 +193,7 @@ describe('detalle de producto en modo mayorista', () => {
   it('dice la unidad, el tamaño del bulto y el mínimo vendible', async () => {
     const dialog = await openDetail('Cerveza');
 
-    expect(dialog.getByText(/caja \(12\)/)).toBeInTheDocument();
+    expect(dialog.getByText(/caja \(12 x 32 CUP\)/)).toBeInTheDocument();
     expect(dialog.getByText(/desde 3 cajas/)).toBeInTheDocument();
   });
 

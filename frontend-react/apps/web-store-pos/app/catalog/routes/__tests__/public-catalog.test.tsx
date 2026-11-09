@@ -1234,7 +1234,7 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('catalog-cart-button').querySelector('svg')).not.toBeNull();
     });
 
-    it('el tope del badge es 99+, porque el badge es de 16 px', async () => {
+    it('el tope del badge es 99+, porque el badge es de 20 px', async () => {
       renderPage();
       await screen.findByTestId('catalog-add-cp1');
 

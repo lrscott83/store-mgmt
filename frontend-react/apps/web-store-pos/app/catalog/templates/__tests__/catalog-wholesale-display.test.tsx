@@ -150,7 +150,7 @@ describe('Carta en modo mayorista — plantilla default', () => {
     expect(price).not.toHaveTextContent(/82\.50/);
 
     const note = screen.getByTestId('catalog-card-wholesale-cerveza');
-    expect(note).toHaveTextContent('caja (12)');
+    expect(note).toHaveTextContent('caja (12 x 8 CUP)');
     expect(note).toHaveTextContent('desde 1 cajas');
   });
 
@@ -179,7 +179,7 @@ describe('Carta en modo mayorista — plantilla boutique', () => {
     expect(card).not.toHaveTextContent(/82\.50/);
 
     const note = screen.getByTestId('catalog-card-wholesale-cerveza');
-    expect(note).toHaveTextContent('caja (12)');
+    expect(note).toHaveTextContent('caja (12 x 8 CUP)');
     expect(note).toHaveTextContent('desde 1 cajas');
   });
 });
