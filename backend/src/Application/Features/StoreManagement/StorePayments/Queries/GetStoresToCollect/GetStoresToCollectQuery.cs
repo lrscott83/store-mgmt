@@ -85,8 +85,13 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
                 dueSoonDays,
                 graceDays);
 
-            // Only include stores that are due soon or in grace period
-            if (status != StoreBillingStatusType.PorVencer && status != StoreBillingStatusType.EnGracia)
+            // A store is listed when it still owes money: due soon (`PorVencer`), in the
+            // grace period (`EnGracia`), or already overdue (`Vencido`). `Vencido` MUST be
+            // listed — it owes the most and this screen is the only place its payment can
+            // be registered. `AlDia` and `NoAplica` never owe and stay excluded.
+            if (status != StoreBillingStatusType.PorVencer
+                && status != StoreBillingStatusType.EnGracia
+                && status != StoreBillingStatusType.Vencido)
                 continue;
 
             // THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included

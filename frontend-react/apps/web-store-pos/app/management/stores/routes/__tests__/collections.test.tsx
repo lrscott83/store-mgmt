@@ -134,6 +134,34 @@ describe('CollectionsPage — rows', () => {
   });
 });
 
+describe('CollectionsPage — Vencido rows', () => {
+  it('renders an overdue (Vencido) row with its translated status and still offers "Registrar pago"', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: [makeRow({ status: 'Vencido' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['BILLING.STATUS.Vencido'])).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: esMessages['BILLING.COLLECTIONS.REGISTER_PAYMENT'] }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('CollectionsPage — register payment popup', () => {
   async function renderWithRow() {
     const { storeHttpService } =

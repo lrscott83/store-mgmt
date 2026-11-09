@@ -130,7 +130,7 @@ public class GetStoresToCollectQueryHandlerTests
     #region SuperAdmin: filtering
 
     [Fact]
-    public async Task Handle_superAdmin_filtersToPorVencerAndEnGracia()
+    public async Task Handle_superAdmin_filtersToPorVencerEnGraciaAndVencido()
     {
         // Arrange
         _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
@@ -148,13 +148,23 @@ public class GetStoresToCollectQueryHandlerTests
         var store2 = CreateStoreWithId(store2Id, "Store AlDia", owner);
         store2.StoreModules.Add(CreatePaidStoreModule(2, 1000f));
 
+        // Store 3: Vencido — started 6 months ago, never paid → nextDue far in the past
+        var store3Id = Guid.NewGuid();
+        var store3 = CreateStoreWithId(store3Id, "Store Vencido", owner, Today.AddMonths(-6));
+        store3.StoreModules.Add(CreatePaidStoreModule(3, 3000f));
+
         _mockStoreRepository
             .Setup(x => x.GetPaidStoresAsync())
-            .ReturnsAsync(new[] { store1, store2 });
+            .ReturnsAsync(new[] { store1, store2, store3 });
 
         // Store1: no payments → nextDue ≈ Today + 3d → PorVencer
         _mockStorePaymentRepository
             .Setup(x => x.GetLastByStoreIdAsync(store1Id))
+            .ReturnsAsync((StorePayment?)null);
+
+        // Store3: no payments → nextDue ≈ Today - 4 months → Vencido
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(store3Id))
             .ReturnsAsync((StorePayment?)null);
 
         // Store2: has payment with PaymentBeforeDate far in future → AlDia
@@ -177,12 +187,23 @@ public class GetStoresToCollectQueryHandlerTests
         result.Succeeded.Should().BeTrue();
         var data = result.Data.ToList();
 
-        // Store2 (AlDia with far-ahead due) should be filtered out
-        data.Should().ContainSingle();
-        data[0].StoreId.Should().Be(store1Id);
-        data[0].StoreName.Should().Be("Store PorVencer");
+        // Store2 (AlDia with far-ahead due) should be filtered out; AlDia and NoAplica never owe.
+        data.Should().HaveCount(2);
+        data.Should().NotContain(d => d.StoreId == store2Id);
+
+        // Store3 (Vencido) owes the most and has the oldest due date → first row.
+        data[0].StoreId.Should().Be(store3Id);
+        data[0].StoreName.Should().Be("Store Vencido");
         data[0].OwnerName.Should().Be("Test Owner");
-        data[0].Amount.Should().Be(2000f);
+        data[0].Amount.Should().Be(3000f);
+        data[0].Status.Should().Be("Vencido");
+
+        // Store1 (PorVencer) still included, ordered after the overdue store.
+        data[1].StoreId.Should().Be(store1Id);
+        data[1].StoreName.Should().Be("Store PorVencer");
+        data[1].OwnerName.Should().Be("Test Owner");
+        data[1].Amount.Should().Be(2000f);
+        data[1].Status.Should().Be("PorVencer");
     }
 
     [Fact]

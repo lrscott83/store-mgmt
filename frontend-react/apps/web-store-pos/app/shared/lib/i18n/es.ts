@@ -1936,6 +1936,7 @@ const messages: Record<string, string> = {
   // Billing — status labels (StoreToCollect.status, DG-8 narrow union)
   'BILLING.STATUS.PorVencer': 'Por vencer',
   'BILLING.STATUS.EnGracia': 'En gracia',
+  'BILLING.STATUS.Vencido': 'Vencido',
 
   // Billing — collections view
   'BILLING.COLLECTIONS.TITLE': 'Cobros pendientes',

@@ -206,7 +206,7 @@ export interface StoreToCollect {
   ownerName: string;
   amount: number;
   nextDueDate: string | null;
-  status: 'PorVencer' | 'EnGracia';
+  status: 'PorVencer' | 'EnGracia' | 'Vencido';
 }
 
 /**
