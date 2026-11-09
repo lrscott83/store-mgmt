@@ -216,4 +216,28 @@ describe('WebCatalogSettingsView — modo de precio del catálogo', () => {
     );
     expect(showToastSuccessMock).not.toHaveBeenCalled();
   });
+
+  it('muestra el motivo del backend cuando el rechazo llega como error HTTP (errors[0].description)', async () => {
+    // Camino real: `apiClient` rechaza el 400, así que el texto NO viene en `result.message` sino en
+    // `error.response.data.errors[0].description`. Sin este manejo la vista caía al genérico.
+    const rejection =
+      'Para cambiar el catálogo a precios mayoristas, primero sincronice los precios mayoristas.';
+    catalogMock.updateBranding.mockRejectedValue({
+      response: {
+        status: 400,
+        data: { errors: [{ code: 'App.Unexpected', description: rejection }] },
+      },
+    });
+
+    renderView();
+
+    const select = await screen.findByTestId('brand-price-mode-select');
+    fireEvent.change(select, { target: { value: 'Wholesale' } });
+    fireEvent.click(screen.getByTestId('brand-save'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(expect.anything(), rejection),
+    );
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+  });
 });

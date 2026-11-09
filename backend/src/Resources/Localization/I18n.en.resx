@@ -640,7 +640,7 @@
     <value>{0} only accepts Unit or Wholesale (per unit or wholesale pricing)</value>
   </data>
   <data name="CatalogWholesaleModeWithoutProducts" xml:space="preserve">
-    <value>The catalog cannot be published with wholesale prices: the store has no product configured with a wholesale price. Configure wholesale prices and sync the catalog to enable this mode.</value>
+    <value>To switch the catalog to wholesale pricing, first sync the wholesale prices. No product has a wholesale price configured yet: set the wholesale price on at least one product and sync the catalog, then you can enable this mode.</value>
   </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>The image type {0} is not valid</value>
