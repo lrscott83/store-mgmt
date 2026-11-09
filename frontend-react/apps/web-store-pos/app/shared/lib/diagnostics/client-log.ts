@@ -1,4 +1,5 @@
 import { GlobalConfig } from '../config/global-config';
+import type { ObservedInstallState, PwaInstallSnapshot } from '../pwa/pwa-install-diagnostics';
 
 /**
  * Client-side diagnostic log (docs/plans/2026-09-14-client-error-log-pwa-plan.md).
@@ -184,11 +185,23 @@ export interface ClientLogExport {
     timestamp: string;
   };
   selectedStoreId?: string;
+  /**
+   * PWA install diagnostics (state, reason and device signals) — present only
+   * when the caller collected a snapshot, so the export shape is unchanged
+   * otherwise.
+   */
+  pwa?: {
+    current: PwaInstallSnapshot;
+    lastObserved: ObservedInstallState | null;
+  };
   entries: ClientLogEntry[];
 }
 
 /** Pretty JSON with a device-metadata header — the shareable artifact. */
-export function exportClientLogs(selectedStoreId?: string): string {
+export function exportClientLogs(
+  selectedStoreId?: string,
+  pwa?: ClientLogExport['pwa'],
+): string {
   const payload: ClientLogExport = {
     appVersion: GlobalConfig.APP_VERSION,
     device: {
@@ -198,6 +211,7 @@ export function exportClientLogs(selectedStoreId?: string): string {
       timestamp: new Date().toISOString(),
     },
     ...(selectedStoreId ? { selectedStoreId } : {}),
+    ...(pwa ? { pwa } : {}),
     entries: getClientLogs(),
   };
   return JSON.stringify(payload, null, 2);

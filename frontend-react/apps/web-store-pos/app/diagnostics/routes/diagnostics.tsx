@@ -8,6 +8,13 @@ import {
   type ClientLogEntry,
   type LogLevel,
 } from '~/shared/lib/diagnostics/client-log';
+import {
+  buildPwaInstallExport,
+  collectPwaInstallSnapshot,
+  getLastObservedInstallState,
+  type InstallAvailability,
+  type PwaInstallSnapshot,
+} from '~/shared/lib/pwa/pwa-install-diagnostics';
 import { confirmDialog, showBlockingSuccess } from '~/shared/lib/blocking-alert';
 import { GlobalConfig } from '~/shared/lib/config/global-config';
 
@@ -22,6 +29,31 @@ const LEVEL_CLASS: Record<LogLevel, string> = {
   warn: 'text-amber-600 dark:text-amber-400',
   info: 'text-cyan-600 dark:text-cyan-400',
 };
+
+/** Human label for every resolved install state (i18n ids). */
+const AVAILABILITY_LABEL_ID: Record<InstallAvailability, string> = {
+  ready: 'DIAGNOSTICS.PWA_AVAILABILITY_READY',
+  'awaiting-prompt': 'DIAGNOSTICS.PWA_AVAILABILITY_AWAITING_PROMPT',
+  'no-service-worker': 'DIAGNOSTICS.PWA_AVAILABILITY_NO_SERVICE_WORKER',
+  standalone: 'DIAGNOSTICS.PWA_AVAILABILITY_STANDALONE',
+  'installed-flag': 'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_FLAG',
+  'installed-related-app': 'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_RELATED_APP',
+};
+
+/**
+ * One-line service-worker summary for the device card: the worker states found
+ * for every registration, or `null` when there is nothing registered.
+ */
+function summarizeServiceWorker(
+  serviceWorker: PwaInstallSnapshot['serviceWorker'],
+): string | null {
+  const states = serviceWorker.registrations.flatMap((registration) => [
+    ...(registration.active ? [`active: ${registration.active}`] : []),
+    ...(registration.waiting ? [`waiting: ${registration.waiting}`] : []),
+    ...(registration.installing ? [`installing: ${registration.installing}`] : []),
+  ]);
+  return states.length > 0 ? states.join(' · ') : null;
+}
 
 function formatLocalDateTime(ts: number): string {
   return new Date(ts).toLocaleString();
@@ -39,6 +71,32 @@ export function DiagnosticsPage() {
   const [entries, setEntries] = useState<ClientLogEntry[]>(() => getClientLogs());
   const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [snapshot, setSnapshot] = useState<PwaInstallSnapshot | null>(null);
+  // The moment the pill was visibly disabled survives only in module memory.
+  const lastObserved = snapshot ? getLastObservedInstallState() : null;
+
+  // Best-effort forensic probe: the page must render even when it fails.
+  useEffect(() => {
+    let cancelled = false;
+    let commitId: ReturnType<typeof setTimeout> | undefined;
+    void collectPwaInstallSnapshot()
+      .then((next) => {
+        if (cancelled) return;
+        // The probe resolves on a microtask. Committing on the next macrotask
+        // keeps the update cancellable: a page that is already gone never
+        // schedules a state update it will not render.
+        commitId = setTimeout(() => {
+          if (!cancelled) setSnapshot(next);
+        }, 0);
+      })
+      .catch(() => {
+        // Best-effort: the page renders without the probe.
+      });
+    return () => {
+      cancelled = true;
+      if (commitId !== undefined) clearTimeout(commitId);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -84,8 +142,19 @@ export function DiagnosticsPage() {
     };
   }, []);
 
+  /**
+   * The single export path every handler shares: same client log, plus the PWA
+   * install diagnostics when the probe already answered.
+   */
+  function exportJson(): string {
+    return exportClientLogs(
+      selectedStoreId ?? undefined,
+      snapshot ? buildPwaInstallExport(snapshot) : undefined,
+    );
+  }
+
   async function handleShare(): Promise<void> {
-    const json = exportClientLogs(selectedStoreId ?? undefined);
+    const json = exportJson();
     const fileName = buildExportFileName();
     const file = new File([json], fileName, { type: 'application/json' });
     const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
@@ -101,7 +170,7 @@ export function DiagnosticsPage() {
   }
 
   function handleDownload(): void {
-    downloadJson(exportClientLogs(selectedStoreId ?? undefined), buildExportFileName());
+    downloadJson(exportJson(), buildExportFileName());
   }
 
   /**
@@ -110,7 +179,7 @@ export function DiagnosticsPage() {
    * owner's number opens in a new tab for the user to attach it.
    */
   function handleSendWhatsApp(): void {
-    downloadJson(exportClientLogs(selectedStoreId ?? undefined), buildExportFileName());
+    downloadJson(exportJson(), buildExportFileName());
     window.open(WHATSAPP_CHAT_URL, '_blank', 'noopener');
   }
 
@@ -125,7 +194,7 @@ export function DiagnosticsPage() {
   }
 
   async function handleCopy(): Promise<void> {
-    await navigator.clipboard.writeText(exportClientLogs(selectedStoreId ?? undefined));
+    await navigator.clipboard.writeText(exportJson());
     void showBlockingSuccess(intl.formatMessage({ id: 'DIAGNOSTICS.COPIED' }));
   }
 
@@ -163,6 +232,51 @@ export function DiagnosticsPage() {
             <dt className="inline font-medium">{intl.formatMessage({ id: 'DIAGNOSTICS.USER_AGENT' })}: </dt>
             <dd className="inline break-all">{navigator.userAgent}</dd>
           </div>
+          {snapshot && (
+            <>
+              <div>
+                <dt className="inline font-medium">{intl.formatMessage({ id: 'DIAGNOSTICS.PWA_STATE' })}: </dt>
+                <dd className="inline">
+                  {intl.formatMessage({ id: AVAILABILITY_LABEL_ID[snapshot.availability] })}
+                </dd>
+              </div>
+              {lastObserved && (
+                <div>
+                  <dt className="inline font-medium">
+                    {intl.formatMessage({ id: 'DIAGNOSTICS.PWA_LAST_OBSERVED' })}:{' '}
+                  </dt>
+                  <dd className="inline">
+                    {intl.formatMessage({ id: AVAILABILITY_LABEL_ID[lastObserved.availability] })} ·{' '}
+                    {new Date(lastObserved.observedAt).toLocaleString()}
+                    {lastObserved.resolvedAt &&
+                      ` · ${intl.formatMessage({ id: 'DIAGNOSTICS.PWA_RESOLVED_AT' })} ${new Date(
+                        lastObserved.resolvedAt,
+                      ).toLocaleString()}`}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="inline font-medium">
+                  {intl.formatMessage({ id: 'DIAGNOSTICS.PWA_SERVICE_WORKER' })}:{' '}
+                </dt>
+                <dd className="inline">
+                  {summarizeServiceWorker(snapshot.serviceWorker) ??
+                    intl.formatMessage({ id: 'DIAGNOSTICS.PWA_SW_NONE' })}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">{intl.formatMessage({ id: 'DIAGNOSTICS.PWA_DISPLAY_MODE' })}: </dt>
+                <dd className="inline">
+                  {intl.formatMessage({
+                    id:
+                      snapshot.signals.displayModeStandalone || snapshot.signals.iosStandalone
+                        ? 'DIAGNOSTICS.PWA_DISPLAY_STANDALONE'
+                        : 'DIAGNOSTICS.PWA_DISPLAY_BROWSER',
+                  })}
+                </dd>
+              </div>
+            </>
+          )}
         </dl>
       </section>
 

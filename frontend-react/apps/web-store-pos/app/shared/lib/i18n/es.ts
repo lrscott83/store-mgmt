@@ -52,6 +52,22 @@ const messages: Record<string, string> = {
   'DIAGNOSTICS.LEVEL_ALL': 'Todos',
   'DIAGNOSTICS.SEARCH': 'Buscar',
   'DIAGNOSTICS.EMPTY': 'No hay eventos registrados en este dispositivo.',
+  // PWA install diagnostics — why the floating "Instalar App" button is
+  // disabled on this device, and the raw browser signals behind it.
+  'DIAGNOSTICS.PWA_STATE': 'Estado de instalación',
+  'DIAGNOSTICS.PWA_LAST_OBSERVED': 'Último estado del botón',
+  'DIAGNOSTICS.PWA_RESOLVED_AT': 'resuelto a las',
+  'DIAGNOSTICS.PWA_SERVICE_WORKER': 'Service worker',
+  'DIAGNOSTICS.PWA_DISPLAY_MODE': 'Modo de visualización',
+  'DIAGNOSTICS.PWA_SW_NONE': 'Sin registro de service worker',
+  'DIAGNOSTICS.PWA_DISPLAY_STANDALONE': 'App instalada (ventana propia)',
+  'DIAGNOSTICS.PWA_DISPLAY_BROWSER': 'Navegador (pestaña)',
+  'DIAGNOSTICS.PWA_AVAILABILITY_READY': 'Listo para instalar',
+  'DIAGNOSTICS.PWA_AVAILABILITY_AWAITING_PROMPT': 'Sin aviso de instalación del navegador',
+  'DIAGNOSTICS.PWA_AVAILABILITY_NO_SERVICE_WORKER': 'Navegador sin soporte de service worker',
+  'DIAGNOSTICS.PWA_AVAILABILITY_STANDALONE': 'Ejecutándose como app instalada',
+  'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_FLAG': 'Marcada como instalada en este dispositivo',
+  'DIAGNOSTICS.PWA_AVAILABILITY_INSTALLED_RELATED_APP': 'Detectada como app web instalada',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
   'GENERAL.LOGOUT': 'Salir',
   // The user-popup's icon-only logout button (dropdown header) — distinct from the
