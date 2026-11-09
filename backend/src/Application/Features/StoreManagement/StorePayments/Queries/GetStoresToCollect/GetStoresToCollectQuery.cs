@@ -85,8 +85,6 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
                 dueSoonDays,
                 graceDays);
 
-            // Only stores that still owe money are listed; `Vencido` must stay included
-            // because this screen is the only place its payment can be registered.
             if (!StoreBillingUtils.OwesMoney(status))
                 continue;
 

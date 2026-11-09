@@ -136,12 +136,12 @@ describe('CollectionsPage — rows', () => {
 });
 
 describe('CollectionsPage — Vencido rows', () => {
-  it('renders an overdue (Vencido) row with its translated status and still offers "Registrar pago"', async () => {
+  async function renderRows(rows: StoreToCollect[]) {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: true,
-      data: [makeRow({ status: 'Vencido' })],
+      data: rows,
       message: '',
       actionCode: 0,
       errors: [],
@@ -153,6 +153,10 @@ describe('CollectionsPage — Vencido rows', () => {
         <CollectionsPage />
       </Wrapper>,
     );
+  }
+
+  it('renders an overdue (Vencido) row with its translated status and still offers "Registrar pago"', async () => {
+    await renderRows([makeRow({ status: 'Vencido' })]);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['BILLING.STATUS.Vencido'])).toBeInTheDocument();
@@ -168,22 +172,7 @@ describe('CollectionsPage — Vencido rows', () => {
   });
 
   it('translates a status whose label differs from its raw value ("PorVencer" → "Por vencer")', async () => {
-    const { storeHttpService } =
-      await import('~/management/stores/lib/services/store-http-service');
-    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
-      succeeded: true,
-      data: [makeRow({ status: 'PorVencer' })],
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-
-    const { default: CollectionsPage } = await import('../collections');
-    render(
-      <Wrapper>
-        <CollectionsPage />
-      </Wrapper>,
-    );
+    await renderRows([makeRow({ status: 'PorVencer' })]);
 
     await waitFor(() => {
       expect(screen.getByText('Por vencer')).toBeInTheDocument();

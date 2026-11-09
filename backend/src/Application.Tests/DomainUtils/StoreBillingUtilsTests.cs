@@ -106,15 +106,23 @@ namespace Application.Tests.DomainUtils
         }
 
         // ── OwesMoney (statuses offered for collection) ────────────────────────────
-        [Theory]
-        [InlineData(StoreBillingStatusType.NoAplica, false)]
-        [InlineData(StoreBillingStatusType.AlDia, false)]
-        [InlineData(StoreBillingStatusType.PorVencer, true)]
-        [InlineData(StoreBillingStatusType.EnGracia, true)]
-        [InlineData(StoreBillingStatusType.Vencido, true)]
-        public void OwesMoney_isTrueOnlyForDueSoonInGraceOrOverdue(StoreBillingStatusType status, bool expected)
+        // Exhaustive against the enum itself, not a hand-written case list: the
+        // collectible set is derived, so a member silently made collectible fails here
+        // until an explicit decision is recorded. The same decision must also touch
+        // `STORE_TO_COLLECT_STATUSES` in the frontend domain package.
+        [Fact]
+        public void OwesMoney_trueSet_isExactlyTheCollectibleStatuses()
         {
-            StoreBillingUtils.OwesMoney(status).Should().Be(expected);
+            var owing = Enum.GetValues<StoreBillingStatusType>()
+                .Where(StoreBillingUtils.OwesMoney)
+                .Select(status => status.ToString())
+                .OrderBy(name => name)
+                .ToArray();
+
+            owing.Should().Equal(
+                nameof(StoreBillingStatusType.EnGracia),
+                nameof(StoreBillingStatusType.PorVencer),
+                nameof(StoreBillingStatusType.Vencido));
         }
 
         // ── IsPaidPlanActive ───────────────────────────────────────────────────────

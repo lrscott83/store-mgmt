@@ -204,6 +204,12 @@ export interface OwnerStoreWithPlan {
  * The statuses the to-collect endpoint can return, as the single source of truth for
  * the union below. Add a status here and the completeness test fails until its
  * `BILLING.STATUS.<status>` translation exists, instead of the UI rendering a raw key.
+ *
+ * FRONTEND MIRROR: the authoritative set lives in the backend —
+ * `Domain.Common.Utils.StoreBillingStatusType` filtered by
+ * `StoreBillingUtils.OwesMoney(...)` (backend/src/Domain/Common/Utils/StoreBillingUtils.cs).
+ * Edit the two together: adding a collectible status there without adding it here leaves
+ * this tuple stale while every frontend test still passes.
  */
 export const STORE_TO_COLLECT_STATUSES = ['PorVencer', 'EnGracia', 'Vencido'] as const;
 
