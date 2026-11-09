@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
@@ -556,6 +556,99 @@ describe('AdminMessagesPage — background loading', () => {
       expect(storeHttpService.listStores).toHaveBeenCalledWith({ background: true });
       expect(messagesHttpService.getConversations).toHaveBeenCalledWith({ background: true });
     });
+  });
+});
+
+describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function incoming(id: string): MessageDto {
+    return {
+      id,
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: `Mensaje ${id}`,
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+  }
+
+  /**
+   * jsdom no tiene layout: todas las rects son 0x0 y "dentro de la caja" sería
+   * cierto para todo. Este stub le da geometría real a la caja del hilo y a cada
+   * fila, para que la prueba pueda distinguir un mensaje en pantalla de uno que
+   * quedó por encima del scroll.
+   */
+  function stubVisibility(visibleIds: readonly string[]): void {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const rect = (top: number, bottom: number): DOMRect =>
+        ({
+          top,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: bottom - top,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      const testId = this.getAttribute('data-testid');
+      if (testId === 'message-thread') return rect(0, 100);
+      if (testId?.startsWith('message-')) {
+        const id = testId.slice('message-'.length);
+        // Fuera de la caja: por encima del borde superior visible.
+        return visibleIds.includes(id) ? rect(10, 40) : rect(-60, -10);
+      }
+      return rect(0, 0);
+    });
+  }
+
+  it('no marca como leído un mensaje que nunca entró en la caja visible', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-old'), incoming('m-new')]),
+    );
+    stubVisibility(['m-new']);
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    await waitFor(() =>
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+    );
+    expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-old', {
+      background: true,
+    });
+  });
+
+  it('manda cada acuse una sola vez aunque el polling relea las mismas filas', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-new')]),
+    );
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    await waitFor(() =>
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+    );
+
+    // Volver a la ventana rearma la escalera: el siguiente poll relee el hilo.
+    fireEvent(window, new Event('focus'));
+    await waitFor(() =>
+      expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1),
+    );
+
+    expect(messagesHttpService.markAsRead).toHaveBeenCalledTimes(1);
   });
 });
 
