@@ -607,7 +607,10 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
         // Fuera de la caja: por encima del borde superior visible.
         return visibleIds.includes(id) ? rect(10, 40) : rect(-60, -10);
       }
-      return rect(0, 0);
+      // Cualquier otro elemento cae fuera de la caja: si el hilo se resolviera
+      // por accidente a este rect degenerado, ningún mensaje sería visible y la
+      // prueba fallaría en vez de pasar por casualidad.
+      return rect(-1000, -900);
     });
   }
 
@@ -654,7 +657,9 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
           }) as DOMRect;
         if (testId === 'message-thread') return rect(0, 100);
         if (testId === 'message-m-tall') return rect(-200, 400);
-        return rect(0, 0);
+        // Elemento no identificado: fuera de la caja, para que una caja mal
+        // resuelta haga fallar la prueba en lugar de satisfacerla.
+        return rect(-1000, -900);
       });
 
     try {
@@ -671,26 +676,99 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
     }
   });
 
+  it('no acusa un mensaje que solo roza el borde de la caja', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-touch'), incoming('m-open')]),
+    );
+    // `m-touch` acaba exactamente en el borde superior de la caja y `m-flush`
+    // empieza exactamente en el inferior: cero píxeles visibles en ambos, así
+    // que ninguno es lectura. `m-open` sí solapa.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-touch') return rect(-60, 0);
+        if (testId === 'message-m-open') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      // `m-open` es el punto de sincronía: si la medición no hubiera corrido,
+      // este assert no pasaría y el "no se acusó" de abajo no probaría nada.
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-open', { background: true }),
+      );
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-touch', {
+        background: true,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('manda cada acuse una sola vez aunque el polling relea las mismas filas', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
     vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
       response<MessageDto[]>([incoming('m-new')]),
     );
+    // jsdom has no layout: the row must be given real geometry inside the box,
+    // or the (correct) overlap predicate sees nothing and never receipts.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-new') return rect(10, 40);
+        return rect(-1000, -900);
+      });
 
-    await renderPage();
-    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
 
-    await waitFor(() =>
-      expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
-    );
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+      );
 
-    // Volver a la ventana rearma la escalera: el siguiente poll relee el hilo.
-    fireEvent(window, new Event('focus'));
-    await waitFor(() =>
-      expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1),
-    );
+      // Volver a la ventana rearma la escalera: el siguiente poll relee el hilo.
+      fireEvent(window, new Event('focus'));
+      await waitFor(() =>
+        expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1),
+      );
 
-    expect(messagesHttpService.markAsRead).toHaveBeenCalledTimes(1);
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

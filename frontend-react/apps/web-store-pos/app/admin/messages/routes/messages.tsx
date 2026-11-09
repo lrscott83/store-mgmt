@@ -261,12 +261,12 @@ export function AdminMessagesPage() {
         const element = itemRefs.current.get(message.id);
         if (!element) return false;
         const rect = element.getBoundingClientRect();
-        // Intersection, never full containment: a message taller than the visible
-        // box can never satisfy `top >= box.top && bottom <= box.bottom`, so it
-        // would stay unread forever however much the operator reads it — and the
-        // header badge, which sums the server-side count, would never come down.
-        // Touching the box is enough.
-        return rect.bottom >= box.top && rect.top <= box.bottom;
+        // Actual overlap, never full containment and never a mere touch. Full
+        // containment (`top >= box.top && bottom <= box.bottom`) can never be met
+        // by a message taller than the box, so it stayed unread forever however
+        // much the operator read it. A message that only touches an edge has zero
+        // visible pixels, so it is not read either.
+        return rect.bottom > box.top && rect.top < box.bottom;
       })
       .map((message) => message.id)
       .filter((id) => !receiptedRef.current.has(id));

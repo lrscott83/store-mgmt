@@ -331,15 +331,40 @@ describe('MessageShell — panel conversation', () => {
       ]),
     );
     markAsReadMock.mockResolvedValue(success(true));
+    // jsdom has no layout, so the receipt predicate needs real geometry: both
+    // rows sit inside the panel box. The fallback is placed OUTSIDE the box so a
+    // mis-resolved box fails the assertion instead of satisfying it.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        if (this.getAttribute('data-testid') === 'message-list-box') return rect(0, 100);
+        return rect(10, 40);
+      });
 
-    renderShell();
-    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
-    openPanel();
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
 
-    await waitFor(() =>
-      expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }),
-    );
-    expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
+      await waitFor(() =>
+        expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }),
+      );
+      expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
+    } finally {
+      spy.mockRestore();
+    }
   });
   it('marks a message taller than the panel box once it is on screen', async () => {
     getConversationsMock.mockResolvedValue(
@@ -365,9 +390,11 @@ describe('MessageShell — panel conversation', () => {
             toJSON: () => ({}),
           }) as DOMRect;
         const testId = this.getAttribute('data-testid');
-        if (testId === 'message-list') return rect(0, 100);
+        if (testId === 'message-list-box') return rect(0, 100);
         if (testId === 'message-tall') return rect(-200, 400);
-        return rect(0, 0);
+        // Unknown element: outside the box, so a mis-resolved box cannot make
+        // this assertion pass by accident.
+        return rect(-1000, -900);
       });
 
     try {
@@ -376,6 +403,54 @@ describe('MessageShell — panel conversation', () => {
       openPanel();
 
       await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('tall', { background: true }));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not receipt a message that only touches the panel box edge', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'touch', senderId: 'sa', readAt: null }),
+        message({ id: 'open', senderId: 'sa', readAt: null }),
+      ]),
+    );
+    markAsReadMock.mockResolvedValue(success(true));
+    // `touch` ends exactly on the box top: zero visible pixels. `open` overlaps.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-list-box') return rect(0, 100);
+        if (testId === 'message-touch') return rect(-60, 0);
+        if (testId === 'message-open') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
+
+      // `open` is the sync point: without it, "touch was not receipted" would
+      // prove nothing about a measurement that never ran.
+      await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('open', { background: true }));
+      expect(markAsReadMock).not.toHaveBeenCalledWith('touch', { background: true });
     } finally {
       spy.mockRestore();
     }

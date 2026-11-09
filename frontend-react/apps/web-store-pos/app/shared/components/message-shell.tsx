@@ -183,10 +183,11 @@ export function MessageShell() {
         const element = itemRefs.current.get(message.id);
         if (!element) return false;
         const rect = element.getBoundingClientRect();
-        // Intersection, never full containment: a message taller than the box can
-        // never satisfy `top >= box.top && bottom <= box.bottom`, so it would stay
-        // unread forever however much the user reads it. Touching the box is enough.
-        return rect.bottom >= box.top && rect.top <= box.bottom;
+        // Actual overlap, never full containment and never a mere touch. Full
+        // containment can never be met by a message taller than the box, so it
+        // stayed unread forever; a message that only touches an edge has zero
+        // visible pixels, so it is not read either.
+        return rect.bottom > box.top && rect.top < box.bottom;
       })
       .map((message) => message.id)
       .filter((id) => !receiptedRef.current.has(id));
@@ -588,7 +589,11 @@ export function MessageShell() {
             </h3>
           </div>
 
-          <div className="max-h-64 overflow-y-auto px-2 py-2" ref={listRef}>
+          <div
+            data-testid="message-list-box"
+            className="max-h-64 overflow-y-auto px-2 py-2"
+            ref={listRef}
+          >
             {displayMessages.length === 0 ? (
               <p className="px-1 py-3 text-xs text-text-muted">
                 {intl.formatMessage({ id: 'MESSAGES.EMPTY' })}
