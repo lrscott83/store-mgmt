@@ -61,6 +61,9 @@ describe('wholesaleDisplayOf — precio del paquete', () => {
     expect(display?.unitPlural).toBe('cajas');
     expect(display?.packSize).toBe(12);
     expect(display?.minPacks).toBe(3);
+    // Nuevos campos para "caja (12 x 32 CUP)" y el popup de rangos.
+    expect(display?.entryUnitPrice).toBe(32);
+    expect(display?.tiers).toEqual([{ minPacks: 3, pricePerUnit: 32 }]);
   });
 
   it('si el servidor NO manda el precio del paquete lo recalcula desde el escalón de entrada', () => {

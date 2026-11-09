@@ -437,7 +437,11 @@ export function PublicCatalogPage() {
 
             {detailWholesale && (
               <p className="text-xs text-text-muted" data-testid="catalog-detail-wholesale">
-                {detailWholesale.unit} ({detailWholesale.packSize}) ·{' '}
+                {detailWholesale.unit} ({detailWholesale.packSize} x{' '}
+                {formatMoneyWithCurrency(
+                  detailWholesale.entryUnitPrice,
+                  currencyFromCode(detail.currency),
+                )}) ·{' '}
                 {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {detailWholesale.minPacks}{' '}
                 {detailWholesale.unitPlural}
               </p>
@@ -446,6 +450,31 @@ export function PublicCatalogPage() {
             <p className="whitespace-pre-line text-sm text-text" data-testid="catalog-detail-description">
               {detail.description}
             </p>
+
+            {detailWholesale && detailWholesale.tiers.length > 0 && (
+              <div data-testid="catalog-detail-wholesale-tiers">
+                <span className="text-xs font-medium text-text-muted">
+                  {intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' })}
+                </span>
+                <ul className="mt-1 space-y-1 text-xs text-text-muted">
+                  {detailWholesale.tiers.map((tier) => (
+                    <li key={tier.minPacks}>
+                      {intl.formatMessage(
+                        { id: 'SALES.WHOLESALE.TIERS_POPUP_FROM' },
+                        {
+                          min: tier.minPacks,
+                          price: formatMoneyWithCurrency(
+                            tier.pricePerUnit,
+                            currencyFromCode(detail.currency),
+                          ),
+                          unit: detailWholesale.unitPlural,
+                        },
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {orderingEnabled && (
               <Button
