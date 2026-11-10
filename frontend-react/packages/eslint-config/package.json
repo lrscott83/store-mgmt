@@ -5,6 +5,7 @@
   "private": true,
   "exports": {
     "./base": "./base.config.js",
+    "./browser-compat": "./browser-compat.js",
     "./react-router": "./react-router.config.js"
   },
   "scripts": {
