@@ -48,7 +48,9 @@ function nestedExpected(): GroupShape[] {
     { planType: 'Gratis', order: 0, moduleIds: [1, 2] },
     { planType: 'Pago', order: 1, moduleIds: [3] },
     { planType: 'Superior', order: 2, moduleIds: [4] },
-    { planType: NO_PLAN_GROUP, order: Number.MAX_SAFE_INTEGER, moduleIds: [5] },
+    // The concrete sentinel, not the imported constant: the empty string is the
+    // observable contract a caller sees.
+    { planType: '', order: Number.MAX_SAFE_INTEGER, moduleIds: [5] },
   ];
 }
 
@@ -72,6 +74,12 @@ describe('groupModulesByPlanDelta', () => {
     expect(groups.flatMap((g) => g.items).map((m) => m.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('exposes the catch-all sentinel as the empty string', () => {
+    // The sentinel is the observable contract: pin its concrete value so a change
+    // to NO_PLAN_GROUP fails here instead of silently shifting caller output.
+    expect(NO_PLAN_GROUP).toBe('');
+  });
+
   it('returns no groups for an empty universe', () => {
     expect(groupModulesByPlanDelta<UniverseItem>([], nestedPlans(), (m) => m.id)).toEqual([]);
   });
@@ -79,7 +87,7 @@ describe('groupModulesByPlanDelta', () => {
   it('returns only the catch-all when there are no plans', () => {
     const items = [{ id: 1 }, { id: 2 }];
     expect(toShape(items, [])).toEqual([
-      { planType: NO_PLAN_GROUP, order: Number.MAX_SAFE_INTEGER, moduleIds: [1, 2] },
+      { planType: '', order: Number.MAX_SAFE_INTEGER, moduleIds: [1, 2] },
     ]);
   });
 
