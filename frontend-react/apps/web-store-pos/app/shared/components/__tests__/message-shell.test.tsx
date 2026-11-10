@@ -410,16 +410,18 @@ describe('MessageShell — panel conversation', () => {
 
   it('does not receipt a message that only touches the panel box edge', async () => {
     getConversationsMock.mockResolvedValue(
-      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]),
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 3 })]),
     );
     getMessagesMock.mockResolvedValue(
       success([
         message({ id: 'touch', senderId: 'sa', readAt: null }),
+        message({ id: 'flush', senderId: 'sa', readAt: null }),
         message({ id: 'open', senderId: 'sa', readAt: null }),
       ]),
     );
     markAsReadMock.mockResolvedValue(success(true));
-    // `touch` ends exactly on the box top: zero visible pixels. `open` overlaps.
+    // Both box edges, zero visible pixels: `touch` ends exactly on the box top
+    // and `flush` starts exactly on the box bottom. `open` overlaps.
     const spy = vi
       .spyOn(Element.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: Element) {
@@ -438,6 +440,7 @@ describe('MessageShell — panel conversation', () => {
         const testId = this.getAttribute('data-testid');
         if (testId === 'message-list-box') return rect(0, 100);
         if (testId === 'message-touch') return rect(-60, 0);
+        if (testId === 'message-flush') return rect(100, 200);
         if (testId === 'message-open') return rect(10, 40);
         return rect(-1000, -900);
       });
@@ -447,10 +450,11 @@ describe('MessageShell — panel conversation', () => {
       await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
       openPanel();
 
-      // `open` is the sync point: without it, "touch was not receipted" would
-      // prove nothing about a measurement that never ran.
+      // `open` is the sync point: without it, "touch/flush were not receipted"
+      // would prove nothing about a measurement that never ran.
       await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('open', { background: true }));
       expect(markAsReadMock).not.toHaveBeenCalledWith('touch', { background: true });
+      expect(markAsReadMock).not.toHaveBeenCalledWith('flush', { background: true });
     } finally {
       spy.mockRestore();
     }

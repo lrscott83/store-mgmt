@@ -679,10 +679,14 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
   it('no acusa un mensaje que solo roza el borde de la caja', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
     vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
-      response<MessageDto[]>([incoming('m-touch'), incoming('m-open')]),
+      response<MessageDto[]>([
+        incoming('m-touch'),
+        incoming('m-flush'),
+        incoming('m-open'),
+      ]),
     );
-    // `m-touch` acaba exactamente en el borde superior de la caja y `m-flush`
-    // empieza exactamente en el inferior: cero píxeles visibles en ambos, así
+    // Los dos bordes de la caja: `m-touch` termina justo en el superior y
+    // `m-flush` empieza justo en el inferior. Cero píxeles visibles en ambos, así
     // que ninguno es lectura. `m-open` sí solapa.
     const spy = vi
       .spyOn(Element.prototype, 'getBoundingClientRect')
@@ -702,6 +706,7 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
         const testId = this.getAttribute('data-testid');
         if (testId === 'message-thread') return rect(0, 100);
         if (testId === 'message-m-touch') return rect(-60, 0);
+        if (testId === 'message-m-flush') return rect(100, 200);
         if (testId === 'message-m-open') return rect(10, 40);
         return rect(-1000, -900);
       });
@@ -711,11 +716,14 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
       fireEvent.click(await screen.findByTestId('owner-owner-a'));
 
       // `m-open` es el punto de sincronía: si la medición no hubiera corrido,
-      // este assert no pasaría y el "no se acusó" de abajo no probaría nada.
+      // este assert no pasaría y los "no se acusó" de abajo no probarían nada.
       await waitFor(() =>
         expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-open', { background: true }),
       );
       expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-touch', {
+        background: true,
+      });
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-flush', {
         background: true,
       });
     } finally {
