@@ -33,6 +33,7 @@ Archivo nuevo `frontend-react/apps/web-store-pos/app/shared/lib/browser-compat/p
   - `Array.prototype.toReversed` (Chrome 110)
   - `Array.prototype.toSpliced` (Chrome 110)
   - `Object.hasOwn` (Chrome 93)
+  - `crypto.randomUUID` (Chrome 92, solo contexto seguro) → v4 generado con `crypto.getRandomValues` (Chrome 11+), **mismo formato de string**: no cambia la forma del dato, no reescribe registros existentes y no invalida ids ya guardados.
 - Cada polyfill respeta la semántica del estándar, incluidos índices negativos en `at` y el comportamiento no mutante de `toSorted`/`toReversed`/`toSpliced`.
 `frontend-react/apps/web-store-pos/app/entry.client.tsx` importa `./shared/lib/browser-compat/polyfills` como **primera** sentencia de import, con un comentario de una línea que explique por qué va primero.
 Criterio de aceptación: `polyfills.test.ts` borra cada API (`delete Array.prototype.at`, etc.), invoca `installBrowserPolyfills()` y comprueba que la operación funciona con el resultado estándar; y comprueba que con la API ya presente no se sobrescribe.
@@ -51,14 +52,24 @@ S5 — Verificación del feature.
 
 - **Sin CI.** El repo no tiene `.github/`; crear CI queda fuera de este feature.
 - **Sin `@vitejs/plugin-legacy` ni `core-js`.** Decisión del owner: polyfills puntuales.
-- **Sin `build.target` ni `browserslist`.** El default de Vite 6 (`modules` → `chrome87`) ya emite sintaxis por debajo del piso; `build.target` no polifillea APIs, así que añadirlo no protege nada y sí arriesga el output del build y los scripts de post-build (CSP, split del landing, service worker).
+- **Sin `build.target`.** El default de Vite 6 (`modules` → `chrome87`) ya emite sintaxis por debajo del piso; `build.target` no polifillea APIs, así que añadirlo no protege nada y sí arriesga el output del build y los scripts de post-build (CSP, split del landing, service worker).
+- **`browserslist` + `eslint-plugin-compat`: SÍ (revertido por el owner).** Ver S6. La decisión inicial era no usarlos; el owner pidió el chequeo mecánico porque una lista escrita a mano no puede probar completitud.
 - **Sin nuevos tests E2E.** La verificación es unitaria más build.
+
+S6 — Chequeo mecánico de compatibilidad (base de datos real, no lista a mano).
+- `frontend-react/package.json` declara `"browserslist": ["chrome 89"]` (el piso), única fuente del target.
+- `frontend-react/packages/eslint-config` añade `eslint-plugin-compat` como devDependency.
+- `base.config.js` activa `compat.configs['flat/recommended']` y `settings.lintAllEsApis: true`, con `settings.polyfills` derivado de `POLYFILLED_APIS` (la misma lista de S1) para que lo polifillado no se reporte.
+- La regla se aplica solo a código que corre en el navegador. Quedan fuera: `**/__tests__/**`, `**/*.test.*`, `e2e/**`, `scripts/**`, `**/*.mjs` y `app/service-worker.ts`.
+- Criterio de aceptación: `pnpm lint` pasa en `frontend-react/`; y una API por encima del piso no declarada como polyfill (por ejemplo `AbortSignal.timeout`, Chrome 103) produce error al introducirla en un archivo de `app/` (prueba de mutación revertida). El inventario de violaciones encontradas al activarlo se reporta al owner antes de decidir arreglos.
 
 ## Tasks
 
-- T1 — S3: política base (`packages/eslint-config/browser-compat.js` + export del paquete) + `polyfills.ts` + import en `entry.client.tsx` + `polyfills.test.ts`. Ruta: delegated. Estado: pending.
+- T1 — S3: política base (`packages/eslint-config/browser-compat.js` + export del paquete) + `polyfills.ts` + import en `entry.client.tsx` + `polyfills.test.ts`. Ruta: delegated. Estado: done — commit `b2b8ef92` (11 tests, typecheck y lint del paquete verdes).
 - T2 — S4: `deep-clone.ts` + sustitución de las 4 llamadas `structuredClone` en `warehouse-offline-service.ts` + `deep-clone.test.ts`. Ruta: delegated. Estado: pending.
 - T3 — S1/S2/S5: `no-restricted-syntax` en `base.config.js` desde `BANNED_APIS` + `compat-policy.test.ts` + verificación final del feature. Ruta: delegated. Estado: pending.
+- T4 — S3: polyfill de `crypto.randomUUID` (v4 con `crypto.getRandomValues`) + entrada en `POLYFILLED_APIS` + ampliación de `polyfills.test.ts`. Ruta: delegated. Estado: pending.
+- T5 — S6: `browserslist` en el root + `eslint-plugin-compat` en `packages/eslint-config` + `flat/recommended` con `lintAllEsApis` y `settings.polyfills` desde `POLYFILLED_APIS`. Ruta: delegated. Estado: pending. Depende de T4 (los polyfills deben estar declarados antes de que el plugin los exija).
 
 ## Log
 
@@ -82,4 +93,21 @@ L4 — Mapa del explorer (2026-11-10), hechos que fijan las specs:
 - `public/pwa-install-capture.js` está fuera de lint (`public/**` ignorado) y el service worker se compila aparte (`esbuild target es2020`).
 - Incógnita abierta y aceptada: el crash real no se reproduce desde código propio porque ya no existe ningún `.at(` en producción; pudo venir de dependencia, de `packages/domain/dist` o de una revisión anterior. Los polyfills de S3 cubren precisamente el caso "lo llama una dependencia".
 
-L5 — Orden elegido para mantener el árbol verde en cada commit: T1 (polyfills + política de datos, sin regla activa) → T2 (quitar `structuredClone`) → T3 (activar la regla de lint). Si la regla se activara antes de T2, `pnpm lint` fallaría legítimamente en cada workspace.
+L5 — Orden elegido para mantener el árbol verde en cada commit: T1 (polyfills + política de datos, sin regla activa) → T2 (quitar `structuredClone`) → T3 (activar la regla de lint) → T4 (`crypto.randomUUID`). Si la regla se activara antes de T2, `pnpm lint` fallaría legítimamente en cada workspace.
+
+L6 — Auditoría de APIs por encima del piso (2026-11-10, búsqueda textual; codegraph no indexa uso de APIs globales, es el fallback documentado). Barrido sobre `apps/web-store-pos/app`, `packages/domain/src` y `packages/web-common/src`, excluyendo tests y `e2e/`, con este conjunto: `.at(`, `.findLast(`, `.findLastIndex(`, `.toSorted(`, `.toReversed(`, `.toSpliced(`, `Object.hasOwn`, `Object.groupBy`, `Map.groupBy`, `Array.fromAsync`, `structuredClone`, `randomUUID`, `AggregateError`, `.replaceAll(`, `reportError`, `AbortSignal.timeout|any`, `CompressionStream`, `DecompressionStream`, `Intl.Segmenter`, `URL.canParse`, `scheduler.postTask`.
+
+Resultado del barrido:
+- `.at(` / `.findLast(` / `.findLastIndex(` / `.toSorted(` / `.toReversed(` / `.toSpliced(`: **0 en producción** (solo tests, fixtures E2E y comentarios).
+- `Object.hasOwn` (Chrome 93): **1 sitio**, `catalog/templates/registry.ts:31`.
+- `structuredClone` (Chrome 98): **4 sitios**, `warehouse-offline-service.ts:1240,1244,1247,1248` (T2).
+- `CompressionStream` / `DecompressionStream` (Chrome 80): **por debajo del piso**, `sync/lib/hotspot/sdp-codec.ts:108,112`. No requiere acción.
+- `crypto.randomUUID` (Chrome 92): **12 llamadas directas sin protección** en producción:
+  `expenses/lib/services/expense-offline-service.ts:24`, `inventory/lib/services/elaboration-offline-service.ts:23`, `inventory/lib/services/inventory-offline-service.ts:119`, `inventory/lib/services/recipe-offline-service.ts:11`, `inventory/lib/services/warehouse-offline-service.ts:41`, `sales/lib/services/product-offline-service.ts:23`, `sales/lib/services/order-offline-service.ts:119`, `sales/lib/services/sale-credit-offline-service.ts:21`, `sales/lib/repositories/product-category-repository.ts:12`, `sales/lib/repositories/product-repository.ts:14`, `management/channel-rates/lib/services/channel-rate-offline-service.ts:114`, `shared/lib/dev/demo-data-generator.ts:119`.
+  Y **2 sitios que ya se protegen solos** con `typeof crypto.randomUUID === 'function'`: `shared/components/multipayments/multi-payment-list.tsx:82-83` y `shared/lib/messages/messages-offline-service.ts:33-34`.
+- Resto del conjunto (`Object.groupBy`, `Map.groupBy`, `Array.fromAsync`, `AggregateError`, `.replaceAll(`, `reportError`, `AbortSignal.timeout|any`, `Intl.Segmenter`, `URL.canParse`, `scheduler.postTask`): **0 en producción**.
+- Corrección de un dato previo: L4 decía "los 12 hits de `.at(` son tests y fixtures" y era correcto; lo que estaba incompleto era el conteo de `crypto.randomUUID` (se reportaron 3 sitios por un truncamiento de la búsqueda; el número real es 12 sin protección).
+
+Límite explícito de esta auditoría: un barrido textual demuestra la ausencia de los patrones que nombra, no la ausencia de toda API por encima del piso. La lista es tan completa como el conjunto buscado.
+
+L7 (2026-11-10, verbatim del owner): «añadelas para el chequeo mecánico». Reversa el non-goal de `browserslist` y añade `eslint-plugin-compat` como S6/T5: la completitud deja de depender de una lista escrita a mano y pasa a una base de datos real (caniuse) contra `chrome 89`. Implicaciones asumidas: nueva devDependency + `pnpm install` (churn de lockfile, antes prohibido por prudencia, ahora autorizado por necesidad del chequeo); el plugin solo entiende Web APIs por defecto, así que `settings.lintAllEsApis: true` es obligatorio para cubrir la clase de bug del `.at()`; `settings.polyfills` se deriva de `POLYFILLED_APIS` para no reportar lo que ya se polifillea; y el inventario de violaciones que aparezca al activarlo se reporta al owner antes de arreglar nada, porque puede ser un backlog grande y no fue autorizado.
