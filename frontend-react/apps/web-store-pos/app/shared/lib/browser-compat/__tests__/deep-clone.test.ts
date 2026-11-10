@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
 import { deepClone } from '../deep-clone';
+
+/** Reachable so the `DOMException` fallback branch can be exercised. */
+const mutableGlobal = globalThis as unknown as Record<string, unknown>;
 
 /**
  * Asserts the value the clone refuses is rejected the way `structuredClone`
- * rejects it: a `DOMException` named `DataCloneError`, not a bare `TypeError`.
+ * rejects it: a real `DOMException` named `DataCloneError`, not `TypeError` and
+ * not something that merely carries that `name` (R3-002).
+ *
+ * The action runs ONCE: re-invoking it to observe a second time asserted nothing
+ * the first capture had not already pinned, and hid a double execution.
  */
-function expectDataCloneError(action: () => unknown): void {
+function expectDataCloneError(action: () => unknown): Error {
   let caught: unknown;
   try {
     action();
@@ -13,8 +21,10 @@ function expectDataCloneError(action: () => unknown): void {
     caught = error;
   }
   expect(caught).toBeDefined();
+  expect(caught).toBeInstanceOf(DOMException);
   expect((caught as Error).name).toBe('DataCloneError');
-  expect(() => action()).toThrow();
+  expect(caught).not.toBeInstanceOf(TypeError);
+  return caught as Error;
 }
 
 describe('deepClone', () => {
@@ -215,15 +225,110 @@ describe('deepClone', () => {
     expect(clone.cause).not.toBe(cause);
   });
 
-  it('throws a DataCloneError for a class instance instead of returning a husk', () => {
-    class Widget {
-      readonly id = 'w-1';
-      describe(): string {
-        return this.id;
-      }
+  it('throws a DataCloneError for a data-only class instance instead of flattening it', () => {
+    // Data-only on purpose: the fields are plain data, so flattening it would
+    // "work" and silently drop the prototype — the exact loss this rejection
+    // exists to prevent. A method-bearing instance would fail for a different,
+    // less interesting reason.
+    class Money {
+      readonly amount = 1000;
+      readonly currency = 'USD';
     }
 
-    expectDataCloneError(() => deepClone(new Widget()));
+    expectDataCloneError(() => deepClone(new Money()));
+  });
+
+  it('clones boxed Number, String and Boolean wrappers with their valueOf() preserved', () => {
+    // `Object(primitive)` boxes exactly like `new Number` / `new String` /
+    // `new Boolean`, minus the `no-new-wrappers` smell.
+    const boxedNumber: Number = Object(41.5);
+    const boxedString: String = Object('boxed text');
+    const boxedBoolean: Boolean = Object(false);
+
+    const numberClone = deepClone(boxedNumber);
+    const stringClone = deepClone(boxedString);
+    const booleanClone = deepClone(boxedBoolean);
+
+    expect(Object.prototype.toString.call(numberClone)).toBe('[object Number]');
+    expect(Object.prototype.toString.call(stringClone)).toBe('[object String]');
+    expect(Object.prototype.toString.call(booleanClone)).toBe('[object Boolean]');
+
+    expect(numberClone).toBeInstanceOf(Number);
+    expect(stringClone).toBeInstanceOf(String);
+    expect(booleanClone).toBeInstanceOf(Boolean);
+
+    expect(numberClone).not.toBe(boxedNumber);
+    expect(stringClone).not.toBe(boxedString);
+    expect(booleanClone).not.toBe(boxedBoolean);
+
+    expect(numberClone.valueOf()).toBe(41.5);
+    expect(stringClone.valueOf()).toBe('boxed text');
+    expect(booleanClone.valueOf()).toBe(false);
+  });
+
+  it('clones a plain record whose prototype chain simulates another realm', () => {
+    // Another realm's `Object.prototype` is, structurally, an object whose own
+    // prototype is `null` — indistinguishable from a null-prototype record. A
+    // prototype-identity check against this realm's `Object.prototype` rejects
+    // this shape; the tag-based classification must not.
+    const foreignPrototype = Object.create(null);
+    const source = Object.create(foreignPrototype) as Record<string, unknown>;
+    source.id = 'record-1';
+    source.nested = { cost: 7 };
+
+    const clone = deepClone(source);
+
+    expect(Object.prototype.toString.call(clone)).toBe('[object Object]');
+    expect(clone).not.toBe(source);
+    expect(clone.id).toBe('record-1');
+    expect(Object.keys(clone)).toEqual(['id', 'nested']);
+    expect(clone.nested).toEqual({ cost: 7 });
+    expect(clone.nested).not.toBe(source.nested);
+  });
+
+  it('clones an Error that came from another realm through the Error path', () => {
+    const context = createContext({});
+    const foreignError = runInContext(
+      'new TypeError("boom from another realm", { cause: { code: "E_FOREIGN" } })',
+      context,
+    ) as Error & { cause?: { code: string } };
+
+    // Precondition: this error really is from another realm, so the `instanceof
+    // Error` fast path cannot see it and only its `[object Error]` tag can.
+    expect(foreignError).not.toBeInstanceOf(Error);
+    expect(Object.prototype.toString.call(foreignError)).toBe('[object Error]');
+
+    const clone = deepClone(foreignError);
+
+    expect(clone).not.toBe(foreignError);
+    expect(clone.name).toBe('TypeError');
+    expect(clone.message).toBe('boom from another realm');
+    expect(clone.stack).toBe(foreignError.stack);
+    expect(clone.cause).toEqual({ code: 'E_FOREIGN' });
+    expect(clone.cause).not.toBe(foreignError.cause);
+  });
+
+  it('falls back to a TypeError when DOMException does not exist', () => {
+    // R3-003: the fallback branch is documented, so it gets a test. `DOMException`
+    // is a writable global in this environment; it is restored in `finally` so a
+    // failure here cannot leak into other tests.
+    const original = mutableGlobal.DOMException;
+    try {
+      mutableGlobal.DOMException = undefined;
+
+      let caught: unknown;
+      try {
+        deepClone({ run: () => 1 });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(TypeError);
+      expect((caught as Error).name).toBe('TypeError');
+      expect((caught as Error).message).toBe('deepClone: cannot clone a function');
+    } finally {
+      mutableGlobal.DOMException = original;
+    }
   });
 
   it('throws a DataCloneError for unsupported built-ins (URL, WeakMap, Promise)', () => {

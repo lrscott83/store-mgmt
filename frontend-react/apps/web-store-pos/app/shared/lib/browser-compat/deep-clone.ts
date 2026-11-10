@@ -6,23 +6,58 @@
  * production code cannot rely on it. `deepClone` is the supported stand-in.
  *
  * Supported shapes, cloned by value with cycles preserved through a `WeakMap`:
- * primitives (passed through), arrays (holes preserved), plain objects (own
- * prototype `Object.prototype` or `null`), `Error` (including subclasses),
- * `Date`, `RegExp`, `Map`, `Set`, and `ArrayBuffer` / `ArrayBuffer` views.
+ * primitives (passed through), arrays (holes preserved), plain objects, `Error`
+ * (subclasses included), `Date`, `RegExp`, `Map`, `Set`, and `ArrayBuffer` /
+ * `ArrayBuffer` views. Boxed `Number` / `String` / `Boolean` wrappers are cloned
+ * as the same wrapper around the same primitive.
+ *
+ * Plain objects and `Error`s are classified with `Object.prototype.toString`,
+ * never with prototype identity or `instanceof`, so a value built in another
+ * realm (iframe, worker, `vm` context) is cloned too: a foreign plain object is
+ * still a record, and a foreign `Error` still takes the `Error` path. The other
+ * built-ins (`Date`, `RegExp`, `Map`, `Set`, `ArrayBuffer`, views, `Array`) keep
+ * same-realm `instanceof` checks — a foreign one is rejected, exactly as before.
  *
  * Every other value is REJECTED, never flattened into a hollow copy: functions,
- * symbols used as values, and any object whose prototype is not `Object.prototype`
- * or `null` (`Blob`, `File`, `URL`, `Promise`, `WeakMap`, DOM nodes, arbitrary
- * class instances) throw through `throwDataCloneError`, a `DOMException` named
- * `DataCloneError` — the same failure `structuredClone` reports — falling back to
- * a `TypeError` only where `DOMException` does not exist.
+ * symbols used as values, `Blob`, `File`, DOM nodes, `Promise`, `WeakMap` /
+ * `WeakSet`, `URL`, and arbitrary class instances throw through
+ * `throwDataCloneError` — a `DOMException` named `DataCloneError`, the very type
+ * `structuredClone` throws, falling back to a `TypeError` only where
+ * `DOMException` does not exist.
  *
- * One deliberate, documented deviation from `structuredClone`: a class instance
- * is NOT flattened into a plain object. `structuredClone` would drop the prototype
- * and silently lose the instance state; here the mismatch is loud instead.
+ * Two deliberate differences from `structuredClone`, both intentional:
+ * - NARROWER for binary and host objects: `structuredClone` really does clone
+ *   `Blob` and `File`, and really does throw `DataCloneError` for DOM nodes;
+ *   this helper rejects all of them. Nothing in the app clones binary or host
+ *   objects, and copying their internal state without understanding it is the
+ *   silent-loss failure this helper exists to prevent.
+ * - STRICTER for class instances: this is not a narrower surface but a louder
+ *   failure. `structuredClone` ACCEPTS a data-only class instance and returns a
+ *   plain object, dropping the prototype and every non-enumerable field. Doing
+ *   that here would lose instance state silently, so a class instance is
+ *   rejected on purpose — including a data-only one, whose only sin is carrying
+ *   a prototype this clone cannot reproduce.
+ *
+ * Error-type contract: rejection is a `DOMException` named `DataCloneError`, not
+ * a `TypeError` (R3-001). Audited blast radius, re-confirmed through the
+ * codegraph call graph: `deepClone` has exactly four callers, all inside
+ * `WarehouseOfflineService.snapshotPurchaseEdit`
+ * (`warehouse-offline-service.ts:1241,1245,1248,1249`), and none of them
+ * discriminates on `TypeError` or `DOMException` — that snapshot is built before
+ * the `try` that maps failures to a `DataResult`, so the rejection propagates
+ * unchanged. No in-repo consumer needed migrating.
  */
 
 type AnyRecord = Record<PropertyKey, unknown>;
+
+/** Tags from `Object.prototype.toString`, spelled identically in every realm. */
+const OBJECT_TAG = '[object Object]';
+const ERROR_TAG = '[object Error]';
+const BOXED_PRIMITIVE_TAGS: ReadonlySet<string> = new Set<string>([
+  '[object Number]',
+  '[object String]',
+  '[object Boolean]',
+]);
 
 /** A typed-array view, narrowed to the members the clone needs. */
 interface TypedArrayView extends ArrayBufferView {
@@ -161,7 +196,40 @@ function cloneError(source: Error, seen: WeakMap<object, unknown>): Error {
 /** Best-effort class name for the rejection message (`Widget`, `URL`, ...). */
 function describeUnsupported(source: object): string {
   const name = (source as { constructor?: { name?: string } }).constructor?.name;
-  return name ? `${name} instance` : 'object';
+  return name ? `a ${name} instance` : 'an object of unknown type';
+}
+
+/**
+ * True when `prototype` is a plain-object prototype in ANY realm.
+ *
+ * Identity against this realm's `Object.prototype` cannot answer that: another
+ * realm's `Object.prototype` is, structurally, an object whose own prototype is
+ * `null` — exactly like the prototype handed to `Object.create(null)`. So the
+ * test is "the prototype has nothing above it", which holds for `null`, for this
+ * realm's `Object.prototype`, and for a foreign one, while a class prototype
+ * always has at least one more link (`Object.prototype` or a foreign
+ * equivalent).
+ */
+function isPlainObjectPrototype(prototype: object | null): boolean {
+  return prototype === null || Object.getPrototypeOf(prototype) === null;
+}
+
+/**
+ * Clones a boxed primitive (`new Number`, `new String`, `new Boolean`).
+ *
+ * Its value lives in an internal slot, not in an own property, so copying own
+ * properties would rebuild the shell and lose the value. `Object(primitive)`
+ * re-boxes `valueOf()` into the same wrapper type; the resulting tag is checked
+ * so a `Symbol.toStringTag` impostor whose `valueOf()` is not primitive is
+ * rejected instead of being returned as a shared reference.
+ */
+function cloneBoxedPrimitive(source: object, tag: string): object {
+  const primitive = (source as { valueOf(): unknown }).valueOf();
+  const clone = Object(primitive) as object;
+  if (clone === source || Object.prototype.toString.call(clone) !== tag) {
+    throwDataCloneError(`deepClone: cannot clone ${describeUnsupported(source)}`);
+  }
+  return clone;
 }
 
 function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
@@ -240,15 +308,31 @@ function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
 
   if (source instanceof Error) return cloneError(source, seen) as unknown as T;
 
-  const prototype = Object.getPrototypeOf(source);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throwDataCloneError(`deepClone: cannot clone a ${describeUnsupported(source)}`);
+  // Realm-independent classification. `instanceof` and prototype identity both
+  // answer "is this ours?", which is the wrong question for a value that came
+  // from another realm (iframe, worker, `vm` context) — those used to be
+  // rejected even though `structuredClone` clones them.
+  const tag = Object.prototype.toString.call(source);
+
+  if (tag === ERROR_TAG) return cloneError(source as Error, seen) as unknown as T;
+
+  if (BOXED_PRIMITIVE_TAGS.has(tag)) {
+    const clone = cloneBoxedPrimitive(source, tag);
+    seen.set(source, clone);
+    return clone as T;
   }
 
-  const clone = Object.create(prototype) as AnyRecord;
-  seen.set(source, clone);
-  copyOwnProperties(source, clone, seen);
-  return clone as T;
+  if (tag === OBJECT_TAG) {
+    const prototype = Object.getPrototypeOf(source);
+    if (isPlainObjectPrototype(prototype)) {
+      const clone = Object.create(prototype) as AnyRecord;
+      seen.set(source, clone);
+      copyOwnProperties(source, clone, seen);
+      return clone as T;
+    }
+  }
+
+  throwDataCloneError(`deepClone: cannot clone ${describeUnsupported(source)}`);
 }
 
 /** Faithful, synchronous stand-in for `structuredClone` on the Chrome 89 floor. */
