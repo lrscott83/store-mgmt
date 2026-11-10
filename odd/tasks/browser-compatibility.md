@@ -63,7 +63,29 @@ S6 — Chequeo mecánico de compatibilidad (base de datos real, no lista a mano)
 - La regla se aplica solo a código que corre en el navegador. Quedan fuera: `**/__tests__/**`, `**/*.test.*`, `e2e/**`, `scripts/**`, `**/*.mjs` y `app/service-worker.ts`.
 - Criterio de aceptación: `pnpm lint` pasa en `frontend-react/`; y una API por encima del piso no declarada como polyfill (por ejemplo `AbortSignal.timeout`, Chrome 103) produce error al introducirla en un archivo de `app/` (prueba de mutación revertida). El inventario de violaciones encontradas al activarlo se reporta al owner antes de decidir arreglos.
 
+## Findings del RDD `review-5a8ec25157b39dd5` (aprobado, 11 advisory) y su resolución
+
+| ID | Lente | Sev. | Resolución |
+|---|---|---|---|
+| R1-proto-key-reparenting | risk | WARNING | U2: copiar claves propias con `defineProperty` para que un `__proto__` propio no reparente el clon. |
+| R1-symbol-descriptor-shared | risk | WARNING | U2: clonar `descriptor.value` de claves símbolo, no compartir la referencia. |
+| R3-001 | reliability | WARNING | U2: clonar `Error` de verdad y lanzar error de clonado para tipos no soportados en vez de devolver un cascarón. |
+| R4-DEEPCLONE-SILENT-LOSS | resilience | WARNING | U2: mismo arreglo; el fallo debe ser ruidoso. |
+| R3-002 | reliability | WARNING | U1: test de contrato del `snapshotPurchaseEdit` real (igualdad + independencia de referencias) por la API pública. |
+| R3-003 | reliability | SUGGESTION | U5: `toSorted` preserva huecos (como el estándar) + test de arreglo disperso en `deepClone`. |
+| R3-004 | reliability | SUGGESTION | U3: restaurar descriptores en `finally` y aserta la restauración; sin depender del aislamiento de realm. |
+| R3-005 | reliability | SUGGESTION | U4: T4 implementado (doc y código dejan de contradecirse). |
+| R4-RANDOMUUID-UNMITIGATED | resilience | WARNING | U4: polyfill de `crypto.randomUUID`. |
+| R4-POLYFILL-NO-FAILSOFT | resilience | WARNING | U3: cada instalador aislado con `try/catch`; un fallo no aborta la evaluación del entry. |
+| R4-DEEPCLONE-NO-PERF-MEASUREMENT | resilience | SUGGESTION | U1: guarda de rendimiento acotada por tamaño y con umbral holgado. |
+
 ## Tasks
+
+- T6 — U1: test de contrato del snapshot (`R3-002`) + guarda de rendimiento (`R4-DEEPCLONE-NO-PERF-MEASUREMENT`). Ruta: delegated. Estado: pending.
+- T7 — U2: fidelidad de `deepClone` (`R1-proto-key-reparenting`, `R1-symbol-descriptor-shared`, `R3-001`, `R4-DEEPCLONE-SILENT-LOSS`). Ruta: delegated. Estado: pending. Depende de T6.
+- T8 — U3: fail-soft de polyfills (`R4-POLYFILL-NO-FAILSOFT`) + higiene de tests (`R3-004`). Ruta: delegated. Estado: pending.
+- T9 — U4: polyfill `crypto.randomUUID` (T4 original; `R4-RANDOMUUID-UNMITIGATED`, `R3-005`). Ruta: delegated. Estado: pending.
+- T10 — U5: `toSorted` con huecos (`R3-003`). Ruta: delegated. Estado: pending.
 
 - T1 — S3: política base (`packages/eslint-config/browser-compat.js` + export del paquete) + `polyfills.ts` + import en `entry.client.tsx` + `polyfills.test.ts`. Ruta: delegated. Estado: done — commit `b2b8ef92` (11 tests, typecheck y lint del paquete verdes).
 - T2 — S4: `deep-clone.ts` + sustitución de las 4 llamadas `structuredClone` en `warehouse-offline-service.ts` + `deep-clone.test.ts`. Ruta: delegated. Estado: pending.
