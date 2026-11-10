@@ -35,6 +35,13 @@ const storeId = 'test-store-snapshot';
  * probe states exactly what it proves (R3-MIDFLIGHT-PROBE-VACUOUS), and the
  * empty-world test asserts the observable contract instead of the reversal's
  * internal routing (R3-PUBLIC-API-MOCK-COUPLING).
+ *
+ * `review-c3e2b4c5d1ae9f8a` (R3-EMPTYWORLD-TEST-VACUOUS) split the two properties
+ * the empty-world test conflated: that case now names what it really proves (a
+ * failure with nothing to undo leaves the state untouched — the restore is a
+ * no-op), and the mid-flight mutation proof moved to a case whose world does
+ * have state to undo, failing through a collaborator (`inventorySvc`) rather
+ * than through the service's own public method.
  */
 
 function seedProduct(
@@ -462,7 +469,59 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
     expect(orderPort.orders).toEqual(expected.orders);
   });
 
-  it('restores the baseline in a world with no store entries and no orders', () => {
+  it('restores the baseline after a mid-flight mutation when a collaborator fails at the entry stage', () => {
+    const { purchaseId } = seedWorld();
+    // A world WITH state to undo: the outflow created a store entry. Orders are
+    // cleared so an empty order collection cannot be what makes the rollback
+    // look correct.
+    orderPort.orders = [];
+
+    const expected = captureBaseline();
+    const movementsBeforeFailure = expected.movements.length;
+
+    // The live persisted state, observed from inside the failing stage and copied
+    // by value with the independent `deepCopy`, so it stays comparable after the
+    // rollback has already replaced the live collections.
+    let midFlight: CapturedState | undefined;
+
+    // Failure injected at a COLLABORATOR — the store-entry stage, which runs
+    // after the reversal + recreation — never at the service's own public
+    // method, so the production path under test stays the real one.
+    const failEntryStage = vi
+      .spyOn(inventorySvc, 'updateWarehouseOriginEntryCost')
+      .mockImplementation(() => {
+        midFlight = captureBaseline();
+        return Result.Failure([{ code: 'Test.EntryStageFailure', description: 'entry stage boom' }]);
+      });
+
+    const result = service.applyPurchaseCostEdit(purchaseId, 4, 7);
+
+    // ── Mid-flight proof: the persisted collections provably diverged from the
+    // baseline before the failure, so the rollback assertions below cannot hold
+    // trivially (that vacuity is exactly what the empty-world case above pins).
+    expect(midFlight).toBeDefined();
+    const observed = midFlight!;
+    expect(observed.movements.length).toBeGreaterThan(movementsBeforeFailure);
+    expect(observed.levels.find((level) => level.productId === 'prod-1')!.lots?.[0]?.costPrice).toBe(
+      7,
+    );
+    expect(observed).not.toEqual(expected);
+
+    // ── The failed edit reports its own error and restores the baseline.
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.map((error) => error.code)).toContain('Test.EntryStageFailure');
+    expect(failEntryStage).toHaveBeenCalledTimes(1);
+    // The order sync was never reached: the failure provably came from an
+    // earlier stage of the same operation.
+    expect(orderPort.updateCalls).toBe(0);
+    expect(service.isReversed(purchaseId)).toBe(false);
+    expect(service.getStorageStockLevels()).toEqual(expected.levels);
+    expect(service.getStorageMovements()).toEqual(expected.movements);
+    expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toEqual(expected.entries);
+    expect(orderPort.orders).toEqual(expected.orders);
+  });
+
+  it('leaves the state untouched when a failure hits a world with nothing to undo (the restore is a no-op)', () => {
     // Empty world for the snapshot collections: one purchase, no outflow, so no
     // store entries and no orders at all.
     const warehouse = service.createWarehouse('A').data!;
@@ -481,13 +540,19 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
 
     const expected = captureBaseline();
 
-    // With no store entries and no orders, the store-entry stage the test above
-    // fails on has nothing to touch, so the recreation step is the only stage of
-    // the operation that can be made to fail through a collaborator seam — it is
-    // the earliest mutable stage here, not a shortcut. The mock below is only the
-    // failure injector; nothing is asserted about the reversal's internal routing,
-    // so a refactor that routes the reversal through `recordMovement` itself
-    // keeps this test green as long as the contract holds.
+    // Vacuity, stated up front: with no store entries and no orders there is no
+    // prior state to restore, so the rollback assertions below hold even if the
+    // restore never runs. This case pins exactly that no-op — "a failure in a
+    // world with nothing to undo leaves the state untouched" — and it is
+    // deliberately NOT the proof that the rollback works; the case above carries
+    // that proof, with a populated world and a mid-flight mutation observation.
+    //
+    // The recreation/reversal step is the only mutable stage of this world, and
+    // here it is reachable only through `recordMovement`, the service's own
+    // public method. The mock is only the failure injector: nothing is asserted
+    // about the reversal's internal routing, so a refactor that routes the
+    // reversal through `recordMovement` itself keeps this test green as long as
+    // the no-op holds.
     vi.spyOn(service, 'recordMovement').mockImplementation(
       () =>
         new DataResultImpl<WarehouseStockMovement[]>(undefined, false, [

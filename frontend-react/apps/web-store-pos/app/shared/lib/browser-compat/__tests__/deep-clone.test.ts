@@ -356,3 +356,92 @@ describe('deepClone — snapshot-scale correctness', () => {
     expect(payload.orders[7].orderItems[0].productCosts[0].costPrice).toBe(5);
   });
 });
+
+/**
+ * Deterministic complexity guard (R3-BENCH-NOT-A-GATED-GUARD, review-c3e2b4c5d1ae9f8a).
+ *
+ * Read counts are the deterministic proxy for complexity: every leaf property in
+ * the payload below is a counted accessor, so the number of property reads
+ * `deepClone` performs is observable without a clock. Wall-clock measurement
+ * lives in `deep-clone.bench.ts`, which the default `vitest run` never executes,
+ * so it cannot gate a regression; this guard can.
+ *
+ * A quadratic clone (one that re-visits every element for every element) would
+ * read roughly `n²` properties: it fails both the per-element bound and the
+ * `4n`-versus-`n` linearity ratio asserted below.
+ */
+const SMALL_PAYLOAD_ELEMENTS = 50;
+const LARGE_PAYLOAD_MULTIPLIER = 4;
+/** Generous ceiling on reads per traversed element (the implementation needs 2). */
+const READS_PER_ELEMENT_BOUND = 4;
+/** Generous ceiling on the `4n`-vs-`n` read ratio to absorb fixed overhead. */
+const LINEARITY_MULTIPLIER = 5;
+
+interface CountedLeaf {
+  readonly costPrice: number;
+  readonly quantity: number;
+}
+
+/**
+ * Builds `elementCount` leaf objects whose enumerable properties are counted
+ * accessors: every read `deepClone` performs via `Object.keys` + index access is
+ * tallied, with no instrumentation inside the helper itself.
+ */
+function buildCountedPayload(elementCount: number): {
+  payload: CountedLeaf[];
+  reads: () => number;
+} {
+  let readCount = 0;
+  const payload: CountedLeaf[] = new Array(elementCount);
+  for (let index = 0; index < elementCount; index += 1) {
+    const element = {} as CountedLeaf;
+    Object.defineProperty(element, 'costPrice', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        readCount += 1;
+        return 5;
+      },
+    });
+    Object.defineProperty(element, 'quantity', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        readCount += 1;
+        return index;
+      },
+    });
+    payload[index] = element;
+  }
+  return { payload, reads: () => readCount };
+}
+
+describe('deepClone — deterministic complexity guard', () => {
+  it('reads a bounded number of properties per element and scales linearly', () => {
+    const small = buildCountedPayload(SMALL_PAYLOAD_ELEMENTS);
+    const smallClone = deepClone(small.payload);
+    // Captured before the correctness assertions below, which read the payload
+    // again through `toEqual`.
+    const smallReads = small.reads();
+
+    // (a) Constant bound per traversed element: no repeated traversal.
+    expect(smallReads).toBeLessThanOrEqual(READS_PER_ELEMENT_BOUND * SMALL_PAYLOAD_ELEMENTS);
+
+    // Correctness on the same payload: values equal, references not shared.
+    expect(smallClone).toHaveLength(SMALL_PAYLOAD_ELEMENTS);
+    expect(smallClone).toEqual(small.payload);
+    expect(smallClone).not.toBe(small.payload);
+    expect(smallClone[0]).not.toBe(small.payload[0]);
+    expect(smallClone[SMALL_PAYLOAD_ELEMENTS - 1].quantity).toBe(SMALL_PAYLOAD_ELEMENTS - 1);
+
+    // (b) Linear scaling: quadrupling the element count must not multiply the
+    // read count by more than the generous multiplier. A quadratic traversal
+    // would land near 16x here, far above the ceiling.
+    const large = buildCountedPayload(SMALL_PAYLOAD_ELEMENTS * LARGE_PAYLOAD_MULTIPLIER);
+    const largeClone = deepClone(large.payload);
+    const largeReads = large.reads();
+
+    expect(largeClone).toEqual(large.payload);
+    expect(largeReads).toBeLessThanOrEqual(LINEARITY_MULTIPLIER * smallReads);
+  });
+});
