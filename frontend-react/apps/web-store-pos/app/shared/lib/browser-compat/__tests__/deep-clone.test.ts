@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { deepClone } from '../deep-clone';
 
+/**
+ * Asserts the value the clone refuses is rejected the way `structuredClone`
+ * rejects it: a `DOMException` named `DataCloneError`, not a bare `TypeError`.
+ */
+function expectDataCloneError(action: () => unknown): void {
+  let caught: unknown;
+  try {
+    action();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeDefined();
+  expect((caught as Error).name).toBe('DataCloneError');
+  expect(() => action()).toThrow();
+}
+
 describe('deepClone', () => {
   it('returns primitives unchanged', () => {
     expect(deepClone(undefined)).toBeUndefined();
@@ -140,13 +156,80 @@ describe('deepClone', () => {
     expect(clone.name).toBe('cycle');
   });
 
-  it('throws TypeError when a function appears as a value', () => {
-    expect(() => deepClone({ run: () => 1 })).toThrow(TypeError);
-    expect(() => deepClone([() => 1])).toThrow(TypeError);
+  it('throws a DataCloneError when a function appears as a value', () => {
+    expectDataCloneError(() => deepClone({ run: () => 1 }));
+    expectDataCloneError(() => deepClone([() => 1]));
   });
 
-  it('throws TypeError when a symbol appears as a value', () => {
-    expect(() => deepClone({ token: Symbol('token') })).toThrow(TypeError);
+  it('throws a DataCloneError when a symbol appears as a value', () => {
+    expectDataCloneError(() => deepClone({ token: Symbol('token') }));
+  });
+
+  it('copies an own "__proto__" data property without re-parenting the clone', () => {
+    const source: Record<string, unknown> = {};
+    Object.defineProperty(source, '__proto__', {
+      value: { polluted: true },
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+
+    const clone = deepClone(source) as Record<string, unknown>;
+
+    expect(Object.getPrototypeOf(clone)).toBe(Object.prototype);
+    expect(Object.prototype.hasOwnProperty.call(clone, '__proto__')).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(clone, '__proto__')?.value).toEqual({ polluted: true });
+    expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('clones the value behind a symbol-keyed own property instead of sharing it', () => {
+    const key = Symbol('meta');
+    const source: Record<PropertyKey, unknown> = { payload: 1 };
+    source[key] = { tags: ['a'] };
+
+    const clone = deepClone(source) as Record<PropertyKey, unknown>;
+
+    expect(clone[key]).toEqual({ tags: ['a'] });
+    expect(clone[key]).not.toBe(source[key]);
+  });
+
+  it('clones an Error subclass with its class, message, stack and a cloned cause', () => {
+    class DomainError extends Error {
+      constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = 'DomainError';
+      }
+    }
+
+    const cause = { code: 'E_X' };
+    const source = new DomainError('boom', { cause });
+
+    const clone = deepClone(source);
+
+    expect(clone).toBeInstanceOf(DomainError);
+    expect(clone.name).toBe('DomainError');
+    expect(clone.message).toBe('boom');
+    expect(clone.stack).toBeDefined();
+    expect(clone.stack).toBe(source.stack);
+    expect(clone.cause).toEqual({ code: 'E_X' });
+    expect(clone.cause).not.toBe(cause);
+  });
+
+  it('throws a DataCloneError for a class instance instead of returning a husk', () => {
+    class Widget {
+      readonly id = 'w-1';
+      describe(): string {
+        return this.id;
+      }
+    }
+
+    expectDataCloneError(() => deepClone(new Widget()));
+  });
+
+  it('throws a DataCloneError for unsupported built-ins (URL, WeakMap, Promise)', () => {
+    expectDataCloneError(() => deepClone(new URL('https://example.com')));
+    expectDataCloneError(() => deepClone(new WeakMap()));
+    expectDataCloneError(() => deepClone(Promise.resolve(1)));
   });
 
   it('returns undefined for undefined input', () => {

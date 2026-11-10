@@ -3,11 +3,23 @@
  *
  * `structuredClone` is only available from Chrome 98, and the project browser
  * floor is Chrome 89 (see `odd/tasks/browser-compatibility.md`, spec S4), so
- * production code cannot rely on it. `deepClone` is the supported stand-in: it
- * handles primitives, arrays, plain objects, `Date`, `RegExp`, `Map`, `Set` and
- * `ArrayBuffer` / typed-array views, preserves cycles through a `WeakMap`, and
- * throws `TypeError` for the values `structuredClone` refuses (functions and
- * symbols used as values).
+ * production code cannot rely on it. `deepClone` is the supported stand-in.
+ *
+ * Supported shapes, cloned by value with cycles preserved through a `WeakMap`:
+ * primitives (passed through), arrays (holes preserved), plain objects (own
+ * prototype `Object.prototype` or `null`), `Error` (including subclasses),
+ * `Date`, `RegExp`, `Map`, `Set`, and `ArrayBuffer` / `ArrayBuffer` views.
+ *
+ * Every other value is REJECTED, never flattened into a hollow copy: functions,
+ * symbols used as values, and any object whose prototype is not `Object.prototype`
+ * or `null` (`Blob`, `File`, `URL`, `Promise`, `WeakMap`, DOM nodes, arbitrary
+ * class instances) throw through `throwDataCloneError`, a `DOMException` named
+ * `DataCloneError` — the same failure `structuredClone` reports — falling back to
+ * a `TypeError` only where `DOMException` does not exist.
+ *
+ * One deliberate, documented deviation from `structuredClone`: a class instance
+ * is NOT flattened into a plain object. `structuredClone` would drop the prototype
+ * and silently lose the instance state; here the mismatch is loud instead.
  */
 
 type AnyRecord = Record<PropertyKey, unknown>;
@@ -22,6 +34,17 @@ interface TypedArrayView extends ArrayBufferView {
   ) => ArrayBufferView;
 }
 
+/**
+ * Rejects a value the clone cannot reproduce faithfully. The shape mirrors what
+ * `structuredClone` throws, so a caller can tell "not clonable" apart from a bug.
+ */
+function throwDataCloneError(message: string): never {
+  if (typeof DOMException === 'function') {
+    throw new DOMException(message, 'DataCloneError');
+  }
+  throw new TypeError(message);
+}
+
 /** Copies the bytes of an `ArrayBufferLike` into a fresh `ArrayBuffer`. */
 function cloneBuffer(buffer: ArrayBufferLike): ArrayBuffer {
   const copy = new ArrayBuffer(buffer.byteLength);
@@ -29,15 +52,127 @@ function cloneBuffer(buffer: ArrayBufferLike): ArrayBuffer {
   return copy;
 }
 
+/**
+ * Defines an own enumerable data property.
+ *
+ * `clone[key] = value` cannot be used for this: an own `"__proto__"` key would
+ * hit `Object.prototype.__proto__` and re-parent the clone instead of creating a
+ * property.
+ */
+function defineOwnDataProperty(target: object, key: PropertyKey, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+/**
+ * Copies own properties onto `clone`.
+ *
+ * String keys are read through `Object.keys` (own enumerable only); symbol keys
+ * keep their original descriptor so accessors still work, but a data descriptor's
+ * value is cloned — getters and setters are not clonable values, so they are
+ * carried over by reference.
+ */
+function copyOwnProperties(
+  source: object,
+  clone: AnyRecord,
+  seen: WeakMap<object, unknown>,
+  skipKeys?: ReadonlySet<PropertyKey>,
+): void {
+  for (const key of Object.keys(source)) {
+    if (skipKeys?.has(key)) continue;
+    defineOwnDataProperty(clone, key, cloneValue((source as AnyRecord)[key], seen));
+  }
+  for (const key of Object.getOwnPropertySymbols(source)) {
+    if (skipKeys?.has(key)) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (!descriptor) continue;
+    if ('value' in descriptor) {
+      Object.defineProperty(clone, key, {
+        value: cloneValue(descriptor.value, seen),
+        writable: descriptor.writable,
+        enumerable: descriptor.enumerable,
+        configurable: descriptor.configurable,
+      });
+    } else {
+      Object.defineProperty(clone, key, descriptor);
+    }
+  }
+}
+
+const ERROR_INTRINSIC_KEYS: ReadonlySet<PropertyKey> = new Set<PropertyKey>([
+  'name',
+  'message',
+  'stack',
+  'cause',
+]);
+
+/**
+ * Installs one `Error` intrinsic (`name`, `message`, `stack`) as an own data
+ * property when the source exposes it.
+ *
+ * The value is read THROUGH the property rather than from the descriptor: V8
+ * installs `stack` as an own lazy accessor, so a descriptor-only copy silently
+ * drops it.
+ */
+function copyErrorIntrinsic(clone: AnyRecord, source: Error, key: string): void {
+  if (!(key in source)) return;
+  const descriptor = Object.getOwnPropertyDescriptor(source, key);
+  const value =
+    descriptor && 'value' in descriptor ? descriptor.value : (source as unknown as AnyRecord)[key];
+  if (value === undefined) return;
+  Object.defineProperty(clone, key, {
+    value,
+    writable: true,
+    enumerable: descriptor?.enumerable ?? false,
+    configurable: true,
+  });
+}
+
+/**
+ * Clones an `Error` (subclasses included) preserving its class, the intrinsic
+ * `name` / `message` / `stack` data properties, and a cloned `cause`.
+ */
+function cloneError(source: Error, seen: WeakMap<object, unknown>): Error {
+  const clone = Object.create(Object.getPrototypeOf(source)) as Error & AnyRecord;
+  seen.set(source, clone);
+
+  for (const key of ['name', 'message', 'stack'] as const) {
+    copyErrorIntrinsic(clone as AnyRecord, source, key);
+  }
+
+  const cause = Object.getOwnPropertyDescriptor(source, 'cause');
+  if (cause && 'value' in cause) {
+    Object.defineProperty(clone, 'cause', {
+      value: cloneValue(cause.value, seen),
+      writable: cause.writable,
+      enumerable: cause.enumerable,
+      configurable: cause.configurable,
+    });
+  }
+
+  copyOwnProperties(source, clone as AnyRecord, seen, ERROR_INTRINSIC_KEYS);
+  return clone;
+}
+
+/** Best-effort class name for the rejection message (`Widget`, `URL`, ...). */
+function describeUnsupported(source: object): string {
+  const name = (source as { constructor?: { name?: string } }).constructor?.name;
+  return name ? `${name} instance` : 'object';
+}
+
 function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
   if (value === null) return value;
 
   const type = typeof value;
   if (type === 'function') {
-    throw new TypeError('deepClone: cannot clone a function');
+    throwDataCloneError('deepClone: cannot clone a function');
   }
   if (type === 'symbol') {
-    throw new TypeError('deepClone: cannot clone a symbol');
+    throwDataCloneError('deepClone: cannot clone a symbol');
   }
   // undefined, boolean, number, string, bigint are immutable and pass through.
   if (type !== 'object') return value;
@@ -103,16 +238,16 @@ function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
     return clone as T;
   }
 
-  const clone = Object.create(Object.getPrototypeOf(source)) as AnyRecord;
+  if (source instanceof Error) return cloneError(source, seen) as unknown as T;
+
+  const prototype = Object.getPrototypeOf(source);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throwDataCloneError(`deepClone: cannot clone a ${describeUnsupported(source)}`);
+  }
+
+  const clone = Object.create(prototype) as AnyRecord;
   seen.set(source, clone);
-  for (const key of Object.keys(source)) {
-    clone[key] = cloneValue((source as AnyRecord)[key], seen);
-  }
-  // Symbol keys are not clonable values, so they are carried over by reference.
-  for (const key of Object.getOwnPropertySymbols(source)) {
-    const descriptor = Object.getOwnPropertyDescriptor(source, key);
-    if (descriptor) Object.defineProperty(clone, key, descriptor);
-  }
+  copyOwnProperties(source, clone, seen);
   return clone as T;
 }
 
