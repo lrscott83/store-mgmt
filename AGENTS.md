@@ -80,6 +80,15 @@ The proper archive sequence:
 
 Archiving does not delete the plan's scratch workspace under `.superpowers/sdd/` — that is git-ignored and can be removed at any time.
 
+## Every commit carries its own RDD (user-mandated 2026-11-10)
+
+**Every work-unit commit gets its own RDD review. No exceptions, no discussion, no substitutes.**
+
+- The candidate is **the commit alone**: run the assess/START with `--committed-only` and `--base-ref <the parent of that commit>`, so `base..HEAD` is exactly that commit and nothing else.
+- The candidate must contain **no untracked files and no dirty tracked changes**. Remove or stash that state before assessing; never let it ride along in the review.
+- If the per-commit review cannot be produced — the CLI only assesses `base..HEAD`, the commit is not `HEAD`, untracked/dirty state cannot be removed, consent is denied, the provider fails, or the result is ambiguous — **STOP and report the blocker with the exact command and its exact output**. Never substitute a consolidated range review, never skip it, and never state the outcome from memory or assumption.
+- A consolidated range review is **not** a substitute and never satisfies this rule.
+
 ## Gotchas
 
 ### `ApplicationDbContext` is `NoTracking` by default
