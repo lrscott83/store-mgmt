@@ -1,8 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import type { Order, OrderItem } from '@store-mgmt/domain';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DataResult as DataResultImpl, Result } from '@store-mgmt/domain';
+import type {
+  InventoryEntry,
+  Order,
+  OrderItem,
+  WarehouseStockLevel,
+  WarehouseStockMovement,
+} from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { deepClone } from '~/shared/lib/browser-compat/deep-clone';
 import { InventoryOfflineService } from '../inventory-offline-service';
 import { WarehouseOfflineService } from '../warehouse-offline-service';
 import type { PurchaseCostOrderPort } from '../warehouse-offline-service';
@@ -18,8 +24,11 @@ const storeId = 'test-store-snapshot';
  * before mutating warehouse levels, movements, store entries and orders and
  * restores it when the operation fails afterwards.
  *
- * T6 findings covered: R3-002 (no contract test for the round trip) and
- * R4-DEEPCLONE-NO-PERF-MEASUREMENT (perf guard, see `deep-clone.test.ts`).
+ * Findings covered here: R3-002 (contract of the round trip), plus the T6 review
+ * advisories R3-A (independent baseline), R3-B (reference independence for every
+ * collection, not just orders), R3-C (no pinned internal magnitude), R3-E
+ * (failure injected before the order sync, and an empty world). R3-D lives in
+ * `deep-clone.test.ts`.
  */
 
 function seedProduct(
@@ -54,9 +63,10 @@ function seedProduct(
  * Order port that mutates the LIVE order lines in place (a real mutation, not a
  * no-op) and can then throw, forcing the rollback path. `receivedSnapshot`
  * keeps the exact array reference the service hands to `restoreOrdersSnapshot`,
- * which is the only seam where the in-memory snapshot is observable: stock
- * levels, movements and entries are persisted, so a leaked reference there is
- * masked by the localStorage round trip.
+ * which is the only seam where the in-memory order snapshot is observable: stock
+ * levels, movements and entries are persisted, so their identity is masked by
+ * the localStorage round trip (their independence is proven by value and by the
+ * mid-flight mutation probe below instead).
  */
 interface FakeOrderPort extends PurchaseCostOrderPort {
   orders: Order[];
@@ -154,6 +164,14 @@ interface MidFlightObservation {
   orderCostPrice: number;
 }
 
+/** The complete pre-failure state the restore must bring back, copied by value. */
+interface CapturedState {
+  levels: WarehouseStockLevel[];
+  movements: WarehouseStockMovement[];
+  entries: InventoryEntry[];
+  orders: Order[];
+}
+
 describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)', () => {
   let productRepo: ProductRepository;
   let inventorySvc: InventoryOfflineService;
@@ -192,6 +210,27 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
     return { warehouse, purchaseId, entryId };
   }
 
+  /**
+   * Captures every collection the restore must bring back, copied with
+   * `structuredClone` — deliberately NOT with `deepClone` (R3-A).
+   *
+   * `deepClone` is the helper whose fidelity the restore depends on, so building
+   * the expectation through it would compare the helper against itself: if it
+   * aliased the live collections instead of copying them, the mid-flight in-place
+   * mutations would land in this baseline too, the restored data and the baseline
+   * would agree, and the rollback assertions would keep passing over a broken
+   * rollback. `structuredClone` is an independent mechanism, so a divergence
+   * between the two shows up as a failure.
+   */
+  function captureBaseline(): CapturedState {
+    return {
+      levels: structuredClone(service.getStorageStockLevels()),
+      movements: structuredClone(service.getStorageMovements()),
+      entries: structuredClone(inventorySvc.getProductInventoriesByProductId('prod-1')),
+      orders: structuredClone(orderPort.orders),
+    };
+  }
+
   it('restores every collection by value after a failure past the reversal', () => {
     const { warehouse, purchaseId, entryId } = seedWorld();
     const entryOf = (id: string) =>
@@ -207,14 +246,12 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
     expect(orderPort.orders).toHaveLength(1);
     expect(orderPort.orders[0].orderItems[0].productCosts[0].costPrice).toBe(5);
 
-    // The pre-failure state, copied by value so later in-place mutations of the
-    // live collections cannot reach it.
-    const expected = {
-      levels: deepClone(service.getStorageStockLevels()),
-      movements: deepClone(service.getStorageMovements()),
-      entries: deepClone(inventorySvc.getProductInventoriesByProductId('prod-1')),
-      orders: deepClone(orderPort.orders),
-    };
+    // The pre-failure state, copied by value with an independent mechanism, so
+    // later in-place mutations of the live collections cannot reach it.
+    const expected = captureBaseline();
+    // R3-C: the reference point for "the state really changed", taken from the
+    // captured state instead of a hard-coded magnitude.
+    const movementsBeforeFailure = expected.movements.length;
 
     // Precondition of the restore path: the operation must mutate the live
     // collections BEFORE failing, otherwise "restore" could be a silent no-op.
@@ -236,7 +273,10 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
     const result = service.applyPurchaseCostEdit(purchaseId, 4, 7);
 
     expect(result.succeeded).toBe(false);
-    expect(midFlight.movementCount).toBeGreaterThan(2);
+    // R3-C: the reversal + recreation really grew the movement collection. This
+    // is a comparison against the captured pre-failure count, so it does not pin
+    // how many rows the reversal happens to create.
+    expect(midFlight.movementCount).toBeGreaterThan(movementsBeforeFailure);
     expect(midFlight.lotCostPrice).toBe(7);
     expect(midFlight.entryCostPrice).toBe(7);
     expect(midFlight.orderCostPrice).toBe(7);
@@ -253,12 +293,17 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
   it('keeps the snapshot reference-independent from the live collections in both directions', () => {
     const { purchaseId } = seedWorld();
 
-    // The live objects the caller holds before the edit. Only the order port is
-    // compared by reference: it is the one collection that lives in memory only
-    // (levels, movements and entries are persisted, so an aliased snapshot is
-    // masked there by the localStorage round trip after the rollback).
+    // The live objects the caller holds before the edit. Orders are compared by
+    // reference through the port seam; entries through their own restoration
+    // seam (`addImportedEntries` receives the snapshot bucket). Levels and
+    // movements are persisted and re-parsed on read, so their identity cannot be
+    // observed after the fact — the next test proves their independence through
+    // the mutation direction instead.
     const ordersBefore = orderPort.orders;
+    const entriesBefore = inventorySvc.getProductInventoriesByProductId('prod-1');
+    const entriesSeam = vi.spyOn(inventorySvc, 'addImportedEntries');
     expect(ordersBefore[0].orderItems[0].productCosts[0].costPrice).toBe(5);
+    expect(entriesBefore[0].costPrice).toBe(5);
 
     orderPort.mutateThenThrow = true;
     expect(service.applyPurchaseCostEdit(purchaseId, 4, 7).succeeded).toBe(false);
@@ -289,5 +334,125 @@ describe('WarehouseOfflineService — purchase-edit snapshot contract (R3-002)',
     // ...and mutating the restored-data copy must not reach the live collection.
     restoredSnapshot[0].orderItems[0].productCosts[0].costPrice = 4242;
     expect(ordersBefore[0].orderItems[0].productCosts[0].costPrice).toBe(999);
+
+    // ── R3-B: same contract for the store entries, at their own seam.
+    expect(entriesSeam).toHaveBeenCalled();
+    const receivedEntries = entriesSeam.mock.calls.at(-1)![1];
+    expect(receivedEntries).not.toBe(entriesBefore);
+    // The live bucket really was rewritten mid-flight (the entry was replaced at
+    // the new cost), and the restored copy still carries the old one.
+    expect(entriesBefore[0].costPrice).toBe(7);
+    expect(receivedEntries[0].costPrice).toBe(5);
+  });
+
+  it('never lets a mid-flight mutation of the pre-failure live objects reach the restored state', () => {
+    const { warehouse, purchaseId } = seedWorld();
+    const expected = captureBaseline();
+    const levelBefore = service.getStockLevel(warehouse.id, 'prod-1')!;
+    const purchaseBefore = service.getStorageMovements()[0];
+
+    // The snapshot was taken from these very objects. This hook poisons them in
+    // place right before the failure: a snapshot that shared references instead
+    // of copying would persist the poisoned values during the restore (R3-B).
+    orderPort.onUpdate = () => {
+      levelBefore.lots![0].costPrice = 111;
+      purchaseBefore.quantity = 111;
+    };
+    orderPort.mutateThenThrow = true;
+
+    expect(service.applyPurchaseCostEdit(purchaseId, 4, 7).succeeded).toBe(false);
+
+    // The probe is not a no-op: the pre-failure objects really are poisoned.
+    expect(levelBefore.lots![0].costPrice).toBe(111);
+    expect(purchaseBefore.quantity).toBe(111);
+
+    // The restored state comes back from the copy, never from those objects.
+    expect(service.getStockLevel(warehouse.id, 'prod-1')!.lots![0].costPrice).toBe(5);
+    expect(service.getStorageMovements()[0].quantity).toBe(expected.movements[0].quantity);
+    expect(service.getStorageStockLevels()).toEqual(expected.levels);
+    expect(service.getStorageMovements()).toEqual(expected.movements);
+    expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toEqual(expected.entries);
+  });
+
+  it('restores the baseline when the failure happens before the order sync', () => {
+    const { warehouse, purchaseId } = seedWorld();
+    const expected = captureBaseline();
+    const midFlight = { movementCount: -1, lotCostPrice: -1 };
+
+    // Failure injected at the store-entry stage — the stage that runs BEFORE the
+    // order sync — through the collaborator the service was constructed with, so
+    // no production code is touched.
+    const failEntryStage = vi
+      .spyOn(inventorySvc, 'updateWarehouseOriginEntryCost')
+      .mockImplementation(() => {
+        midFlight.movementCount = service.getStorageMovements().length;
+        midFlight.lotCostPrice =
+          service.getStockLevel(warehouse.id, 'prod-1')!.lots?.[0]?.costPrice ?? -1;
+        return Result.Failure([{ code: 'Test.EntryStageFailure', description: 'entry stage boom' }]);
+      });
+
+    const result = service.applyPurchaseCostEdit(purchaseId, 4, 7);
+
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.map((error) => error.code)).toContain('Test.EntryStageFailure');
+    expect(failEntryStage).toHaveBeenCalledTimes(1);
+    // The order sync was never reached: the failure provably came from an
+    // earlier stage of the same operation.
+    expect(orderPort.updateCalls).toBe(0);
+    // ...and the warehouse stages had already run, so the restore was not a no-op.
+    expect(midFlight.movementCount).toBeGreaterThan(expected.movements.length);
+    expect(midFlight.lotCostPrice).toBe(7);
+
+    expect(service.isReversed(purchaseId)).toBe(false);
+    expect(service.getStorageStockLevels()).toEqual(expected.levels);
+    expect(service.getStorageMovements()).toEqual(expected.movements);
+    expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toEqual(expected.entries);
+    expect(orderPort.orders).toEqual(expected.orders);
+  });
+
+  it('restores the baseline in a world with no store entries and no orders', () => {
+    // Empty world for the snapshot collections: one purchase, no outflow, so no
+    // store entries and no orders at all.
+    const warehouse = service.createWarehouse('A').data!;
+    const purchaseId = service.recordMovement({
+      type: 'purchase_in',
+      warehouseId: warehouse.id,
+      productId: 'prod-1',
+      quantity: 10,
+      costPrice: 5,
+    }).data![0].id;
+    orderPort.orders = [];
+
+    expect(service.getStorageMovements()).toHaveLength(1);
+    expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toHaveLength(0);
+    expect(orderPort.orders).toHaveLength(0);
+
+    const expected = captureBaseline();
+    const midFlight = { movementCount: -1 };
+
+    // The reversal runs first, so the failure is injected at the recreation step:
+    // the earliest mutable stage of the operation, and the only one reachable
+    // when there are no store entries to fail on.
+    const failRecreation = vi.spyOn(service, 'recordMovement').mockImplementation(() => {
+      midFlight.movementCount = service.getStorageMovements().length;
+      return new DataResultImpl<WarehouseStockMovement[]>(undefined, false, [
+        { code: 'Test.RecreationFailure', description: 'recreation boom' },
+      ]);
+    });
+
+    const result = service.applyPurchaseCostEdit(purchaseId, 4, 7);
+
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.map((error) => error.code)).toContain('Test.RecreationFailure');
+    expect(failRecreation).toHaveBeenCalledTimes(1);
+    expect(orderPort.updateCalls).toBe(0);
+    // The reversal had already appended its row, so the world really did change.
+    expect(midFlight.movementCount).toBeGreaterThan(expected.movements.length);
+
+    expect(service.isReversed(purchaseId)).toBe(false);
+    expect(service.getStorageStockLevels()).toEqual(expected.levels);
+    expect(service.getStorageMovements()).toEqual(expected.movements);
+    expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toEqual([]);
+    expect(orderPort.orders).toEqual([]);
   });
 });

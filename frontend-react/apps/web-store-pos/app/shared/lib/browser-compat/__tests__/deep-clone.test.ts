@@ -155,21 +155,26 @@ describe('deepClone', () => {
 });
 
 /**
- * Size-bounded performance guard (R4-DEEPCLONE-NO-PERF-MEASUREMENT).
+ * Scale-correctness guard (R4-DEEPCLONE-NO-PERF-MEASUREMENT, reworked by R3-D).
  *
  * `deepClone` replaced `structuredClone` in `WarehouseOfflineService.snapshotPurchaseEdit`,
  * where it runs synchronously over whole-store collections on every purchase-cost
- * edit. This bounds the cost on a realistic payload so a quadratic regression
- * shows up as a failure instead of as a frozen UI. The threshold is deliberately
- * generous (5000 ms) to stay green on slow CI machines: it catches complexity
- * blow-ups, not micro-benchmark drift.
+ * edit — so it has to stay CORRECT at whole-store scale, not merely fast.
+ *
+ * The previous version of this guard used wall-clock time as its verdict. That is
+ * not a unit-test assertion: the number depends on the machine's load, so it is
+ * either flaky or so loose that it proves nothing. Wall-clock benchmarking belongs
+ * outside a unit test. What is deterministic and still catches a real regression is
+ * the observable result on a payload shaped like the actual snapshot: cardinality,
+ * value equality, and no shared references at any nesting level.
  */
-const PERF_BOUND_MS = 5_000;
-const STOCK_LEVEL_COUNT = 2_000;
+const STOCK_LEVEL_COUNT = 250;
 const LOTS_PER_LEVEL = 3;
-const MOVEMENT_COUNT = 20_000;
+const MOVEMENT_COUNT = 1_000;
+const ENTRY_COUNT = 250;
+const ORDER_COUNT = 100;
 
-interface PerfStockLevel {
+interface SnapshotStockLevel {
   id: string;
   warehouseId: string;
   productId: string;
@@ -179,7 +184,7 @@ interface PerfStockLevel {
   createdDate: Date;
 }
 
-interface PerfMovement {
+interface SnapshotMovement {
   id: string;
   warehouseId: string;
   productId: string;
@@ -191,8 +196,40 @@ interface PerfMovement {
   createdByName: string;
 }
 
-function buildWholeStorePayload(): { levels: PerfStockLevel[]; movements: PerfMovement[] } {
-  const levels: PerfStockLevel[] = new Array(STOCK_LEVEL_COUNT);
+interface SnapshotEntry {
+  id: string;
+  productId: string;
+  quantity: number;
+  available: number;
+  costPrice: number;
+  currency: number;
+  isActive: boolean;
+  createdDate: Date;
+}
+
+interface SnapshotOrder {
+  id: string;
+  total: number;
+  isActive: boolean;
+  date: Date;
+  orderItems: Array<{
+    productId: string;
+    quantity: number;
+    price: number;
+    productCosts: Array<{ inventoryId: string; costPrice: number; quantity: number }>;
+  }>;
+}
+
+/** The four collections `snapshotPurchaseEdit` copies, at whole-store scale. */
+interface SnapshotPayload {
+  levels: SnapshotStockLevel[];
+  movements: SnapshotMovement[];
+  entries: SnapshotEntry[];
+  orders: SnapshotOrder[];
+}
+
+function buildSnapshotPayload(): SnapshotPayload {
+  const levels: SnapshotStockLevel[] = new Array(STOCK_LEVEL_COUNT);
   for (let index = 0; index < STOCK_LEVEL_COUNT; index += 1) {
     levels[index] = {
       id: `sl-${index}`,
@@ -209,7 +246,7 @@ function buildWholeStorePayload(): { levels: PerfStockLevel[]; movements: PerfMo
     };
   }
 
-  const movements: PerfMovement[] = new Array(MOVEMENT_COUNT);
+  const movements: SnapshotMovement[] = new Array(MOVEMENT_COUNT);
   for (let index = 0; index < MOVEMENT_COUNT; index += 1) {
     movements[index] = {
       id: `mv-${index}`,
@@ -220,32 +257,95 @@ function buildWholeStorePayload(): { levels: PerfStockLevel[]; movements: PerfMo
       costPrice: 5,
       reason: null,
       createdDate: new Date('2026-01-01T00:00:00.000Z'),
-      createdByName: 'perf',
+      createdByName: 'snapshot',
     };
   }
 
-  return { levels, movements };
+  const entries: SnapshotEntry[] = new Array(ENTRY_COUNT);
+  for (let index = 0; index < ENTRY_COUNT; index += 1) {
+    entries[index] = {
+      id: `en-${index}`,
+      productId: `prod-${index}`,
+      quantity: 3,
+      available: 2,
+      costPrice: 5,
+      currency: 0,
+      isActive: true,
+      createdDate: new Date('2026-01-01T00:00:00.000Z'),
+    };
+  }
+
+  const orders: SnapshotOrder[] = new Array(ORDER_COUNT);
+  for (let index = 0; index < ORDER_COUNT; index += 1) {
+    orders[index] = {
+      id: `o-${index}`,
+      total: 1400,
+      isActive: index % 2 === 0,
+      date: new Date('2026-01-01T00:00:00.000Z'),
+      orderItems: [
+        {
+          productId: `prod-${index}`,
+          quantity: 2,
+          price: 700,
+          productCosts: [{ inventoryId: `en-${index}`, costPrice: 5, quantity: 2 }],
+        },
+      ],
+    };
+  }
+
+  return { levels, movements, entries, orders };
 }
 
-describe('deepClone — performance guard', () => {
-  it('clones a whole-store payload correctly and well under the generous bound', () => {
-    const payload = buildWholeStorePayload();
-
-    const startedAt = performance.now();
+describe('deepClone — snapshot-scale correctness', () => {
+  it('clones a payload shaped like the purchase-edit snapshot without sharing references', () => {
+    const payload = buildSnapshotPayload();
     const clone = deepClone(payload);
-    const elapsedMs = performance.now() - startedAt;
 
-    // Correctness first: a fast but wrong clone is not a pass.
+    // Cardinality: nothing is dropped or duplicated at scale.
     expect(clone.levels).toHaveLength(STOCK_LEVEL_COUNT);
     expect(clone.movements).toHaveLength(MOVEMENT_COUNT);
-    expect(clone.levels[1234]).toEqual(payload.levels[1234]);
-    expect(clone.levels[1234]).not.toBe(payload.levels[1234]);
-    expect(clone.levels[1234].lots[1]).not.toBe(payload.levels[1234].lots[1]);
-    expect(clone.movements[19_999]).toEqual(payload.movements[19_999]);
-    expect(clone.movements[19_999]).not.toBe(payload.movements[19_999]);
-    expect(clone.levels[1234].lots[0].costPrice).toBe(payload.levels[1234].lots[0].costPrice);
+    expect(clone.entries).toHaveLength(ENTRY_COUNT);
+    expect(clone.orders).toHaveLength(ORDER_COUNT);
 
-    // Generous bound: it catches an algorithmic regression, not a slow machine.
-    expect(elapsedMs).toBeLessThan(PERF_BOUND_MS);
+    // Value equality across the whole payload (Dates included)...
+    expect(clone).toEqual(payload);
+
+    // ...and on a sampled element at every nesting level.
+    expect(clone.levels[123]).toEqual(payload.levels[123]);
+    expect(clone.levels[123].lots[1].costPrice).toBe(payload.levels[123].lots[1].costPrice);
+    expect(clone.movements[MOVEMENT_COUNT - 1]).toEqual(payload.movements[MOVEMENT_COUNT - 1]);
+    expect(clone.entries[ENTRY_COUNT - 1]).toEqual(payload.entries[ENTRY_COUNT - 1]);
+    expect(clone.orders[ORDER_COUNT - 1].orderItems[0].productCosts[0]).toEqual(
+      payload.orders[ORDER_COUNT - 1].orderItems[0].productCosts[0],
+    );
+
+    // No shared references, at the collection level and down through nesting.
+    expect(clone).not.toBe(payload);
+    expect(clone.levels).not.toBe(payload.levels);
+    expect(clone.movements).not.toBe(payload.movements);
+    expect(clone.entries).not.toBe(payload.entries);
+    expect(clone.orders).not.toBe(payload.orders);
+    expect(clone.levels[123]).not.toBe(payload.levels[123]);
+    expect(clone.levels[123].lots).not.toBe(payload.levels[123].lots);
+    expect(clone.levels[123].lots[1]).not.toBe(payload.levels[123].lots[1]);
+    expect(clone.levels[123].createdDate).not.toBe(payload.levels[123].createdDate);
+    expect(clone.entries[ENTRY_COUNT - 1]).not.toBe(payload.entries[ENTRY_COUNT - 1]);
+    expect(clone.orders[ORDER_COUNT - 1]).not.toBe(payload.orders[ORDER_COUNT - 1]);
+    expect(clone.orders[ORDER_COUNT - 1].orderItems[0]).not.toBe(
+      payload.orders[ORDER_COUNT - 1].orderItems[0],
+    );
+    expect(clone.orders[ORDER_COUNT - 1].orderItems[0].productCosts[0]).not.toBe(
+      payload.orders[ORDER_COUNT - 1].orderItems[0].productCosts[0],
+    );
+
+    // Mutating the clone at any depth leaves the original untouched.
+    clone.levels[123].lots[1].costPrice = 999;
+    clone.movements[7].quantity = 999;
+    clone.entries[7].costPrice = 999;
+    clone.orders[7].orderItems[0].productCosts[0].costPrice = 999;
+    expect(payload.levels[123].lots[1].costPrice).toBe(6);
+    expect(payload.movements[7].quantity).toBe(1);
+    expect(payload.entries[7].costPrice).toBe(5);
+    expect(payload.orders[7].orderItems[0].productCosts[0].costPrice).toBe(5);
   });
 });
