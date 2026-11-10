@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createContext, runInContext } from 'node:vm';
 import { deepClone } from '../deep-clone';
 
-/** Reachable so the `DOMException` fallback branch can be exercised. */
-const mutableGlobal = globalThis as unknown as Record<string, unknown>;
+afterEach(() => {
+  // Every global stubbed below is restored here, so a stub cannot leak into
+  // another test in this file or the next one.
+  vi.unstubAllGlobals();
+});
 
 /**
  * Asserts the value the clone refuses is rejected the way `structuredClone`
@@ -245,6 +248,13 @@ describe('deepClone', () => {
     const boxedString: String = Object('boxed text');
     const boxedBoolean: Boolean = Object(false);
 
+    // R3-002: a wrapper is a normal object, so expandos are allowed on it. They
+    // must survive the clone; dropping them would make the clone a hollow copy.
+    const meta = Symbol('meta');
+    const numberExtras = boxedNumber as unknown as Record<PropertyKey, unknown>;
+    numberExtras.label = 'expando';
+    numberExtras[meta] = { tags: ['a'] };
+
     const numberClone = deepClone(boxedNumber);
     const stringClone = deepClone(boxedString);
     const booleanClone = deepClone(boxedBoolean);
@@ -264,26 +274,89 @@ describe('deepClone', () => {
     expect(numberClone.valueOf()).toBe(41.5);
     expect(stringClone.valueOf()).toBe('boxed text');
     expect(booleanClone.valueOf()).toBe(false);
+
+    const clonedExtras = numberClone as unknown as Record<PropertyKey, unknown>;
+    expect(clonedExtras.label).toBe('expando');
+    expect(clonedExtras[meta]).toEqual({ tags: ['a'] });
+    expect(clonedExtras[meta]).not.toBe(numberExtras[meta]);
   });
 
-  it('clones a plain record whose prototype chain simulates another realm', () => {
-    // Another realm's `Object.prototype` is, structurally, an object whose own
-    // prototype is `null` — indistinguishable from a null-prototype record. A
-    // prototype-identity check against this realm's `Object.prototype` rejects
-    // this shape; the tag-based classification must not.
-    const foreignPrototype = Object.create(null);
-    const source = Object.create(foreignPrototype) as Record<string, unknown>;
-    source.id = 'record-1';
-    source.nested = { cost: 7 };
+  it('clones a plain record built in another realm as a record', () => {
+    // R3-003: a real second realm, not a same-realm structural stand-in. Only a
+    // foreign prototype can prove the classification is realm-independent.
+    const context = createContext({});
+    const foreignRecord = runInContext(
+      '({ id: "record-1", nested: { cost: 7 } })',
+      context,
+    ) as { id: string; nested: { cost: number } };
 
-    const clone = deepClone(source);
+    // Preconditions: the record really is foreign and really is a plain record.
+    expect(Object.getPrototypeOf(foreignRecord)).not.toBe(Object.prototype);
+    expect(Object.prototype.toString.call(foreignRecord)).toBe('[object Object]');
+    expect(foreignRecord).not.toBeInstanceOf(Object);
 
+    const clone = deepClone(foreignRecord);
+
+    expect(clone).not.toBe(foreignRecord);
     expect(Object.prototype.toString.call(clone)).toBe('[object Object]');
-    expect(clone).not.toBe(source);
     expect(clone.id).toBe('record-1');
     expect(Object.keys(clone)).toEqual(['id', 'nested']);
     expect(clone.nested).toEqual({ cost: 7 });
+    expect(clone.nested).not.toBe(foreignRecord.nested);
+  });
+
+  it('clones a plain record carrying a custom "Error" tag as a plain record', () => {
+    // R3-001: `Symbol.toStringTag` is writable by any record, so the intrinsic
+    // tag is an impostor target. Trusting it routed this record into the `Error`
+    // path, which copies `message` by reference as an Error intrinsic; the record
+    // path clones every own value, so reference identity tells the two apart.
+    const message = { detail: 'not an error' };
+    const source = {
+      id: 'tagged',
+      message,
+      nested: { cost: 3 },
+      [Symbol.toStringTag]: 'Error',
+    };
+
+    const clone = deepClone(source);
+
+    expect(clone).not.toBe(source);
+    expect(clone).not.toBeInstanceOf(Error);
+    expect(Object.prototype.hasOwnProperty.call(clone, 'stack')).toBe(false);
+    expect(clone.id).toBe('tagged');
+    expect(clone.message).toEqual({ detail: 'not an error' });
+    expect(clone.message).not.toBe(message);
+    expect(clone.nested).toEqual({ cost: 3 });
     expect(clone.nested).not.toBe(source.nested);
+    expect((clone as Record<PropertyKey, unknown>)[Symbol.toStringTag]).toBe('Error');
+  });
+
+  it('clones a plain record carrying a custom "Promise" tag instead of rejecting it', () => {
+    // R3-001: the tag used to fall through to the catch-all rejection, although
+    // the value is an ordinary record (the baseline cloned it as one).
+    const source = { id: 'promise-lookalike', [Symbol.toStringTag]: 'Promise' };
+
+    const clone = deepClone(source);
+
+    expect(clone).not.toBe(source);
+    expect(clone).not.toBeInstanceOf(Promise);
+    expect(clone.id).toBe('promise-lookalike');
+  });
+
+  it('rejects an unsupported object with a stable unknown-type message', () => {
+    // R3-005: the wording is part of the observable contract, so it is pinned.
+    // An unnamed class instance behind the value leaves no constructor name to
+    // report, which is the only way to reach the "unknown type" branch while the
+    // prototype is still not a plain-record prototype.
+    class UnnamedBase {}
+    Object.defineProperty(UnnamedBase, 'name', { value: '' });
+    const source = Object.create(new UnnamedBase());
+
+    const caught = expectDataCloneError(() => deepClone(source));
+
+    expect(caught.name).toBe('DataCloneError');
+    expect(caught.message).toContain('deepClone: cannot clone');
+    expect(caught.message).toContain('an object of unknown type');
   });
 
   it('clones an Error that came from another realm through the Error path', () => {
@@ -309,26 +382,22 @@ describe('deepClone', () => {
   });
 
   it('falls back to a TypeError when DOMException does not exist', () => {
-    // R3-003: the fallback branch is documented, so it gets a test. `DOMException`
-    // is a writable global in this environment; it is restored in `finally` so a
-    // failure here cannot leak into other tests.
-    const original = mutableGlobal.DOMException;
+    // R3-004: the fallback branch is documented, so it gets a test — through the
+    // runner's global stub, not by assigning to `globalThis` by hand, and
+    // asserting a stable property of the failure instead of the internal string.
+    vi.stubGlobal('DOMException', undefined);
+
+    let caught: unknown;
     try {
-      mutableGlobal.DOMException = undefined;
-
-      let caught: unknown;
-      try {
-        deepClone({ run: () => 1 });
-      } catch (error) {
-        caught = error;
-      }
-
-      expect(caught).toBeInstanceOf(TypeError);
-      expect((caught as Error).name).toBe('TypeError');
-      expect((caught as Error).message).toBe('deepClone: cannot clone a function');
-    } finally {
-      mutableGlobal.DOMException = original;
+      deepClone({ run: () => 1 });
+    } catch (error) {
+      caught = error;
     }
+
+    expect(caught).toBeInstanceOf(TypeError);
+    expect((caught as Error).name).toBe('TypeError');
+    expect((caught as Error).message).toContain('deepClone: cannot clone');
+    expect((caught as Error).message).toContain('function');
   });
 
   it('throws a DataCloneError for unsupported built-ins (URL, WeakMap, Promise)', () => {

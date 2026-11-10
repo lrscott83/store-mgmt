@@ -9,14 +9,21 @@
  * primitives (passed through), arrays (holes preserved), plain objects, `Error`
  * (subclasses included), `Date`, `RegExp`, `Map`, `Set`, and `ArrayBuffer` /
  * `ArrayBuffer` views. Boxed `Number` / `String` / `Boolean` wrappers are cloned
- * as the same wrapper around the same primitive.
+ * as the same wrapper around the same primitive, expandos included.
  *
  * Plain objects and `Error`s are classified with `Object.prototype.toString`,
  * never with prototype identity or `instanceof`, so a value built in another
  * realm (iframe, worker, `vm` context) is cloned too: a foreign plain object is
- * still a record, and a foreign `Error` still takes the `Error` path. The other
- * built-ins (`Date`, `RegExp`, `Map`, `Set`, `ArrayBuffer`, views, `Array`) keep
- * same-realm `instanceof` checks — a foreign one is rejected, exactly as before.
+ * still a record, and a foreign `Error` still takes the `Error` path. That tag is
+ * trusted ONLY for a value that carries no custom `Symbol.toStringTag` anywhere
+ * on its prototype chain, because the symbol is writable by any record: a record
+ * spoofing `'Error'` would otherwise be routed into the `Error` path and one
+ * spoofing `'Promise'` would be rejected. A value that does carry one is
+ * classified by prototype shape instead — a plain record (a prototype chain that
+ * ends at `null`, in any realm) is cloned as a record, everything else goes to
+ * the rejection helper. The other built-ins (`Date`, `RegExp`, `Map`, `Set`,
+ * `ArrayBuffer`, views, `Array`) keep same-realm `instanceof` checks — a foreign
+ * one is rejected, exactly as before.
  *
  * Every other value is REJECTED, never flattened into a hollow copy: functions,
  * symbols used as values, `Blob`, `File`, DOM nodes, `Promise`, `WeakMap` /
@@ -193,7 +200,13 @@ function cloneError(source: Error, seen: WeakMap<object, unknown>): Error {
   return clone;
 }
 
-/** Best-effort class name for the rejection message (`Widget`, `URL`, ...). */
+/**
+ * Best-effort class name for the rejection message (`Widget`, `URL`, ...).
+ *
+ * The wording is part of the observable contract, not a debug aid: a caller (and
+ * a test) reads "an object of unknown type" for a value whose constructor has no
+ * name, so neither branch of this message is free to drift.
+ */
 function describeUnsupported(source: object): string {
   const name = (source as { constructor?: { name?: string } }).constructor?.name;
   return name ? `a ${name} instance` : 'an object of unknown type';
@@ -215,6 +228,36 @@ function isPlainObjectPrototype(prototype: object | null): boolean {
 }
 
 /**
+ * Clones a plain record, keeping its prototype (which may be another realm's
+ * `Object.prototype`, or `null`) and copying its own properties by value.
+ */
+function clonePlainRecord<T>(
+  source: object,
+  prototype: object | null,
+  seen: WeakMap<object, unknown>,
+): T {
+  const clone = Object.create(prototype) as AnyRecord;
+  seen.set(source, clone);
+  copyOwnProperties(source, clone, seen);
+  return clone as T;
+}
+
+/**
+ * Own property keys a fresh `Object(primitive)` wrapper already carries and
+ * cannot accept again: a `String` wrapper exposes its characters as own,
+ * non-writable, non-configurable index properties, so re-defining them throws.
+ * They are already implied by the boxed primitive, so they are skipped; every
+ * other own key on the source is an expando and is copied.
+ */
+function unassignableOwnKeys(target: object): ReadonlySet<PropertyKey> {
+  const keys = new Set<PropertyKey>();
+  for (const key of Reflect.ownKeys(target)) {
+    if (Object.getOwnPropertyDescriptor(target, key)?.configurable === false) keys.add(key);
+  }
+  return keys;
+}
+
+/**
  * Clones a boxed primitive (`new Number`, `new String`, `new Boolean`).
  *
  * Its value lives in an internal slot, not in an own property, so copying own
@@ -222,13 +265,24 @@ function isPlainObjectPrototype(prototype: object | null): boolean {
  * re-boxes `valueOf()` into the same wrapper type; the resulting tag is checked
  * so a `Symbol.toStringTag` impostor whose `valueOf()` is not primitive is
  * rejected instead of being returned as a shared reference.
+ *
+ * Own expandos are copied with the same rules as a record — otherwise a wrapper
+ * returned with its value but without the properties hanging off it would be the
+ * hollow copy this module never returns. The clone is registered in `seen` before
+ * those properties are walked, so a wrapper pointing at itself terminates.
  */
-function cloneBoxedPrimitive(source: object, tag: string): object {
+function cloneBoxedPrimitive(
+  source: object,
+  tag: string,
+  seen: WeakMap<object, unknown>,
+): object {
   const primitive = (source as { valueOf(): unknown }).valueOf();
   const clone = Object(primitive) as object;
   if (clone === source || Object.prototype.toString.call(clone) !== tag) {
     throwDataCloneError(`deepClone: cannot clone ${describeUnsupported(source)}`);
   }
+  seen.set(source, clone);
+  copyOwnProperties(source, clone as AnyRecord, seen, unassignableOwnKeys(clone));
   return clone;
 }
 
@@ -312,24 +366,30 @@ function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
   // answer "is this ours?", which is the wrong question for a value that came
   // from another realm (iframe, worker, `vm` context) — those used to be
   // rejected even though `structuredClone` clones them.
+  //
+  // The intrinsic tag is trusted only when nothing on the prototype chain
+  // overrides `Symbol.toStringTag`. That symbol is written by any object, so a
+  // plain record carrying `'Error'` would be routed into the `Error` path and one
+  // carrying `'Promise'` would be rejected, while the baseline cloned both as
+  // plain records. A value that does carry a tag is therefore classified by
+  // prototype shape: a plain record stays a record, anything else is rejected.
+  if (Symbol.toStringTag in source) {
+    const prototype = Object.getPrototypeOf(source);
+    if (isPlainObjectPrototype(prototype)) return clonePlainRecord<T>(source, prototype, seen);
+    throwDataCloneError(`deepClone: cannot clone ${describeUnsupported(source)}`);
+  }
+
   const tag = Object.prototype.toString.call(source);
 
   if (tag === ERROR_TAG) return cloneError(source as Error, seen) as unknown as T;
 
   if (BOXED_PRIMITIVE_TAGS.has(tag)) {
-    const clone = cloneBoxedPrimitive(source, tag);
-    seen.set(source, clone);
-    return clone as T;
+    return cloneBoxedPrimitive(source, tag, seen) as unknown as T;
   }
 
   if (tag === OBJECT_TAG) {
     const prototype = Object.getPrototypeOf(source);
-    if (isPlainObjectPrototype(prototype)) {
-      const clone = Object.create(prototype) as AnyRecord;
-      seen.set(source, clone);
-      copyOwnProperties(source, clone, seen);
-      return clone as T;
-    }
+    if (isPlainObjectPrototype(prototype)) return clonePlainRecord<T>(source, prototype, seen);
   }
 
   throwDataCloneError(`deepClone: cannot clone ${describeUnsupported(source)}`);
