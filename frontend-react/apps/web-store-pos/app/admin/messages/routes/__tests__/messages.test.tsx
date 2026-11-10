@@ -726,6 +726,11 @@ describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => 
       expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-flush', {
         background: true,
       });
+      // Fija el conjunto COMPLETO de acuses de este pase: un acuse de cualquier
+      // borde, con cualquier forma de llamada, también rompe este assert.
+      expect(vi.mocked(messagesHttpService.markAsRead).mock.calls).toEqual([
+        ['m-open', { background: true }],
+      ]);
     } finally {
       spy.mockRestore();
     }

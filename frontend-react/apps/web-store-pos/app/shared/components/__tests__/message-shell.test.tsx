@@ -455,6 +455,9 @@ describe('MessageShell — panel conversation', () => {
       await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('open', { background: true }));
       expect(markAsReadMock).not.toHaveBeenCalledWith('touch', { background: true });
       expect(markAsReadMock).not.toHaveBeenCalledWith('flush', { background: true });
+      // Pins the COMPLETE receipt set for this pass: a receipt of either edge,
+      // under any call shape, breaks this assertion too.
+      expect(markAsReadMock.mock.calls).toEqual([['open', { background: true }]]);
     } finally {
       spy.mockRestore();
     }
