@@ -155,7 +155,8 @@ describe('deepClone', () => {
 });
 
 /**
- * Scale-correctness guard (R4-DEEPCLONE-NO-PERF-MEASUREMENT, reworked by R3-D).
+ * Scale-correctness guard (R4-DEEPCLONE-NO-PERF-MEASUREMENT, reworked by R3-D,
+ * cost coverage restored by R3-PERF-GUARD-REMOVED).
  *
  * `deepClone` replaced `structuredClone` in `WarehouseOfflineService.snapshotPurchaseEdit`,
  * where it runs synchronously over whole-store collections on every purchase-cost
@@ -163,10 +164,16 @@ describe('deepClone', () => {
  *
  * The previous version of this guard used wall-clock time as its verdict. That is
  * not a unit-test assertion: the number depends on the machine's load, so it is
- * either flaky or so loose that it proves nothing. Wall-clock benchmarking belongs
- * outside a unit test. What is deterministic and still catches a real regression is
- * the observable result on a payload shaped like the actual snapshot: cardinality,
- * value equality, and no shared references at any nesting level.
+ * either flaky or so loose that it proves nothing. What is deterministic and still
+ * catches a real regression is the observable result on a payload shaped like the
+ * actual snapshot: cardinality, value equality, and no shared references at any
+ * nesting level.
+ *
+ * Cost is covered separately and on demand, in the benchmark next to this file —
+ * `deep-clone.bench.ts`, which clones the same payload shape at 250, 1 000 and
+ * 4 000 stock levels so linear-vs-quadratic scaling is observable by comparing
+ * time per level. Run it with:
+ * `pnpm --filter @store-mgmt/web-store-pos exec vitest bench app/shared/lib/browser-compat/__tests__/deep-clone.bench.ts`
  */
 const STOCK_LEVEL_COUNT = 250;
 const LOTS_PER_LEVEL = 3;
