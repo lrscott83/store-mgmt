@@ -281,6 +281,33 @@ describe('deepClone', () => {
     expect(clonedExtras[meta]).not.toBe(numberExtras[meta]);
   });
 
+  it('terminates when a wrapper expando points back at the wrapper and re-points it at the clone', () => {
+    // R3-002: the expando recursion is new, so its termination path needs proof.
+    // A wrapper whose own property points back at itself would recurse forever
+    // if the clone were not registered before its properties were walked.
+    const source: Number = Object(7);
+    const sourceExtras = source as unknown as Record<PropertyKey, unknown>;
+    sourceExtras.self = source;
+
+    const clone = deepClone(source);
+    const clonedExtras = clone as unknown as Record<PropertyKey, unknown> & { valueOf(): number };
+
+    expect(clone).not.toBe(source);
+    // The cloned expando points at the CLONE, not at the source wrapper.
+    expect(clonedExtras.self).toBe(clone);
+    expect(clonedExtras.self).not.toBe(source);
+    expect(clonedExtras.valueOf()).toBe(7);
+  });
+
+  it('throws a DataCloneError when a wrapper expando holds a function', () => {
+    // R3-002: a wrapper is cloned with its expandos, so an unclonable expando
+    // must fail loudly instead of being dropped from the clone.
+    const source: Number = Object(1);
+    (source as unknown as Record<PropertyKey, unknown>).run = () => 1;
+
+    expectDataCloneError(() => deepClone(source));
+  });
+
   it('clones a plain record built in another realm as a record', () => {
     // R3-003: a real second realm, not a same-realm structural stand-in. Only a
     // foreign prototype can prove the classification is realm-independent.
@@ -341,6 +368,63 @@ describe('deepClone', () => {
     expect(clone).not.toBe(source);
     expect(clone).not.toBeInstanceOf(Promise);
     expect(clone.id).toBe('promise-lookalike');
+  });
+
+  it('clones an Error carrying an own "Error" tag through the Error path', () => {
+    // R3-001: the custom-tag gate must not be able to intercept an `Error` — the
+    // same-realm `instanceof Error` classification runs first, so a value that is
+    // BOTH an `Error` and tagged still takes the Error path instead of being
+    // rejected for "carrying a custom tag".
+    const source = new Error('tagged failure');
+    Object.defineProperty(source, Symbol.toStringTag, {
+      value: 'Error',
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+
+    // Precondition: the value really is tagged, so the gate would see it.
+    expect(Symbol.toStringTag in source).toBe(true);
+
+    const clone = deepClone(source);
+
+    expect(clone).not.toBe(source);
+    expect(clone).toBeInstanceOf(Error);
+    expect(clone.constructor).toBe(Error);
+    expect(clone.message).toBe('tagged failure');
+    expect(clone.stack).toBe(source.stack);
+    expect(clone.stack).toBeDefined();
+  });
+
+  it('clones an Error subclass whose prototype defines a "Symbol.toStringTag" getter', () => {
+    // R3-001: the tag reaches the object through the prototype chain, not as an
+    // own property, which is the shape `Symbol.toStringTag in source` sees first.
+    class TaggedError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'TaggedError';
+      }
+
+      get [Symbol.toStringTag](): string {
+        return 'TaggedError';
+      }
+    }
+
+    const source = new TaggedError('tagged subclass failure');
+
+    // Precondition: the tag is inherited and the value really is an `Error`.
+    expect(Object.prototype.hasOwnProperty.call(source, Symbol.toStringTag)).toBe(false);
+    expect(Symbol.toStringTag in source).toBe(true);
+    expect(source).toBeInstanceOf(Error);
+
+    const clone = deepClone(source);
+
+    expect(clone).not.toBe(source);
+    expect(clone).toBeInstanceOf(TaggedError);
+    expect(clone).toBeInstanceOf(Error);
+    expect(clone.name).toBe('TaggedError');
+    expect(clone.message).toBe('tagged subclass failure');
+    expect(clone.stack).toBe(source.stack);
   });
 
   it('rejects an unsupported object with a stable unknown-type message', () => {

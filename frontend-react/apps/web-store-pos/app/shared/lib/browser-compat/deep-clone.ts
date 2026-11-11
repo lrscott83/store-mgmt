@@ -11,10 +11,12 @@
  * `ArrayBuffer` views. Boxed `Number` / `String` / `Boolean` wrappers are cloned
  * as the same wrapper around the same primitive, expandos included.
  *
- * Plain objects and `Error`s are classified with `Object.prototype.toString`,
+ * Plain objects and foreign `Error`s are classified with `Object.prototype.toString`,
  * never with prototype identity or `instanceof`, so a value built in another
  * realm (iframe, worker, `vm` context) is cloned too: a foreign plain object is
- * still a record, and a foreign `Error` still takes the `Error` path. That tag is
+ * still a record, and a foreign `Error` still takes the `Error` path. A
+ * same-realm `Error` is caught earlier by `instanceof`, ahead of the custom-tag
+ * gate, so an `Error` is never rejected for carrying a tag. That tag is
  * trusted ONLY for a value that carries no custom `Symbol.toStringTag` anywhere
  * on its prototype chain, because the symbol is writable by any record: a record
  * spoofing `'Error'` would otherwise be routed into the `Error` path and one
@@ -23,7 +25,9 @@
  * ends at `null`, in any realm) is cloned as a record, everything else goes to
  * the rejection helper. The other built-ins (`Date`, `RegExp`, `Map`, `Set`,
  * `ArrayBuffer`, views, `Array`) keep same-realm `instanceof` checks — a foreign
- * one is rejected, exactly as before.
+ * one is rejected, exactly as before. One shape is left unserved: an `Error` from
+ * another realm that also carries a custom tag is rejected, because neither
+ * `instanceof` nor the tag can be trusted for it.
  *
  * Every other value is REJECTED, never flattened into a hollow copy: functions,
  * symbols used as values, `Blob`, `File`, DOM nodes, `Promise`, `WeakMap` /
@@ -360,6 +364,9 @@ function cloneValue<T>(value: T, seen: WeakMap<object, unknown>): T {
     return clone as T;
   }
 
+  // Deliberately ahead of the custom-tag gate below: an `Error` is classified by
+  // same-realm identity first, so a tagged `Error` still clones through this path
+  // instead of being rejected for carrying a tag (R3-001).
   if (source instanceof Error) return cloneError(source, seen) as unknown as T;
 
   // Realm-independent classification. `instanceof` and prototype identity both
