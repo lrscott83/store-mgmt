@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { POLYFILLED_APIS } from '@store-mgmt/eslint-config/browser-compat';
-import type { PolyfillInstallResult } from '../polyfills';
+import type { PolyfillInstallResult, StartupPolyfillReport } from '../polyfills';
 
 /**
  * `lib` is ES2022, so `findLast`, `findLastIndex`, `toSorted`, `toReversed`
@@ -94,13 +94,43 @@ function expectOriginalDescriptors(apis: readonly string[]): void {
   }
 }
 
+/** Original `defineProperty`, captured before any spy is installed. */
+const originalDefineProperty = Object.defineProperty as unknown as (
+  target: object,
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+) => object;
+
+/**
+ * Makes exactly one installer throw `thrown`: every other `defineProperty`
+ * call goes through to the real one. Callers must `mockRestore()` before
+ * restoring descriptors, or the restore itself would be blocked.
+ */
+function failInstallationOf(target: object, name: string, thrown: unknown) {
+  const implementation = ((
+    actualTarget: object,
+    actualKey: PropertyKey,
+    descriptor: PropertyDescriptor,
+  ) => {
+    if (actualTarget === target && actualKey === name) throw thrown;
+    return originalDefineProperty(actualTarget, actualKey, descriptor);
+  }) as unknown as typeof Object.defineProperty;
+
+  return vi.spyOn(Object, 'defineProperty').mockImplementation(implementation);
+}
+
 let installBrowserPolyfills: () => PolyfillInstallResult = () => {
+  throw new Error('polyfills module was not loaded before use');
+};
+
+let readStartupPolyfillReport: () => StartupPolyfillReport = () => {
   throw new Error('polyfills module was not loaded before use');
 };
 
 beforeAll(async () => {
   const module = await import('../polyfills');
   installBrowserPolyfills = module.installBrowserPolyfills;
+  readStartupPolyfillReport = module.readStartupPolyfillReport;
 });
 
 /**
@@ -396,5 +426,101 @@ describe('installBrowserPolyfills', () => {
       restoreApis(touched);
     }
     expectOriginalDescriptors(touched);
+  });
+
+  it('reports installed, already present and failed APIs in a single pass', () => {
+    const touched = ALL_APIS;
+    const alreadyApi = 'Array.prototype.at';
+    const failingApi = 'Array.prototype.toSorted';
+    const failing = requireTarget(failingApi);
+    const definePropertySpy = failInstallationOf(
+      failing.target,
+      failing.name,
+      new TypeError('mixed-state failure'),
+    );
+
+    try {
+      for (const api of touched) dropApi(api);
+
+      // A working implementation that is already there: reported as present
+      // and never replaced.
+      const sentinel = () => 'sentinel';
+      Object.defineProperty(Array.prototype, 'at', {
+        value: sentinel,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+
+      const result = installBrowserPolyfills();
+
+      const expectedInstalled = POLYFILLED_APIS.map((entry) => entry.api)
+        .filter((api) => api !== alreadyApi && api !== failingApi)
+        .sort();
+
+      expect(result.alreadyPresent).toEqual([alreadyApi]);
+      expect([...result.installed].sort()).toEqual(expectedInstalled);
+      expect(result.failed).toEqual([{ api: failingApi, reason: 'mixed-state failure' }]);
+      expect(readApi(alreadyApi)).toBe(sentinel);
+    } finally {
+      definePropertySpy.mockRestore();
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('reports the thrown value itself when an installer throws a non-Error', () => {
+    const touched = ['Array.prototype.toReversed'];
+    const failing = requireTarget('Array.prototype.toReversed');
+    const thrownValue: unknown = 'boom';
+    const definePropertySpy = failInstallationOf(
+      failing.target,
+      failing.name,
+      thrownValue,
+    );
+
+    try {
+      dropApi('Array.prototype.toReversed');
+
+      const result = installBrowserPolyfills();
+
+      expect(result.failed).toEqual([{ api: 'Array.prototype.toReversed', reason: 'boom' }]);
+      expect(readApi('Array.prototype.toReversed')).toBeUndefined();
+    } finally {
+      definePropertySpy.mockRestore();
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('falls back to the error name when the thrown Error has an empty message', () => {
+    const touched = ['Object.hasOwn'];
+    const failing = requireTarget('Object.hasOwn');
+    const definePropertySpy = failInstallationOf(failing.target, failing.name, new Error(''));
+
+    try {
+      dropApi('Object.hasOwn');
+
+      const result = installBrowserPolyfills();
+
+      expect(result.failed).toEqual([{ api: 'Object.hasOwn', reason: 'Error' }]);
+      expect(readApi('Object.hasOwn')).toBeUndefined();
+    } finally {
+      definePropertySpy.mockRestore();
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('exposes the module-scope startup report to later consumers', () => {
+    const report = readStartupPolyfillReport();
+
+    expect(report.error).toBeNull();
+    const result = report.result;
+    if (!result) throw new Error('startup report missing its installation result');
+
+    const accountedFor = [...result.installed, ...result.alreadyPresent].sort();
+    expect(accountedFor).toEqual(POLYFILLED_APIS.map((entry) => entry.api).sort());
+    expect(result.failed).toEqual([]);
   });
 });

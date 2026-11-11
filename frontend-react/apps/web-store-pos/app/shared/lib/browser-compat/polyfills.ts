@@ -14,7 +14,9 @@
  * `Object.defineProperty` costs exactly the API it blocked: module evaluation
  * still completes, `entry.client` still mounts, and every other polyfill is
  * still installed. The failure is reported in the returned result instead of
- * being thrown, because the module-scope call below has no caller to catch it.
+ * being thrown; the module-scope call below keeps that result, warns once and
+ * exposes it through `readStartupPolyfillReport` so the degradation is visible
+ * on a device in the field.
  *
  * Installation is idempotent: an API that already exists is never replaced.
  * Every definition is declared non-enumerable so `for...in` and
@@ -271,9 +273,67 @@ export function installBrowserPolyfills(): PolyfillInstallResult {
   return result;
 }
 
+export interface StartupPolyfillReport {
+  /** What the module-scope installation produced, or `null` when it threw. */
+  readonly result: PolyfillInstallResult | null;
+  /** The thrown value rendered as text, or `null` when the run completed. */
+  readonly error: string | null;
+}
+
+const STARTUP_WARNING_PREFIX = '[browser-compat]';
+
+let startupReport: StartupPolyfillReport = { result: null, error: null };
+
+/**
+ * Leaves a trace in the console when the startup run degraded.
+ *
+ * Deliberately `console.warn` and no import: importing the diagnostic log here
+ * would drag `global-config` into the very first module the bundle evaluates,
+ * breaking "polyfills run first". `root.tsx` flushes the same report into the
+ * exportable `/diagnostics` log once it is mounted.
+ */
+function warnAboutStartupDegradation(report: StartupPolyfillReport): void {
+  try {
+    if (report.error !== null) {
+      console.warn(
+        `${STARTUP_WARNING_PREFIX} polyfills failed at startup: ${report.error}`,
+      );
+      return;
+    }
+    const failed = report.result?.failed ?? [];
+    if (failed.length === 0) return;
+    const details = failed.map(({ api, reason }) => `${api}: ${reason}`).join('; ');
+    console.warn(`${STARTUP_WARNING_PREFIX} polyfills degraded at startup: ${details}`);
+  } catch {
+    // A hardened browser can make even `console.warn` throw; losing a warning
+    // line never justifies taking module evaluation down.
+  }
+}
+
 try {
-  installBrowserPolyfills();
-} catch {
+  startupReport = { result: installBrowserPolyfills(), error: null };
+} catch (error) {
   // Defensive only: `installBrowserPolyfills` isolates every installer, so
   // nothing reaches here. Module evaluation must never fail on a polyfill.
+  startupReport = { result: null, error: describeFailure(error) };
+}
+
+warnAboutStartupDegradation(startupReport);
+
+/**
+ * Read-only snapshot of the module-scope installation, for consumers that load
+ * later (e.g. `app/root.tsx`, which persists it in the diagnostic log).
+ */
+export function readStartupPolyfillReport(): StartupPolyfillReport {
+  const { result, error } = startupReport;
+  return {
+    error,
+    result: result
+      ? {
+          installed: [...result.installed],
+          alreadyPresent: [...result.alreadyPresent],
+          failed: result.failed.map((failure) => ({ ...failure })),
+        }
+      : null,
+  };
 }

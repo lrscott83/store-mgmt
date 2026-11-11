@@ -16,6 +16,7 @@ import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registrat
 import { isPublicCatalogPath } from '~/shared/lib/pwa/public-catalog-route';
 import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
+import { flushStartupPolyfillDiagnostics } from '~/shared/lib/browser-compat/startup-diagnostics';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { useSitePageView } from '~/shared/lib/telemetry/use-site-page-view';
 import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
@@ -37,6 +38,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // client-error-log: global capture hooks mount BEFORE anything else so even
   // boot-time errors land in the diagnostic ring buffer (/diagnostics view).
   installClientLog();
+  // browser-compat: the polyfill startup report is captured before anything
+  // else evaluates, so a degraded install is only visible here. Flush it into
+  // the exportable diagnostic log, next to the capture hooks above.
+  flushStartupPolyfillDiagnostics(logClientError);
 
   return (
     <html lang="es">
