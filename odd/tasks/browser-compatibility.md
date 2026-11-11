@@ -63,6 +63,12 @@ S6 — Chequeo mecánico de compatibilidad (base de datos real, no lista a mano)
 - La regla se aplica solo a código que corre en el navegador. Quedan fuera: `**/__tests__/**`, `**/*.test.*`, `e2e/**`, `scripts/**`, `**/*.mjs` y `app/service-worker.ts`.
 - Criterio de aceptación: `pnpm lint` pasa en `frontend-react/`; y una API por encima del piso no declarada como polyfill (por ejemplo `AbortSignal.timeout`, Chrome 103) produce error al introducirla en un archivo de `app/` (prueba de mutación revertida). El inventario de violaciones encontradas al activarlo se reporta al owner antes de decidir arreglos.
 
+S7 — Un fallo de polyfills en el arranque deja rastro (advisories del RDD de `44b0c6b9`).
+- `polyfills.ts` captura el resultado del arranque en module scope y **no lo descarta**; si `failed` no está vacío, o si el arranque entero lanza, emite `console.warn` con la lista de APIs fallidas y su `reason` (sin imports nuevos, el invariante "polyfills se evalúa primero" se mantiene).
+- El resultado del arranque es legible por un consumidor posterior: `readStartupPolyfillReport()`.
+- `root.tsx`, junto a `installClientLog()`, vuelca el reporte con `logClientError` (nivel `warn`) cuando hubo fallos o error de arranque, para que quede persistido en el log exportable de `/diagnostics`.
+- Criterio de aceptación: hay test del reparto **mixto** (`installed`, `alreadyPresent` y `failed` no vacíos en una misma pasada), test del `reason` cuando el valor lanzado **no** es un `Error` (`String(error)`) y cuando es un `Error` con `message` vacío (cae en `name`), y test del volcado a diagnóstico. El `catch` de arranque deja de estar sin cubrir.
+
 ## Findings del RDD `review-5a8ec25157b39dd5` (aprobado, 11 advisory) y su resolución
 
 | ID | Lente | Sev. | Resolución |
@@ -86,6 +92,8 @@ S6 — Chequeo mecánico de compatibilidad (base de datos real, no lista a mano)
 - T8 — U3: fail-soft de polyfills (`R4-POLYFILL-NO-FAILSOFT`) + higiene de tests (`R3-004`). Ruta: delegated. Estado: pending.
 - T9 — U4: polyfill `crypto.randomUUID` (T4 original; `R4-RANDOMUUID-UNMITIGATED`, `R3-005`). Ruta: delegated. Estado: pending.
 - T10 — U5: `toSorted` con huecos (`R3-003`). Ruta: delegated. Estado: pending.
+- T11 — S7: rastro de degradación en el arranque (`R3-silent-startup-degradation`, `R4-bootstrap-catch-no-diagnostic`). Ruta: delegated. Estado: done — commit `f974a24a`, RDD `review-50483731246ac81f` aprobado (lentes resilience + reliability), autoridad quemada.
+- T12 — S7: huecos de test restantes (`R3-nonerror-reason-branch`, `R3-mixed-report-state-gap`). Ruta: delegated. Estado: done — commit `f974a24a`.
 
 - T1 — S3: política base (`packages/eslint-config/browser-compat.js` + export del paquete) + `polyfills.ts` + import en `entry.client.tsx` + `polyfills.test.ts`. Ruta: delegated. Estado: done — commit `b2b8ef92` (11 tests, typecheck y lint del paquete verdes).
 - T2 — S4: `deep-clone.ts` + sustitución de las 4 llamadas `structuredClone` en `warehouse-offline-service.ts` + `deep-clone.test.ts`. Ruta: delegated. Estado: pending.
@@ -133,3 +141,12 @@ Resultado del barrido:
 Límite explícito de esta auditoría: un barrido textual demuestra la ausencia de los patrones que nombra, no la ausencia de toda API por encima del piso. La lista es tan completa como el conjunto buscado.
 
 L7 (2026-11-10, verbatim del owner): «añadelas para el chequeo mecánico». Reversa el non-goal de `browserslist` y añade `eslint-plugin-compat` como S6/T5: la completitud deja de depender de una lista escrita a mano y pasa a una base de datos real (caniuse) contra `chrome 89`. Implicaciones asumidas: nueva devDependency + `pnpm install` (churn de lockfile, antes prohibido por prudencia, ahora autorizado por necesidad del chequeo); el plugin solo entiende Web APIs por defecto, así que `settings.lintAllEsApis: true` es obligatorio para cubrir la clase de bug del `.at()`; `settings.polyfills` se deriva de `POLYFILLED_APIS` para no reportar lo que ya se polifillea; y el inventario de violaciones que aparezca al activarlo se reporta al owner antes de arreglar nada, porque puede ser un backlog grande y no fue autorizado.
+L8 (2026-11-11, verbatim del owner): "continua con lo 4 advertencias. Recuerda usar los subagentes para el explorer, para el worker y las tareas que debes usar los subagentes. Usa codegraph para las cosas que debes usarlo y no usar grep o otro comando para esos casos. Ademas tienes que hacer RDD cada vez que toque. Cualquier duda me preguntas para que no asumas nada de nada."
+
+L9 - Decision del owner (2026-11-11): el rastro de una degradacion de polyfills en el arranque va por la opcion "console.warn en module scope + volcado con logClientError en root.tsx". Motivo del ask: un console.warn antes de installClientLog no se persiste en el log exportable, e importar logClientError dentro de polyfills.ts arrastra global-config a la primera evaluacion del bundle. Se anaden T11 y T12 (S7) y el estado queda en 4 advisories no bloqueantes del RDD de 44b0c6b9.
+L10 (2026-11-11) - Cierre de T11/T12 (S7) en el commit `f974a24a`.
+- Estado real de la lista de tareas reconciliado con `git log` (estaba obsoleta): T2 = `05c12161`; T6 = `2df7bba6` + `422d585b` + `33e70c49` + `bdb8f28c`; T7 = `66463de5` + `a56af8b4` + `64bbe3fc` + `5ecd73e0`; T8 = `44b0c6b9`. Siguen pendientes T3, T4, T5, T9 y T10.
+- RED honesto: los 3 tests de huecos (estado mixto, `String(error)`, `Error` con mensaje vacio) pasaron ya en la primera corrida porque `describeFailure` ya implementaba ambas ramas; lo que faltaba de verdad era la captura y el volcado del reporte de arranque, y ese es el rojo observado (`readStartupPolyfillReport is not a function` + import sin resolver de `../startup-diagnostics`).
+- Verde: 21 tests en los dos ficheros del modulo; suite completa del workspace 461 ficheros / 6383 tests; typecheck OK; eslint de los 5 ficheros tocados OK.
+- FALLO PRE-EXISTENTE EN HEAD, no de este cambio: `pnpm lint` del workspace esta rojo por 5 errores `@typescript-eslint/no-wrapper-object-types` en `__tests__/deep-clone.test.ts` (lineas 247, 248, 249, 288, 305), fichero sin diff respecto a HEAD y heredado del commit `44b0c6b9`. Verificado ejecutando eslint sobre ese fichero. Bloquea el criterio S5 del feature y queda pendiente de decision del owner.
+- RDD del commit: `review-50483731246ac81f` aprobado (candidato = `f974a24a` solo, base `a1b0e477`), autoridad quemada, `consumed_revision` sha256:4b90a79d. 5 advisories no bloqueantes emitidas por esa review: `R3-1` y `R4-flush-not-idempotent` (el volcado desde `Layout` no tiene guarda de una sola vez, se reemite en cada render), `R3-2` (el test del volcado sustituye `polyfills` con `vi.mock`, no prueba el cableado real hacia `logClientError` desde `root.tsx`), `R3-3` (el mensaje dice "degraded" tambien cuando el arranque entero fallo), `R4-module-graph-server-eval` (`root.tsx` arrastra `polyfills` al grafo del servidor).
