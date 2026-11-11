@@ -33,8 +33,19 @@ interface ApiTarget {
 /**
  * The `crypto` object the polyfill installs onto. Captured before any test
  * mutates it; `globalThis.crypto` is the same object in this environment.
+ *
+ * A host without Web Crypto has no `crypto` at all, so this module must not
+ * dereference it at load: the whole suite would otherwise fail at import
+ * instead of degrading (R3-2). The crypto tests skip in that host, and the
+ * table falls back to a stand-in owner that keeps its full key set.
  */
-const cryptoGlobal = globalThis.crypto;
+const cryptoGlobal = globalThis.crypto as Crypto;
+const hasWebCrypto = typeof cryptoGlobal === 'object' && cryptoGlobal !== null;
+const missingCryptoStandIn: object = {};
+const cryptoInstallTarget: object = hasWebCrypto ? cryptoGlobal : missingCryptoStandIn;
+const cryptoPrototype: object | undefined = hasWebCrypto
+  ? (Object.getPrototypeOf(cryptoGlobal) as object)
+  : undefined;
 
 /** Each policy API name mapped to the object/property that owns it. */
 const API_TARGETS: Record<string, ApiTarget> = {
@@ -47,9 +58,9 @@ const API_TARGETS: Record<string, ApiTarget> = {
   'Array.prototype.toSpliced': { target: Array.prototype, name: 'toSpliced' },
   'Object.hasOwn': { target: Object, name: 'hasOwn' },
   'crypto.randomUUID': {
-    target: cryptoGlobal,
+    target: cryptoInstallTarget,
     name: 'randomUUID',
-    inheritedFrom: Object.getPrototypeOf(cryptoGlobal),
+    inheritedFrom: cryptoPrototype,
   },
 };
 
@@ -185,6 +196,67 @@ beforeAll(async () => {
 afterEach(() => {
   restoreApis(ALL_APIS);
 });
+
+/**
+ * Crypto tests need a Web Crypto host. A host without one skips them cleanly
+ * instead of failing the whole file at import (R3-2); every non-crypto test
+ * still runs there.
+ */
+const itWithCrypto = it.skipIf(!hasWebCrypto);
+
+/** Descriptor `globalThis.crypto` had before any test shadowed it. */
+const CRYPTO_GLOBAL_DESCRIPTOR = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+
+interface ShadowedProperty {
+  /** How many times the shadowed property was read while it was in place. */
+  reads: number;
+}
+
+/**
+ * Replaces `globalThis.crypto` with a recording getter returning `value`, so a
+ * test can prove the shadow was live while the installers ran. Put back by
+ * `restoreCryptoGlobal`, never by plain assignment.
+ */
+function shadowCryptoGlobal(value: unknown): ShadowedProperty {
+  const shadow: ShadowedProperty = { reads: 0 };
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    get() {
+      shadow.reads += 1;
+      return value;
+    },
+  });
+  return shadow;
+}
+
+function restoreCryptoGlobal(): void {
+  delete (globalThis as unknown as Record<string, unknown>).crypto;
+  if (CRYPTO_GLOBAL_DESCRIPTOR) {
+    Object.defineProperty(globalThis, 'crypto', CRYPTO_GLOBAL_DESCRIPTOR);
+  }
+}
+
+/** Shadows one crypto method with a recording getter returning `undefined`. */
+function shadowCryptoMethod(target: object, name: string): ShadowedProperty {
+  const shadow: ShadowedProperty = { reads: 0 };
+  Object.defineProperty(target, name, {
+    configurable: true,
+    get() {
+      shadow.reads += 1;
+      return undefined;
+    },
+  });
+  return shadow;
+}
+
+function restoreCryptoMethod(
+  target: object,
+  name: string,
+  original: PropertyDescriptor | undefined,
+): void {
+  delete (target as Record<string, unknown>)[name];
+  if (original) Object.defineProperty(target, name, original);
+}
 
 describe('installBrowserPolyfills', () => {
   it('installs Array.prototype.at with negative-index support', () => {
@@ -342,7 +414,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('installs crypto.randomUUID producing a lowercase v4 UUID', () => {
+  itWithCrypto('installs crypto.randomUUID producing a lowercase v4 UUID', () => {
     const touched = ['crypto.randomUUID'];
     try {
       dropApi('crypto.randomUUID');
@@ -374,7 +446,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('generates distinct crypto.randomUUID values on successive calls', () => {
+  itWithCrypto('generates distinct crypto.randomUUID values on successive calls', () => {
     const touched = ['crypto.randomUUID'];
     try {
       dropApi('crypto.randomUUID');
@@ -388,7 +460,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('does not overwrite an existing crypto.randomUUID implementation', () => {
+  itWithCrypto('does not overwrite an existing crypto.randomUUID implementation', () => {
     const touched = ['crypto.randomUUID'];
     try {
       dropApi('crypto.randomUUID');
@@ -405,6 +477,102 @@ describe('installBrowserPolyfills', () => {
       expect(cryptoGlobal.randomUUID).toBe(sentinel);
       expect(result.alreadyPresent).toContain('crypto.randomUUID');
       expect(result.installed).not.toContain('crypto.randomUUID');
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  itWithCrypto('reports crypto.randomUUID as failed when the host has no crypto object', () => {
+    const touched = ALL_APIS;
+    try {
+      for (const api of touched) dropApi(api);
+      const shadow = shadowCryptoGlobal(undefined);
+      let result: PolyfillInstallResult;
+      try {
+        result = installBrowserPolyfills();
+      } finally {
+        restoreCryptoGlobal();
+      }
+
+      // The shadow was live *during* the call: the installer read it at least
+      // once, and the reason is the no-crypto branch's own TypeError text.
+      expect(shadow.reads).toBeGreaterThan(0);
+
+      const failure = result.failed.find((entry) => entry.api === 'crypto.randomUUID');
+      expect(failure).toBeDefined();
+      expect(failure?.reason).toBe('crypto.randomUUID: crypto is not available');
+      expect(failure?.reason.length).toBeGreaterThan(0);
+
+      // A missing host crypto costs exactly that API; everything else installs.
+      expect([...result.installed].sort()).toEqual(
+        touched.filter((api) => api !== 'crypto.randomUUID').sort(),
+      );
+      expect(result.alreadyPresent).toEqual([]);
+      expect(readApi('crypto.randomUUID')).toBeUndefined();
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  itWithCrypto('reports crypto.randomUUID as failed when crypto.getRandomValues is missing', () => {
+    const touched = ALL_APIS;
+    try {
+      for (const api of touched) dropApi(api);
+      const originalGetRandomValues = Object.getOwnPropertyDescriptor(
+        cryptoGlobal,
+        'getRandomValues',
+      );
+      const shadow = shadowCryptoMethod(cryptoGlobal, 'getRandomValues');
+      let result: PolyfillInstallResult;
+      try {
+        result = installBrowserPolyfills();
+      } finally {
+        restoreCryptoMethod(cryptoGlobal, 'getRandomValues', originalGetRandomValues);
+      }
+
+      // The shadow was live *during* the call: the installer read the method
+      // and took the missing-source branch.
+      expect(shadow.reads).toBeGreaterThan(0);
+      expect(Object.getOwnPropertyDescriptor(cryptoGlobal, 'getRandomValues')).toEqual(
+        originalGetRandomValues,
+      );
+      expect(typeof cryptoGlobal.getRandomValues).toBe('function');
+
+      const failure = result.failed.find((entry) => entry.api === 'crypto.randomUUID');
+      expect(failure).toBeDefined();
+      expect(failure?.reason).toBe('crypto.randomUUID: crypto.getRandomValues is not available');
+      expect(failure?.reason.length).toBeGreaterThan(0);
+
+      expect([...result.installed].sort()).toEqual(
+        touched.filter((api) => api !== 'crypto.randomUUID').sort(),
+      );
+      expect(result.alreadyPresent).toEqual([]);
+      expect(readApi('crypto.randomUUID')).toBeUndefined();
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  itWithCrypto('leaves a native inherited crypto.randomUUID untouched', () => {
+    const touched = ['crypto.randomUUID'];
+    try {
+      const originalOwn = Object.getOwnPropertyDescriptor(cryptoGlobal, 'randomUUID');
+      const originalImplementation = cryptoGlobal.randomUUID;
+      expect(typeof originalImplementation).toBe('function');
+
+      const result = installBrowserPolyfills();
+
+      expect(result.alreadyPresent).toContain('crypto.randomUUID');
+      expect(result.installed).not.toContain('crypto.randomUUID');
+      expect(result.failed.map((entry) => entry.api)).not.toContain('crypto.randomUUID');
+      // Same function identity, and the installer defined nothing on the
+      // crypto instance itself: the native implementation is still inherited.
+      expect(cryptoGlobal.randomUUID).toBe(originalImplementation);
+      expect(Object.getOwnPropertyDescriptor(cryptoGlobal, 'randomUUID')).toEqual(originalOwn);
+      expect(originalOwn).toBeUndefined();
     } finally {
       restoreApis(touched);
     }
@@ -454,7 +622,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('covers exactly the APIs declared in POLYFILLED_APIS', () => {
+  itWithCrypto('covers exactly the APIs declared in POLYFILLED_APIS', () => {
     const touched = ALL_APIS;
     try {
       expect(POLYFILLED_APIS.length).toBeGreaterThan(0);
@@ -473,7 +641,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('keeps installing every other API when a single installer throws', () => {
+  itWithCrypto('keeps installing every other API when a single installer throws', () => {
     const touched = ALL_APIS;
     const failingApi = 'Array.prototype.toSorted';
     const failing = requireTarget(failingApi);
@@ -524,7 +692,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('reports an API that already exists as already present, not as installed', () => {
+  itWithCrypto('reports an API that already exists as already present, not as installed', () => {
     const touched = ALL_APIS;
     try {
       for (const api of touched) dropApi(api);
@@ -542,7 +710,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('reports installed, already present and failed APIs in a single pass', () => {
+  itWithCrypto('reports installed, already present and failed APIs in a single pass', () => {
     const touched = ALL_APIS;
     const alreadyApi = 'Array.prototype.at';
     const failingApi = 'Array.prototype.toSorted';
@@ -626,7 +794,7 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  it('exposes the module-scope startup report to later consumers', () => {
+  itWithCrypto('exposes the module-scope startup report to later consumers', () => {
     const report = readStartupPolyfillReport();
 
     expect(report.error).toBeNull();
