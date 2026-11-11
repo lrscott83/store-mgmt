@@ -2,6 +2,18 @@ import js from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import turboPlugin from "eslint-plugin-turbo";
 import tseslint from "typescript-eslint";
+import { BANNED_APIS, BROWSER_FLOOR } from "./browser-compat.js";
+
+/**
+ * The restricted syntax list is generated from the single-source policy in
+ * `browser-compat.js`, never hand-written here: a duplicated list drifts from
+ * the policy silently. `severity` is always `error` because every lint script
+ * in this monorepo runs with `--max-warnings=0` (see below).
+ */
+const bannedApiRestrictions = BANNED_APIS.map(({ api, alternative, selector }) => ({
+  selector,
+  message: `${api} is not available in Chrome ${BROWSER_FLOOR.chrome} (the project browser floor) and is not polyfilled. Use ${alternative}.`,
+}));
 
 /** @type {import("eslint").Linter.Config[]} */
 export const config = [
@@ -38,5 +50,23 @@ export const config = [
   },
   {
     ignores: ["dist/**"],
+  },
+  {
+    // Banned APIs are a browser-floor concern, so the rule only guards code
+    // that ships to the device. Tests, benches, E2E fixtures and build scripts
+    // run on developer machines where the API exists, and a test may
+    // legitimately use it to prove the replacement is equivalent.
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+    ignores: [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/__tests__/**",
+      "**/*.bench.*",
+      "e2e/**",
+      "scripts/**",
+    ],
+    rules: {
+      "no-restricted-syntax": ["error", ...bannedApiRestrictions],
+    },
   },
 ];
