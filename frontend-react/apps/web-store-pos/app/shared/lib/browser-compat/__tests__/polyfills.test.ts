@@ -453,6 +453,40 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
+  it('preserves holes when reversing a sparse array', () => {
+    const touched = ['Array.prototype.toReversed'];
+    try {
+      dropApi('Array.prototype.toReversed');
+      installBrowserPolyfills();
+
+      // A real hole, not a present `undefined`: index 1 has never been written.
+      const source: unknown[] = new Array(3);
+      source[0] = 3;
+      source[2] = 1;
+      expect(source).toHaveLength(3);
+      expect(1 in source, 'the source really carries a hole').toBe(false);
+
+      const reversed = modernArray(source).toReversed();
+
+      // Same length and same elements in reverse order. The hole travels with
+      // its element position: index 1 is a hole again, not a present `undefined`.
+      expect(reversed).toHaveLength(3);
+      expect(reversed[0]).toBe(1);
+      expect(reversed[2]).toBe(3);
+      expect(1 in reversed, 'the hole survives as a hole').toBe(false);
+      expect(reversed).not.toBe(source);
+
+      // The receiver is untouched: same values, still sparse.
+      expect(source).toHaveLength(3);
+      expect(1 in source, 'the receiver keeps its hole').toBe(false);
+      expect(source[0]).toBe(3);
+      expect(source[2]).toBe(1);
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
   it('installs Array.prototype.toSpliced without mutating the receiver', () => {
     const touched = ['Array.prototype.toSpliced'];
     try {
@@ -469,6 +503,45 @@ describe('installBrowserPolyfills', () => {
       expect(modernArray(source).toSpliced(-2)).toEqual(['a', 'b']);
       // start beyond the end appends.
       expect(modernArray(source).toSpliced(10, 0, 'z')).toEqual(['a', 'b', 'c', 'd', 'z']);
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('preserves holes outside the replaced range when splicing a sparse array', () => {
+    const touched = ['Array.prototype.toSpliced'];
+    try {
+      dropApi('Array.prototype.toSpliced');
+      installBrowserPolyfills();
+
+      // Index 1 has never been written, so it is a real hole, not `undefined`.
+      const source: unknown[] = new Array(4);
+      source[0] = 'a';
+      source[2] = 'c';
+      source[3] = 'd';
+      expect(source).toHaveLength(4);
+      expect(1 in source, 'the source really carries a hole').toBe(false);
+
+      // Replace index 0 only: the hole sits in the retained tail and shifts one
+      // place to the right, because two items are inserted in its stead.
+      const spliced = modernArray(source).toSpliced(0, 1, 'x', 'y');
+
+      // length - deleteCount + items.length
+      expect(spliced).toHaveLength(5);
+      expect(spliced[0]).toBe('x');
+      expect(spliced[1]).toBe('y');
+      expect(spliced[3]).toBe('c');
+      expect(spliced[4]).toBe('d');
+      expect(2 in spliced, 'the hole survives as a hole at its new position').toBe(false);
+      expect(spliced).not.toBe(source);
+
+      // The receiver is untouched: same values, still sparse.
+      expect(source).toHaveLength(4);
+      expect(1 in source, 'the receiver keeps its hole').toBe(false);
+      expect(source[0]).toBe('a');
+      expect(source[2]).toBe('c');
+      expect(source[3]).toBe('d');
     } finally {
       restoreApis(touched);
     }

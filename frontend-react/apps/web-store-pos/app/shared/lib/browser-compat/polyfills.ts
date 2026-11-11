@@ -39,6 +39,25 @@ function defineHidden(target: AnyRecord, name: string, value: unknown): void {
   });
 }
 
+/**
+ * Copies `source` into a fresh array of the same length, writing only the
+ * indices that actually exist.
+ *
+ * This is the single place that decides how a sparse receiver is copied. The
+ * standard keeps holes as holes: `Array.from`, spread and `push` would each
+ * materialize every hole as a present `undefined`, which changes `in`,
+ * `hasOwnProperty` and the sparse-ness of the result. Every copying polyfill
+ * (`toSorted`, `toReversed`, `toSpliced`) goes through here for that reason.
+ */
+function copyExistingIndices(source: ArrayLike<unknown>): unknown[] {
+  const length = source.length;
+  const copy: unknown[] = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    if (index in source) copy[index] = source[index];
+  }
+  return copy;
+}
+
 /** `ToIntegerOrInfinity` for the index argument of `at`. */
 function toRelativeIndex(index: number): number {
   const integer = Math.trunc(index);
@@ -122,15 +141,9 @@ function installToSorted(): void {
       if (compareFn !== undefined && typeof compareFn !== 'function') {
         throw new TypeError('Array.prototype.toSorted: comparator is not a function');
       }
-      // Copy only the indices that actually exist. `Array.from` would materialize
-      // every hole as a present `undefined`; the standard keeps holes as holes
-      // (and `sort` parks them at the end).
-      const source = this as ArrayLike<unknown>;
-      const length = source.length;
-      const copy: unknown[] = new Array(length);
-      for (let index = 0; index < length; index += 1) {
-        if (index in source) copy[index] = source[index];
-      }
+      // `copyExistingIndices` keeps every hole a hole; `sort` then parks the
+      // holes at the end, exactly like the standard.
+      const copy = copyExistingIndices(this as ArrayLike<unknown>);
       if (compareFn) copy.sort(compareFn);
       else copy.sort();
       return copy;
@@ -141,7 +154,12 @@ function installToSorted(): void {
 function installToReversed(): void {
   if (typeof arrayPrototype.toReversed === 'function') return;
   defineHidden(arrayPrototype, 'toReversed', function toReversed(this: unknown[]): unknown[] {
-    return Array.from(this as ArrayLike<unknown>).reverse();
+    // The hole-preserving copy is what makes `reverse` correct here: `reverse`
+    // moves existing values and leaves the holes where they land, so the result
+    // is a new array with the same length, reversed values and preserved holes.
+    const copy = copyExistingIndices(this as ArrayLike<unknown>);
+    copy.reverse();
+    return copy;
   });
 }
 
@@ -165,11 +183,13 @@ function installToSpliced(): void {
         ? length - actualStart
         : Math.min(Math.max(toRelativeIndex(deleteCount), 0), length - actualStart);
 
-      const result: unknown[] = [];
-      for (let i = 0; i < actualStart; i += 1) result.push(this[i]);
-      for (const item of items) result.push(item);
-      for (let i = actualStart + actualDeleteCount; i < length; i += 1) result.push(this[i]);
-      return result;
+      // Same index computation as `Array.prototype.splice`; only the copy keeps
+      // holes. `slice` and `concat` copy existing indices only, so a hole in the
+      // retained head or tail stays a hole, while `items` are present values.
+      const copy = copyExistingIndices(this as ArrayLike<unknown>);
+      return copy
+        .slice(0, actualStart)
+        .concat(items, copy.slice(actualStart + actualDeleteCount));
     },
   );
 }
