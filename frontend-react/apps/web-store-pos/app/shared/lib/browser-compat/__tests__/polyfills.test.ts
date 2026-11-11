@@ -47,6 +47,18 @@ const cryptoPrototype: object | undefined = hasWebCrypto
   ? (Object.getPrototypeOf(cryptoGlobal) as object)
   : undefined;
 
+/**
+ * The one policy API whose installer can legitimately fail on this host: a
+ * host without Web Crypto has no `crypto` object to install onto. Every other
+ * API must install on every host, so `ALLOWED_EXTRA_FAILURES` is the ONLY
+ * tolerated extra failure in a run that injects none of its own.
+ *
+ * Derived from host capability, never from a run's own report: a report-derived
+ * allowance would silently reclassify a real regression as expected.
+ */
+const CRYPTO_API = 'crypto.randomUUID';
+const ALLOWED_EXTRA_FAILURES: readonly string[] = hasWebCrypto ? [] : [CRYPTO_API];
+
 /** Each policy API name mapped to the object/property that owns it. */
 const API_TARGETS: Record<string, ApiTarget> = {
   'Array.prototype.at': { target: Array.prototype, name: 'at' },
@@ -57,7 +69,7 @@ const API_TARGETS: Record<string, ApiTarget> = {
   'Array.prototype.toReversed': { target: Array.prototype, name: 'toReversed' },
   'Array.prototype.toSpliced': { target: Array.prototype, name: 'toSpliced' },
   'Object.hasOwn': { target: Object, name: 'hasOwn' },
-  'crypto.randomUUID': {
+  [CRYPTO_API]: {
     target: cryptoInstallTarget,
     name: 'randomUUID',
     inheritedFrom: cryptoPrototype,
@@ -65,6 +77,32 @@ const API_TARGETS: Record<string, ApiTarget> = {
 };
 
 const ALL_APIS = Object.keys(API_TARGETS);
+
+/**
+ * The full declared API list, sorted. Fixed expectations start here rather
+ * than from whatever a particular run happened to report.
+ */
+const DECLARED_APIS: readonly string[] = [...ALL_APIS].sort();
+
+/**
+ * The exact `failed` set a run must report when exactly `injected` (if any) is
+ * made to throw. `ALLOWED_EXTRA_FAILURES` is the only host-dependent part; no
+ * other failure is ever tolerated.
+ */
+function expectedFailedApis(injected?: string): string[] {
+  if (injected !== undefined && !ALL_APIS.includes(injected)) {
+    throw new Error(`Untracked API in test table: ${injected}`);
+  }
+  const failed = [...ALLOWED_EXTRA_FAILURES];
+  if (injected !== undefined) failed.push(injected);
+  return failed.sort();
+}
+
+/** APIs expected to end up installed or already present, sorted. */
+function expectedHealthyApis(injected?: string): string[] {
+  const failed = new Set(expectedFailedApis(injected));
+  return ALL_APIS.filter((api) => !failed.has(api)).sort();
+}
 
 function asRecord(target: object): Record<string, unknown> {
   return target as Record<string, unknown>;
@@ -645,13 +683,20 @@ describe('installBrowserPolyfills', () => {
       for (const entry of POLYFILLED_APIS) dropApi(entry.api);
       const result = installBrowserPolyfills();
 
-      const installed = [...result.installed];
-      const alreadyPresent = [...result.alreadyPresent];
-      const failedApis = result.failed.map((failure) => failure.api);
-      const accountedFor = [...installed, ...alreadyPresent, ...failedApis];
+      const installed = [...result.installed].sort();
+      const alreadyPresent = [...result.alreadyPresent].sort();
+      const failedApis = result.failed.map((failure) => failure.api).sort();
 
-      // Each declared name lands in exactly one bucket: no name outside the
-      // policy, no name lost, no name counted twice.
+      // Fixed policy expectations: the only tolerated failure is the declared
+      // host-capability one; everything else is installed and nothing was
+      // present yet. A regression in any installer lands in `failed` and breaks
+      // these two assertions instead of being absorbed into a derived set.
+      expect(failedApis).toEqual(expectedFailedApis());
+      expect(alreadyPresent).toEqual([]);
+      expect(installed).toEqual(expectedHealthyApis());
+
+      // The three buckets are disjoint and cover the declared list exactly once.
+      const accountedFor = [...installed, ...alreadyPresent, ...failedApis];
       expect(new Set(accountedFor).size, 'each API is reported once').toBe(accountedFor.length);
       expect([...accountedFor].sort()).toEqual(declaredNames);
 
@@ -700,22 +745,20 @@ describe('installBrowserPolyfills', () => {
       // Must not throw: one broken installer cannot abort module evaluation.
       const result = installBrowserPolyfills();
 
-      const failedApis = result.failed.map((failure) => failure.api);
-      // The broken installer is the only failure this test causes; the crypto
-      // API is the one other API that can legitimately fail, and only on a host
-      // without Web Crypto.
-      expect(failedApis.filter((api) => api !== 'crypto.randomUUID')).toEqual([failingApi]);
+      const failedApis = result.failed.map((failure) => failure.api).sort();
+      // Fixed expectation: the one broken installer plus, only on a host
+      // without Web Crypto, the one allowed capability failure. Any other
+      // failure is a regression this assertion refuses to absorb.
+      expect(failedApis).toEqual(expectedFailedApis(failingApi));
       expect(result.failed.find((failure) => failure.api === failingApi)?.reason).toBe(
         'Cannot redefine property: toSorted',
       );
       expect(result.alreadyPresent).toEqual([]);
 
-      // Nothing that survived the failure was skipped: every API that is not
-      // reported failed was installed by this same run.
-      const healthyApis = touched.filter((api) => !failedApis.includes(api));
-      expect([...result.installed, ...result.alreadyPresent].sort()).toEqual(
-        [...healthyApis].sort(),
-      );
+      // Nothing that survived the failure was skipped: exactly the declared
+      // APIs minus the fixed failed set were installed by this same run.
+      const healthyApis = expectedHealthyApis(failingApi);
+      expect([...result.installed].sort()).toEqual(healthyApis);
 
       // App-visible outcome: only the failed API is missing, the rest work.
       expect(readApi(failingApi)).toBeUndefined();
@@ -740,28 +783,31 @@ describe('installBrowserPolyfills', () => {
 
   /**
    * Runs in every host: idempotence is an accounting property, not a crypto
-   * capability, so the counts are derived from what the first pass reported.
+   * capability. The expected buckets are fixed from the policy, with only the
+   * declared host-capability failure tolerated.
    */
   it('reports an API that already exists as already present, not as installed', () => {
     const touched = ALL_APIS;
     try {
       for (const api of touched) dropApi(api);
 
-      const first = installBrowserPolyfills();
-      const firstFailedApis = first.failed.map((failure) => failure.api);
-      const firstHealthyApis = touched.filter((api) => !firstFailedApis.includes(api));
+      const expectedFailures = expectedFailedApis();
+      const expectedInstalled = expectedHealthyApis();
 
-      // With every intrinsic dropped, nothing is pre-existing, and every API
-      // the first pass did not fail on was installed by that pass.
+      const first = installBrowserPolyfills();
+
+      // With every intrinsic dropped, nothing is pre-existing, every API the
+      // policy says can install did install, and only the allowed failure failed.
       expect(first.alreadyPresent).toEqual([]);
-      expect([...first.installed].sort()).toEqual([...firstHealthyApis].sort());
+      expect([...first.installed].sort()).toEqual(expectedInstalled);
+      expect(first.failed.map((failure) => failure.api).sort()).toEqual(expectedFailures);
 
       const second = installBrowserPolyfills();
       // A second pass installs nothing and invents no new failure.
       expect(second.installed).toEqual([]);
-      expect(second.failed).toEqual(first.failed);
+      expect(second.failed.map((failure) => failure.api).sort()).toEqual(expectedFailures);
       // Everything the first pass made available is now merely already present.
-      expect([...second.alreadyPresent].sort()).toEqual([...firstHealthyApis].sort());
+      expect([...second.alreadyPresent].sort()).toEqual(expectedInstalled);
     } finally {
       restoreApis(touched);
     }
@@ -798,9 +844,9 @@ describe('installBrowserPolyfills', () => {
 
       const result = installBrowserPolyfills();
 
-      const installed = [...result.installed];
-      const alreadyPresent = [...result.alreadyPresent];
-      const failedApis = result.failed.map((failure) => failure.api);
+      const installed = [...result.installed].sort();
+      const alreadyPresent = [...result.alreadyPresent].sort();
+      const failedApis = result.failed.map((failure) => failure.api).sort();
 
       // The pre-existing API is reported exactly there, nowhere else, and its
       // implementation survives untouched.
@@ -809,20 +855,27 @@ describe('installBrowserPolyfills', () => {
       expect(failedApis).not.toContain(alreadyApi);
       expect(readApi(alreadyApi)).toBe(sentinel);
 
-      // The throwing installer is reported failed with its own reason, and it
-      // appears in neither of the other two buckets.
+      // The throwing installer is reported failed with its own reason, and the
+      // failed set is exactly the injected failure plus the one allowed
+      // host-capability failure -- no report-derived allowance.
       expect(result.failed.find((failure) => failure.api === failingApi)).toEqual({
         api: failingApi,
         reason: 'mixed-state failure',
       });
-      expect(installed).not.toContain(failingApi);
+      expect(failedApis).toEqual(expectedFailedApis(failingApi));
+      expect(result.installed).not.toContain(failingApi);
       expect(alreadyPresent).not.toContain(failingApi);
       expect(readApi(failingApi)).toBeUndefined();
+
+      // Everything that was neither pre-existing nor failed was installed.
+      expect(installed).toEqual(
+        expectedHealthyApis(failingApi).filter((api) => api !== alreadyApi),
+      );
 
       // The three buckets are disjoint and every declared API is in exactly one.
       const accountedFor = [...installed, ...alreadyPresent, ...failedApis];
       expect(new Set(accountedFor).size, 'each API is reported once').toBe(accountedFor.length);
-      expect([...accountedFor].sort()).toEqual(POLYFILLED_APIS.map((entry) => entry.api).sort());
+      expect([...accountedFor].sort()).toEqual(DECLARED_APIS);
 
       // Everything reported installed really is callable.
       for (const api of installed) {
@@ -848,7 +901,12 @@ describe('installBrowserPolyfills', () => {
 
       const result = installBrowserPolyfills();
 
-      expect(result.failed).toEqual([{ api: 'Array.prototype.toReversed', reason: 'boom' }]);
+      expect(result.failed.map((failure) => failure.api).sort()).toEqual(
+        expectedFailedApis('Array.prototype.toReversed'),
+      );
+      expect(
+        result.failed.find((failure) => failure.api === 'Array.prototype.toReversed'),
+      ).toEqual({ api: 'Array.prototype.toReversed', reason: 'boom' });
       expect(readApi('Array.prototype.toReversed')).toBeUndefined();
     } finally {
       definePropertySpy.mockRestore();
@@ -867,7 +925,13 @@ describe('installBrowserPolyfills', () => {
 
       const result = installBrowserPolyfills();
 
-      expect(result.failed).toEqual([{ api: 'Object.hasOwn', reason: 'Error' }]);
+      expect(result.failed.map((failure) => failure.api).sort()).toEqual(
+        expectedFailedApis('Object.hasOwn'),
+      );
+      expect(result.failed.find((failure) => failure.api === 'Object.hasOwn')).toEqual({
+        api: 'Object.hasOwn',
+        reason: 'Error',
+      });
       expect(readApi('Object.hasOwn')).toBeUndefined();
     } finally {
       definePropertySpy.mockRestore();
@@ -894,8 +958,8 @@ describe('installBrowserPolyfills', () => {
       ...result.failed.map((failure) => failure.api),
     ].sort();
     expect(accountedFor).toEqual(POLYFILLED_APIS.map((entry) => entry.api).sort());
-    expect(result.failed.map((failure) => failure.api)).toEqual(
-      hasWebCrypto ? [] : ['crypto.randomUUID'],
+    expect(result.failed.map((failure) => failure.api).sort()).toEqual(
+      [...ALLOWED_EXTRA_FAILURES].sort(),
     );
   });
 });
