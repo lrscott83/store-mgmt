@@ -20,6 +20,7 @@ export const POLYFILLED_APIS = [
   { api: 'Array.prototype.toReversed', chromeVersion: 110 },
   { api: 'Array.prototype.toSpliced', chromeVersion: 110 },
   { api: 'Object.hasOwn', chromeVersion: 93 },
+  { api: 'crypto.randomUUID', chromeVersion: 92 },
 ];
 
 /** APIs above the floor that the project does NOT polyfill, so code must not use them. */

@@ -22,7 +22,19 @@ function modernArray<T>(values: T[]): ModernArray<T> {
 interface ApiTarget {
   target: object;
   name: string;
+  /**
+   * Where the native implementation may also live further up the chain.
+   * `crypto.randomUUID` is a prototype method on the `crypto` instance in
+   * jsdom, so removing the own property is not enough to make it absent.
+   */
+  inheritedFrom?: object;
 }
+
+/**
+ * The `crypto` object the polyfill installs onto. Captured before any test
+ * mutates it; `globalThis.crypto` is the same object in this environment.
+ */
+const cryptoGlobal = globalThis.crypto;
 
 /** Each policy API name mapped to the object/property that owns it. */
 const API_TARGETS: Record<string, ApiTarget> = {
@@ -34,6 +46,11 @@ const API_TARGETS: Record<string, ApiTarget> = {
   'Array.prototype.toReversed': { target: Array.prototype, name: 'toReversed' },
   'Array.prototype.toSpliced': { target: Array.prototype, name: 'toSpliced' },
   'Object.hasOwn': { target: Object, name: 'hasOwn' },
+  'crypto.randomUUID': {
+    target: cryptoGlobal,
+    name: 'randomUUID',
+    inheritedFrom: Object.getPrototypeOf(cryptoGlobal),
+  },
 };
 
 const ALL_APIS = Object.keys(API_TARGETS);
@@ -48,25 +65,40 @@ function requireTarget(api: string): ApiTarget {
   return entry;
 }
 
+/**
+ * Reads only the owner's own property: a lower prototype implementation must
+ * not mask the fact that an installer did not define anything.
+ */
 function readApi(api: string): unknown {
   const entry = requireTarget(api);
-  return asRecord(entry.target)[entry.name];
+  return Object.getOwnPropertyDescriptor(entry.target, entry.name)?.value;
 }
 
-/** Deletes an API from its owner and proves it is really gone. */
+/** Deletes an API from its owner(s) and proves it is really gone. */
 function dropApi(api: string): void {
   const entry = requireTarget(api);
   delete asRecord(entry.target)[entry.name];
+  if (entry.inheritedFrom) delete asRecord(entry.inheritedFrom)[entry.name];
   expect(readApi(api)).toBeUndefined();
+}
+
+interface CapturedDescriptors {
+  own: PropertyDescriptor | undefined;
+  inherited: PropertyDescriptor | undefined;
 }
 
 /**
  * Captured while the originals are still in place: this module's top-level
  * code runs before `beforeAll` dynamically imports the polyfills module.
  */
-const ORIGINAL_DESCRIPTORS = new Map<string, PropertyDescriptor | undefined>();
+const ORIGINAL_DESCRIPTORS = new Map<string, CapturedDescriptors>();
 for (const [api, entry] of Object.entries(API_TARGETS)) {
-  ORIGINAL_DESCRIPTORS.set(api, Object.getOwnPropertyDescriptor(entry.target, entry.name));
+  ORIGINAL_DESCRIPTORS.set(api, {
+    own: Object.getOwnPropertyDescriptor(entry.target, entry.name),
+    inherited: entry.inheritedFrom
+      ? Object.getOwnPropertyDescriptor(entry.inheritedFrom, entry.name)
+      : undefined,
+  });
 }
 
 /**
@@ -78,8 +110,14 @@ function restoreApis(apis: readonly string[]): void {
   for (const api of apis) {
     const entry = requireTarget(api);
     const original = ORIGINAL_DESCRIPTORS.get(api);
-    if (original) Object.defineProperty(entry.target, entry.name, original);
-    else delete asRecord(entry.target)[entry.name];
+    delete asRecord(entry.target)[entry.name];
+    if (original?.own) Object.defineProperty(entry.target, entry.name, original.own);
+    if (entry.inheritedFrom) {
+      delete asRecord(entry.inheritedFrom)[entry.name];
+      if (original?.inherited) {
+        Object.defineProperty(entry.inheritedFrom, entry.name, original.inherited);
+      }
+    }
   }
 }
 
@@ -87,10 +125,17 @@ function restoreApis(apis: readonly string[]): void {
 function expectOriginalDescriptors(apis: readonly string[]): void {
   for (const api of apis) {
     const entry = requireTarget(api);
+    const original = ORIGINAL_DESCRIPTORS.get(api);
     expect(
       Object.getOwnPropertyDescriptor(entry.target, entry.name),
-      `${api} is back to its original descriptor`,
-    ).toEqual(ORIGINAL_DESCRIPTORS.get(api));
+      `${api} is back to its original own descriptor`,
+    ).toEqual(original?.own);
+    if (entry.inheritedFrom) {
+      expect(
+        Object.getOwnPropertyDescriptor(entry.inheritedFrom, entry.name),
+        `${api} is back to its original inherited descriptor`,
+      ).toEqual(original?.inherited);
+    }
   }
 }
 
@@ -291,6 +336,75 @@ describe('installBrowserPolyfills', () => {
       expect(Object.hasOwn({ a: 1 }, 'b')).toBe(false);
       expect(Object.hasOwn(Object.create({ inherited: true }), 'inherited')).toBe(false);
       expect(Object.hasOwn([], 'length')).toBe(true);
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('installs crypto.randomUUID producing a lowercase v4 UUID', () => {
+    const touched = ['crypto.randomUUID'];
+    try {
+      dropApi('crypto.randomUUID');
+      expect(typeof cryptoGlobal.randomUUID).toBe('undefined');
+
+      installBrowserPolyfills();
+
+      const randomUUID = cryptoGlobal.randomUUID as () => string;
+      expect(typeof randomUUID).toBe('function');
+
+      const value = randomUUID();
+      expect(value).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      // Version nibble (13th hex digit, index 14 with hyphens) is exactly 4.
+      expect(value.charAt(14)).toBe('4');
+      // Variant nibble (index 19) is 8, 9, a or b.
+      expect(['8', '9', 'a', 'b']).toContain(value.charAt(19));
+
+      // Same string format as the native implementation: no prefix, braces,
+      // uppercase or trailing noise.
+      expect(value).toHaveLength(36);
+      expect(value).not.toContain('urn:uuid:');
+      expect(value).not.toContain('{');
+      expect(value).toBe(value.toLowerCase());
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('generates distinct crypto.randomUUID values on successive calls', () => {
+    const touched = ['crypto.randomUUID'];
+    try {
+      dropApi('crypto.randomUUID');
+      installBrowserPolyfills();
+
+      const randomUUID = cryptoGlobal.randomUUID as () => string;
+      expect(randomUUID()).not.toBe(randomUUID());
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
+  it('does not overwrite an existing crypto.randomUUID implementation', () => {
+    const touched = ['crypto.randomUUID'];
+    try {
+      dropApi('crypto.randomUUID');
+      const sentinel = (): string => '00000000-0000-4000-8000-000000000000';
+      Object.defineProperty(cryptoGlobal, 'randomUUID', {
+        value: sentinel,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+
+      const result = installBrowserPolyfills();
+
+      expect(cryptoGlobal.randomUUID).toBe(sentinel);
+      expect(result.alreadyPresent).toContain('crypto.randomUUID');
+      expect(result.installed).not.toContain('crypto.randomUUID');
     } finally {
       restoreApis(touched);
     }

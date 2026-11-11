@@ -177,6 +177,53 @@ function installObjectHasOwn(): void {
   );
 }
 
+/** `globalThis` seen as a plain record so a missing host object is inspectable. */
+const globalObject = globalThis as unknown as AnyRecord;
+
+/** The host `crypto` object, or `undefined` when the runtime has none. */
+function getCrypto(): AnyRecord | undefined {
+  return globalObject.crypto as AnyRecord | undefined;
+}
+
+/**
+ * Polyfills `crypto.randomUUID` (Chrome 92, secure contexts only) with a v4
+ * generated from `crypto.getRandomValues` (Chrome 11+). The output keeps the
+ * native string shape, so stored ids and existing records stay valid.
+ */
+function installCryptoRandomUUID(): void {
+  const cryptoObject = getCrypto();
+  if (!cryptoObject) {
+    throw new TypeError('crypto.randomUUID: crypto is not available');
+  }
+  if (typeof cryptoObject.randomUUID === 'function') return;
+  const randomSource = cryptoObject as unknown as {
+    getRandomValues: (array: Uint8Array) => Uint8Array;
+  };
+  if (typeof cryptoObject.getRandomValues !== 'function') {
+    throw new TypeError('crypto.randomUUID: crypto.getRandomValues is not available');
+  }
+
+  defineHidden(cryptoObject, 'randomUUID', function randomUUID(): string {
+    const bytes = new Uint8Array(16);
+    randomSource.getRandomValues(bytes);
+    // Version 4 (random) and variant 10xx (RFC 4122), per the standard.
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    let hex = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20),
+    ].join('-');
+  });
+}
+
 /** One polyfilled API, named exactly as in `POLYFILLED_APIS`. */
 interface PolyfillInstaller {
   readonly api: string;
@@ -224,6 +271,14 @@ const POLYFILL_INSTALLERS: readonly PolyfillInstaller[] = [
     api: 'Object.hasOwn',
     isPresent: () => typeof objectConstructor.hasOwn === 'function',
     install: installObjectHasOwn,
+  },
+  {
+    api: 'crypto.randomUUID',
+    isPresent: () => {
+      const cryptoObject = getCrypto();
+      return !!cryptoObject && typeof cryptoObject.randomUUID === 'function';
+    },
+    install: installCryptoRandomUUID,
   },
 ];
 
