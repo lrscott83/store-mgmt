@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { POLYFILLED_APIS, BANNED_APIS } from '@store-mgmt/eslint-config/browser-compat';
+import { Linter } from 'eslint';
+import {
+  POLYFILLED_APIS,
+  BANNED_APIS,
+  BROWSER_FLOOR,
+} from '@store-mgmt/eslint-config/browser-compat';
 import type { PolyfillInstallResult } from '../polyfills';
 
 /**
@@ -202,5 +207,144 @@ describe('browser compatibility policy', () => {
       }
       expectOriginalDescriptors(touched);
     }
+  });
+});
+
+/**
+ * The policy above only proves the *data* is well formed. Nothing so far proves
+ * the generated lint rule exists, or that each `selector` it carries really
+ * matches the call it claims to ban: a typo in a selector silently unenforces
+ * that ban and every other test stays green. These tests load the real config
+ * that `pnpm lint` consumes and run ESLint's own `Linter` over a tiny fixture
+ * per banned API.
+ */
+
+const BASE_CONFIG_SPECIFIER: string = '@store-mgmt/eslint-config/base';
+const RESTRICTED_SYNTAX = 'no-restricted-syntax';
+const FIXTURE_FILENAME = 'fixture.js';
+
+/**
+ * `@store-mgmt/eslint-config` ships plain ESM and this workspace does not
+ * enable `allowJs`. The `./browser-compat` subpath has an ambient declaration
+ * file, but `./base` has none, so a literal specifier would fail typecheck with
+ * `TS7016` for a module that resolves perfectly at runtime. Widening the
+ * specifier to `string` makes TypeScript treat the import as `any` while the
+ * runtime still resolves the real package, and the cast restores the
+ * `Linter.Config[]` shape the package documents in its own JSDoc.
+ */
+async function loadBaseConfig(): Promise<readonly Linter.Config[]> {
+  const baseModule: unknown = await import(BASE_CONFIG_SPECIFIER);
+  const { config } = baseModule as { config: Linter.Config[] };
+  expect(Array.isArray(config), 'base config exports a flat config array').toBe(true);
+  return config;
+}
+
+interface RestrictedSyntaxEntry {
+  readonly selector: string;
+  readonly message: string;
+}
+
+function isRestrictedSyntaxEntry(value: unknown): value is RestrictedSyntaxEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { selector?: unknown; message?: unknown };
+  return typeof candidate.selector === 'string' && typeof candidate.message === 'string';
+}
+
+/**
+ * Reads the raw `no-restricted-syntax` value the way ESLint stores it. Returns
+ * `undefined` when the generated rule is absent so a test can fail loudly
+ * instead of silently linting with no guard at all.
+ */
+function readRestrictedSyntaxRule(configs: readonly Linter.Config[]): unknown {
+  const owners = configs.filter(
+    (candidate) => candidate.rules?.[RESTRICTED_SYNTAX] !== undefined,
+  );
+  expect(
+    owners,
+    `the generated base config must carry exactly one \`${RESTRICTED_SYNTAX}\` rule`,
+  ).toHaveLength(1);
+  return owners[0]?.rules?.[RESTRICTED_SYNTAX];
+}
+
+function readSeverity(rule: unknown): unknown {
+  return Array.isArray(rule) ? rule[0] : rule;
+}
+
+function readRestrictions(rule: unknown): RestrictedSyntaxEntry[] {
+  const parts: readonly unknown[] = Array.isArray(rule) ? rule : [];
+  return parts.slice(1).map((part) => {
+    if (!isRestrictedSyntaxEntry(part)) {
+      throw new Error(
+        `${RESTRICTED_SYNTAX} carries an entry that is not a { selector, message } object: ${JSON.stringify(part)}`,
+      );
+    }
+    return part;
+  });
+}
+
+/** The config object a fixture is linted with: the real one, ported as-is. */
+function requireRestrictedSyntaxConfig(configs: readonly Linter.Config[]): Linter.Config {
+  const owner = configs.find(
+    (candidate) => candidate.rules?.[RESTRICTED_SYNTAX] !== undefined,
+  );
+  if (!owner) {
+    throw new Error(
+      `the generated base config no longer carries \`${RESTRICTED_SYNTAX}\`; the browser-floor guard is unenforced`,
+    );
+  }
+  return owner;
+}
+
+function lint(source: string, config: Linter.Config): Linter.LintMessage[] {
+  const linter = new Linter();
+  return linter.verify(source, config, FIXTURE_FILENAME);
+}
+
+describe('generated browser-floor lint guard', () => {
+  let configs: readonly Linter.Config[];
+
+  beforeAll(async () => {
+    configs = await loadBaseConfig();
+  });
+
+  it('generates one restriction per banned API instead of degenerating', () => {
+    const rule = readRestrictedSyntaxRule(configs);
+
+    expect(readSeverity(rule), 'the guard fails the build, so it is an error').toBe('error');
+
+    const restrictions = readRestrictions(rule);
+    expect(
+      restrictions,
+      'one restriction per banned API: a short list means a ban was dropped',
+    ).toHaveLength(BANNED_APIS.length);
+
+    const selectors = new Set(restrictions.map((restriction) => restriction.selector));
+    for (const entry of BANNED_APIS) {
+      expect(selectors, `${entry.api} keeps its policy selector`).toContain(entry.selector);
+    }
+  });
+
+  /**
+   * Driven from `BANNED_APIS`, so an entry added to the policy is covered here
+   * without editing this test. Every banned name is callable as `name(0)`, and
+   * the argument's arity is irrelevant to a syntax selector.
+   */
+  describe.each(BANNED_APIS.map((entry) => ({ entry })))('$entry.api', ({ entry }) => {
+    it(`reports a call to ${entry.api} with the policy message`, () => {
+      const messages = lint(`${entry.api}(0);`, requireRestrictedSyntaxConfig(configs));
+
+      expect(messages, `${entry.api}(0) must produce exactly one diagnostic`).toHaveLength(1);
+      const [message] = messages;
+      expect(message?.ruleId).toBe(RESTRICTED_SYNTAX);
+      expect(message?.message).toContain(entry.api);
+      expect(message?.message).toContain(`Chrome ${BROWSER_FLOOR.chrome}`);
+      expect(message?.message).toContain(entry.alternative);
+    });
+  });
+
+  it('leaves a harmless call alone', () => {
+    const messages = lint('Math.max(1, 2);', requireRestrictedSyntaxConfig(configs));
+
+    expect(messages, 'Math.max is available in Chrome 89 and is not restricted').toEqual([]);
   });
 });
