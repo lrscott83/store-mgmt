@@ -8,6 +8,14 @@
  * this module installs the shims before any application or library module
  * evaluates, which is why `app/entry.client.tsx` imports it first.
  *
+ * Rule: a missing polyfill degrades that one API, it never takes the app down.
+ * Each installer runs inside its own `try/catch`, so a hardened browser (frozen
+ * or locked intrinsics) or a fingerprinting-protection extension that refuses
+ * `Object.defineProperty` costs exactly the API it blocked: module evaluation
+ * still completes, `entry.client` still mounts, and every other polyfill is
+ * still installed. The failure is reported in the returned result instead of
+ * being thrown, because the module-scope call below has no caller to catch it.
+ *
  * Installation is idempotent: an API that already exists is never replaced.
  * Every definition is declared non-enumerable so `for...in` and
  * `Object.keys` behave exactly as before.
@@ -167,16 +175,105 @@ function installObjectHasOwn(): void {
   );
 }
 
-/** Installs every polyfilled API that is still missing. Safe to call repeatedly. */
-export function installBrowserPolyfills(): void {
-  installArrayAt();
-  installStringAt();
-  installFindLast();
-  installFindLastIndex();
-  installToSorted();
-  installToReversed();
-  installToSpliced();
-  installObjectHasOwn();
+/** One polyfilled API, named exactly as in `POLYFILLED_APIS`. */
+interface PolyfillInstaller {
+  readonly api: string;
+  readonly isPresent: () => boolean;
+  readonly install: () => void;
 }
 
-installBrowserPolyfills();
+const POLYFILL_INSTALLERS: readonly PolyfillInstaller[] = [
+  {
+    api: 'Array.prototype.at',
+    isPresent: () => typeof arrayPrototype.at === 'function',
+    install: installArrayAt,
+  },
+  {
+    api: 'String.prototype.at',
+    isPresent: () => typeof stringPrototype.at === 'function',
+    install: installStringAt,
+  },
+  {
+    api: 'Array.prototype.findLast',
+    isPresent: () => typeof arrayPrototype.findLast === 'function',
+    install: installFindLast,
+  },
+  {
+    api: 'Array.prototype.findLastIndex',
+    isPresent: () => typeof arrayPrototype.findLastIndex === 'function',
+    install: installFindLastIndex,
+  },
+  {
+    api: 'Array.prototype.toSorted',
+    isPresent: () => typeof arrayPrototype.toSorted === 'function',
+    install: installToSorted,
+  },
+  {
+    api: 'Array.prototype.toReversed',
+    isPresent: () => typeof arrayPrototype.toReversed === 'function',
+    install: installToReversed,
+  },
+  {
+    api: 'Array.prototype.toSpliced',
+    isPresent: () => typeof arrayPrototype.toSpliced === 'function',
+    install: installToSpliced,
+  },
+  {
+    api: 'Object.hasOwn',
+    isPresent: () => typeof objectConstructor.hasOwn === 'function',
+    install: installObjectHasOwn,
+  },
+];
+
+export interface PolyfillFailure {
+  /** API name, same spelling as `POLYFILLED_APIS`. */
+  readonly api: string;
+  /** Human-readable cause of the rejected installation. */
+  readonly reason: string;
+}
+
+export interface PolyfillInstallResult {
+  /** APIs this call actually installed. */
+  readonly installed: string[];
+  /** APIs that already existed and were therefore left untouched. */
+  readonly alreadyPresent: string[];
+  /** APIs whose installer threw; each one stays missing. */
+  readonly failed: PolyfillFailure[];
+}
+
+function describeFailure(error: unknown): string {
+  if (error instanceof Error) return error.message || error.name;
+  return String(error);
+}
+
+/**
+ * Installs every polyfilled API that is still missing. Safe to call repeatedly.
+ *
+ * Never throws: each installer is isolated, so one rejected API cannot abort
+ * the remaining installers or module evaluation.
+ */
+export function installBrowserPolyfills(): PolyfillInstallResult {
+  const result: PolyfillInstallResult = { installed: [], alreadyPresent: [], failed: [] };
+
+  for (const { api, isPresent, install } of POLYFILL_INSTALLERS) {
+    try {
+      if (isPresent()) {
+        result.alreadyPresent.push(api);
+        continue;
+      }
+      install();
+      result.installed.push(api);
+    } catch (error) {
+      result.failed.push({ api, reason: describeFailure(error) });
+    }
+  }
+
+  return result;
+}
+
+try {
+  installBrowserPolyfills();
+} catch {
+  // Defensive only: `installBrowserPolyfills` isolates every installer, so
+  // nothing reaches here. Module evaluation must never fail on a polyfill.
+}
