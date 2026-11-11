@@ -31,4 +31,35 @@ export const BANNED_APIS = [
     alternative: "deepClone from '~/shared/lib/browser-compat/deep-clone'",
     selector: 'CallExpression[callee.name="structuredClone"]',
   },
+  {
+    api: 'AbortSignal.timeout',
+    chromeVersion: 103,
+    alternative: "an AbortController aborted by a setTimeout you clear yourself",
+    selector: 'CallExpression[callee.object.name="AbortSignal"][callee.property.name="timeout"]',
+  },
+  {
+    api: 'AbortSignal.any',
+    chromeVersion: 116,
+    alternative:
+      "a parent AbortController that aborts when each signal fires its 'abort' event",
+    selector: 'CallExpression[callee.object.name="AbortSignal"][callee.property.name="any"]',
+  },
+  {
+    api: 'URL.canParse',
+    chromeVersion: 120,
+    alternative: 'a `new URL(value)` call wrapped in try/catch',
+    selector: 'CallExpression[callee.object.name="URL"][callee.property.name="canParse"]',
+  },
+  {
+    api: 'Object.groupBy',
+    chromeVersion: 117,
+    alternative: 'a reduce into a plain object keyed by the grouping value',
+    selector: 'CallExpression[callee.object.name="Object"][callee.property.name="groupBy"]',
+  },
+  {
+    api: 'Array.fromAsync',
+    chromeVersion: 121,
+    alternative: 'a `for await` loop that pushes each value into an array',
+    selector: 'CallExpression[callee.object.name="Array"][callee.property.name="fromAsync"]',
+  },
 ];
