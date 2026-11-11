@@ -95,6 +95,8 @@ S7 — Un fallo de polyfills en el arranque deja rastro (advisories del RDD de `
 - T10 — U5: `toSorted` con huecos (`R3-003`). Ruta: delegated. Estado: done — commit `ca3b0316`, RDD `review-34e6db542ed533bf` aprobado (lente reliability), autoridad quemada.
 - T11 — S7: rastro de degradación en el arranque (`R3-silent-startup-degradation`, `R4-bootstrap-catch-no-diagnostic`). Ruta: delegated. Estado: done — commit `f974a24a`, RDD `review-50483731246ac81f` aprobado (lentes resilience + reliability), autoridad quemada.
 - T12 — S7: huecos de test restantes (`R3-nonerror-reason-branch`, `R3-mixed-report-state-gap`). Ruta: delegated. Estado: done — commit `f974a24a`.
+- T13 — S3: huecos en `toReversed` y `toSpliced` (mismo defecto que T10: `Array.from` materializa los huecos). Ruta: delegated. Estado: pending.
+- T14 — S2/S6: cubrir con `BANNED_APIS` las 5 APIs por encima del piso que la base de datos de `eslint-plugin-compat` no conoce (`AbortSignal.timeout`, `AbortSignal.any`, `URL.canParse`, `Object.groupBy`, `Array.fromAsync`), cada una con su alternativa real. Ruta: delegated. Estado: pending.
 
 - T1 — S3: política base (`packages/eslint-config/browser-compat.js` + export del paquete) + `polyfills.ts` + import en `entry.client.tsx` + `polyfills.test.ts`. Ruta: delegated. Estado: done — commit `b2b8ef92` (11 tests, typecheck y lint del paquete verdes).
 - T2 — S4: `deep-clone.ts` + sustitución de las 4 llamadas `structuredClone` en `warehouse-offline-service.ts` + `deep-clone.test.ts`. Ruta: delegated. Estado: done — commit `05c12161`.
