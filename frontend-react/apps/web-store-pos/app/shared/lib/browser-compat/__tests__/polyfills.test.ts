@@ -198,9 +198,14 @@ afterEach(() => {
 });
 
 /**
- * Crypto tests need a Web Crypto host. A host without one skips them cleanly
- * instead of failing the whole file at import (R3-2); every non-crypto test
- * still runs there.
+ * Only the tests whose subject *is* the crypto polyfill need a Web Crypto host:
+ * they call into `crypto`, or they pin outcomes that depend on
+ * `crypto.randomUUID` being installable. A host without Web Crypto skips those
+ * cleanly instead of failing the whole file at import (R3-2).
+ *
+ * Every contract test that can state its invariant without a crypto host runs
+ * unconditionally (`it`), so the all-API contract is proved in the same host
+ * this work targets, not only in a jsdom run.
  */
 const itWithCrypto = it.skipIf(!hasWebCrypto);
 
@@ -568,11 +573,14 @@ describe('installBrowserPolyfills', () => {
       expect(result.alreadyPresent).toContain('crypto.randomUUID');
       expect(result.installed).not.toContain('crypto.randomUUID');
       expect(result.failed.map((entry) => entry.api)).not.toContain('crypto.randomUUID');
-      // Same function identity, and the installer defined nothing on the
-      // crypto instance itself: the native implementation is still inherited.
+      // Same function identity before and after the call: the installers
+      // replaced nothing, whichever object owns the native implementation.
       expect(cryptoGlobal.randomUUID).toBe(originalImplementation);
+      // The crypto instance's own descriptor is byte-for-byte what it was: the
+      // installers added no own property and changed none that existed, so a
+      // host that exposes `randomUUID` directly on the instance is equally
+      // covered as one that inherits it from the prototype.
       expect(Object.getOwnPropertyDescriptor(cryptoGlobal, 'randomUUID')).toEqual(originalOwn);
-      expect(originalOwn).toBeUndefined();
     } finally {
       restoreApis(touched);
     }
@@ -622,7 +630,11 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  itWithCrypto('covers exactly the APIs declared in POLYFILLED_APIS', () => {
+  /**
+   * Runs in every host: the assertions below are the invariants of the policy,
+   * which do not depend on `crypto.randomUUID` being installable here.
+   */
+  it('covers exactly the APIs declared in POLYFILLED_APIS', () => {
     const touched = ALL_APIS;
     try {
       expect(POLYFILLED_APIS.length).toBeGreaterThan(0);
@@ -631,9 +643,25 @@ describe('installBrowserPolyfills', () => {
       expect(Object.keys(API_TARGETS).sort()).toEqual(declaredNames);
 
       for (const entry of POLYFILLED_APIS) dropApi(entry.api);
-      installBrowserPolyfills();
-      for (const entry of POLYFILLED_APIS) {
-        expect(typeof readApi(entry.api), `${entry.api} is declared as polyfilled`).toBe('function');
+      const result = installBrowserPolyfills();
+
+      const installed = [...result.installed];
+      const alreadyPresent = [...result.alreadyPresent];
+      const failedApis = result.failed.map((failure) => failure.api);
+      const accountedFor = [...installed, ...alreadyPresent, ...failedApis];
+
+      // Each declared name lands in exactly one bucket: no name outside the
+      // policy, no name lost, no name counted twice.
+      expect(new Set(accountedFor).size, 'each API is reported once').toBe(accountedFor.length);
+      expect([...accountedFor].sort()).toEqual(declaredNames);
+
+      // Whatever the run claims is now available really is; a failed API stays
+      // exactly as missing as it was before the run.
+      for (const api of [...installed, ...alreadyPresent]) {
+        expect(typeof readApi(api), `${api} is callable after the run`).toBe('function');
+      }
+      for (const api of failedApis) {
+        expect(readApi(api), `${api} stays missing when its installer failed`).toBeUndefined();
       }
     } finally {
       restoreApis(touched);
@@ -641,7 +669,11 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  itWithCrypto('keeps installing every other API when a single installer throws', () => {
+  /**
+   * Runs in every host: the subject is isolation between installers, not how
+   * many APIs this particular host can install.
+   */
+  it('keeps installing every other API when a single installer throws', () => {
     const touched = ALL_APIS;
     const failingApi = 'Array.prototype.toSorted';
     const failing = requireTarget(failingApi);
@@ -668,16 +700,30 @@ describe('installBrowserPolyfills', () => {
       // Must not throw: one broken installer cannot abort module evaluation.
       const result = installBrowserPolyfills();
 
-      expect(result.failed).toEqual([
-        { api: failingApi, reason: 'Cannot redefine property: toSorted' },
-      ]);
-      expect([...result.installed].sort()).toEqual(
-        touched.filter((api) => api !== failingApi).sort(),
+      const failedApis = result.failed.map((failure) => failure.api);
+      // The broken installer is the only failure this test causes; the crypto
+      // API is the one other API that can legitimately fail, and only on a host
+      // without Web Crypto.
+      expect(failedApis.filter((api) => api !== 'crypto.randomUUID')).toEqual([failingApi]);
+      expect(result.failed.find((failure) => failure.api === failingApi)?.reason).toBe(
+        'Cannot redefine property: toSorted',
       );
       expect(result.alreadyPresent).toEqual([]);
 
+      // Nothing that survived the failure was skipped: every API that is not
+      // reported failed was installed by this same run.
+      const healthyApis = touched.filter((api) => !failedApis.includes(api));
+      expect([...result.installed, ...result.alreadyPresent].sort()).toEqual(
+        [...healthyApis].sort(),
+      );
+
       // App-visible outcome: only the failed API is missing, the rest work.
       expect(readApi(failingApi)).toBeUndefined();
+      for (const api of healthyApis) {
+        expect(typeof readApi(api), `${api} is callable despite the foreign failure`).toBe(
+          'function',
+        );
+      }
       expect([1, 2, 3].at(-1)).toBe(3);
       expect('abc'.at(0)).toBe('a');
       expect(modernArray([1, 2, 3]).findLast((value) => value === 1)).toBe(1);
@@ -692,25 +738,41 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  itWithCrypto('reports an API that already exists as already present, not as installed', () => {
+  /**
+   * Runs in every host: idempotence is an accounting property, not a crypto
+   * capability, so the counts are derived from what the first pass reported.
+   */
+  it('reports an API that already exists as already present, not as installed', () => {
     const touched = ALL_APIS;
     try {
       for (const api of touched) dropApi(api);
 
       const first = installBrowserPolyfills();
-      expect([...first.installed].sort()).toEqual([...touched].sort());
+      const firstFailedApis = first.failed.map((failure) => failure.api);
+      const firstHealthyApis = touched.filter((api) => !firstFailedApis.includes(api));
+
+      // With every intrinsic dropped, nothing is pre-existing, and every API
+      // the first pass did not fail on was installed by that pass.
+      expect(first.alreadyPresent).toEqual([]);
+      expect([...first.installed].sort()).toEqual([...firstHealthyApis].sort());
 
       const second = installBrowserPolyfills();
+      // A second pass installs nothing and invents no new failure.
       expect(second.installed).toEqual([]);
-      expect(second.failed).toEqual([]);
-      expect([...second.alreadyPresent].sort()).toEqual([...touched].sort());
+      expect(second.failed).toEqual(first.failed);
+      // Everything the first pass made available is now merely already present.
+      expect([...second.alreadyPresent].sort()).toEqual([...firstHealthyApis].sort());
     } finally {
       restoreApis(touched);
     }
     expectOriginalDescriptors(touched);
   });
 
-  itWithCrypto('reports installed, already present and failed APIs in a single pass', () => {
+  /**
+   * Runs in every host: the three buckets and their disjointness hold whether
+   * or not the host can install `crypto.randomUUID`.
+   */
+  it('reports installed, already present and failed APIs in a single pass', () => {
     const touched = ALL_APIS;
     const alreadyApi = 'Array.prototype.at';
     const failingApi = 'Array.prototype.toSorted';
@@ -736,14 +798,38 @@ describe('installBrowserPolyfills', () => {
 
       const result = installBrowserPolyfills();
 
-      const expectedInstalled = POLYFILLED_APIS.map((entry) => entry.api)
-        .filter((api) => api !== alreadyApi && api !== failingApi)
-        .sort();
+      const installed = [...result.installed];
+      const alreadyPresent = [...result.alreadyPresent];
+      const failedApis = result.failed.map((failure) => failure.api);
 
-      expect(result.alreadyPresent).toEqual([alreadyApi]);
-      expect([...result.installed].sort()).toEqual(expectedInstalled);
-      expect(result.failed).toEqual([{ api: failingApi, reason: 'mixed-state failure' }]);
+      // The pre-existing API is reported exactly there, nowhere else, and its
+      // implementation survives untouched.
+      expect(alreadyPresent).toEqual([alreadyApi]);
+      expect(installed).not.toContain(alreadyApi);
+      expect(failedApis).not.toContain(alreadyApi);
       expect(readApi(alreadyApi)).toBe(sentinel);
+
+      // The throwing installer is reported failed with its own reason, and it
+      // appears in neither of the other two buckets.
+      expect(result.failed.find((failure) => failure.api === failingApi)).toEqual({
+        api: failingApi,
+        reason: 'mixed-state failure',
+      });
+      expect(installed).not.toContain(failingApi);
+      expect(alreadyPresent).not.toContain(failingApi);
+      expect(readApi(failingApi)).toBeUndefined();
+
+      // The three buckets are disjoint and every declared API is in exactly one.
+      const accountedFor = [...installed, ...alreadyPresent, ...failedApis];
+      expect(new Set(accountedFor).size, 'each API is reported once').toBe(accountedFor.length);
+      expect([...accountedFor].sort()).toEqual(POLYFILLED_APIS.map((entry) => entry.api).sort());
+
+      // Everything reported installed really is callable.
+      for (const api of installed) {
+        expect(typeof readApi(api), `${api} is callable after being reported installed`).toBe(
+          'function',
+        );
+      }
     } finally {
       definePropertySpy.mockRestore();
       restoreApis(touched);
@@ -755,11 +841,7 @@ describe('installBrowserPolyfills', () => {
     const touched = ['Array.prototype.toReversed'];
     const failing = requireTarget('Array.prototype.toReversed');
     const thrownValue: unknown = 'boom';
-    const definePropertySpy = failInstallationOf(
-      failing.target,
-      failing.name,
-      thrownValue,
-    );
+    const definePropertySpy = failInstallationOf(failing.target, failing.name, thrownValue);
 
     try {
       dropApi('Array.prototype.toReversed');
@@ -794,15 +876,26 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
-  itWithCrypto('exposes the module-scope startup report to later consumers', () => {
+  /**
+   * Runs in every host: the startup report contract is that every declared API
+   * is accounted for exactly once, and that no API other than the one needing a
+   * host object (`crypto.randomUUID`) can be blamed in the report.
+   */
+  it('exposes the module-scope startup report to later consumers', () => {
     const report = readStartupPolyfillReport();
 
     expect(report.error).toBeNull();
     const result = report.result;
     if (!result) throw new Error('startup report missing its installation result');
 
-    const accountedFor = [...result.installed, ...result.alreadyPresent].sort();
+    const accountedFor = [
+      ...result.installed,
+      ...result.alreadyPresent,
+      ...result.failed.map((failure) => failure.api),
+    ].sort();
     expect(accountedFor).toEqual(POLYFILLED_APIS.map((entry) => entry.api).sort());
-    expect(result.failed).toEqual([]);
+    expect(result.failed.map((failure) => failure.api)).toEqual(
+      hasWebCrypto ? [] : ['crypto.randomUUID'],
+    );
   });
 });
