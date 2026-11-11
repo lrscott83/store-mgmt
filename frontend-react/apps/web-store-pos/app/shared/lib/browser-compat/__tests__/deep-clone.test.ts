@@ -244,9 +244,9 @@ describe('deepClone', () => {
   it('clones boxed Number, String and Boolean wrappers with their valueOf() preserved', () => {
     // `Object(primitive)` boxes exactly like `new Number` / `new String` /
     // `new Boolean`, minus the `no-new-wrappers` smell.
-    const boxedNumber: Number = Object(41.5);
-    const boxedString: String = Object('boxed text');
-    const boxedBoolean: Boolean = Object(false);
+    const boxedNumber = Object(41.5);
+    const boxedString = Object('boxed text');
+    const boxedBoolean = Object(false);
 
     // R3-002: a wrapper is a normal object, so expandos are allowed on it. They
     // must survive the clone; dropping them would make the clone a hollow copy.
@@ -285,7 +285,7 @@ describe('deepClone', () => {
     // R3-002: the expando recursion is new, so its termination path needs proof.
     // A wrapper whose own property points back at itself would recurse forever
     // if the clone were not registered before its properties were walked.
-    const source: Number = Object(7);
+    const source = Object(7);
     const sourceExtras = source as unknown as Record<PropertyKey, unknown>;
     sourceExtras.self = source;
 
@@ -302,7 +302,7 @@ describe('deepClone', () => {
   it('throws a DataCloneError when a wrapper expando holds a function', () => {
     // R3-002: a wrapper is cloned with its expandos, so an unclonable expando
     // must fail loudly instead of being dropped from the clone.
-    const source: Number = Object(1);
+    const source = Object(1);
     (source as unknown as Record<PropertyKey, unknown>).run = () => 1;
 
     expectDataCloneError(() => deepClone(source));
