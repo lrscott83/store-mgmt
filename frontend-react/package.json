@@ -1,6 +1,7 @@
 {
   "name": "store-mgmt-frontend",
   "private": true,
+  "browserslist": ["chrome 89"],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
