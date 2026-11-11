@@ -73,6 +73,35 @@ describe('deepClone', () => {
     expect(original).toHaveLength(2);
   });
 
+  it('preserves holes when cloning a sparse array', () => {
+    // A real hole, not a present `undefined`: index 1 has never been written.
+    const first = { id: 'first' };
+    const third = { id: 'third' };
+    const sparse: unknown[] = new Array(3);
+    sparse[0] = first;
+    sparse[2] = third;
+    expect(sparse).toHaveLength(3);
+    expect(1 in sparse, 'the source really carries a hole').toBe(false);
+
+    const clone = deepClone(sparse);
+
+    // Same length, and the hole is still absent rather than materialized.
+    expect(clone).toHaveLength(3);
+    expect(1 in clone, 'the hole survives as a hole').toBe(false);
+    // The present elements are cloned by value, not shared by reference.
+    expect(clone[0]).toEqual({ id: 'first' });
+    expect(clone[0]).not.toBe(first);
+    expect(clone[2]).toEqual({ id: 'third' });
+    expect(clone[2]).not.toBe(third);
+    expect(clone).not.toBe(sparse);
+
+    // The original is unmodified: still sparse, same length, same values.
+    expect(sparse).toHaveLength(3);
+    expect(1 in sparse).toBe(false);
+    expect(sparse[0]).toBe(first);
+    expect(sparse[2]).toBe(third);
+  });
+
   it('clones a Date by value with a distinct reference', () => {
     const original = new Date('2026-11-10T08:30:00.000Z');
     const clone = deepClone(original);

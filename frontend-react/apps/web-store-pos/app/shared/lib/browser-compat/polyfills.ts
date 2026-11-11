@@ -122,7 +122,15 @@ function installToSorted(): void {
       if (compareFn !== undefined && typeof compareFn !== 'function') {
         throw new TypeError('Array.prototype.toSorted: comparator is not a function');
       }
-      const copy = Array.from(this as ArrayLike<unknown>);
+      // Copy only the indices that actually exist. `Array.from` would materialize
+      // every hole as a present `undefined`; the standard keeps holes as holes
+      // (and `sort` parks them at the end).
+      const source = this as ArrayLike<unknown>;
+      const length = source.length;
+      const copy: unknown[] = new Array(length);
+      for (let index = 0; index < length; index += 1) {
+        if (index in source) copy[index] = source[index];
+      }
       if (compareFn) copy.sort(compareFn);
       else copy.sort();
       return copy;

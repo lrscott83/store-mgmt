@@ -401,6 +401,40 @@ describe('installBrowserPolyfills', () => {
     expectOriginalDescriptors(touched);
   });
 
+  it('preserves holes when sorting a sparse array', () => {
+    const touched = ['Array.prototype.toSorted'];
+    try {
+      dropApi('Array.prototype.toSorted');
+      installBrowserPolyfills();
+
+      // A real hole, not a present `undefined`: index 1 has never been written.
+      const source: unknown[] = new Array(3);
+      source[0] = 3;
+      source[2] = 1;
+      expect(source).toHaveLength(3);
+      expect(1 in source, 'the source really carries a hole').toBe(false);
+
+      const sorted = modernArray(source).toSorted((a, b) => (a as number) - (b as number));
+
+      // The standard keeps holes as holes and `sort` parks them at the end, so
+      // the result is [1, 3, <hole>] — three slots, two present.
+      expect(sorted).toHaveLength(3);
+      expect(sorted[0]).toBe(1);
+      expect(sorted[1]).toBe(3);
+      expect(2 in sorted, 'the hole survives as a hole').toBe(false);
+      expect(sorted).not.toBe(source);
+
+      // The receiver is untouched, still sparse and still in its original order.
+      expect(source).toHaveLength(3);
+      expect(1 in source, 'the receiver keeps its hole').toBe(false);
+      expect(source[0]).toBe(3);
+      expect(source[2]).toBe(1);
+    } finally {
+      restoreApis(touched);
+    }
+    expectOriginalDescriptors(touched);
+  });
+
   it('installs Array.prototype.toReversed without mutating the receiver', () => {
     const touched = ['Array.prototype.toReversed'];
     try {
