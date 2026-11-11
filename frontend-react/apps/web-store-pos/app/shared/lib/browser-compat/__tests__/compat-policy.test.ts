@@ -215,13 +215,21 @@ describe('browser compatibility policy', () => {
  * the generated lint rule exists, or that each `selector` it carries really
  * matches the call it claims to ban: a typo in a selector silently unenforces
  * that ban and every other test stays green. These tests load the real config
- * that `pnpm lint` consumes and run ESLint's own `Linter` over a tiny fixture
+ * that `pnpm lint` consumes and run ESLint's own `Linter` over the *whole*
+ * exported config array — the same array the CLI feeds ESLint — for a fixture
  * per banned API.
  */
 
 const BASE_CONFIG_SPECIFIER: string = '@store-mgmt/eslint-config/base';
 const RESTRICTED_SYNTAX = 'no-restricted-syntax';
-const FIXTURE_FILENAME = 'fixture.js';
+
+/**
+ * A path shaped like real application source, not a bare `fixture.js` at the
+ * config root. The guard is scoped by `files` and `ignores`, so linting a file
+ * outside `app/` would prove the selector strings while leaving the question
+ * "is this rule reachable at all for a file that actually ships?" unanswered.
+ */
+const FIXTURE_FILENAME = 'app/sales/example.js';
 
 /**
  * `@store-mgmt/eslint-config` ships plain ESM and this workspace does not
@@ -282,30 +290,41 @@ function readRestrictions(rule: unknown): RestrictedSyntaxEntry[] {
   });
 }
 
-/** The config object a fixture is linted with: the real one, ported as-is. */
-function requireRestrictedSyntaxConfig(configs: readonly Linter.Config[]): Linter.Config {
-  const owner = configs.find(
-    (candidate) => candidate.rules?.[RESTRICTED_SYNTAX] !== undefined,
-  );
-  if (!owner) {
-    throw new Error(
-      `the generated base config no longer carries \`${RESTRICTED_SYNTAX}\`; the browser-floor guard is unenforced`,
-    );
-  }
-  return owner;
+/**
+ * Lints `source` through the entire exported config array, exactly the way
+ * `pnpm lint` does, and returns every diagnostic unfiltered.
+ */
+function lint(source: string, configs: readonly Linter.Config[]): Linter.LintMessage[] {
+  // `configType` is pinned explicitly: without it these tests inherit whatever
+  // default the installed ESLint major happens to have, so an upgrade could
+  // change what is being proven without touching this file.
+  const linter = new Linter({ configType: 'flat' });
+  // `verify` types its config parameter as a mutable array; the loaded array is
+  // only read here, so a shallow copy keeps the `readonly` contract intact.
+  return linter.verify(source, [...configs], { filename: FIXTURE_FILENAME });
 }
 
-function lint(source: string, config: Linter.Config): Linter.LintMessage[] {
-  const linter = new Linter();
-  return linter.verify(source, config, FIXTURE_FILENAME);
-}
+/**
+ * Loading the real config pulls ESLint, `eslint-plugin-compat` and the
+ * browserslist databases into a worker for the first time. On this suite (462
+ * files, jsdom, `vitest.config.ts` already documents a busy workstation) that
+ * cold import has been observed to blow the global 15 s `hookTimeout`, which
+ * skips every case below and reports a failure that has nothing to do with the
+ * guard. The budget is raised for this file only; it does not relax any
+ * assertion and a genuine hang still fails, just later.
+ */
+const CONFIG_LOAD_TIMEOUT_MS = 60_000;
 
 describe('generated browser-floor lint guard', () => {
   let configs: readonly Linter.Config[];
 
   beforeAll(async () => {
     configs = await loadBaseConfig();
-  });
+    // Fails loudly, before a single fixture is linted, if the generated guard
+    // is absent or duplicated: silence here would make every case below pass
+    // for the wrong reason.
+    readRestrictedSyntaxRule(configs);
+  }, CONFIG_LOAD_TIMEOUT_MS);
 
   it('generates one restriction per banned API instead of degenerating', () => {
     const rule = readRestrictedSyntaxRule(configs);
@@ -331,10 +350,22 @@ describe('generated browser-floor lint guard', () => {
    */
   describe.each(BANNED_APIS.map((entry) => ({ entry })))('$entry.api', ({ entry }) => {
     it(`reports a call to ${entry.api} with the policy message`, () => {
-      const messages = lint(`${entry.api}(0);`, requireRestrictedSyntaxConfig(configs));
+      const messages = lint(`${entry.api}(0);`, configs);
 
-      expect(messages, `${entry.api}(0) must produce exactly one diagnostic`).toHaveLength(1);
-      const [message] = messages;
+      // The full array also runs the other rules that `pnpm lint` runs, and a
+      // fixture is a bare expression statement in a file with no declared
+      // browser globals: `no-undef` fires on the global name, and
+      // `compat/compat` fires for the APIs its database knows (`structuredClone`
+      // among them). Neither is the guard under test here, so the assertion is
+      // scoped to `no-restricted-syntax` — filtered, not trimmed: an unexpected
+      // extra copy of *this* rule would still fail the exact-one count below.
+      const restricted = messages.filter((message) => message.ruleId === RESTRICTED_SYNTAX);
+
+      expect(
+        restricted,
+        `${entry.api}(0) must produce exactly one ${RESTRICTED_SYNTAX} diagnostic`,
+      ).toHaveLength(1);
+      const [message] = restricted;
       expect(message?.ruleId).toBe(RESTRICTED_SYNTAX);
       expect(message?.message).toContain(entry.api);
       expect(message?.message).toContain(`Chrome ${BROWSER_FLOOR.chrome}`);
@@ -343,8 +374,11 @@ describe('generated browser-floor lint guard', () => {
   });
 
   it('leaves a harmless call alone', () => {
-    const messages = lint('Math.max(1, 2);', requireRestrictedSyntaxConfig(configs));
+    const messages = lint('Math.max(1, 2);', configs);
 
-    expect(messages, 'Math.max is available in Chrome 89 and is not restricted').toEqual([]);
+    expect(
+      messages,
+      'Math.max is available in Chrome 89 and is not restricted, so the whole config array stays quiet',
+    ).toEqual([]);
   });
 });
