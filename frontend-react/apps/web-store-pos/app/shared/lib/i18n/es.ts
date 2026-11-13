@@ -33,6 +33,11 @@ const messages: Record<string, string> = {
   'GENERAL.ENTRY': 'Entrada',
   'GENERAL.INSERT': 'Adicionar',
   'GENERAL.ERROR': 'Error',
+  // GENERAL.RETRY / GENERAL.GO_HOME — acciones de la pantalla de recuperación del
+  // ErrorBoundary del layout (app-layout.tsx). No existe una clave genérica previa:
+  // ONAT.RETRY vive en el namespace del módulo Onat y no sirve aquí.
+  'GENERAL.RETRY': 'Reintentar',
+  'GENERAL.GO_HOME': 'Ir al inicio',
   'GENERAL.SUCCESS': 'Éxito',
   // client-error-log: Diagnostics view (/diagnostics — public route)
   'DIAGNOSTICS.TITLE': 'Diagnóstico',
