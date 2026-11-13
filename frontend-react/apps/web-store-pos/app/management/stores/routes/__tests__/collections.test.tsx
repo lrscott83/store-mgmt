@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { StoreToCollect } from '@store-mgmt/domain';
+import { STORE_TO_COLLECT_STATUSES } from '@store-mgmt/domain';
 
 // ─── loader mock (Req: Route Gating — must be resellerFeatureLoader) ─────────
 
@@ -131,6 +132,59 @@ describe('CollectionsPage — rows', () => {
     });
 
     expect(storeHttpService.getStoresToCollect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CollectionsPage — Vencido rows', () => {
+  async function renderRows(rows: StoreToCollect[]) {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: rows,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+  }
+
+  it('renders an overdue (Vencido) row with its translated status and still offers "Registrar pago"', async () => {
+    await renderRows([makeRow({ status: 'Vencido' })]);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['BILLING.STATUS.Vencido'])).toBeInTheDocument();
+    });
+    // `esMessages['BILLING.STATUS.Vencido']` is literally 'Vencido', identical to the raw
+    // domain status — so the assertion above alone would pass on an untranslated row.
+    // A missing i18n key makes intl.formatMessage render the id itself, so asserting the
+    // id is absent is what proves the key resolves.
+    expect(screen.queryByText('BILLING.STATUS.Vencido')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: esMessages['BILLING.COLLECTIONS.REGISTER_PAYMENT'] }),
+    ).toBeInTheDocument();
+  });
+
+  it('translates a status whose label differs from its raw value ("PorVencer" → "Por vencer")', async () => {
+    await renderRows([makeRow({ status: 'PorVencer' })]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Por vencer')).toBeInTheDocument();
+    });
+    // The raw status must not leak through: the translation path is what renders.
+    expect(screen.queryByText('PorVencer')).toBeNull();
+  });
+
+  it('has a translation for every to-collect status in the domain tuple', () => {
+    for (const status of STORE_TO_COLLECT_STATUSES) {
+      expect(esMessages[`BILLING.STATUS.${status}`]).toBeDefined();
+    }
   });
 });
 

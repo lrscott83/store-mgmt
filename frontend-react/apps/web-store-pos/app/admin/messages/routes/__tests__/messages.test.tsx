@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
@@ -556,6 +556,232 @@ describe('AdminMessagesPage — background loading', () => {
       expect(storeHttpService.listStores).toHaveBeenCalledWith({ background: true });
       expect(messagesHttpService.getConversations).toHaveBeenCalledWith({ background: true });
     });
+  });
+});
+
+describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function incoming(id: string): MessageDto {
+    return {
+      id,
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: `Mensaje ${id}`,
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+  }
+
+  /**
+   * jsdom no tiene layout: todas las rects son 0x0 y "dentro de la caja" sería
+   * cierto para todo. Este stub le da geometría real a la caja del hilo y a cada
+   * fila, para que la prueba pueda distinguir un mensaje en pantalla de uno que
+   * quedó por encima del scroll.
+   */
+  function stubVisibility(visibleIds: readonly string[]): void {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const rect = (top: number, bottom: number): DOMRect =>
+        ({
+          top,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: bottom - top,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      const testId = this.getAttribute('data-testid');
+      if (testId === 'message-thread') return rect(0, 100);
+      if (testId?.startsWith('message-')) {
+        const id = testId.slice('message-'.length);
+        // Fuera de la caja: por encima del borde superior visible.
+        return visibleIds.includes(id) ? rect(10, 40) : rect(-60, -10);
+      }
+      // Cualquier otro elemento cae fuera de la caja: si el hilo se resolviera
+      // por accidente a este rect degenerado, ningún mensaje sería visible y la
+      // prueba fallaría en vez de pasar por casualidad.
+      return rect(-1000, -900);
+    });
+  }
+
+  it('no marca como leído un mensaje que nunca entró en la caja visible', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-old'), incoming('m-new')]),
+    );
+    stubVisibility(['m-new']);
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    await waitFor(() =>
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+    );
+    expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-old', {
+      background: true,
+    });
+  });
+
+  it('acusa un mensaje más alto que la caja en cuanto asoma, no solo si cabe entero', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-tall')]),
+    );
+    // Un mensaje de 600px dentro de una caja visible de 100px: nunca cabe
+    // entero, pero el operador lo ve y lo lee mientras hace scroll.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const testId = this.getAttribute('data-testid');
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-tall') return rect(-200, 400);
+        // Elemento no identificado: fuera de la caja, para que una caja mal
+        // resuelta haga fallar la prueba en lugar de satisfacerla.
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-tall', {
+          background: true,
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('no acusa un mensaje que solo roza el borde de la caja', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([
+        incoming('m-touch'),
+        incoming('m-flush'),
+        incoming('m-open'),
+      ]),
+    );
+    // Los dos bordes de la caja: `m-touch` termina justo en el superior y
+    // `m-flush` empieza justo en el inferior. Cero píxeles visibles en ambos, así
+    // que ninguno es lectura. `m-open` sí solapa.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-touch') return rect(-60, 0);
+        if (testId === 'message-m-flush') return rect(100, 200);
+        if (testId === 'message-m-open') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      // `m-open` es el punto de sincronía: si la medición no hubiera corrido,
+      // este assert no pasaría y los "no se acusó" de abajo no probarían nada.
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-open', { background: true }),
+      );
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-touch', {
+        background: true,
+      });
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-flush', {
+        background: true,
+      });
+      // Fija el conjunto COMPLETO de acuses de este pase: un acuse de cualquier
+      // borde, con cualquier forma de llamada, también rompe este assert.
+      expect(vi.mocked(messagesHttpService.markAsRead).mock.calls).toEqual([
+        ['m-open', { background: true }],
+      ]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('manda cada acuse una sola vez aunque el polling relea las mismas filas', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-new')]),
+    );
+    // jsdom has no layout: the row must be given real geometry inside the box,
+    // or the (correct) overlap predicate sees nothing and never receipts.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-new') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+      );
+
+      // Volver a la ventana rearma la escalera: el siguiente poll relee el hilo.
+      fireEvent(window, new Event('focus'));
+      await waitFor(() =>
+        expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1),
+      );
+
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

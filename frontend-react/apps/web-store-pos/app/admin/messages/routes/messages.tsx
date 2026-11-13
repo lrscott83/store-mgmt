@@ -75,6 +75,14 @@ export function AdminMessagesPage() {
    * genuinely NEW newest message (or opening another thread) may move the view.
    */
   const lastMessageIdRef = useRef<string | null>(null);
+  /** Rendered `<li>` per message id, so visibility can be measured per message. */
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  /**
+   * Ids already sent a receipt. `messages` keeps its original `readAt === null`
+   * forever, so without this every poll would re-POST the same rows the server
+   * already marked read.
+   */
+  const receiptedRef = useRef<Set<string>>(new Set());
 
   const storeLabels = useMemo(
     () => new Map(stores.map((store) => [store.id, store.name])),
@@ -174,6 +182,15 @@ export function AdminMessagesPage() {
    * Message requests are always background: the admin chat must not drive the
    * global overlay nor toast on a timer. That now includes the owners/stores
    * directory (`loadDirectory`): the whole view is background by contract.
+   *
+   * Listing a thread is NOT reading it — read receipts are issued by
+   * `markVisibleIncomingAsRead`, never here. This thread mounts every message
+   * inside a `max-h-[60vh]` scroll box, so most of what this returns was never on
+   * screen; stamping them all here dropped the unread count (and the header
+   * gadget's badge, which sums the same server-side number) to 0 for messages the
+   * operator had not seen — a hole that survived logout because `ReadAt` is
+   * persisted server-side. The owner chat shell fixed exactly this on 2026-10-04;
+   * this is the same rule applied to the SuperAdmin inbox.
    */
   const loadMessages = useCallback(
     async (conversationId: string) => {
@@ -183,23 +200,11 @@ export function AdminMessagesPage() {
         });
         if (!response.succeeded) return;
         setMessages(response.data);
-        const unreadIncoming = response.data.filter(
-          (message) => message.readAt === null && message.senderId !== userId,
-        );
-        if (unreadIncoming.length > 0) {
-          await Promise.all(
-            unreadIncoming.map((message) =>
-              messagesHttpService.markAsRead(message.id, { background: true }),
-            ),
-          );
-          const updated = await messagesHttpService.getConversations({ background: true });
-          if (updated.succeeded) setConversations(updated.data);
-        }
       } catch {
         // Background: a failed load is silent. The next poll retries.
       }
     },
-    [userId],
+    [],
   );
 
   /**
@@ -234,6 +239,80 @@ export function AdminMessagesPage() {
     }
   }, [loadMessages]);
 
+  const selectedConversationId = selectedConversation?.id ?? null;
+
+  /**
+   * A read receipt asserts the operator SAW the message, so it follows the eye,
+   * not the fetcher: only incoming messages whose rendered rect sits inside the
+   * visible box are receipted. Everything else stays unread and keeps counting in
+   * the header badge, which is the number that tells the SuperAdmin an owner is
+   * waiting.
+   *
+   * In jsdom every rect is 0x0, so "inside the box" is true for all of them and
+   * the tests keep exercising this path end to end.
+   */
+  const markVisibleIncomingAsRead = useCallback(() => {
+    const container = threadRef.current;
+    if (!container) return;
+    const box = container.getBoundingClientRect();
+    const visible = messages
+      .filter((message) => message.readAt === null && message.senderId !== userId)
+      .filter((message) => {
+        const element = itemRefs.current.get(message.id);
+        if (!element) return false;
+        const rect = element.getBoundingClientRect();
+        // Actual overlap, never full containment and never a mere touch. Full
+        // containment (`top >= box.top && bottom <= box.bottom`) can never be met
+        // by a message taller than the box, so it stayed unread forever however
+        // much the operator read it. A message that only touches an edge has zero
+        // visible pixels, so it is not read either.
+        return rect.bottom > box.top && rect.top < box.bottom;
+      })
+      .map((message) => message.id)
+      .filter((id) => !receiptedRef.current.has(id));
+    if (visible.length === 0) return;
+
+    // Claim them before awaiting: a scroll mid-flight must not double-POST.
+    visible.forEach((id) => receiptedRef.current.add(id));
+    void Promise.all(visible.map((id) => messagesHttpService.markAsRead(id, { background: true })))
+      .then((results) => {
+        // A refused receipt has to stay retryable, or the message is stranded
+        // unread with nothing left that could re-trigger it.
+        results.forEach((result, index) => {
+          if (!result.succeeded) receiptedRef.current.delete(visible[index]);
+        });
+        return messagesHttpService.getConversations({ background: true });
+      })
+      .then((updated) => {
+        if (updated.succeeded) setConversations(updated.data);
+      })
+      .catch(() => {
+        visible.forEach((id) => receiptedRef.current.delete(id));
+      });
+  }, [messages, userId]);
+
+  // After paint, and again on every scroll inside the thread box. rAF-throttled:
+  // scroll fires per frame and each pass measures every incoming row.
+  useEffect(() => {
+    if (!selectedConversationId) return;
+    const frame = requestAnimationFrame(markVisibleIncomingAsRead);
+    const container = threadRef.current;
+    let scrollFrame = 0;
+    const handleScroll = () => {
+      if (scrollFrame !== 0) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        markVisibleIncomingAsRead();
+      });
+    };
+    container?.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (scrollFrame !== 0) cancelAnimationFrame(scrollFrame);
+      container?.removeEventListener('scroll', handleScroll);
+    };
+  }, [selectedConversationId, messages, markVisibleIncomingAsRead]);
+
   useEffect(() => {
     void loadDirectory();
   }, [loadDirectory]);
@@ -241,8 +320,6 @@ export function AdminMessagesPage() {
   useEffect(() => {
     void refreshThreads();
   }, [refreshThreads]);
-
-  const selectedConversationId = selectedConversation?.id ?? null;
 
   useEffect(() => {
     if (selectedConversationId) void loadMessages(selectedConversationId);
@@ -493,6 +570,10 @@ export function AdminMessagesPage() {
                       return (
                         <li
                           key={message.id}
+                          ref={(element) => {
+                            if (element) itemRefs.current.set(message.id, element);
+                            else itemRefs.current.delete(message.id);
+                          }}
                           data-testid={`message-${message.id}`}
                           data-mine={isMine ? 'true' : 'false'}
                           className={isMine ? 'flex justify-end' : 'flex justify-start'}

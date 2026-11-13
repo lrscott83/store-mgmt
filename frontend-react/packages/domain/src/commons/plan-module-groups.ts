@@ -75,8 +75,10 @@ export function groupModulesByPlanDelta<T>(
   for (const plan of orderedPlans) {
     // The `order`-chain predecessor, exactly as deltaModules resolves it: the nearest plan
     // below this one in the catalog. The lowest-order plan has no predecessor and keeps its
-    // full list.
-    const previous = orderedPlans.filter((p) => p.order < plan.order).at(-1);
+    // full list. Index access, not `.at(-1)`: Array.prototype.at is ES2022 (Chrome 92+) and
+    // the app must still run on Chrome 89 (Android 9) with no polyfill layer.
+    const predecessors = orderedPlans.filter((p) => p.order < plan.order);
+    const previous = predecessors[predecessors.length - 1];
     take(
       plan.planType,
       plan.order,

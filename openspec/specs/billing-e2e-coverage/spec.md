@@ -91,9 +91,9 @@ Existing coverage: `Vencido` excludes paid modules, `AlDia` includes all. This c
 - GIVEN AlDia and PorVencer stores
 - THEN AlDia NOT in results
 
-#### Scenario: Vencido excluded
+#### Scenario: Vencido included
 - GIVEN Vencido stores
-- THEN Vencido NOT in results
+- THEN Vencido SHALL be in results — an overdue store still owes money and is the only place its payment can be registered from
 
 #### Scenario: PorVencer and EnGracia included
 - GIVEN stores with those statuses

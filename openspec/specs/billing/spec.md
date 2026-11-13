@@ -381,7 +381,7 @@ The system MUST provide `POST /stores/{storeId}/payments` for recording manual p
 
 ### R6: GetStoresToCollect
 
-The system MUST provide `GET /stores/to-collect` returning stores with `PorVencer` or `EnGracia` status.
+The system MUST provide `GET /stores/to-collect` returning stores that still owe money — status `PorVencer`, `EnGracia`, or `Vencido`. `AlDia` and `NoAplica` stores are excluded.
 
 | Scope | Behavior |
 |-------|----------|
@@ -395,6 +395,12 @@ The system MUST provide `GET /stores/to-collect` returning stores with `PorVence
 - GIVEN two stores (one `PorVencer`, one `AlDia`)
 - WHEN calling `GetStoresToCollect`
 - THEN only the `PorVencer` store SHALL be returned
+
+#### Scenario: Overdue (`Vencido`) store is returned
+
+- GIVEN a store whose billing status is `Vencido` (its due date plus the grace period already passed)
+- WHEN calling `GetStoresToCollect`
+- THEN the store SHALL be returned with `Status = "Vencido"`, its `NextDueDate`, and its paid-module `Amount`
 
 #### Scenario: Scoped by reseller
 

@@ -15,6 +15,7 @@ import {
   Result,
   WarehouseErrors,
 } from '@store-mgmt/domain';
+import { deepClone } from '~/shared/lib/browser-compat/deep-clone';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -1237,15 +1238,15 @@ export class WarehouseOfflineService {
 
   private snapshotPurchaseEdit(productId: string): PurchaseEditSnapshot {
     return {
-      levels: structuredClone(this.getStorageStockLevels()),
+      levels: deepClone(this.getStorageStockLevels()),
       entriesByProduct: new Map([
         [
           productId,
-          structuredClone(this.inventoryService.getProductInventoriesByProductId(productId)),
+          deepClone(this.inventoryService.getProductInventoriesByProductId(productId)),
         ],
       ]),
-      movements: structuredClone(this.getStorageMovements()),
-      orders: this.orderPort ? structuredClone(this.orderPort.getStorageOrders()) : undefined,
+      movements: deepClone(this.getStorageMovements()),
+      orders: this.orderPort ? deepClone(this.orderPort.getStorageOrders()) : undefined,
     };
   }
 

@@ -1,3 +1,5 @@
+// Must stay first: polyfills have to be installed before any other module evaluates.
+import './shared/lib/browser-compat/polyfills';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';

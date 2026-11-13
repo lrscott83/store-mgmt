@@ -85,8 +85,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
                 dueSoonDays,
                 graceDays);
 
-            // Only include stores that are due soon or in grace period
-            if (status != StoreBillingStatusType.PorVencer && status != StoreBillingStatusType.EnGracia)
+            if (!StoreBillingUtils.OwesMoney(status))
                 continue;
 
             // THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included

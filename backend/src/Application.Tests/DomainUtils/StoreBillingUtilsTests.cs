@@ -105,6 +105,26 @@ namespace Application.Tests.DomainUtils
                 .Should().Be(StoreBillingStatusType.NoAplica);
         }
 
+        // ── OwesMoney (statuses offered for collection) ────────────────────────────
+        // Exhaustive against the enum itself, not a hand-written case list: the
+        // collectible set is derived, so a member silently made collectible fails here
+        // until an explicit decision is recorded. The same decision must also touch
+        // `STORE_TO_COLLECT_STATUSES` in the frontend domain package.
+        [Fact]
+        public void OwesMoney_trueSet_isExactlyTheCollectibleStatuses()
+        {
+            var owing = Enum.GetValues<StoreBillingStatusType>()
+                .Where(StoreBillingUtils.OwesMoney)
+                .Select(status => status.ToString())
+                .OrderBy(name => name)
+                .ToArray();
+
+            owing.Should().Equal(
+                nameof(StoreBillingStatusType.EnGracia),
+                nameof(StoreBillingStatusType.PorVencer),
+                nameof(StoreBillingStatusType.Vencido));
+        }
+
         // ── IsPaidPlanActive ───────────────────────────────────────────────────────
         [Fact]
         public void IsPaidPlanActive_withinGrace_true()

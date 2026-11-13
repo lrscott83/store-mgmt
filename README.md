@@ -343,6 +343,15 @@ dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 - ⚠️ **Nunca en paralelo con la suite Playwright**: el `ResetDataAsync` de `WebAppFixture` borraría las filas vivas que los tests del frontend están usando. En secuencia es seguro.
 - ⚠️ **No verifiques que la base `smca_test` exista antes de correr**: ejecuta el comando directamente. `WebAppFixture` aplica las migraciones por sí mismo y el guard de arranque confirma la base; si algo falta, los tests lo reportan.
 
+#### Ruido esperado en una corrida verde (0 failed)
+
+Una corrida **sana** imprime líneas `[WRN]` e incluso `[ERR]`, y eso **no** es un fallo. Los logs de la app bajo prueba salen porque `WebApplicationFactory` ejecuta el `Program` real, y la suite incluye a propósito casos negativos: peticiones que deben ser rechazadas y escrituras que la base debe negar por integridad. Cada uno deja su línea de log antes de que el test la verifique.
+
+- **`[WRN]`** — normalmente rechazos esperados: validaciones, recursos inexistentes, conflictos de unicidad. Los emite el middleware de errores a nivel Warning.
+- **`[ERR] ... DbUpdateException ...`** — fallos de `SaveChanges` que un test provoca a propósito para comprobar que una restricción de la base rechaza el dato. EF Core loguea el intento a nivel Error antes de que el test lo capture.
+
+La regla es simple: **si el resultado es `0 failed`, la corrida pasó y estos logs se ignoran**; no hace falta reportarlos ni mencionarlos. Solo son señal cuando hay tests en rojo, o cuando aparece un `[ERR]` que ningún test espera — pero eso ya no lo decide el log, lo decide un test fallando.
+
 ### Comando único del backend
 
 Los 3 proyectos de tests (los 2 unitarios + el E2E) en un solo comando, verificado:

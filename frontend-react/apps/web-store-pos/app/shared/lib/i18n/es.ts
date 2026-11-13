@@ -33,6 +33,11 @@ const messages: Record<string, string> = {
   'GENERAL.ENTRY': 'Entrada',
   'GENERAL.INSERT': 'Adicionar',
   'GENERAL.ERROR': 'Error',
+  // GENERAL.RETRY / GENERAL.GO_HOME — acciones de la pantalla de recuperación del
+  // ErrorBoundary del layout (app-layout.tsx). No existe una clave genérica previa:
+  // ONAT.RETRY vive en el namespace del módulo Onat y no sirve aquí.
+  'GENERAL.RETRY': 'Reintentar',
+  'GENERAL.GO_HOME': 'Ir al inicio',
   'GENERAL.SUCCESS': 'Éxito',
   // client-error-log: Diagnostics view (/diagnostics — public route)
   'DIAGNOSTICS.TITLE': 'Diagnóstico',
@@ -1936,6 +1941,7 @@ const messages: Record<string, string> = {
   // Billing — status labels (StoreToCollect.status, DG-8 narrow union)
   'BILLING.STATUS.PorVencer': 'Por vencer',
   'BILLING.STATUS.EnGracia': 'En gracia',
+  'BILLING.STATUS.Vencido': 'Vencido',
 
   // Billing — collections view
   'BILLING.COLLECTIONS.TITLE': 'Cobros pendientes',

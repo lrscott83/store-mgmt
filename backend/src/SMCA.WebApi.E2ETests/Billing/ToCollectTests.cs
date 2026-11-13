@@ -170,7 +170,7 @@ public sealed class ToCollectTests
     }
 
     [Fact]
-    public async Task Vencido_stores_excluded()
+    public async Task Vencido_stores_included()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -187,8 +187,13 @@ public sealed class ToCollectTests
                 ApiResponse<List<StoreToCollectData>>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
 
+            // An overdue store owes the most, so it MUST be listed — it is the only
+            // screen from which its payment can be registered.
             var storeInResult = body.Data!.FirstOrDefault(s => s.StoreId == fx.StoreId);
-            storeInResult.Should().BeNull();
+            storeInResult.Should().NotBeNull();
+            storeInResult!.Status.Should().Be("Vencido");
+            storeInResult.NextDueDate.Should().NotBeNull();
+            storeInResult.Amount.Should().Be(2000f);
         }
         finally
         {
