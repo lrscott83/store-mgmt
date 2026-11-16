@@ -12,15 +12,9 @@
  * registered in the per-message `itemRefs` map, which is what keeps it out of
  * the read-receipt measurement entirely.
  */
-export function MessageDaySeparator({
-  label,
-  testId = 'message-day-separator',
-}: {
-  label: string;
-  testId?: string;
-}) {
+export function MessageDaySeparator({ label }: { label: string }) {
   return (
-    <li data-testid={testId} className="flex items-center justify-center">
+    <li data-testid="message-day-separator" className="flex items-center justify-center">
       <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] text-text-muted">
         {label}
       </span>

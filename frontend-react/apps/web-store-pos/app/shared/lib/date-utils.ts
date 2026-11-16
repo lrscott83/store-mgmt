@@ -243,6 +243,9 @@ export function groupByLocalDay<T>(
     .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 }
 
+/** Milliseconds in one civil day, before any DST adjustment. */
+const DAY_MS = 86_400_000;
+
 /**
  * Short label for a chat day separator, computed in the VIEWER's LOCAL timezone.
  *
@@ -259,11 +262,19 @@ export function groupByLocalDay<T>(
  * exactly 7 days ago is still a weekday name, 8 days ago is a date. A future
  * day (`daysAgo < 0`, clock skew) collapses to 'hoy' rather than inventing a
  * label for a day that has not happened.
+ *
+ * The span is divided by `DAY_MS` and ROUNDED, not floored. Both endpoints are
+ * LOCAL midnights, so across a DST shift the real span is 23 or 25 hours — up to
+ * one hour away from a whole day — and `Math.round` absorbs that offset, landing
+ * exactly on `daysAgo === 1` and `daysAgo === 8` at their boundaries. `Math.floor`
+ * would not: under a spring-forward it turns 1 day ago into 0 ('hoy' instead of
+ * 'ayer') and 8 days ago into 7 (a weekday instead of dd/mm/yyyy), silently
+ * breaking the INCLUSIVE 7-day boundary above. Do NOT "simplify" it to `floor`.
  */
 export function formatChatDayLabel(date: Date, today: Date = new Date()): string {
   const target = startOfDay(date);
   const reference = startOfDay(today);
-  const daysAgo = Math.round((reference.getTime() - target.getTime()) / 86_400_000);
+  const daysAgo = Math.round((reference.getTime() - target.getTime()) / DAY_MS);
   if (daysAgo <= 0) return 'hoy';
   if (daysAgo === 1) return 'ayer';
   if (daysAgo <= 7) return weekdayNameEs(target);

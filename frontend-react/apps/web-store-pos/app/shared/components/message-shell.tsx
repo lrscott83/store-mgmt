@@ -494,6 +494,12 @@ export function MessageShell() {
    * of each LOCAL day. Pending offline rows are grouped by their `queuedAt`
    * (`timestamp` above), never by "now": a message queued two days ago belongs to
    * that day even if it is drained today.
+   *
+   * Deliberately NOT memoized, exactly like the admin inbox: the labels
+   * (`hoy`/`ayer`) depend on the current LOCAL day, which changes at midnight
+   * without `messages` changing, so a memo keyed on `[messages]` would strand
+   * yesterday's labels until the next message arrives. Recomputing per render is
+   * the cheap, correct trade.
    */
   const displayItems = buildMessageDayItems(displayMessages, (message) => new Date(message.timestamp));
 

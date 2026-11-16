@@ -4,6 +4,12 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
 import type { Owner, Store, BaseResponseModel } from '@store-mgmt/domain';
+import {
+  TEST_NOW,
+  daySeparatorRows,
+  localInstant,
+  separatorKinds,
+} from '~/shared/lib/messages/__tests__/message-day-fixtures';
 
 vi.mock('~/auth/routes/loaders', () => ({
   superAdminLoader: vi.fn().mockResolvedValue(null),
@@ -823,13 +829,17 @@ describe('AdminMessagesPage — sending scrolls the thread', () => {
 });
 
 describe('AdminMessagesPage — separadores de día', () => {
-  /** Local instant `daysAgo` days back, at the given local hour. */
-  function localInstant(daysAgo: number, hour = 12): string {
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
-    date.setHours(hour, 0, 0, 0);
-    return date.toISOString();
-  }
+  beforeEach(() => {
+    // Fake ONLY `Date`: this page polls with real timers, so faking them would
+    // freeze its async loads. Pinning the calendar day is what makes the labels
+    // independent of when the suite runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TEST_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   function incomingAt(id: string, daysAgo: number): MessageDto {
     return {
@@ -868,16 +878,17 @@ describe('AdminMessagesPage — separadores de día', () => {
     expect(separators[1].textContent).toBe('hoy');
 
     // Each separator is a SIBLING of the message rows, inside the same list.
-    for (const separator of separators) {
-      expect(separator.tagName).toBe('LI');
-      expect(separator.parentElement).toBe(list);
-    }
+    expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
+    expect(daySeparatorRows(list)).toHaveLength(separators.length);
 
     // Order: separator, two messages, separator, one message.
-    const kinds = Array.from(list.children).map((child) =>
-      child.getAttribute('data-testid') === 'message-day-separator' ? 'separator' : 'message',
-    );
-    expect(kinds).toEqual(['separator', 'message', 'message', 'separator', 'message']);
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'message',
+      'separator',
+      'message',
+    ]);
   });
 
   it('never treats a separator as a message', async () => {

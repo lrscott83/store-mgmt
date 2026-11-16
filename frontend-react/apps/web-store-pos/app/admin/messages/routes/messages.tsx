@@ -470,11 +470,14 @@ export function AdminMessagesPage() {
    * The thread with one centered day separator before the first message of each
    * LOCAL day. The API already returns ascending `sentAt`, so the array order is
    * the render order — no extra sort here.
+   *
+   * Deliberately NOT memoized, exactly like the owner chat shell: the labels
+   * (`hoy`/`ayer`) depend on the current LOCAL day, which changes at midnight
+   * without `messages` changing, so a memo keyed on `[messages]` would strand
+   * yesterday's labels until the next message arrives. Recomputing per render is
+   * the cheap, correct trade.
    */
-  const threadItems = useMemo(
-    () => buildMessageDayItems(messages, (message) => new Date(message.sentAt)),
-    [messages],
-  );
+  const threadItems = buildMessageDayItems(messages, (message) => new Date(message.sentAt));
 
   return (
     <div className="space-y-4 p-4">

@@ -1,12 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { MemoryRouter } from 'react-router';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import esMessages from '~/shared/lib/i18n/es';
-import { weekdayNameEs } from '~/shared/lib/date-utils';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
+import {
+  TEST_NOW,
+  daySeparatorRows,
+  localDay,
+  localInstant,
+  separatorKinds,
+} from '~/shared/lib/messages/__tests__/message-day-fixtures';
 
 const getConversationsMock = vi.hoisted(() => vi.fn());
 const getMessagesMock = vi.hoisted(() => vi.fn());
@@ -604,17 +610,18 @@ describe('MessageShell — trigger color identity', () => {
 });
 
 describe('MessageShell — separadores de día', () => {
-  /** Local instant `daysAgo` days back, at the given local hour. */
-  function localInstant(daysAgo: number, hour = 12): string {
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
-    date.setHours(hour, 0, 0, 0);
-    return date.toISOString();
-  }
-
   beforeEach(() => {
+    // Fake ONLY `Date`: the shell polls with real timers, so faking them would
+    // freeze its async loads. Pinning the calendar day is what makes the labels
+    // independent of when the suite runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TEST_NOW);
     vi.clearAllMocks();
     mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders ONE separator before the first message of each local day', async () => {
@@ -640,15 +647,47 @@ describe('MessageShell — separadores de día', () => {
     expect(separators).toHaveLength(2);
     expect(separators[0].textContent).toBe('ayer');
     expect(separators[1].textContent).toBe('hoy');
-    for (const separator of separators) {
-      expect(separator.tagName).toBe('LI');
-      expect(separator.parentElement).toBe(list);
-    }
+    // Literal `LI` siblings of the message rows, never nested in one of them.
+    expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
+    expect(daySeparatorRows(list)).toHaveLength(separators.length);
 
-    const kinds = Array.from(list.children).map((child) =>
-      child.getAttribute('data-testid') === 'message-day-separator' ? 'separator' : 'message',
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'separator',
+      'message',
+      'message',
+    ]);
+  });
+
+  it('labels a day older than a week with the local dd/mm/yyyy date, not a weekday', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
     );
-    expect(kinds).toEqual(['separator', 'message', 'separator', 'message', 'message']);
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-old', sentAt: localInstant(8), readAt: '2026-09-30T10:00:00Z' }),
+        message({ id: 'm-today', sentAt: localInstant(0), readAt: '2026-09-30T10:00:00Z' }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    const list = await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-today')).toBeInTheDocument());
+
+    // Sunday 8 Nov 2026 — an independent literal. 8 days back is a date; the
+    // weekday branch stops at 7, and `weekdayNameEs` is never the oracle here.
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators.map((separator) => separator.textContent)).toEqual(['08/11/2026', 'hoy']);
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'separator',
+      'message',
+    ]);
   });
 
   it('never treats a separator as a message', async () => {
@@ -664,7 +703,10 @@ describe('MessageShell — separadores de día', () => {
     markAsReadMock.mockResolvedValue(success(true));
 
     // jsdom has no layout: give the panel box real geometry so the receipt pass
-    // actually measures the rows. Any element that is not the box sits inside it.
+    // actually measures the rows, and count every measurement per element. That
+    // is a real behavioural assertion: a separator that slipped into the
+    // read-receipt pass would show up as a measured element.
+    const measuredRows = new Map<string, number>();
     const spy = vi
       .spyOn(Element.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: Element) {
@@ -680,7 +722,9 @@ describe('MessageShell — separadores de día', () => {
             y: top,
             toJSON: () => ({}),
           }) as DOMRect;
-        return this.getAttribute('data-testid') === 'message-list-box' ? rect(0, 100) : rect(10, 40);
+        const testId = this.getAttribute('data-testid') ?? '';
+        measuredRows.set(testId, (measuredRows.get(testId) ?? 0) + 1);
+        return testId === 'message-list-box' ? rect(0, 100) : rect(10, 40);
       });
 
     try {
@@ -691,11 +735,6 @@ describe('MessageShell — separadores de día', () => {
       const list = await screen.findByTestId('message-list');
       await waitFor(() => expect(screen.getAllByTestId('message-day-separator')).toHaveLength(2));
 
-      for (const separator of screen.getAllByTestId('message-day-separator')) {
-        expect(separator).not.toHaveAttribute('data-mine');
-        expect(separator).not.toHaveAttribute('data-pending');
-      }
-
       // Only real messages are receipted; the separator has no id to receipt.
       await waitFor(() =>
         expect(markAsReadMock.mock.calls).toEqual([
@@ -703,6 +742,12 @@ describe('MessageShell — separadores de día', () => {
           ['m-new', { background: true }],
         ]),
       );
+
+      // Every message row is measured exactly once by the receipt pass…
+      expect(measuredRows.get('message-m-old')).toBe(1);
+      expect(measuredRows.get('message-m-new')).toBe(1);
+      // …and a separator is never measured, because it is never a candidate row.
+      expect(measuredRows.get('message-day-separator') ?? 0).toBe(0);
 
       const messageRows = Array.from(list.children).filter(
         (child) => child.getAttribute('data-testid') !== 'message-day-separator',
@@ -718,9 +763,7 @@ describe('MessageShell — separadores de día', () => {
       '~/shared/lib/messages/messages-offline-service'
     );
     localStorage.clear();
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    twoDaysAgo.setHours(12, 0, 0, 0);
+    const twoDaysAgo = localDay(2);
 
     // Seeded through the service's own import seam: `enqueue` always stamps
     // `queuedAt = now`, and this test needs a queued message from an earlier day.
@@ -752,8 +795,9 @@ describe('MessageShell — separadores de día', () => {
       expect(pendingRow).toHaveTextContent('Pendiente');
 
       const [separator] = screen.getAllByTestId('message-day-separator');
-      // Two days back is a weekday name (never 'hoy'), taken from `queuedAt`.
-      expect(separator.textContent).toBe(weekdayNameEs(twoDaysAgo));
+      // Two days back is Saturday 14 Nov 2026 — an independent literal, never
+      // `weekdayNameEs`, so a consistently wrong weekday table cannot pass here.
+      expect(separator.textContent).toBe('sábado');
       expect(separator.textContent).not.toBe('hoy');
     } finally {
       Object.defineProperty(navigator, 'onLine', { value: wasOnline, configurable: true });
