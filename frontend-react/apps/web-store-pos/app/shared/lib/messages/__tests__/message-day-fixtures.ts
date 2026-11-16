@@ -36,10 +36,19 @@ export function localInstant(daysAgo: number, hour = 12): string {
   return localDay(daysAgo, hour).toISOString();
 }
 
+/**
+ * A `readAt` that FOLLOWS its own send: one minute after the same `localDay`.
+ * Deriving it from the row's `sentAt` keeps every instant anchored to
+ * `TEST_NOW` and makes a read-before-send row impossible to write by accident.
+ */
+export function readInstant(daysAgo: number, hour = 12): string {
+  return new Date(localDay(daysAgo, hour).getTime() + 60_000).toISOString();
+}
+
 const SEPARATOR_TEST_ID = 'message-day-separator';
 
 /** True when `element` is the chat's centered day separator chip. */
-export function isDaySeparator(element: Element): boolean {
+function isDaySeparator(element: Element): boolean {
   return element.getAttribute('data-testid') === SEPARATOR_TEST_ID;
 }
 

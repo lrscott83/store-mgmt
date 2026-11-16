@@ -878,8 +878,8 @@ describe('AdminMessagesPage — separadores de día', () => {
     expect(separators[1].textContent).toBe('hoy');
 
     // Each separator is a SIBLING of the message rows, inside the same list.
+    // `toEqual` pins the exact count (2) and the tag in one assertion.
     expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
-    expect(daySeparatorRows(list)).toHaveLength(separators.length);
 
     // Order: separator, two messages, separator, one message.
     expect(separatorKinds(list.children)).toEqual([

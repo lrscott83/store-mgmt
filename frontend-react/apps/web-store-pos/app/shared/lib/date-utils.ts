@@ -247,6 +247,26 @@ export function groupByLocalDay<T>(
 const DAY_MS = 86_400_000;
 
 /**
+ * Whole LOCAL calendar days from `from` to `to` — both expected to be LOCAL
+ * MIDNIGHTS (the caller snaps them with `startOfDay`).
+ *
+ * The span is divided by `DAY_MS` and ROUNDED, not floored. Across a DST shift
+ * two local midnights are 23 or 25 hours apart — up to one hour away from a
+ * whole day — and `Math.round` absorbs that offset, landing exactly on
+ * `1` and `8` at the boundaries. `Math.floor` would not: a 23-hour span becomes
+ * `0` (a day ago reported as 'hoy'), a 191-hour span (8 days minus an hour)
+ * becomes `7` (an 8-day-old message reported as a weekday). Do NOT "simplify"
+ * it to `floor`.
+ *
+ * Exported so the arithmetic can be pinned directly with synthetic 23h/25h/191h
+ * spans: `formatChatDayLabel` re-snaps both endpoints, so a synthetic span
+ * handed to it collapses back to a whole number of days and cannot prove this.
+ */
+export function localDaysBetween(from: Date, to: Date): number {
+  return Math.round((to.getTime() - from.getTime()) / DAY_MS);
+}
+
+/**
  * Short label for a chat day separator, computed in the VIEWER's LOCAL timezone.
  *
  * `today` (default: now) is the reference day, so every comparison happens
@@ -263,18 +283,13 @@ const DAY_MS = 86_400_000;
  * day (`daysAgo < 0`, clock skew) collapses to 'hoy' rather than inventing a
  * label for a day that has not happened.
  *
- * The span is divided by `DAY_MS` and ROUNDED, not floored. Both endpoints are
- * LOCAL midnights, so across a DST shift the real span is 23 or 25 hours — up to
- * one hour away from a whole day — and `Math.round` absorbs that offset, landing
- * exactly on `daysAgo === 1` and `daysAgo === 8` at their boundaries. `Math.floor`
- * would not: under a spring-forward it turns 1 day ago into 0 ('hoy' instead of
- * 'ayer') and 8 days ago into 7 (a weekday instead of dd/mm/yyyy), silently
- * breaking the INCLUSIVE 7-day boundary above. Do NOT "simplify" it to `floor`.
+ * The day delta itself lives in `localDaysBetween`, which documents why the
+ * division is ROUNDED rather than floored across 23h/25h DST days.
  */
 export function formatChatDayLabel(date: Date, today: Date = new Date()): string {
   const target = startOfDay(date);
   const reference = startOfDay(today);
-  const daysAgo = Math.round((reference.getTime() - target.getTime()) / DAY_MS);
+  const daysAgo = localDaysBetween(target, reference);
   if (daysAgo <= 0) return 'hoy';
   if (daysAgo === 1) return 'ayer';
   if (daysAgo <= 7) return weekdayNameEs(target);

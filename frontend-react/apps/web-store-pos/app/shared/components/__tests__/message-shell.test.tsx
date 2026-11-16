@@ -11,6 +11,7 @@ import {
   daySeparatorRows,
   localDay,
   localInstant,
+  readInstant,
   separatorKinds,
 } from '~/shared/lib/messages/__tests__/message-day-fixtures';
 
@@ -630,9 +631,9 @@ describe('MessageShell — separadores de día', () => {
     );
     getMessagesMock.mockResolvedValue(
       success([
-        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: '2026-09-30T10:00:00Z' }),
-        message({ id: 'm-hoy-1', sentAt: localInstant(0, 9), readAt: '2026-09-30T10:00:00Z' }),
-        message({ id: 'm-hoy-2', sentAt: localInstant(0, 10), readAt: '2026-09-30T10:00:00Z' }),
+        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: readInstant(1) }),
+        message({ id: 'm-hoy-1', sentAt: localInstant(0, 9), readAt: readInstant(0, 9) }),
+        message({ id: 'm-hoy-2', sentAt: localInstant(0, 10), readAt: readInstant(0, 10) }),
       ]),
     );
 
@@ -648,8 +649,9 @@ describe('MessageShell — separadores de día', () => {
     expect(separators[0].textContent).toBe('ayer');
     expect(separators[1].textContent).toBe('hoy');
     // Literal `LI` siblings of the message rows, never nested in one of them.
+    // The `toEqual` pins the exact count (2) as well as the tag, so a separate
+    // length assertion over the same `daySeparatorRows(list)` scan adds nothing.
     expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
-    expect(daySeparatorRows(list)).toHaveLength(separators.length);
 
     expect(separatorKinds(list.children)).toEqual([
       'separator',
@@ -660,14 +662,60 @@ describe('MessageShell — separadores de día', () => {
     ]);
   });
 
+  it('flips the separators when ONLY the LOCAL day advances, with no new messages', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    // The SAME rows on both sides of the midnight crossing: `getMessages` is
+    // never re-stubbed, so any label change can only come from the reference.
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: readInstant(1) }),
+        message({ id: 'm-hoy', sentAt: localInstant(0, 9), readAt: readInstant(0, 9) }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy')).toBeInTheDocument());
+    expect(
+      screen.getAllByTestId('message-day-separator').map((separator) => separator.textContent),
+    ).toEqual(['ayer', 'hoy']);
+
+    // Move ONLY the clock one local day forward, then force a re-render that
+    // does NOT touch the message list: typing in the composer is a pure local
+    // state update, so `displayMessages` keeps its identity and no refetch is
+    // triggered. A `[messages]`-keyed memo would keep the stale 'ayer'/'hoy'
+    // here and pass every other test in this file.
+    const nextDay = new Date(TEST_NOW);
+    nextDay.setDate(nextDay.getDate() + 1);
+    act(() => {
+      vi.setSystemTime(nextDay);
+    });
+
+    fireEvent.change(screen.getByLabelText('Escriba un mensaje'), {
+      target: { value: 'sin enviar' },
+    });
+
+    expect(screen.getByTestId('message-m-hoy')).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId('message-day-separator').map((separator) => separator.textContent),
+    ).toEqual(['domingo', 'ayer']);
+    // Proof the re-render came from local state, not from a refetch.
+    expect(getMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
   it('labels a day older than a week with the local dd/mm/yyyy date, not a weekday', async () => {
     getConversationsMock.mockResolvedValue(
       success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
     );
     getMessagesMock.mockResolvedValue(
       success([
-        message({ id: 'm-old', sentAt: localInstant(8), readAt: '2026-09-30T10:00:00Z' }),
-        message({ id: 'm-today', sentAt: localInstant(0), readAt: '2026-09-30T10:00:00Z' }),
+        message({ id: 'm-old', sentAt: localInstant(8), readAt: readInstant(8) }),
+        message({ id: 'm-today', sentAt: localInstant(0), readAt: readInstant(0) }),
       ]),
     );
 
