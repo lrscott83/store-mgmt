@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import esMessages from '~/shared/lib/i18n/es';
+import { weekdayNameEs } from '~/shared/lib/date-utils';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
 
 const getConversationsMock = vi.hoisted(() => vi.fn());
@@ -599,5 +600,164 @@ describe('MessageShell — trigger color identity', () => {
     expect(css).toContain('--color-whatsapp-light:');
     // Not collapsed into --color-success, which is a different green.
     expect(css).not.toMatch(/--color-whatsapp:\s*rgb\(82 196 26\)/);
+  });
+});
+
+describe('MessageShell — separadores de día', () => {
+  /** Local instant `daysAgo` days back, at the given local hour. */
+  function localInstant(daysAgo: number, hour = 12): string {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(hour, 0, 0, 0);
+    return date.toISOString();
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+  });
+
+  it('renders ONE separator before the first message of each local day', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: '2026-09-30T10:00:00Z' }),
+        message({ id: 'm-hoy-1', sentAt: localInstant(0, 9), readAt: '2026-09-30T10:00:00Z' }),
+        message({ id: 'm-hoy-2', sentAt: localInstant(0, 10), readAt: '2026-09-30T10:00:00Z' }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    const list = await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy-2')).toBeInTheDocument());
+
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators).toHaveLength(2);
+    expect(separators[0].textContent).toBe('ayer');
+    expect(separators[1].textContent).toBe('hoy');
+    for (const separator of separators) {
+      expect(separator.tagName).toBe('LI');
+      expect(separator.parentElement).toBe(list);
+    }
+
+    const kinds = Array.from(list.children).map((child) =>
+      child.getAttribute('data-testid') === 'message-day-separator' ? 'separator' : 'message',
+    );
+    expect(kinds).toEqual(['separator', 'message', 'separator', 'message', 'message']);
+  });
+
+  it('never treats a separator as a message', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-old', senderId: 'sa', sentAt: localInstant(1), readAt: null }),
+        message({ id: 'm-new', senderId: 'sa', sentAt: localInstant(0), readAt: null }),
+      ]),
+    );
+    markAsReadMock.mockResolvedValue(success(true));
+
+    // jsdom has no layout: give the panel box real geometry so the receipt pass
+    // actually measures the rows. Any element that is not the box sits inside it.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        return this.getAttribute('data-testid') === 'message-list-box' ? rect(0, 100) : rect(10, 40);
+      });
+
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
+
+      const list = await screen.findByTestId('message-list');
+      await waitFor(() => expect(screen.getAllByTestId('message-day-separator')).toHaveLength(2));
+
+      for (const separator of screen.getAllByTestId('message-day-separator')) {
+        expect(separator).not.toHaveAttribute('data-mine');
+        expect(separator).not.toHaveAttribute('data-pending');
+      }
+
+      // Only real messages are receipted; the separator has no id to receipt.
+      await waitFor(() =>
+        expect(markAsReadMock.mock.calls).toEqual([
+          ['m-old', { background: true }],
+          ['m-new', { background: true }],
+        ]),
+      );
+
+      const messageRows = Array.from(list.children).filter(
+        (child) => child.getAttribute('data-testid') !== 'message-day-separator',
+      );
+      expect(messageRows).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('groups a pending offline message by its queuedAt day, not by today', async () => {
+    const { MessagesOfflineService } = await import(
+      '~/shared/lib/messages/messages-offline-service'
+    );
+    localStorage.clear();
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    twoDaysAgo.setHours(12, 0, 0, 0);
+
+    // Seeded through the service's own import seam: `enqueue` always stamps
+    // `queuedAt = now`, and this test needs a queued message from an earlier day.
+    new MessagesOfflineService('s1').addImportedQueuedMessage({
+      id: 'p-old',
+      conversationId: 'c1',
+      ownerId: 'u1',
+      storeId: 's1',
+      content: 'Enviado hace dos días',
+      queuedAt: twoDaysAgo,
+    });
+
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    getMessagesMock.mockResolvedValue(success([]));
+
+    // Offline: the queue must NOT flush away before the panel is opened.
+    const wasOnline = navigator.onLine;
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+    try {
+      renderShell();
+      openPanel();
+
+      const pendingRow = await screen.findByTestId('pending-message-p-old');
+      // The pending row keeps its own identity and styling.
+      expect(pendingRow).toHaveAttribute('data-pending', 'true');
+      expect(pendingRow).toHaveTextContent('Pendiente');
+
+      const [separator] = screen.getAllByTestId('message-day-separator');
+      // Two days back is a weekday name (never 'hoy'), taken from `queuedAt`.
+      expect(separator.textContent).toBe(weekdayNameEs(twoDaysAgo));
+      expect(separator.textContent).not.toBe('hoy');
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { value: wasOnline, configurable: true });
+      localStorage.clear();
+    }
   });
 });

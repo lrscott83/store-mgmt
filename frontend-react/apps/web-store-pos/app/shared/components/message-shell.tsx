@@ -17,6 +17,8 @@ import {
   resolveMessagesHubUrl,
 } from '~/shared/lib/messages/messages-realtime-service';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
+import { buildMessageDayItems } from '~/shared/lib/messages/message-day-groups';
+import { MessageDaySeparator } from '~/shared/components/message-day-separator';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import type {
   ConversationDto,
@@ -487,6 +489,14 @@ export function MessageShell() {
     })),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
+  /**
+   * The rendered rows with one centered day separator before the first message
+   * of each LOCAL day. Pending offline rows are grouped by their `queuedAt`
+   * (`timestamp` above), never by "now": a message queued two days ago belongs to
+   * that day even if it is drained today.
+   */
+  const displayItems = buildMessageDayItems(displayMessages, (message) => new Date(message.timestamp));
+
   if (!user || !seesHeaderMessages(user)) return null;
 
   // The SuperAdmin never opens the panel: it has no active-store thread to
@@ -600,36 +610,44 @@ export function MessageShell() {
               </p>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="message-list">
-                {displayMessages.map((message) => (
-                  <li
-                    key={message.key}
-                    ref={(element) => {
-                      if (element) itemRefs.current.set(message.key, element);
-                      else itemRefs.current.delete(message.key);
-                    }}
-                    data-testid={message.testId}
-                    data-mine={message.isMine ? 'true' : 'false'}
-                    data-pending={message.pending ? 'true' : 'false'}
-                    className={message.isMine ? 'flex justify-end' : 'flex justify-start'}
-                  >
-                    <div
-                      className={
-                        message.pending
-                          ? 'max-w-[80%] rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 text-xs text-text opacity-60'
-                          : message.isMine
-                            ? 'max-w-[80%] rounded-xl bg-primary px-3 py-1.5 text-xs text-white'
-                            : 'max-w-[80%] rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-text'
-                      }
+                {displayItems.map((entry) => {
+                  if (entry.kind === 'separator') {
+                    return (
+                      <MessageDaySeparator key={`day-${entry.dayKey}`} label={entry.label} />
+                    );
+                  }
+                  const message = entry.item;
+                  return (
+                    <li
+                      key={message.key}
+                      ref={(element) => {
+                        if (element) itemRefs.current.set(message.key, element);
+                        else itemRefs.current.delete(message.key);
+                      }}
+                      data-testid={message.testId}
+                      data-mine={message.isMine ? 'true' : 'false'}
+                      data-pending={message.pending ? 'true' : 'false'}
+                      className={message.isMine ? 'flex justify-end' : 'flex justify-start'}
                     >
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                      <span className="mt-0.5 block text-right text-[10px] opacity-70">
-                        {message.pending
-                          ? intl.formatMessage({ id: 'MESSAGES.PENDING' })
-                          : message.time}
-                      </span>
-                    </div>
-                  </li>
-                ))}
+                      <div
+                        className={
+                          message.pending
+                            ? 'max-w-[80%] rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 text-xs text-text opacity-60'
+                            : message.isMine
+                              ? 'max-w-[80%] rounded-xl bg-primary px-3 py-1.5 text-xs text-white'
+                              : 'max-w-[80%] rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-text'
+                        }
+                      >
+                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        <span className="mt-0.5 block text-right text-[10px] opacity-70">
+                          {message.pending
+                            ? intl.formatMessage({ id: 'MESSAGES.PENDING' })
+                            : message.time}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

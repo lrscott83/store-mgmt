@@ -821,3 +821,141 @@ describe('AdminMessagesPage — sending scrolls the thread', () => {
     expect(thread.scrollTop).toBe(480);
   });
 });
+
+describe('AdminMessagesPage — separadores de día', () => {
+  /** Local instant `daysAgo` days back, at the given local hour. */
+  function localInstant(daysAgo: number, hour = 12): string {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(hour, 0, 0, 0);
+    return date.toISOString();
+  }
+
+  function incomingAt(id: string, daysAgo: number): MessageDto {
+    return {
+      id,
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: `Mensaje ${id}`,
+      sentAt: localInstant(daysAgo),
+      readAt: null,
+    };
+  }
+
+  it('renders ONE centered separator before the first message of each local day', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([
+        incomingAt('m-ayer-1', 1),
+        incomingAt('m-ayer-2', 1),
+        incomingAt('m-hoy-1', 0),
+      ]),
+    );
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const list = await screen.findByTestId('message-list');
+
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy-1')).toBeInTheDocument());
+
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators).toHaveLength(2);
+    // Oldest day first, lowercase labels — never uppercased.
+    expect(separators[0].textContent).toBe('ayer');
+    expect(separators[1].textContent).toBe('hoy');
+
+    // Each separator is a SIBLING of the message rows, inside the same list.
+    for (const separator of separators) {
+      expect(separator.tagName).toBe('LI');
+      expect(separator.parentElement).toBe(list);
+    }
+
+    // Order: separator, two messages, separator, one message.
+    const kinds = Array.from(list.children).map((child) =>
+      child.getAttribute('data-testid') === 'message-day-separator' ? 'separator' : 'message',
+    );
+    expect(kinds).toEqual(['separator', 'message', 'message', 'separator', 'message']);
+  });
+
+  it('never treats a separator as a message', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incomingAt('m-a', 1), incomingAt('m-b', 0)]),
+    );
+    vi.mocked(messagesHttpService.markAsRead).mockResolvedValue(response(true));
+
+    // jsdom has no layout: give the thread box and the message rows real
+    // geometry so the receipt pass actually measures something. Every measured
+    // element is recorded, which is how the test proves the separators are never
+    // even looked at.
+    const measured: string[] = [];
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid') ?? '';
+        measured.push(testId);
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId.startsWith('message-m-')) return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+      const list = await screen.findByTestId('message-list');
+
+      await waitFor(() => expect(screen.getAllByTestId('message-day-separator')).toHaveLength(2));
+
+      for (const separator of screen.getAllByTestId('message-day-separator')) {
+        // A message row is identified by these attributes; a separator carries none.
+        expect(separator).not.toHaveAttribute('data-mine');
+        expect(separator).not.toHaveAttribute('data-pending');
+      }
+
+      // The read-receipt pass walks the message array keyed by message id, so the
+      // separators can never enter it: exactly the two messages are receipted.
+      await waitFor(() =>
+        expect(vi.mocked(messagesHttpService.markAsRead).mock.calls).toEqual([
+          ['m-a', { background: true }],
+          ['m-b', { background: true }],
+        ]),
+      );
+      // Not a single separator was ever measured as a candidate row.
+      expect(measured).toContain('message-m-a');
+      expect(measured).not.toContain('message-day-separator');
+
+      const messageRows = Array.from(list.children).filter(
+        (child) => child.getAttribute('data-testid') !== 'message-day-separator',
+      );
+      expect(messageRows).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('keeps the empty state and renders no separator when there are no messages', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(response<MessageDto[]>([]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    expect(await screen.findByText('No hay mensajes con el administrador.')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-day-separator')).not.toBeInTheDocument();
+  });
+});

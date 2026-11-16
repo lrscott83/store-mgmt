@@ -6,10 +6,12 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { messagesHttpService } from '~/shared/lib/messages/messages-http-service';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
+import { buildMessageDayItems } from '~/shared/lib/messages/message-day-groups';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { Modal } from '~/shared/components/ui/modal';
+import { MessageDaySeparator } from '~/shared/components/message-day-separator';
 
 export const clientLoader = superAdminLoader;
 
@@ -464,6 +466,16 @@ export function AdminMessagesPage() {
     }
   }
 
+  /**
+   * The thread with one centered day separator before the first message of each
+   * LOCAL day. The API already returns ascending `sentAt`, so the array order is
+   * the render order — no extra sort here.
+   */
+  const threadItems = useMemo(
+    () => buildMessageDayItems(messages, (message) => new Date(message.sentAt)),
+    [messages],
+  );
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -565,7 +577,16 @@ export function AdminMessagesPage() {
                   </p>
                 ) : (
                   <ul data-testid="message-list" className="flex flex-col gap-2">
-                    {messages.map((message) => {
+                    {threadItems.map((entry) => {
+                      if (entry.kind === 'separator') {
+                        return (
+                          <MessageDaySeparator
+                            key={`day-${entry.dayKey}`}
+                            label={entry.label}
+                          />
+                        );
+                      }
+                      const message = entry.item;
                       const isMine = message.senderId === userId;
                       return (
                         <li

@@ -242,3 +242,30 @@ export function groupByLocalDay<T>(
     }))
     .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 }
+
+/**
+ * Short label for a chat day separator, computed in the VIEWER's LOCAL timezone.
+ *
+ * `today` (default: now) is the reference day, so every comparison happens
+ * between LOCAL midnights — never on UTC parts and never through
+ * `toISOString().split('T')[0]`. A 23:00 message under a negative offset
+ * belongs to the day the viewer actually lived through, not the UTC day it
+ * projects onto; using local parts keeps the label agreeing with `startOfDay`,
+ * `toLocalDayKey` and `formatLocalDate`.
+ *
+ * `daysAgo` is the whole number of local calendar days back from `today`:
+ * `0` → 'hoy', `1` → 'ayer', `2..7` → lowercase Spanish weekday name, and
+ * anything older than 7 → local dd/mm/yyyy. The 7-day boundary is INCLUSIVE:
+ * exactly 7 days ago is still a weekday name, 8 days ago is a date. A future
+ * day (`daysAgo < 0`, clock skew) collapses to 'hoy' rather than inventing a
+ * label for a day that has not happened.
+ */
+export function formatChatDayLabel(date: Date, today: Date = new Date()): string {
+  const target = startOfDay(date);
+  const reference = startOfDay(today);
+  const daysAgo = Math.round((reference.getTime() - target.getTime()) / 86_400_000);
+  if (daysAgo <= 0) return 'hoy';
+  if (daysAgo === 1) return 'ayer';
+  if (daysAgo <= 7) return weekdayNameEs(target);
+  return formatLocalDate(target);
+}
