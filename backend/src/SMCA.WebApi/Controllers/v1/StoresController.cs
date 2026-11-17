@@ -459,8 +459,14 @@ namespace SMCA.WebApi.Controllers.v1
         /// <para>
         /// The query handler therefore keeps a defined-value guard as a BACKSTOP, not as the wire
         /// gate: it protects any future caller that builds the query without going through the
-        /// binder, and it is covered by unit tests rather than end-to-end. Neither the action nor
-        /// the handler ever coerces a value to another tab.
+        /// binder, and unit tests pin it directly. Neither the action nor the handler ever coerces a
+        /// value to another tab.
+        /// </para>
+        /// <para>
+        /// The numeric path is pinned end to end by
+        /// <c>GetStorePaymentsHistoryTests.SuperAdmin_out_of_range_numeric_currency_is_a_400_not_the_usd_tab</c>,
+        /// which asserts that 400 and its parameter-keyed validation error. Removing the handler's
+        /// backstop guard leaves that test green, which is how the binder behaviour was established.
         /// </para>
         /// </summary>
         [HttpGet("payments")]

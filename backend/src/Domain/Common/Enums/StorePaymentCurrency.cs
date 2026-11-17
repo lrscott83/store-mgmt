@@ -43,9 +43,12 @@ namespace Domain.Common.Enums
         /// </summary>
         /// <remarks>
         /// Derived from the enum itself rather than a hand-kept member list, so a currency added
-        /// later cannot be silently rejected (or silently mapped) until someone notices. Over the
-        /// wire the HTTP enum binder already answers 400 for an undefined value; this is the
-        /// guard for every path that does not pass through it.
+        /// later is served without editing this method. It deliberately does NOT make a new member
+        /// safe by itself: a member declared without an arm in <see cref="ToWireValue"/> passes this
+        /// guard and then throws there, which is why <c>EveryEnumMember_hasAWireValue_andIsServed</c>
+        /// asserts both halves for every declared member. Over the wire the HTTP enum binder already
+        /// answers 400 for an undefined value; this is the guard for every path that does not pass
+        /// through it.
         /// </remarks>
         public static bool IsDefinedCurrency(this StorePaymentCurrency currency)
             => Enum.IsDefined(currency);

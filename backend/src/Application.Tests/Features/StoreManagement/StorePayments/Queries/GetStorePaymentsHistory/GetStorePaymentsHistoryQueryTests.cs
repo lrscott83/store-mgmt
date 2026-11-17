@@ -253,22 +253,28 @@ public class GetStorePaymentsHistoryQueryTests
         => currency.ToWireValue().Should().Be(expected);
 
     /// <summary>
-    /// The enum is the single source of truth, so this test derives its rows FROM the enum instead
-    /// of restating them. A hand-written theory cannot notice a member added later: the exhaustive
-    /// switch would throw from <c>ToWireValue</c> and the guard would answer 400, while every
-    /// explicitly listed case stayed green. Here a new currency must gain a wire value and remain
-    /// served, or the suite goes red on the day it is written.
+    /// The enum is the single source of truth, so this test derives its MEMBERS from it instead of
+    /// restating them. A hand-written theory cannot notice a member added later: the exhaustive
+    /// switch would throw from <c>ToWireValue</c>, while every explicitly listed case stayed green.
+    ///
+    /// The expected wire strings stay a deliberate allow-list: the JSON contract is fixed at
+    /// uppercase <c>USD</c>/<c>CUP</c>, so a currency added with any other wire value must fail here
+    /// until the contract itself is widened.
     /// </summary>
     [Fact]
     public void EveryEnumMember_hasAWireValue_andIsServed()
     {
+        // The next ordinal past the last declared member: what an out-of-range cast or a stale
+        // client produces, and the value the guard must refuse.
+        const int UndefinedOrdinal = 7;
+
         foreach (var currency in Enum.GetValues<StorePaymentCurrency>())
         {
             currency.IsDefinedCurrency().Should().BeTrue($"{currency} must be a served currency");
             currency.ToWireValue().Should().BeOneOf("USD", "CUP");
         }
 
-        ((StorePaymentCurrency)7).IsDefinedCurrency().Should().BeFalse();
+        ((StorePaymentCurrency)UndefinedOrdinal).IsDefinedCurrency().Should().BeFalse();
     }
 
     /// <summary>
