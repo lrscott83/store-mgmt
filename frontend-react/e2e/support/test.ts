@@ -1,6 +1,12 @@
 import { test as base, expect } from '@playwright/test';
 import { installRegisterNetworkObserver, type RegisterNetworkObserver } from './network-observer';
 import { installLoginNetworkObserver, type LoginNetworkObserver } from './login-network-observer';
+import {
+  ATTACHMENT_NAME as FAILURE_DIAGNOSTICS_ATTACHMENT,
+  formatFailureDiagnosticsSummary,
+  installFailureDiagnostics,
+  type FailureDiagnostics,
+} from './failure-diagnostics';
 import { createPersonaCache, restoreSignedInSession } from './session';
 import type { PersonaCache, PersonaKind, SignedInSession } from './session';
 
@@ -39,8 +45,12 @@ interface LoginFixtures {
   loginNetwork: LoginNetworkObserver;
 }
 
+interface DiagnosticsFixtures {
+  failureDiagnostics: FailureDiagnostics;
+}
+
 export const test = base.extend<
-  RegisterFixtures & SessionFixtures & LoginFixtures,
+  RegisterFixtures & SessionFixtures & LoginFixtures & DiagnosticsFixtures,
   SessionWorkerFixtures
 >({
   // `auto: true`: installed for every test that imports from this file, with
@@ -63,6 +73,31 @@ export const test = base.extend<
     async ({ page }, use) => {
       const observer = installLoginNetworkObserver(page);
       await use(observer);
+    },
+    { auto: true },
+  ],
+
+  // Same criterion again: browser-side evidence must exist for EVERY failing
+  // test, not for the ones whose author remembered to ask for it. Installed
+  // before the test body and read only on teardown.
+  failureDiagnostics: [
+    async ({ page }, use, testInfo) => {
+      const diagnostics = installFailureDiagnostics(page);
+      await use(diagnostics);
+      try {
+        // Only an unexpected outcome is worth the artifact: a passing test
+        // that logs a console error is still a passing test.
+        if (testInfo.status === testInfo.expectedStatus) return;
+        const entries = diagnostics.entries();
+        if (entries.length === 0) return;
+        await testInfo.attach(FAILURE_DIAGNOSTICS_ATTACHMENT, {
+          body: entries.join('\n'),
+          contentType: 'text/plain',
+        });
+        console.log(formatFailureDiagnosticsSummary(entries));
+      } catch {
+        // Diagnostics never turn a reported failure into a different one.
+      }
     },
     { auto: true },
   ],

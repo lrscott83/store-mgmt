@@ -388,7 +388,7 @@
     <value>{0} solo admite los valores Unit o Wholesale (precio por unidad o mayorista)</value>
   </data>
   <data name="CatalogWholesaleModeWithoutProducts" xml:space="preserve">
-    <value>No se puede publicar el catálogo con precios mayoristas: la tienda no tiene ningún producto con precio mayorista configurado. Configure los precios mayoristas y sincronice el catálogo para activar este modo.</value>
+    <value>Para cambiar el catálogo a precios mayoristas, primero sincronice los precios mayoristas. Aún no hay ningún producto con precio mayorista configurado: configure el precio mayorista de al menos un producto y sincronice el catálogo; después podrá activar este modo.</value>
   </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>El tipo de imagen {0} no es válido</value>

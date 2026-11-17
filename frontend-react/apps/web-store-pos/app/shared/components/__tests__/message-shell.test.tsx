@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { MemoryRouter } from 'react-router';
@@ -6,6 +6,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
+import {
+  TEST_NOW,
+  daySeparatorRows,
+  localDay,
+  localInstant,
+  readInstant,
+  separatorKinds,
+} from '~/shared/lib/messages/__tests__/message-day-fixtures';
 
 const getConversationsMock = vi.hoisted(() => vi.fn());
 const getMessagesMock = vi.hoisted(() => vi.fn());
@@ -331,15 +339,136 @@ describe('MessageShell — panel conversation', () => {
       ]),
     );
     markAsReadMock.mockResolvedValue(success(true));
+    // jsdom has no layout, so the receipt predicate needs real geometry: both
+    // rows sit inside the panel box. The fallback is placed OUTSIDE the box so a
+    // mis-resolved box fails the assertion instead of satisfying it.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        if (this.getAttribute('data-testid') === 'message-list-box') return rect(0, 100);
+        return rect(10, 40);
+      });
 
-    renderShell();
-    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
-    openPanel();
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
 
-    await waitFor(() =>
-      expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }),
+      await waitFor(() =>
+        expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }),
+      );
+      expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it('marks a message taller than the panel box once it is on screen', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 1 })]),
     );
-    expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
+    getMessagesMock.mockResolvedValue(success([message({ id: 'tall', senderId: 'sa', readAt: null })]));
+    markAsReadMock.mockResolvedValue(success(true));
+    // A 600px message inside a 100px visible box: it can never fit entirely,
+    // but the owner reads it while scrolling.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-list-box') return rect(0, 100);
+        if (testId === 'message-tall') return rect(-200, 400);
+        // Unknown element: outside the box, so a mis-resolved box cannot make
+        // this assertion pass by accident.
+        return rect(-1000, -900);
+      });
+
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
+
+      await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('tall', { background: true }));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not receipt a message that only touches the panel box edge', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 3 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'touch', senderId: 'sa', readAt: null }),
+        message({ id: 'flush', senderId: 'sa', readAt: null }),
+        message({ id: 'open', senderId: 'sa', readAt: null }),
+      ]),
+    );
+    markAsReadMock.mockResolvedValue(success(true));
+    // Both box edges, zero visible pixels: `touch` ends exactly on the box top
+    // and `flush` starts exactly on the box bottom. `open` overlaps.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-list-box') return rect(0, 100);
+        if (testId === 'message-touch') return rect(-60, 0);
+        if (testId === 'message-flush') return rect(100, 200);
+        if (testId === 'message-open') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
+
+      // `open` is the sync point: without it, "touch/flush were not receipted"
+      // would prove nothing about a measurement that never ran.
+      await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('open', { background: true }));
+      expect(markAsReadMock).not.toHaveBeenCalledWith('touch', { background: true });
+      expect(markAsReadMock).not.toHaveBeenCalledWith('flush', { background: true });
+      // Pins the COMPLETE receipt set for this pass: a receipt of either edge,
+      // under any call shape, breaks this assertion too.
+      expect(markAsReadMock.mock.calls).toEqual([['open', { background: true }]]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -478,5 +607,249 @@ describe('MessageShell — trigger color identity', () => {
     expect(css).toContain('--color-whatsapp-light:');
     // Not collapsed into --color-success, which is a different green.
     expect(css).not.toMatch(/--color-whatsapp:\s*rgb\(82 196 26\)/);
+  });
+});
+
+describe('MessageShell — separadores de día', () => {
+  beforeEach(() => {
+    // Fake ONLY `Date`: the shell polls with real timers, so faking them would
+    // freeze its async loads. Pinning the calendar day is what makes the labels
+    // independent of when the suite runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TEST_NOW);
+    vi.clearAllMocks();
+    mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders ONE separator before the first message of each local day', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: readInstant(1) }),
+        message({ id: 'm-hoy-1', sentAt: localInstant(0, 9), readAt: readInstant(0, 9) }),
+        message({ id: 'm-hoy-2', sentAt: localInstant(0, 10), readAt: readInstant(0, 10) }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    const list = await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy-2')).toBeInTheDocument());
+
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators).toHaveLength(2);
+    expect(separators[0].textContent).toBe('ayer');
+    expect(separators[1].textContent).toBe('hoy');
+    // Literal `LI` siblings of the message rows, never nested in one of them.
+    // The `toEqual` pins the exact count (2) as well as the tag, so a separate
+    // length assertion over the same `daySeparatorRows(list)` scan adds nothing.
+    expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
+
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'separator',
+      'message',
+      'message',
+    ]);
+  });
+
+  it('flips the separators when ONLY the LOCAL day advances, with no new messages', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    // The SAME rows on both sides of the midnight crossing: `getMessages` is
+    // never re-stubbed, so any label change can only come from the reference.
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-ayer', sentAt: localInstant(1), readAt: readInstant(1) }),
+        message({ id: 'm-hoy', sentAt: localInstant(0, 9), readAt: readInstant(0, 9) }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy')).toBeInTheDocument());
+    expect(
+      screen.getAllByTestId('message-day-separator').map((separator) => separator.textContent),
+    ).toEqual(['ayer', 'hoy']);
+
+    // Move ONLY the clock one local day forward, then force a re-render that
+    // does NOT touch the message list: typing in the composer is a pure local
+    // state update, so `displayMessages` keeps its identity and no refetch is
+    // triggered. A `[messages]`-keyed memo would keep the stale 'ayer'/'hoy'
+    // here and pass every other test in this file.
+    const nextDay = new Date(TEST_NOW);
+    nextDay.setDate(nextDay.getDate() + 1);
+    act(() => {
+      vi.setSystemTime(nextDay);
+    });
+
+    fireEvent.change(screen.getByLabelText('Escriba un mensaje'), {
+      target: { value: 'sin enviar' },
+    });
+
+    expect(screen.getByTestId('message-m-hoy')).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId('message-day-separator').map((separator) => separator.textContent),
+    ).toEqual(['domingo', 'ayer']);
+    // Proof the re-render came from local state, not from a refetch.
+    expect(getMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels a day older than a week with the local dd/mm/yyyy date, not a weekday', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-old', sentAt: localInstant(8), readAt: readInstant(8) }),
+        message({ id: 'm-today', sentAt: localInstant(0), readAt: readInstant(0) }),
+      ]),
+    );
+
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    const list = await screen.findByTestId('message-list');
+    await waitFor(() => expect(screen.getByTestId('message-m-today')).toBeInTheDocument());
+
+    // Sunday 8 Nov 2026 — an independent literal. 8 days back is a date; the
+    // weekday branch stops at 7, and `weekdayNameEs` is never the oracle here.
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators.map((separator) => separator.textContent)).toEqual(['08/11/2026', 'hoy']);
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'separator',
+      'message',
+    ]);
+  });
+
+  it('never treats a separator as a message', async () => {
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]),
+    );
+    getMessagesMock.mockResolvedValue(
+      success([
+        message({ id: 'm-old', senderId: 'sa', sentAt: localInstant(1), readAt: null }),
+        message({ id: 'm-new', senderId: 'sa', sentAt: localInstant(0), readAt: null }),
+      ]),
+    );
+    markAsReadMock.mockResolvedValue(success(true));
+
+    // jsdom has no layout: give the panel box real geometry so the receipt pass
+    // actually measures the rows, and count every measurement per element. That
+    // is a real behavioural assertion: a separator that slipped into the
+    // read-receipt pass would show up as a measured element.
+    const measuredRows = new Map<string, number>();
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid') ?? '';
+        measuredRows.set(testId, (measuredRows.get(testId) ?? 0) + 1);
+        return testId === 'message-list-box' ? rect(0, 100) : rect(10, 40);
+      });
+
+    try {
+      renderShell();
+      await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+      openPanel();
+
+      const list = await screen.findByTestId('message-list');
+      await waitFor(() => expect(screen.getAllByTestId('message-day-separator')).toHaveLength(2));
+
+      // Only real messages are receipted; the separator has no id to receipt.
+      await waitFor(() =>
+        expect(markAsReadMock.mock.calls).toEqual([
+          ['m-old', { background: true }],
+          ['m-new', { background: true }],
+        ]),
+      );
+
+      // Every message row is measured exactly once by the receipt pass…
+      expect(measuredRows.get('message-m-old')).toBe(1);
+      expect(measuredRows.get('message-m-new')).toBe(1);
+      // …and a separator is never measured, because it is never a candidate row.
+      expect(measuredRows.get('message-day-separator') ?? 0).toBe(0);
+
+      const messageRows = Array.from(list.children).filter(
+        (child) => child.getAttribute('data-testid') !== 'message-day-separator',
+      );
+      expect(messageRows).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('groups a pending offline message by its queuedAt day, not by today', async () => {
+    const { MessagesOfflineService } = await import(
+      '~/shared/lib/messages/messages-offline-service'
+    );
+    localStorage.clear();
+    const twoDaysAgo = localDay(2);
+
+    // Seeded through the service's own import seam: `enqueue` always stamps
+    // `queuedAt = now`, and this test needs a queued message from an earlier day.
+    new MessagesOfflineService('s1').addImportedQueuedMessage({
+      id: 'p-old',
+      conversationId: 'c1',
+      ownerId: 'u1',
+      storeId: 's1',
+      content: 'Enviado hace dos días',
+      queuedAt: twoDaysAgo,
+    });
+
+    getConversationsMock.mockResolvedValue(
+      success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]),
+    );
+    getMessagesMock.mockResolvedValue(success([]));
+
+    // Offline: the queue must NOT flush away before the panel is opened.
+    const wasOnline = navigator.onLine;
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+    try {
+      renderShell();
+      openPanel();
+
+      const pendingRow = await screen.findByTestId('pending-message-p-old');
+      // The pending row keeps its own identity and styling.
+      expect(pendingRow).toHaveAttribute('data-pending', 'true');
+      expect(pendingRow).toHaveTextContent('Pendiente');
+
+      const [separator] = screen.getAllByTestId('message-day-separator');
+      // Two days back is Saturday 14 Nov 2026 — an independent literal, never
+      // `weekdayNameEs`, so a consistently wrong weekday table cannot pass here.
+      expect(separator.textContent).toBe('sábado');
+      expect(separator.textContent).not.toBe('hoy');
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { value: wasOnline, configurable: true });
+      localStorage.clear();
+    }
   });
 });

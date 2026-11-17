@@ -53,6 +53,42 @@ describe('isKnownDevOnly', () => {
     ).toBe(true);
   });
 
+  // 2026-11-09 — the four inline scripts `/` emits because dev SSR streams a pending boundary
+  // (known-issues 09). Each is pinned to its own literal prefix; none of them may be covered by
+  // the react-router entry above.
+  it('matches the ScrollRestoration inline script', () => {
+    expect(
+      isKnownDevOnly(
+        record({ sample: '((storageKey2, restoreKey) => {\n    if ("react-router-scroll-positions"' })
+      )
+    ).toBe(true);
+  });
+
+  it('matches the Fizz scheduler shim (requestAnimationFrame/$RT)', () => {
+    // The browser truncates `sample` to ~40 chars — pin the REAL reported text, not the full
+    // script, or the regex silently never matches in the sweep (this exact mistake happened).
+    expect(
+      isKnownDevOnly(record({ sample: 'requestAnimationFrame(function(){$RT=per' }))
+    ).toBe(true);
+  });
+
+  it('matches the Fizz boundary bootstrap ($RB/$RV)', () => {
+    expect(
+      isKnownDevOnly(record({ sample: '$RB=[];$RV=function(a){$RT=performance.n' }))
+    ).toBe(true);
+  });
+
+  it('matches the Fizz completeBoundary call ($RC)', () => {
+    expect(isKnownDevOnly(record({ sample: '$RC("B:1","S:1")' }))).toBe(true);
+  });
+
+  it('still rejects a lookalike that is NOT one of those prefixes', () => {
+    expect(isKnownDevOnly(record({ sample: '$RD("B:1","S:1")' }))).toBe(false);
+    expect(isKnownDevOnly(record({ sample: 'requestAnimationFrame(() => fetch("/x"))' }))).toBe(
+      false
+    );
+  });
+
   it('trims leading whitespace from the sample before matching', () => {
     expect(isKnownDevOnly(record({ sample: '   \n  window.__reactRouterContext = {}' }))).toBe(true);
   });

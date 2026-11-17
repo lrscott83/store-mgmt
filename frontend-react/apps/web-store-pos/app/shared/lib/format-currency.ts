@@ -15,10 +15,31 @@
  * panels). A single amount must never split across lines anywhere it renders,
  * so every money string this app produces is a single unbreakable unit.
  */
-export function formatCurrency(amount: number): string {
+function groupAmount(amount: number): { sign: string; grouped: string; decimals: string } {
   const sign = amount < 0 ? '-' : '';
   const [intPart, decPart] = Math.abs(amount).toFixed(2).split('.');
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
   const decimals = decPart === '00' ? '' : `.${decPart}`;
+  return { sign, grouped, decimals };
+}
+
+export function formatCurrency(amount: number): string {
+  const { sign, grouped, decimals } = groupAmount(amount);
   return `${sign}$${grouped}${decimals}`;
+}
+
+/**
+ * Money string carrying an EXPLICIT currency suffix (`12 500 CUP`, `25 USD`).
+ *
+ * For screens where a bare `$` would lie or mislead: the payment history shows two
+ * currencies side by side, and the commissions screen sums them into separate columns.
+ * Grouping is identical to `formatCurrency` (U+00A0 thousands, decimals only when
+ * non-zero) — only the symbol slot differs.
+ *
+ * The currency is a structural union rather than the domain model's type so this module
+ * stays dependency-free.
+ */
+export function formatMoneyWithCurrency(amount: number, currency: 'USD' | 'CUP'): string {
+  const { sign, grouped, decimals } = groupAmount(amount);
+  return `${sign}${grouped}${decimals} ${currency}`;
 }

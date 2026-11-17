@@ -8,6 +8,7 @@ using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
 using Application.Features.StoreManagement.Stores.Commands.ToggleStorePlan;
 using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
 using Application.Features.StoreManagement.StorePayments.Queries.GetReSellerCommissions;
+using Application.Features.StoreManagement.StorePayments.Queries.GetStorePaymentsHistory;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
 using Application.Features.StoreManagement.Stores.Commands.ApproveStore;
 using Application.Features.StoreManagement.Stores.Commands.ChangeStorePlan;
@@ -428,5 +429,59 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetReSellerCommissionsAsync()
             => Ok(await Sender.Send(new GetReSellerCommissionsQuery()));
+
+        /// <summary>
+        /// Cobros realizados (store-payments-history): one page of PAID payments for the selected
+        /// currency tab, plus the totals over the WHOLE filter and both tab counts. A payment is one
+        /// charge in one currency, so the tab — and only the tab — decides the currency.
+        ///
+        /// <para>
+        /// <c>currency</c> accepts <c>USD</c>/<c>CUP</c>, matched case-insensitively by name. Omitting
+        /// it selects the USD tab.
+        /// </para>
+        ///
+        /// <para>
+        /// An unrecognised value is a 400 on BOTH paths, and the two 400s come from different
+        /// places. This is MEASURED behaviour of this app configuration, not an assumption:
+        /// </para>
+        /// <list type="bullet">
+        /// <item><description>
+        /// an unknown NAME (<c>?currency=EUR</c>) is rejected by ASP.NET Core model binding before
+        /// this action runs; and
+        /// </description></item>
+        /// <item><description>
+        /// an unknown NUMBER (<c>?currency=7</c>) is ALSO rejected by model binding - the enum
+        /// binder does not accept an undefined numeric value here - answering a validation envelope
+        /// whose error is keyed by the parameter name. Removing the handler's guard leaves this
+        /// request a 400, which is how the behaviour was verified.
+        /// </description></item>
+        /// </list>
+        /// <para>
+        /// The query handler therefore keeps a defined-value guard as a BACKSTOP, not as the wire
+        /// gate: it protects any future caller that builds the query without going through the
+        /// binder, and unit tests pin it directly. Neither the action nor the handler ever coerces a
+        /// value to another tab.
+        /// </para>
+        /// <para>
+        /// The numeric path is pinned end to end by
+        /// <c>GetStorePaymentsHistoryTests.SuperAdmin_out_of_range_numeric_currency_is_a_400_not_the_usd_tab</c>,
+        /// which asserts that 400 and its parameter-keyed validation error. Removing the handler's
+        /// backstop guard leaves that test green, which is how the binder behaviour was established.
+        /// </para>
+        /// </summary>
+        [HttpGet("payments")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StorePaymentsHistoryDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetStorePaymentsHistoryAsync(
+            [FromQuery] StorePaymentCurrency? currency = null,
+            [FromQuery] DateOnly? from = null,
+            [FromQuery] DateOnly? to = null,
+            [FromQuery] Guid? storeId = null,
+            [FromQuery] int page = 1)
+            => Ok(await Sender.Send(new GetStorePaymentsHistoryQuery(
+                currency ?? StorePaymentCurrency.Usd, from, to, storeId, page)));
     }
 }

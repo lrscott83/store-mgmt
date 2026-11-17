@@ -1,9 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
 import type { Owner, Store, BaseResponseModel } from '@store-mgmt/domain';
+import {
+  TEST_NOW,
+  daySeparatorRows,
+  localInstant,
+  separatorKinds,
+} from '~/shared/lib/messages/__tests__/message-day-fixtures';
 
 vi.mock('~/auth/routes/loaders', () => ({
   superAdminLoader: vi.fn().mockResolvedValue(null),
@@ -559,6 +565,232 @@ describe('AdminMessagesPage — background loading', () => {
   });
 });
 
+describe('AdminMessagesPage — los acuses siguen al ojo, no al fetcher', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function incoming(id: string): MessageDto {
+    return {
+      id,
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: `Mensaje ${id}`,
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+  }
+
+  /**
+   * jsdom no tiene layout: todas las rects son 0x0 y "dentro de la caja" sería
+   * cierto para todo. Este stub le da geometría real a la caja del hilo y a cada
+   * fila, para que la prueba pueda distinguir un mensaje en pantalla de uno que
+   * quedó por encima del scroll.
+   */
+  function stubVisibility(visibleIds: readonly string[]): void {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const rect = (top: number, bottom: number): DOMRect =>
+        ({
+          top,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: bottom - top,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      const testId = this.getAttribute('data-testid');
+      if (testId === 'message-thread') return rect(0, 100);
+      if (testId?.startsWith('message-')) {
+        const id = testId.slice('message-'.length);
+        // Fuera de la caja: por encima del borde superior visible.
+        return visibleIds.includes(id) ? rect(10, 40) : rect(-60, -10);
+      }
+      // Cualquier otro elemento cae fuera de la caja: si el hilo se resolviera
+      // por accidente a este rect degenerado, ningún mensaje sería visible y la
+      // prueba fallaría en vez de pasar por casualidad.
+      return rect(-1000, -900);
+    });
+  }
+
+  it('no marca como leído un mensaje que nunca entró en la caja visible', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-old'), incoming('m-new')]),
+    );
+    stubVisibility(['m-new']);
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    await waitFor(() =>
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+    );
+    expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-old', {
+      background: true,
+    });
+  });
+
+  it('acusa un mensaje más alto que la caja en cuanto asoma, no solo si cabe entero', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-tall')]),
+    );
+    // Un mensaje de 600px dentro de una caja visible de 100px: nunca cabe
+    // entero, pero el operador lo ve y lo lee mientras hace scroll.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const testId = this.getAttribute('data-testid');
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-tall') return rect(-200, 400);
+        // Elemento no identificado: fuera de la caja, para que una caja mal
+        // resuelta haga fallar la prueba en lugar de satisfacerla.
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-tall', {
+          background: true,
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('no acusa un mensaje que solo roza el borde de la caja', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([
+        incoming('m-touch'),
+        incoming('m-flush'),
+        incoming('m-open'),
+      ]),
+    );
+    // Los dos bordes de la caja: `m-touch` termina justo en el superior y
+    // `m-flush` empieza justo en el inferior. Cero píxeles visibles en ambos, así
+    // que ninguno es lectura. `m-open` sí solapa.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-touch') return rect(-60, 0);
+        if (testId === 'message-m-flush') return rect(100, 200);
+        if (testId === 'message-m-open') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      // `m-open` es el punto de sincronía: si la medición no hubiera corrido,
+      // este assert no pasaría y los "no se acusó" de abajo no probarían nada.
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-open', { background: true }),
+      );
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-touch', {
+        background: true,
+      });
+      expect(messagesHttpService.markAsRead).not.toHaveBeenCalledWith('m-flush', {
+        background: true,
+      });
+      // Fija el conjunto COMPLETO de acuses de este pase: un acuse de cualquier
+      // borde, con cualquier forma de llamada, también rompe este assert.
+      expect(vi.mocked(messagesHttpService.markAsRead).mock.calls).toEqual([
+        ['m-open', { background: true }],
+      ]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('manda cada acuse una sola vez aunque el polling relea las mismas filas', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming('m-new')]),
+    );
+    // jsdom has no layout: the row must be given real geometry inside the box,
+    // or the (correct) overlap predicate sees nothing and never receipts.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid');
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId === 'message-m-new') return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+      await waitFor(() =>
+        expect(messagesHttpService.markAsRead).toHaveBeenCalledWith('m-new', { background: true }),
+      );
+
+      // Volver a la ventana rearma la escalera: el siguiente poll relee el hilo.
+      fireEvent(window, new Event('focus'));
+      await waitFor(() =>
+        expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1),
+      );
+
+      expect(messagesHttpService.markAsRead).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('AdminMessagesPage — sending scrolls the thread', () => {
   it('jumps the thread to the bottom after the SuperAdmin sends a message', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
@@ -593,5 +825,148 @@ describe('AdminMessagesPage — sending scrolls the thread', () => {
       expect(screen.getByTestId('message-m-sent')).toBeInTheDocument();
     });
     expect(thread.scrollTop).toBe(480);
+  });
+});
+
+describe('AdminMessagesPage — separadores de día', () => {
+  beforeEach(() => {
+    // Fake ONLY `Date`: this page polls with real timers, so faking them would
+    // freeze its async loads. Pinning the calendar day is what makes the labels
+    // independent of when the suite runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TEST_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function incomingAt(id: string, daysAgo: number): MessageDto {
+    return {
+      id,
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: `Mensaje ${id}`,
+      sentAt: localInstant(daysAgo),
+      readAt: null,
+    };
+  }
+
+  it('renders ONE centered separator before the first message of each local day', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([
+        incomingAt('m-ayer-1', 1),
+        incomingAt('m-ayer-2', 1),
+        incomingAt('m-hoy-1', 0),
+      ]),
+    );
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const list = await screen.findByTestId('message-list');
+
+    await waitFor(() => expect(screen.getByTestId('message-m-hoy-1')).toBeInTheDocument());
+
+    const separators = screen.getAllByTestId('message-day-separator');
+    expect(separators).toHaveLength(2);
+    // Oldest day first, lowercase labels — never uppercased.
+    expect(separators[0].textContent).toBe('ayer');
+    expect(separators[1].textContent).toBe('hoy');
+
+    // Each separator is a SIBLING of the message rows, inside the same list.
+    // `toEqual` pins the exact count (2) and the tag in one assertion.
+    expect(daySeparatorRows(list).map((separator) => separator.tagName)).toEqual(['LI', 'LI']);
+
+    // Order: separator, two messages, separator, one message.
+    expect(separatorKinds(list.children)).toEqual([
+      'separator',
+      'message',
+      'message',
+      'separator',
+      'message',
+    ]);
+  });
+
+  it('never treats a separator as a message', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incomingAt('m-a', 1), incomingAt('m-b', 0)]),
+    );
+    vi.mocked(messagesHttpService.markAsRead).mockResolvedValue(response(true));
+
+    // jsdom has no layout: give the thread box and the message rows real
+    // geometry so the receipt pass actually measures something. Every measured
+    // element is recorded, which is how the test proves the separators are never
+    // even looked at.
+    const measured: string[] = [];
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const rect = (top: number, bottom: number): DOMRect =>
+          ({
+            top,
+            bottom,
+            left: 0,
+            right: 0,
+            width: 0,
+            height: bottom - top,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const testId = this.getAttribute('data-testid') ?? '';
+        measured.push(testId);
+        if (testId === 'message-thread') return rect(0, 100);
+        if (testId.startsWith('message-m-')) return rect(10, 40);
+        return rect(-1000, -900);
+      });
+
+    try {
+      await renderPage();
+      fireEvent.click(await screen.findByTestId('owner-owner-a'));
+      const list = await screen.findByTestId('message-list');
+
+      await waitFor(() => expect(screen.getAllByTestId('message-day-separator')).toHaveLength(2));
+
+      for (const separator of screen.getAllByTestId('message-day-separator')) {
+        // A message row is identified by these attributes; a separator carries none.
+        expect(separator).not.toHaveAttribute('data-mine');
+        expect(separator).not.toHaveAttribute('data-pending');
+      }
+
+      // The read-receipt pass walks the message array keyed by message id, so the
+      // separators can never enter it: exactly the two messages are receipted.
+      await waitFor(() =>
+        expect(vi.mocked(messagesHttpService.markAsRead).mock.calls).toEqual([
+          ['m-a', { background: true }],
+          ['m-b', { background: true }],
+        ]),
+      );
+      // Not a single separator was ever measured as a candidate row.
+      expect(measured).toContain('message-m-a');
+      expect(measured).not.toContain('message-day-separator');
+
+      const messageRows = Array.from(list.children).filter(
+        (child) => child.getAttribute('data-testid') !== 'message-day-separator',
+      );
+      expect(messageRows).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('keeps the empty state and renders no separator when there are no messages', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(response<MessageDto[]>([]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+
+    expect(await screen.findByText('No hay mensajes con el administrador.')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-day-separator')).not.toBeInTheDocument();
   });
 });

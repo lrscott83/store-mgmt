@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router';
+import { Outlet, useNavigate } from 'react-router';
 import { Sidebar } from './sidebar';
 import { Navbar } from './navbar';
 import { Breadcrumbs } from './breadcrumbs';
@@ -8,6 +8,8 @@ import { PaymentBanner } from './payment-banner';
 import { authLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { OFFLINE_SESSION_TOKEN } from '~/shared/lib/offline/offline-session';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
+import messages from '~/shared/lib/i18n/es';
 // Static import (design D5): a dynamic import inside the effect below would
 // race cleanup — a timer could arm after unmount. For a guard that must
 // NEVER fire on an online session, a static import of this zero-import,
@@ -100,3 +102,61 @@ export function AppLayout() {
 // Without this the navbar/sidebar/breadcrumbs/footer chrome never mounts and
 // child routes render bare.
 export default AppLayout;
+
+/**
+ * Layout-scoped recovery screen.
+ *
+ * The router's data strategy can fail to resolve this layout's route
+ * (`No result returned from dataStrategy for route app-layout`), and before
+ * this boundary the only catch was root.tsx's static page — a dead end with no
+ * way back. This boundary replaces the layout instead of rendering inside it:
+ * the authenticated chrome never renders here, so a failed loader/strategy
+ * cannot trap the user in a half-mounted shell. Retry reloads (the only way to
+ * re-run the failed navigation from scratch); the secondary action goes home.
+ *
+ * Copy comes from the message map directly, like root.tsx's boundary, so the
+ * screen still renders if it mounts outside I18nProvider.
+ */
+export function ErrorBoundary({ error }: { error: unknown }) {
+  const navigate = useNavigate();
+
+  // Effect, not render body: a side effect during render fires on discarded
+  // renders too, and StrictMode would log the same failure twice.
+  useEffect(() => {
+    logClientError({
+      level: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      location: error instanceof Error ? error.stack : undefined,
+    });
+  }, [error]);
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center">
+      <h1 className="text-2xl font-semibold text-gray-900">{messages['GENERAL.ERROR']}</h1>
+      <p className="mt-2 max-w-md text-sm text-gray-600">
+        {messages['GENERAL.RESPONSE.ERROR500_MESSAGE']}
+      </p>
+      {import.meta.env.DEV && error instanceof Error && (
+        <pre className="mt-4 max-w-full overflow-x-auto rounded bg-white p-3 text-left text-xs text-gray-700">
+          <code>{error.stack ?? error.message}</code>
+        </pre>
+      )}
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
+        >
+          {messages['GENERAL.RETRY']}
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+        >
+          {messages['GENERAL.GO_HOME']}
+        </button>
+      </div>
+    </main>
+  );
+}

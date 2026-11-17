@@ -6,6 +6,7 @@ import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-m
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
+import { WholesaleTiersInfo } from '~/catalog/components/wholesale-tiers-info';
 import {
   isWholesaleProduct,
   wholesaleDisplayOf,
@@ -27,18 +28,20 @@ function BoutiqueProductPrice({ product }: { readonly product: PublicCatalogProd
 
   return (
     <div className="mt-3 flex flex-wrap items-baseline gap-2">
-      <span className="text-xl font-bold text-primary">
+      <span className="inline-flex items-baseline gap-1 text-xl font-bold text-primary">
         {formatMoneyWithCurrency(
           wholesale ? wholesale.packPrice : product.finalPrice,
           currencyFromCode(product.currency),
         )}
+        {wholesale && <WholesaleTiersInfo product={product} className="text-xs font-normal" />}
       </span>
       {wholesale ? (
         <span
           className="text-xs text-text-muted"
           data-testid={`catalog-card-wholesale-${product.id}`}
         >
-          {wholesale.unit} ({wholesale.packSize}) ·{' '}
+          {wholesale.unit} ({wholesale.packSize} x{' '}
+          {formatMoneyWithCurrency(wholesale.entryUnitPrice, currencyFromCode(product.currency))}) ·{' '}
           {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {wholesale.minPacks}{' '}
           {wholesale.unitPlural}
         </span>
@@ -150,7 +153,7 @@ export function BoutiqueCatalogTemplate(props: CatalogTemplateProps) {
           >
             <CartIcon />
             <span
-              className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+              className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white"
               data-testid="catalog-cart-badge"
             >
               {cartCount > 99 ? '99+' : cartCount}

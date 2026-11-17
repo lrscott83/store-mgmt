@@ -33,6 +33,11 @@ const messages: Record<string, string> = {
   'GENERAL.ENTRY': 'Entrada',
   'GENERAL.INSERT': 'Adicionar',
   'GENERAL.ERROR': 'Error',
+  // GENERAL.RETRY / GENERAL.GO_HOME — acciones de la pantalla de recuperación del
+  // ErrorBoundary del layout (app-layout.tsx). No existe una clave genérica previa:
+  // ONAT.RETRY vive en el namespace del módulo Onat y no sirve aquí.
+  'GENERAL.RETRY': 'Reintentar',
+  'GENERAL.GO_HOME': 'Ir al inicio',
   'GENERAL.SUCCESS': 'Éxito',
   // client-error-log: Diagnostics view (/diagnostics — public route)
   'DIAGNOSTICS.TITLE': 'Diagnóstico',
@@ -906,6 +911,7 @@ const messages: Record<string, string> = {
   'MENU.USERS': 'Empleados',
   'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
   'MENU.BILLING_COMMISSIONS': 'Comisiones',
+  'MENU.BILLING_HISTORY': 'Cobros realizados',
   'MENU.DIAGNOSTICS': 'Diagnóstico',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
@@ -1970,6 +1976,31 @@ const messages: Record<string, string> = {
   'BILLING.COMMISSIONS.TOTAL_CUP': 'Total (CUP)',
   'BILLING.COMMISSIONS.EMPTY_STATE': 'No hay comisiones registradas.',
   'BILLING.COMMISSIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
+
+  // Billing — registered store payments history (one tab per currency)
+  'BILLING.HISTORY.TITLE': 'Cobros realizados',
+  'BILLING.HISTORY.TAB_USD': 'USD',
+  'BILLING.HISTORY.TAB_CUP': 'CUP',
+  'BILLING.HISTORY.FILTER_FROM': 'Desde',
+  'BILLING.HISTORY.FILTER_TO': 'Hasta',
+  'BILLING.HISTORY.FILTER_STORE': 'Tienda',
+  'BILLING.HISTORY.FILTER_ALL_STORES': 'Todas las tiendas',
+  'BILLING.HISTORY.STORE': 'Tienda',
+  'BILLING.HISTORY.OWNER': 'Propietario',
+  'BILLING.HISTORY.PAID_DATE': 'Fecha del pago',
+  'BILLING.HISTORY.PERIOD': 'Período que cubre',
+  'BILLING.HISTORY.AMOUNT': 'Monto',
+  'BILLING.HISTORY.COMMISSION': 'Comisión',
+  'BILLING.HISTORY.DETAIL_HEADER': 'Detalle',
+  'BILLING.HISTORY.DETAIL_LABEL': 'Detalle del cobro de {store}',
+  'BILLING.HISTORY.DETAIL_LINE': 'Tasa: {rate} CUP/USD · Debía: {owed}',
+  'BILLING.HISTORY.TOTAL_AMOUNT': 'Total cobrado',
+  'BILLING.HISTORY.TOTAL_COMMISSION': 'Total comisión',
+  'BILLING.HISTORY.PAGE': 'Página {page} de {last}',
+  'BILLING.HISTORY.PREV_PAGE': 'Anterior',
+  'BILLING.HISTORY.NEXT_PAGE': 'Siguiente',
+  'BILLING.HISTORY.EMPTY_STATE': 'No hay cobros registrados con estos filtros.',
+  'BILLING.HISTORY.ERROR': 'Ocurrió un error. Intente de nuevo.',
 
   // Management — Users
   'USERS.LIST_TITLE': 'Empleados',

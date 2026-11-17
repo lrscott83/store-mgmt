@@ -8,6 +8,7 @@ import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
 import { CatalogSeeProducts } from '~/catalog/components/catalog-see-products';
+import { WholesaleTiersInfo } from '~/catalog/components/wholesale-tiers-info';
 import {
   isWholesaleProduct,
   wholesaleDisplayOf,
@@ -84,18 +85,20 @@ function ProductPrice({ product }: { readonly product: PublicCatalogProduct }) {
 
   return (
     <>
-      <span className="block text-base font-bold text-primary">
+      <span className="flex items-center gap-1 text-base font-bold text-primary">
         {formatMoneyWithCurrency(
           wholesale ? wholesale.packPrice : product.finalPrice,
           currencyFromCode(product.currency),
         )}
+        {wholesale && <WholesaleTiersInfo product={product} className="text-xs font-normal" />}
       </span>
       {wholesale ? (
         <span
           className="block text-xs text-text-muted"
           data-testid={`catalog-card-wholesale-${product.id}`}
         >
-          {wholesale.unit} ({wholesale.packSize}) ·{' '}
+          {wholesale.unit} ({wholesale.packSize} x{' '}
+          {formatMoneyWithCurrency(wholesale.entryUnitPrice, currencyFromCode(product.currency))}) ·{' '}
           {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {wholesale.minPacks}{' '}
           {wholesale.unitPlural}
         </span>
@@ -229,9 +232,9 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
               >
                 <CartIcon />
                 {/* Contador SIEMPRE visible, como en el POS: tapar y destapar el número con la
-                    compra es ruido. Con tope en 99+ porque el badge es de 16 px. */}
+                    compra es ruido. Con tope en 99+ porque el badge es de 20 px. */}
                 <span
-                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+                  className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white"
                   data-testid="catalog-cart-badge"
                 >
                   {cartCount > 99 ? '99+' : cartCount}

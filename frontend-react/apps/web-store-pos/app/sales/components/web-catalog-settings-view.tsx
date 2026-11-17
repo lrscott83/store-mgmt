@@ -40,6 +40,23 @@ import {
 } from '../lib/services/catalog-http-service';
 
 /**
+ * Extrae el mensaje legible que el backend manda en un rechazo (`errors[0].description`).
+ * `apiClient` rechaza cualquier respuesta no-2xx, así que el motivo de negocio (p. ej. "no puedes
+ * pasar a mayorista sin productos mayoristas sincronizados") llega en `error.response.data` y no en
+ * el envelope resuelto. Sin esto la vista mostraba el genérico y se perdía la instrucción del
+ * servidor — que es justo la que le dice al dueño qué corregir.
+ */
+function backendErrorMessage(error: unknown): string | undefined {
+  const description = (
+    error as
+      | { response?: { data?: { errors?: Array<{ description?: unknown }> } } }
+      | null
+      | undefined
+  )?.response?.data?.errors?.[0]?.description;
+  return typeof description === 'string' && description.trim().length > 0 ? description : undefined;
+}
+
+/**
  * Props de la vista de configuración del catálogo.
  *
  * `storeId` ausente = vista del dueño: la tienda sale de la sesión y los endpoints son los del
@@ -1115,7 +1132,8 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
     } catch (err) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_REMOVE_ERROR') }),
+        backendErrorMessage(err) ??
+          intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_REMOVE_ERROR') }),
       );
     } finally {
       setIsSavingBrand(false);
@@ -1148,10 +1166,13 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
       if (!result.succeeded) {
         // El backend explica el MOTIVO de un rechazo de negocio —activar mayorista sin ningún
         // producto con precio mayorista—, así que su mensaje manda: un "no se pudo guardar" genérico
-        // dejaría al dueño sin saber qué corregir.
+        // dejaría al dueño sin saber qué corregir. El texto puede venir en `message` o, cuando el
+        // envelope lo trae como error, en `errors[0].description`.
         showBlockingError(
           intl.formatMessage({ id: 'GENERAL.ERROR' }),
-          result.message || intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVE_ERROR' }),
+          result.message ||
+            result.errors?.[0]?.description ||
+            intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVE_ERROR' }),
         );
         return;
       }
@@ -1162,9 +1183,13 @@ export function WebCatalogSettingsView({ storeId }: WebCatalogSettingsViewProps)
       // (la clave nueva lleva guid, así que el navegador no sirve la imagen vieja desde caché).
       await loadBranding();
     } catch (err) {
+      // `apiClient` rechaza cualquier no-2xx, así que el motivo de negocio viaja en
+      // `error.response.data.errors[0].description`; sin esto se mostraba el genérico y se perdía
+      // la instrucción del servidor (p. ej. "sincronice los precios mayoristas primero").
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_SAVE_ERROR') }),
+        backendErrorMessage(err) ??
+          intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_SAVE_ERROR') }),
       );
     } finally {
       setIsSavingBrand(false);

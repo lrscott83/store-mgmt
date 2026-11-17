@@ -7,6 +7,8 @@ import {
   formatLocalDate,
   isoToDashedDate,
   dashedToIsoDate,
+  formatChatDayLabel,
+  localDaysBetween,
 } from './date-utils';
 
 describe('startOfDay', () => {
@@ -220,5 +222,67 @@ describe('isoToDashedDate / dashedToIsoDate (native picker ↔ dd-mm-yyyy bridge
 
   it('S-DATE-21: round-trips through the same local calendar day', () => {
     expect(dashedToIsoDate(isoToDashedDate('2026-09-01'))).toBe('2026-09-01');
+  });
+});
+
+describe('formatChatDayLabel (separadores de día del chat, 2026-11-16)', () => {
+  // A lunes, 16 nov 2026, mediodía LOCAL. Everything below is relative to this
+  // fixed reference so the labels never depend on the machine clock.
+  const TODAY = new Date(2026, 10, 16, 12, 0, 0);
+
+  it('S-CHAT-DAY-1: the same local day reads "hoy", whatever the hour', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 16, 0, 5, 0), TODAY)).toBe('hoy');
+    expect(formatChatDayLabel(new Date(2026, 10, 16, 23, 55, 0), TODAY)).toBe('hoy');
+  });
+
+  it('S-CHAT-DAY-2: the previous local day reads "ayer"', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 15, 23, 59, 0), TODAY)).toBe('ayer');
+  });
+
+  it('S-CHAT-DAY-3: 2 to 7 days ago read as the lowercase Spanish weekday', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 14, 9, 0, 0), TODAY)).toBe('sábado');
+    expect(formatChatDayLabel(new Date(2026, 10, 13, 9, 0, 0), TODAY)).toBe('viernes');
+  });
+
+  it('S-CHAT-DAY-4: EXACTLY 7 days ago still reads as the weekday, not the date', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 9, 9, 0, 0), TODAY)).toBe('lunes');
+  });
+
+  it('S-CHAT-DAY-5: 8 days ago switches to dd/mm/yyyy in local parts', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 8, 9, 0, 0), TODAY)).toBe('08/11/2026');
+  });
+
+  it('S-CHAT-DAY-6: a future instant (clock skew) collapses to "hoy"', () => {
+    expect(formatChatDayLabel(new Date(2026, 10, 20, 9, 0, 0), TODAY)).toBe('hoy');
+  });
+
+  it('S-CHAT-DAY-7: a message 15 minutes before local midnight is yesterday, not today', () => {
+    const justAfterMidnight = new Date(2026, 10, 16, 0, 15, 0);
+    const lateLastNight = new Date(2026, 10, 15, 23, 45, 0);
+    expect(formatChatDayLabel(lateLastNight, justAfterMidnight)).toBe('ayer');
+  });
+});
+
+describe('localDaysBetween (DST-safe day delta, 2026-11-16)', () => {
+  // Both endpoints are LOCAL MIDNIGHTS in production, so across a DST shift the
+  // real span is 23 or 25 hours. The spans below are built by adding exact
+  // MILLISECONDS to a fixed epoch, so each one is the stated length on every
+  // host and without needing a real DST transition to occur.
+  const HOUR_MS = 3_600_000;
+  const midnight = new Date(2026, 10, 16, 0, 0, 0, 0);
+  const spanHours = (hours: number) => new Date(midnight.getTime() + hours * HOUR_MS);
+
+  it('S-CHAT-DELTA-1: a 23-hour span (spring-forward day) is 1 day, not 0', () => {
+    expect(localDaysBetween(midnight, spanHours(23))).toBe(1);
+  });
+
+  it('S-CHAT-DELTA-2: a 25-hour span (fall-back day) is 1 day, not 2', () => {
+    expect(localDaysBetween(midnight, spanHours(25))).toBe(1);
+  });
+
+  it('S-CHAT-DELTA-3: a 191-hour span (8 days minus 1h) is 8 days, not 7', () => {
+    // `Math.floor` reports 7 here, which would push an 8-day-old message back
+    // into the weekday branch and break the INCLUSIVE 7-day boundary.
+    expect(localDaysBetween(midnight, spanHours(191))).toBe(8);
   });
 });

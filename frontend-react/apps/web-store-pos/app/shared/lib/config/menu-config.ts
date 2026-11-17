@@ -153,6 +153,17 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Comisiones de gestores. Consulta las comisiones acumuladas por mes de cada gestor (reseller) según los pagos registrados de sus tiendas.',
       },
+      // Cobros realizados: el histórico de los pagos YA registrados, en dos pestañas (USD y CUP)
+      // con filtros por fecha y tienda. Mismo gate que las otras dos vistas de cobros.
+      {
+        label: 'MENU.BILLING_HISTORY',
+        path: '/management/stores/payments',
+        featureIds: [EFeatures.StorePayment],
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
+        helpContent:
+          'Cobros realizados. Consulta los pagos ya registrados de las tiendas, separados en una pestaña por moneda (USD y CUP). Filtra por fecha del pago y por tienda, y mira el total cobrado y la comisión del período.',
+      },
     ],
   },
   {

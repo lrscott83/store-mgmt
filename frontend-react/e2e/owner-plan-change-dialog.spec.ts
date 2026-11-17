@@ -1,8 +1,11 @@
 import { test, expect } from './support/test';
+import type { APIRequestContext, Browser } from '@playwright/test';
+import { request as playwrightRequest } from '@playwright/test';
 import { Client } from 'pg';
 import { assertStoresFeature, degradeStoreToFreePlan } from './support/store-fixture';
 import { readBearerToken } from './support/auth-storage';
 import { installPlanChangeObserver } from './support/plan-change-observer';
+import { mintSuperAdmin } from './support/superadmin-session';
 import { E2E_API_URL } from './support/backend-url';
 
 /**
@@ -36,8 +39,75 @@ test.use({ persona: 'owner-admin' });
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
+/** The store this spec mutates, captured so the cleanup can restore it even on failure. */
+let personaStoreId: string | undefined;
+
+// Runs after the test whether it passed or failed: leaving the shared persona
+// store on Pago is what made `owner-stores` order-dependent.
+test.afterAll(async ({ browser }) => {
+  if (!personaStoreId) return;
+  const api = await playwrightRequest.newContext();
+  try {
+    await restoreBirthPlan(api, browser, personaStoreId);
+  } finally {
+    await api.dispose();
+  }
+});
+
 // Same default as the documented backend mode; override with E2E_DB_URL
 // (store-fixture.ts, global-teardown.ts:27).
+const SUPERIOR_PLAN_ID = 3;
+
+/**
+ * The persona store is WORKER-scoped (`personaCache`, support/test.ts): every
+ * later test in this worker inherits whatever plan this spec leaves behind.
+ * This spec degrades it to Gratis and then activates Pago, so it used to end
+ * with the store on Pago — which made `owner-stores.spec.ts` E-01..E-05
+ * (`Plan: Superior`) fail or pass depending on worker interleaving
+ * (2026-11-09).
+ *
+ * Restores the ONE shape a store is born with — Superior — through the app's
+ * own endpoint, which also rewrites the module set (`ChangeStorePlanCommand`).
+ * Owner callers are blocked from Superior/VIP, so this uses a SuperAdmin
+ * snapshot: the legitimate path, same as `store-multimonedas-fixture.ts`.
+ */
+async function restoreBirthPlan(
+  api: APIRequestContext,
+  browser: Browser,
+  storeId: string,
+): Promise<void> {
+  const superAdmin = await mintSuperAdmin(browser);
+  const bearer = superAdmin.localStorage.find((entry) => entry.name === 'token')?.value;
+  if (!bearer) {
+    throw new Error(
+      'owner-plan-change-dialog: SuperAdmin snapshot has no `token` entry — the birth-plan ' +
+        'restore cannot be authorized.',
+    );
+  }
+
+  const response = await api.post(`${E2E_API_URL}/v1/stores/${storeId}/change-plan`, {
+    headers: { Authorization: `Bearer ${bearer}` },
+    data: { storePlanId: SUPERIOR_PLAN_ID },
+  });
+  if (!response.ok()) {
+    throw new Error(
+      `owner-plan-change-dialog: restoring the persona store ${storeId} to Superior failed ` +
+        `(status ${response.status()}). Every later test in this worker would see the wrong ` +
+        'birth plan.',
+    );
+  }
+
+  // Pin the restore instead of trusting the 200: a silent no-op here is exactly
+  // the drift this cleanup exists to prevent.
+  const restored = await readStorePlanRow(storeId);
+  if (restored.storePlanId !== SUPERIOR_PLAN_ID) {
+    throw new Error(
+      `owner-plan-change-dialog: after the restore POST, store ${storeId} is on plan ` +
+        `${restored.storePlanId}, expected ${SUPERIOR_PLAN_ID} (Superior).`,
+    );
+  }
+}
+
 const DEFAULT_DB_URL = 'postgresql://postgres:postgres@localhost:5432/smca_test';
 
 /** Reads PaymentStartDate + StorePlanId straight from the DB (anchor pinning). */
@@ -66,8 +136,13 @@ async function readStorePlanRow(
 
 test('OwnerAdmin cambia el plan de su tienda desde el dialog (POST change-plan, ancla intacta)', async ({
   signedInPage,
+  browser,
 }) => {
   const { page, selectedStoreId } = signedInPage;
+
+  // Captured BEFORE any mutation so afterAll can restore it even if a later
+  // assertion throws.
+  personaStoreId = selectedStoreId;
 
   // REQ-13/D9 — before anything else: a silent logout becomes a readable
   // failure instead of every downstream assertion failing for the wrong reason.
@@ -167,6 +242,7 @@ test('OwnerAdmin cambia el plan de su tienda desde el dialog (POST change-plan, 
   // Exactly one POST fired for this store (no retry storm, no double activation).
   observer.expectExactlyOneChangePlanPost();
 
-  // The persona default is paid — the activation itself restored it; nothing
-  // else to seed for following tests.
+  // The store is left on Pago HERE on purpose (that is the assertion above);
+  // `afterAll` restores it to its Superior birth plan afterwards, because the
+  // persona store is shared by every test in this worker.
 });
