@@ -10,10 +10,10 @@ today with no read path. SuperAdmin sees every store; ReSeller sees only its own
 
 - `StorePayment.Price` (float) — `backend/src/Domain/Entities/StorePayments/StorePayment.cs:18` —
   the **monto cobrado**, always USD, computed by `ModulePriceCalculator`. It never changes.
-- `ExchangeRate` (decimal?) — `:31` — CUP per 1 USD, captured in the register popup. Optional.
-- `AmountPaid` (decimal?) — `:33-38` — the **total pagado**, in CUP when the rate was used. Optional,
-  not editable after registration.
-- `ReSellerAmount` (float) — `:24` — commission computed over `AmountPaid ?? Price`
+- `ExchangeRate` (decimal?) — same file, `:31` — CUP per 1 USD, captured in the register popup. Optional.
+- `AmountPaid` (decimal?) — same file, `:33-38` — the **total pagado**, in CUP when the rate was used.
+  Optional, not editable after registration.
+- `ReSellerAmount` (float) — same file, `:24` — commission computed over `AmountPaid ?? Price`
   (`RegisterStorePaymentCommand.cs:94-100`), so its currency is **CUP when `AmountPaid` has a value,
   USD otherwise**.
 - A payment is therefore ONE charge collected in ONE currency at a time. It is never two charges.
@@ -84,13 +84,23 @@ totals are one currency.
 ### S11 — Order
 Newest first: `PaidDate DESC`, then `PaymentBeforeDate DESC`, then `Id` (stable tie-break).
 
-### S12 — States
+### S12 - States
 Empty state and error state use i18n keys under `BILLING.HISTORY.*`, never a hardcoded Spanish
 string. No new spinner: the house pattern for these screens is state + empty state only.
+
+Implementation note: the menu label is the single key `MENU.BILLING_HISTORY` (matching
+`MENU.BILLING_COLLECTIONS` / `MENU.BILLING_COMMISSIONS` beside it); every screen string lives under
+the `BILLING.HISTORY.*` root. Those are the only two roots this feature uses.
 
 ### S13 — Backend contract (fixed; both units implement against this)
 
 `GET /v1/stores/payments?currency=USD|CUP&from=&to=&storeId=&page=&pageSize=`
+
+`pageSize` is accepted in the query string for forward compatibility and **ignored**: the server
+always pages by 50 (S5) and echoes the value it actually used. `total` is the ROW COUNT for the
+selected currency, not a money aggregate; the money aggregates are `totalAmount` and
+`totalCommission`. Unknown `currency` values are coerced to `USD`; the endpoint never answers 400
+for a currency it does not recognise.
 
 ```jsonc
 {
@@ -141,10 +151,15 @@ menu entries and tests untouched.
 
 | ID | Unit | Route | Specs | Status |
 |---|---|---|---|---|
-| T1 | Backend: repository method, query, DTOs, controller endpoint, unit tests, new E2E | delegated | S2-S7, S9-S11, S13, S14 | pending |
-| T2 | Frontend: route, menu, http service, domain models, page with two tabs, i18n, unit tests | delegated | S1, S4-S10, S12-S14 | pending |
-| T3 | Seam check: both test suites, both typechecks, contract diff against S13 | inline | all | pending |
-| T4 | Commits: one per unit, each with its own RDD review | inline | all | pending |
+| T1 | Backend: repository method, query, DTOs, controller endpoint, unit tests, new E2E | delegated | S2-S7, S9-S11, S13, S14 | done — `0be56a37` (13 unit + 4 E2E green) |
+| T2 | Frontend: route, menu, http service, domain models, page with two tabs, i18n, unit tests | delegated | S1, S4-S10, S12-S14 | done — `0bf85133` (23 tests green) |
+| T3 | Seam check: both test suites, both typechecks, contract diff against S13 | inline | all | done — backend 1871 unit green, frontend 466 files green, `pnpm typecheck` 5/5 |
+| T4 | Commits: one per unit, each with its own RDD review | inline | all | done — four commits, four approved reviews (`0be56a37`, `0bf85133`, `9a7a0b76`, `af9199fd`) |
+
+The frontend review surfaced a money-truth defect after T2 (`9a7a0b76`): a failed re-request left
+the previous tab's rows on screen under the new tab, so a USD figure could be read as CUP. It is
+fixed and reviewed; the tab, request-race and disclosure-control findings were fixed in the same
+commit.
 
 ## Log
 
