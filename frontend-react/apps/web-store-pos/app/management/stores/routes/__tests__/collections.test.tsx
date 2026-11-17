@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { StoreToCollect } from '@store-mgmt/domain';
+import type { BaseResponseModel, StoreModulePricingReadResult, StoreToCollect } from '@store-mgmt/domain';
 import { STORE_TO_COLLECT_STATUSES } from '@store-mgmt/domain';
 
 // ─── loader mock (Req: Route Gating — must be resellerFeatureLoader) ─────────
@@ -53,6 +53,31 @@ function makeRow(overrides: Partial<StoreToCollect> = {}): StoreToCollect {
     status: 'PorVencer',
     ...overrides,
   };
+}
+
+function makePricingRow(
+  overrides: Partial<StoreModulePricingReadResult['modules'][number]> = {},
+): StoreModulePricingReadResult['modules'][number] {
+  return {
+    moduleId: 1,
+    name: 'Ventas',
+    isActive: true,
+    priceIncluded: false,
+    price: 100,
+    discountPrice: 0,
+    percentDiscountPrice: 0,
+    currentPrice: 100,
+    ...overrides,
+  };
+}
+
+/** A promise whose settlement this test controls — no timers involved. */
+function deferredResponse<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -529,5 +554,101 @@ describe('CollectionsPage — module breakdown popup', () => {
         screen.getByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR']),
       ).toBeInTheDocument();
     });
+  });
+
+  it('surfaces the translated error and stops the spinner when the pricing call REJECTS', async () => {
+    const svc = await renderSuperAdminRow();
+    // A rejected promise, not a `succeeded: false` envelope: the catch branch, not the guard.
+    vi.mocked(svc.getStoreModulePricing).mockRejectedValue(new Error('network down'));
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-s1'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR']),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY'])).toBeNull();
+  });
+
+  it('never paints a slow store response under the store the dialog now shows', async () => {
+    mockAuthUser = { isSuperAdmin: true };
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeRow({ storeId: 'sA', storeName: 'Store A' }),
+        makeRow({ storeId: 'sB', storeName: 'Store B' }),
+      ],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    // Store A answers LAST; store B answers immediately.
+    const storeAResponse = deferredResponse<
+      BaseResponseModel<StoreModulePricingReadResult>
+    >();
+    vi.mocked(storeHttpService.getStoreModulePricing).mockImplementation((storeId: string) => {
+      if (storeId === 'sA') return storeAResponse.promise;
+      return Promise.resolve({
+        succeeded: true,
+        data: {
+          storeId: 'sB',
+          modules: [makePricingRow({ moduleId: 2, name: 'Modulo B' })],
+          totalCurrentPrice: 100,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Store A')).toBeInTheDocument();
+      expect(screen.getByText('Store B')).toBeInTheDocument();
+    });
+
+    // Open A, give up on it, then open B — whose answer lands first.
+    fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: esMessages['GENERAL.CLOSE'] })[0],
+    );
+    fireEvent.click(screen.getByTestId('collection-breakdown-sB'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Modulo B')).toBeInTheDocument();
+    });
+
+    // A finally answers, with prices that belong to A and to nobody else.
+    await act(async () => {
+      storeAResponse.resolve({
+        succeeded: true,
+        data: {
+          storeId: 'sA',
+          modules: [makePricingRow({ moduleId: 1, name: 'Modulo A' })],
+          totalCurrentPrice: 100,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
+      await storeAResponse.promise;
+    });
+
+    expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
+    expect(screen.queryByText('Modulo A')).toBeNull();
+    expect(screen.getByText('Modulo B')).toBeInTheDocument();
   });
 });

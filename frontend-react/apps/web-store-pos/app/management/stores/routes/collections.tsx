@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
@@ -58,6 +58,9 @@ export function CollectionsPage() {
   const [breakdownRows, setBreakdownRows] = useState<StoreModulePricingReadRow[]>([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [breakdownError, setBreakdownError] = useState<string | undefined>(undefined);
+  // Monotonic id of the breakdown fetch the dialog currently waits on. A response whose id is
+  // no longer the latest belongs to a store the operator already left, so it is discarded.
+  const breakdownRequestIdRef = useRef(0);
 
   const loadRows = useCallback(async () => {
     try {
@@ -91,12 +94,14 @@ export function CollectionsPage() {
   }
 
   async function openBreakdown(row: StoreToCollect) {
+    const requestId = ++breakdownRequestIdRef.current;
     setBreakdownRow(row);
     setBreakdownRows([]);
     setBreakdownError(undefined);
     setBreakdownLoading(true);
     try {
       const res = await storeHttpService.getStoreModulePricing(row.storeId);
+      if (requestId !== breakdownRequestIdRef.current) return;
       if (!res.succeeded) {
         setBreakdownError(
           intl.formatMessage({ id: 'BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR' }),
@@ -105,17 +110,20 @@ export function CollectionsPage() {
       }
       setBreakdownRows(res.data.modules);
     } catch (error) {
+      if (requestId !== breakdownRequestIdRef.current) return;
       setBreakdownError(
         intl.formatMessage({
           id: httpErrorKey(error, 'BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR'),
         }),
       );
     } finally {
-      setBreakdownLoading(false);
+      if (requestId === breakdownRequestIdRef.current) setBreakdownLoading(false);
     }
   }
 
   function closeBreakdown() {
+    // Bump first: an in-flight response can then never repopulate a closed dialog.
+    breakdownRequestIdRef.current += 1;
     setBreakdownRow(null);
     setBreakdownRows([]);
     setBreakdownError(undefined);

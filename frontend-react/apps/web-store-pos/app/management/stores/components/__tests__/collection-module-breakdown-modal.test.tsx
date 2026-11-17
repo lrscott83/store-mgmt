@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { StoreModulePricingReadRow } from '@store-mgmt/domain';
@@ -113,6 +113,23 @@ describe('CollectionModuleBreakdownModal — states', () => {
     renderModal({ error: 'No se pudieron cargar los módulos.' });
 
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar los módulos.');
+    // A failed call must never be described as "this store has no modules": that empty-state
+    // sentence is billing information, and it would be false.
+    expect(screen.queryByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY'])).toBeNull();
+    expect(screen.queryByTestId('collection-breakdown-table')).toBeNull();
+  });
+
+  it('shows only the alert when a failure arrives with rows already in hand', () => {
+    renderModal({
+      error: 'No se pudieron cargar los módulos.',
+      rows: [makeModule({ moduleId: 1, name: 'Ventas', price: 100, currentPrice: 100 })],
+    });
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByTestId('collection-breakdown-table')).toBeNull();
+    expect(screen.queryByText('Ventas')).toBeNull();
+    expect(screen.queryByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY'])).toBeNull();
+    expect(screen.queryByTestId('collection-breakdown-total')).toBeNull();
   });
 
   it('shows the translated empty state when no row contributes to the amount', () => {
@@ -124,5 +141,41 @@ describe('CollectionModuleBreakdownModal — states', () => {
       screen.getByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY']),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('collection-breakdown-table')).toBeNull();
+  });
+});
+
+describe('CollectionModuleBreakdownModal — dismissal', () => {
+  it('calls onClose from the header close button', () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    // Two controls share the translated "close" name: the header icon button (aria-label)
+    // and the footer button (visible text). The header one comes first in DOM order.
+    const closeButtons = screen.getAllByRole('button', {
+      name: esMessages['GENERAL.CLOSE'],
+    });
+    expect(closeButtons).toHaveLength(2);
+
+    fireEvent.click(closeButtons[0]);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onClose when the overlay itself is clicked', () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    fireEvent.click(screen.getByRole('dialog'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onClose when the content panel is clicked', () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-store'));
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

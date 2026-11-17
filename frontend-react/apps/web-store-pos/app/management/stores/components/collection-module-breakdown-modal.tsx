@@ -79,16 +79,14 @@ export function CollectionModuleBreakdownModal({
           {t('BILLING.COLLECTIONS.MODULE_BREAKDOWN_HINT')}
         </p>
 
-        {error && (
+        {error ? (
           <p
             role="alert"
             className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"
           >
             {error}
           </p>
-        )}
-
-        {loading ? (
+        ) : loading ? (
           <Spinner label={t('BILLING.COLLECTIONS.MODULE_BREAKDOWN_LOADING')} />
         ) : billable.length === 0 ? (
           <p className="py-8 text-center text-sm text-text-muted">
