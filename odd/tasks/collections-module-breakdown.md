@@ -25,8 +25,11 @@ Mientras carga muestra el spinner con texto traducido; si falla, un `role="alert
 
 ## Tasks
 
-T1 — Backend: `BaseAmount` en `StoreToCollectDto` + cálculo en el handler + test unitario. Route: delegated worker. Status: done — commit hash registrado al cierre de la feature. RED: `error CS1061` (BaseAmount inexistente); GREEN: `Passed: 6, Failed: 0`, cero `error MSB`/`error CS`.
-T2 — Frontend: `baseAmount` en `StoreToCollect`, columna Monto con tachado, botón "i" SuperAdmin, modal de desglose, i18n, tests. Route: delegated worker. Status: done — commit hash registrado al cierre de la feature. RED: 4 tests fallando (import del modal inexistente y testids ausentes); GREEN: `Test Files 15 passed (15)`, `Tests 207 passed (207)`, typecheck y lint en 0.
+T1 — Backend: `BaseAmount` en `StoreToCollectDto` + cálculo en el handler + test unitario. Route: delegated worker. Status: done — commit `c9e3a11b`. RED: `error CS1061` (BaseAmount inexistente); GREEN: `Passed: 6, Failed: 0`, cero `error MSB`/`error CS`. RDD: aprobado (`review-8f011d0767a1fe8d`), 5 sugerencias informativas.
+T2 — Frontend: `baseAmount` en `StoreToCollect`, columna Monto con tachado, botón "i" SuperAdmin, modal de desglose, i18n, tests. Route: delegated worker. Status: done — commit `c9543824`. RED: 4 tests fallando (import del modal inexistente y testids ausentes); GREEN: `Test Files 15 passed (15)`, `Tests 207 passed (207)`, typecheck y lint en 0. RDD: aprobado (`review-432918a588a89330`).
+T3 — Corrección de dos defectos hallados por el RDD de T2: error exclusivo en el popup y descarte de respuestas obsoletas por tienda. Route: delegated worker. Status: done — commit `0b0534f1`. RED: 4 tests fallando; GREEN: `Tests 213 passed (213)`, typecheck y lint en 0. RDD: aprobado (`review-06693f0bcd4e3223`).
+
+Follow-ups aceptados (no bloquean, sugerencias informativas de las revisiones): R2-discount-rule-duplicated (la regla "hay descuento" existe como `baseAmount > amount` en la fila y como `currentPrice < price` en el pie del popup), R2-dual-closed-gate (`open` + `storeId` nulo), R3-1 sin test de rechazo obsoleto, R3-2 sin test de cierre sin reapertura, R3-3 test de cierre acoplado al índice del DOM.
 
 ## Log
 
