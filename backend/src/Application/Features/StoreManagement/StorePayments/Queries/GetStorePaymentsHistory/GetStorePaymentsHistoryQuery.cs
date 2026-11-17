@@ -59,6 +59,15 @@ internal sealed class GetStorePaymentsHistoryQueryHandler
         if (!isSuperAdmin && !isReSeller)
             throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
+        // R3-currency-numeric-coercion: ASP.NET Core model binding refuses an unknown currency NAME
+        // with a 400 before this handler runs, but it accepts ANY NUMBER for an enum, so
+        // `?currency=7` arrives here as `(StorePaymentCurrency)7`. Without this guard the
+        // repository's `== Cup` test would read it as USD and the endpoint would answer 200 on the
+        // USD tab — the silent coercion this feature exists to remove. An undefined value is a bad
+        // request, never a tab.
+        if (!request.Currency.IsDefinedCurrency())
+            throw new ApiException(_localizer["ApiRequestInvalid"], HttpStatusCode.BadRequest);
+
         // S2 — the ReSeller scope is a query argument, never a post-filter in memory. Page clamping
         // happens in the repository, once (see the repository's GetHistoryPageAsync).
         var filter = new StorePaymentHistoryFilter(

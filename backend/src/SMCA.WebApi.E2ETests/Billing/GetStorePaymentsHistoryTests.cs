@@ -13,6 +13,8 @@ using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using Resources;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
 
@@ -370,13 +372,17 @@ public sealed class GetStorePaymentsHistoryTests
         => new(year, month, day, hour, 0, 0, TimeSpan.Zero);
 
     /// <summary>
-    /// The repository's third ordering key is <c>Id</c>, and PostgreSQL compares a <c>uuid</c> over
-    /// its 16 stored bytes — the same order <see cref="Guid.ToByteArray"/> returns (Npgsql writes the
-    /// Guid's own byte layout). This predicts which of two tied rows the server must put first,
-    /// instead of assuming that whatever the server answered is correct.
+    /// The repository's third ordering key is <c>Id</c>, and PostgreSQL compares a <c>uuid</c>
+    /// byte-wise over its 16 stored bytes — which are the BIG-ENDIAN layout (the textual order),
+    /// NOT the layout <see cref="Guid.ToByteArray()"/> returns: that overload writes the first
+    /// three fields little-endian, so a plain byte comparison predicts the wrong row whenever the
+    /// first differing byte lands in one of them (this helper did exactly that and flaked ~50%).
+    /// <c>ToByteArray(bigEndian: true)</c> (net8.0) is the layout Npgsql writes, so this predicts
+    /// which of two tied rows the server must put first instead of assuming its answer is right.
     /// </summary>
     private static bool IdOrdersBefore(Guid candidate, Guid other)
-        => candidate.ToByteArray().AsSpan().SequenceCompareTo(other.ToByteArray()) < 0;
+        => candidate.ToByteArray(bigEndian: true).AsSpan()
+            .SequenceCompareTo(other.ToByteArray(bigEndian: true)) < 0;
 
     [Fact]
     public async Task SuperAdmin_USD_tab_returns_usd_payments_with_both_tab_counts()
@@ -651,6 +657,119 @@ public sealed class GetStorePaymentsHistoryTests
             await CleanupAsync(seeded);
             await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
+    }
+
+    /// <summary>
+    /// R3-currency-numeric-coercion: a NUMERIC currency must never reach a tab. Observed behaviour of
+    /// this app configuration: ASP.NET Core's enum binder refuses an undefined numeric value for a
+    /// non-flags enum, so <c>?currency=7</c> is a 400 from model binding, surfaced through the unified
+    /// ResponseResult with the offending parameter as the error code. The handler's own guard
+    /// (<c>IsDefinedCurrency</c>) is the second line for any path that reaches the query without
+    /// going through that binder; the Application test proves it directly. What this test pins is the
+    /// part that matters on the wire: a 400 that names the parameter, and NO tab body.
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_out_of_range_numeric_currency_is_a_400_not_the_usd_tab()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("numericcurrency");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            var response = await client.GetAsync(
+                $"/api/v1/stores/payments?currency=7&storeId={seeded.StoreId}");
+
+            response.StatusCode.Should().Be(
+                HttpStatusCode.BadRequest,
+                "an undefined currency is a bad request, not a silent USD tab");
+
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.Data.Should().BeNull("no tab may be served for an undefined currency");
+            body.ActionCode.Should().Be((int)HttpStatusCode.BadRequest);
+
+            // The unified validation envelope carries one error per invalid parameter, keyed by that
+            // parameter — so the client is told WHICH value was wrong instead of receiving a tab.
+            var error = body.Errors.Should().ContainSingle().Which;
+            error.Code.Should().Be("currency");
+            error.Description.Should().NotBeNullOrWhiteSpace();
+            error.Description.Should().NotBe("ApiRequestInvalid");
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    /// <summary>
+    /// R3-page-clamp-unproved: the ONE page clamp lives in the repository
+    /// (<c>page &lt; 1 ? 1 : page</c>) and the handler only echoes the effective value it gets back.
+    /// This test is the only place the clamp is proved against real SQL: without it, <c>page=0</c>
+    /// would compute <c>Skip(-50)</c> and no test in the change would notice.
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_page_below_one_is_clamped_to_first_page_and_page_two_skips_it()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("pageclamp");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            // Two USD PAID rows in total (the fixture's + one extra) — the page size is fixed at 50.
+            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 4, 10), D(2026, 11, 20), price: 10f);
+
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+
+            var clamped = await client.GetFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(
+                $"/api/v1/stores/payments?currency=USD&storeId={seeded.StoreId}&page=0", ApiResponse.Json);
+
+            var clampedData = clamped!.Data!;
+            clampedData.Page.Should().Be(1, "the repository clamps page < 1 and reports the effective page");
+            clampedData.PageSize.Should().Be(50);
+            clampedData.Total.Should().Be(2, "the clamp must not change the filter-wide total");
+            clampedData.Items.Should().HaveCount(2, "page 1 is the same first page a caller gets by default");
+            clampedData.Items[0].PaidDate.Should().Be(D(2026, 11, 4, 10));
+
+            var second = await client.GetFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(
+                $"/api/v1/stores/payments?currency=USD&storeId={seeded.StoreId}&page=2", ApiResponse.Json);
+
+            var secondData = second!.Data!;
+            secondData.Page.Should().Be(2, "a valid page is echoed unchanged, not clamped up or down");
+            secondData.PageSize.Should().Be(50);
+            secondData.Total.Should().Be(2, "the total is filter-wide, never the page");
+            secondData.Items.Should().BeEmpty("two rows fit in page 1, so page 2 skips both");
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    /// <summary>
+    /// R3-forbidden-contract-mocked-only: the handler's 403 backstop throws
+    /// <c>_localizer["NotAuthorized"]</c> and the undefined-currency guard throws
+    /// <c>_localizer["ApiRequestInvalid"]</c>. The unit tests prove both only against a MOCK — a mock
+    /// answers whatever it is told, so a missing resource entry would ship the raw key text while
+    /// every test stayed green. Here the localizer is the REAL one the API registers: no mock, no
+    /// stub, so <c>ResourceNotFound</c> is the honest answer to "does the entry exist?".
+    /// </summary>
+    [Theory]
+    [InlineData("NotAuthorized")]
+    [InlineData("ApiRequestInvalid")]
+    public void Denial_messages_resolve_to_real_resource_entries(string key)
+    {
+        using var scope = _f.Services.CreateScope();
+        var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<I18n>>();
+
+        var localized = localizer[key];
+
+        localized.ResourceNotFound.Should().BeFalse(
+            "the message must be a real resource entry, not the key echoed back at the client");
+        localized.Value.Should().NotBeNullOrWhiteSpace();
+        localized.Value.Should().NotBe(key);
     }
 
     // ------------------------------------------------------------------

@@ -436,12 +436,25 @@ namespace SMCA.WebApi.Controllers.v1
         /// charge in one currency, so the tab — and only the tab — decides the currency.
         ///
         /// <para>
-        /// <c>currency</c> is an enum-bound query parameter, matched case-insensitively by name
-        /// (<c>USD</c>/<c>CUP</c>). Omitting it selects the USD tab. A value the enum does not
-        /// recognise (e.g. <c>EUR</c>) is rejected by ASP.NET Core model binding with a 400 BEFORE
-        /// this action runs — the 400 does not come from the handler, which never sees a bad value
-        /// and never coerces one to another tab.
+        /// <c>currency</c> accepts <c>USD</c>/<c>CUP</c>, matched case-insensitively by name. Omitting
+        /// it selects the USD tab.
         /// </para>
+        ///
+        /// <para>
+        /// An unrecognised value is a 400 on BOTH paths, because neither can reach a tab:
+        /// </para>
+        /// <list type="bullet">
+        /// <item><description>
+        /// an unknown NAME (<c>?currency=EUR</c>) is rejected by ASP.NET Core model binding before
+        /// this action runs; and
+        /// </description></item>
+        /// <item><description>
+        /// an unknown NUMBER (<c>?currency=7</c>) binds successfully — model binding accepts any
+        /// numeric text for an enum — so the query handler rejects it with the same 400
+        /// (<c>ApiRequestInvalid</c>) before the repository is asked. Neither the action nor the
+        /// handler ever coerces a value to another tab.
+        /// </description></item>
+        /// </list>
         /// </summary>
         [HttpGet("payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]

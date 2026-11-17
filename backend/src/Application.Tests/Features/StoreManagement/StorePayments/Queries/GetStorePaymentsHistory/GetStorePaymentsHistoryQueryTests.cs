@@ -15,6 +15,7 @@ namespace Application.Tests.Features.StoreManagement.StorePayments.Queries.GetSt
 public class GetStorePaymentsHistoryQueryTests
 {
     private const string NotAuthorizedMessage = "No autorizado";
+    private const string ApiRequestInvalidMessage = "La petición no es válida";
 
     private readonly Guid _reSellerUserId = Guid.NewGuid();
     private readonly Guid _storeId = Guid.NewGuid();
@@ -204,6 +205,69 @@ public class GetStorePaymentsHistoryQueryTests
     }
 
     // ---------------------------------------------------------------------
+    // Undefined currency values (R3-currency-numeric-coercion)
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// ASP.NET Core binds ANY numeric string into an enum: <c>?currency=7</c> reaches the query as
+    /// <c>(StorePaymentCurrency)7</c> instead of being rejected by model binding. Without a guard the
+    /// repository's <c>== Cup</c> test reads it as USD and the endpoint answers 200 on the USD tab —
+    /// the silent coercion this feature removed. The guard must answer 400 and never query.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]   // the first value past the defined range
+    [InlineData(7)]   // the exact case reported by review
+    [InlineData(-1)]
+    public async Task Handle_undefinedCurrencyValue_throwsBadRequestAndNeverQueries(int rawCurrency)
+    {
+        // Arrange
+        var mocks = CreateMocks(BuildPage(total: 1, usdCount: 1));
+        mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+
+        var handler = CreateHandler(mocks);
+
+        // Act
+        var act = () => handler.Handle(
+            new GetStorePaymentsHistoryQuery(Currency: (StorePaymentCurrency)rawCurrency),
+            CancellationToken.None);
+
+        // Assert: the house shape (ApiException + localizer key), and NOT a USD tab.
+        var exception = (await act.Should().ThrowAsync<ApiException>()).Which;
+        exception.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        exception.Message.Should().Be(ApiRequestInvalidMessage);
+
+        mocks.PaymentRepository.Verify(
+            x => x.GetHistoryPageAsync(It.IsAny<StorePaymentHistoryFilter>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // ---------------------------------------------------------------------
+    // Wire value mapping (S13, R2-wire-value-implicit-default)
+    // ---------------------------------------------------------------------
+
+    /// <summary>Every DEFINED member has its own arm; no member falls through to a default.</summary>
+    [Theory]
+    [InlineData(StorePaymentCurrency.Usd, "USD")]
+    [InlineData(StorePaymentCurrency.Cup, "CUP")]
+    public void ToWireValue_maps_every_definedMember(StorePaymentCurrency currency, string expected)
+        => currency.ToWireValue().Should().Be(expected);
+
+    /// <summary>
+    /// An out-of-range cast must not render as USD. The mapping is exhaustive per member, so an
+    /// unmapped value throws instead of quietly becoming the USD wire string.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(7)]
+    [InlineData(-1)]
+    public void ToWireValue_throwsForAnUndefinedMember(int rawCurrency)
+    {
+        var act = () => ((StorePaymentCurrency)rawCurrency).ToWireValue();
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    // ---------------------------------------------------------------------
     // Totals and counts (S6, S9)
     // ---------------------------------------------------------------------
 
@@ -357,7 +421,13 @@ public class GetStorePaymentsHistoryQueryTests
     private TestMocks CreateMocks(StorePaymentHistoryPage page)
     {
         var localizer = new Mock<IStringLocalizer<I18n>>();
-        localizer.Setup(x => x["NotAuthorized"]).Returns(new LocalizedString("NotAuthorized", "No autorizado"));
+        // The two resource keys are wired through the SAME constants the assertions use, so the stub
+        // and the expected text cannot drift apart (the real resource values are pinned end-to-end
+        // by the E2E suite, which resolves the live IStringLocalizer instead of a mock).
+        localizer.Setup(x => x["NotAuthorized"])
+            .Returns(new LocalizedString("NotAuthorized", NotAuthorizedMessage));
+        localizer.Setup(x => x["ApiRequestInvalid"])
+            .Returns(new LocalizedString("ApiRequestInvalid", ApiRequestInvalidMessage));
 
         var mocks = new TestMocks
         {
