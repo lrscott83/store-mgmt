@@ -144,20 +144,29 @@ describe('CollectionModuleBreakdownModal — states', () => {
 });
 
 describe('CollectionModuleBreakdownModal — dismissal', () => {
-  it('calls onClose from the header close button', () => {
+  it('calls onClose from the header close button, which still exposes the localized name', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
+    // Addressed by test id so the assertion never depends on how many close controls exist or
+    // on their DOM order — but the accessible name is asserted too, so dropping the aria-label
+    // still fails here instead of silently shipping an unlabelled icon button.
+    const headerClose = screen.getByTestId('collection-breakdown-close');
+    expect(headerClose).toHaveAttribute('aria-label', esMessages['GENERAL.CLOSE']);
+
+    fireEvent.click(headerClose);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose from the footer dismiss button', () => {
+  it('calls onClose from the footer dismiss button, which still exposes the localized name', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    fireEvent.click(screen.getByTestId('collection-breakdown-dismiss'));
+    const footerClose = screen.getByTestId('collection-breakdown-dismiss');
+    expect(footerClose).toHaveTextContent(esMessages['GENERAL.CLOSE']);
+
+    fireEvent.click(footerClose);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });

@@ -574,7 +574,11 @@ describe('CollectionsPage — module breakdown popup', () => {
     expect(screen.queryByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY'])).toBeNull();
   });
 
-  it('never paints a slow store response under the store the dialog now shows', async () => {
+  /**
+   * Two stores whose pricing answers this test controls: store A stays pending, store B answers
+   * at once. The popup is already open on A and spinning when this returns.
+   */
+  async function renderTwoStoresWithAOpen() {
     mockAuthUser = { isSuperAdmin: true };
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
@@ -590,86 +594,6 @@ describe('CollectionsPage — module breakdown popup', () => {
     });
 
     // Store A answers LAST; store B answers immediately.
-    const storeAResponse = deferredResponse<
-      BaseResponseModel<StoreModulePricingReadResult>
-    >();
-    vi.mocked(storeHttpService.getStoreModulePricing).mockImplementation((storeId: string) => {
-      if (storeId === 'sA') return storeAResponse.promise;
-      return Promise.resolve({
-        succeeded: true,
-        data: {
-          storeId: 'sB',
-          modules: [makePricingRow({ moduleId: 2, name: 'Modulo B' })],
-          totalCurrentPrice: 100,
-        },
-        message: '',
-        actionCode: 0,
-        errors: [],
-      });
-    });
-
-    const { default: CollectionsPage } = await import('../collections');
-    render(
-      <Wrapper>
-        <CollectionsPage />
-      </Wrapper>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText('Store A')).toBeInTheDocument();
-      expect(screen.getByText('Store B')).toBeInTheDocument();
-    });
-
-    // Open A, give up on it, then open B — whose answer lands first.
-    fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toBeInTheDocument();
-    });
-    fireEvent.click(
-      screen.getAllByRole('button', { name: esMessages['GENERAL.CLOSE'] })[0],
-    );
-    fireEvent.click(screen.getByTestId('collection-breakdown-sB'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Modulo B')).toBeInTheDocument();
-    });
-
-    // A finally answers, with prices that belong to A and to nobody else.
-    await act(async () => {
-      storeAResponse.resolve({
-        succeeded: true,
-        data: {
-          storeId: 'sA',
-          modules: [makePricingRow({ moduleId: 1, name: 'Modulo A' })],
-          totalCurrentPrice: 100,
-        },
-        message: '',
-        actionCode: 0,
-        errors: [],
-      });
-      await storeAResponse.promise;
-    });
-
-    expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
-    expect(screen.queryByText('Modulo A')).toBeNull();
-    expect(screen.getByText('Modulo B')).toBeInTheDocument();
-  });
-
-  /** Store A's pricing answer is deferred; store B's answers immediately. */
-  async function renderTwoStores() {
-    mockAuthUser = { isSuperAdmin: true };
-    const { storeHttpService } =
-      await import('~/management/stores/lib/services/store-http-service');
-    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
-      succeeded: true,
-      data: [
-        makeRow({ storeId: 'sA', storeName: 'Store A' }),
-        makeRow({ storeId: 'sB', storeName: 'Store B' }),
-      ],
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-
     const storeAResponse = deferredResponse<BaseResponseModel<StoreModulePricingReadResult>>();
     vi.mocked(storeHttpService.getStoreModulePricing).mockImplementation((storeId: string) => {
       if (storeId === 'sA') return storeAResponse.promise;
@@ -697,16 +621,49 @@ describe('CollectionsPage — module breakdown popup', () => {
       expect(screen.getByText('Store B')).toBeInTheDocument();
     });
 
-    return { storeAResponse };
-  }
-
-  it('discards a stale REJECTION: store A failing after the operator left for store B shows no error', async () => {
-    const { storeAResponse } = await renderTwoStores();
-
     fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
+
+    return { storeAResponse };
+  }
+
+  it('never paints a slow store response under the store the dialog now shows', async () => {
+    const { storeAResponse } = await renderTwoStoresWithAOpen();
+
+    // Give up on A, then open B — whose answer lands first.
+    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
+    fireEvent.click(screen.getByTestId('collection-breakdown-sB'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Modulo B')).toBeInTheDocument();
+    });
+
+    // A finally answers, with prices that belong to A and to nobody else.
+    await act(async () => {
+      storeAResponse.resolve({
+        succeeded: true,
+        data: {
+          storeId: 'sA',
+          modules: [makePricingRow({ moduleId: 1, name: 'Modulo A' })],
+          totalCurrentPrice: 100,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
+      await storeAResponse.promise;
+    });
+
+    expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
+    expect(screen.queryByText('Modulo A')).toBeNull();
+    expect(screen.getByText('Modulo B')).toBeInTheDocument();
+  });
+
+  it('discards a stale REJECTION: store A failing after the operator left for store B shows no error', async () => {
+    const { storeAResponse } = await renderTwoStoresWithAOpen();
+
     // Leave A for B before A settles — B answers at once.
     fireEvent.click(screen.getByTestId('collection-breakdown-close'));
     fireEvent.click(screen.getByTestId('collection-breakdown-sB'));
@@ -728,34 +685,11 @@ describe('CollectionsPage — module breakdown popup', () => {
     expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
   });
 
-  it('a response for a CLOSED dialog cannot repopulate it', async () => {
-    const { storeAResponse } = await renderTwoStores();
-
-    fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
-    expect(screen.queryByRole('dialog')).toBeNull();
-
-    // The abandoned store finally answers, with a distinctive module name of its own.
-    await act(async () => {
-      storeAResponse.resolve({
-        succeeded: true,
-        data: {
-          storeId: 'sA',
-          modules: [makePricingRow({ moduleId: 9, name: 'Modulo A Tardio' })],
-          totalCurrentPrice: 100,
-        },
-        message: '',
-        actionCode: 0,
-        errors: [],
-      });
-      await storeAResponse.promise;
-    });
-
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByText('Modulo A Tardio')).toBeNull();
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
+  // The "a response for a CLOSED dialog cannot repopulate it" case is deliberately NOT
+  // asserted here, because it cannot be observed: the popup renders nothing whenever
+  // `storeId` is null, so a stale write into closed state has no surface to appear on, and
+  // `openBreakdown` resets rows and error before every fetch anyway. A test for it would pass
+  // with the request-id guard removed — an assertion that proves nothing is worse than none.
+  // What IS observable, and is pinned above, is the discriminating case: a slow response for
+  // store A landing while the dialog shows store B.
 });
