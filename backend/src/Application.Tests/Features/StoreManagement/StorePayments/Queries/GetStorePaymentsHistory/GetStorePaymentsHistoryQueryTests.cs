@@ -2,6 +2,7 @@ using Application.Abstractions.HttpContext;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStorePaymentsHistory;
+using Domain.Common.Enums;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -13,6 +14,8 @@ namespace Application.Tests.Features.StoreManagement.StorePayments.Queries.GetSt
 
 public class GetStorePaymentsHistoryQueryTests
 {
+    private const string NotAuthorizedMessage = "No autorizado";
+
     private readonly Guid _reSellerUserId = Guid.NewGuid();
     private readonly Guid _storeId = Guid.NewGuid();
 
@@ -21,7 +24,7 @@ public class GetStorePaymentsHistoryQueryTests
     // ---------------------------------------------------------------------
 
     [Fact]
-    public async Task Handle_nonSuperAdmin_nonReSeller_throwsApiException()
+    public async Task Handle_neitherSuperAdminNorReSeller_throwsForbiddenNotAuthorized()
     {
         // Arrange
         var mocks = CreateMocks(BuildPage());
@@ -31,9 +34,11 @@ public class GetStorePaymentsHistoryQueryTests
         // Act
         var act = () => handler.Handle(new GetStorePaymentsHistoryQuery(), CancellationToken.None);
 
-        // Assert
-        await act.Should().ThrowAsync<ApiException>()
-            .Where(e => e.StatusCode == HttpStatusCode.BadRequest);
+        // Assert: the denial says what actually happened. A 400 "UserNotFound" names a cause that
+        // cannot be the cause here (the caller is authenticated; it is the role that is wrong).
+        var exception = (await act.Should().ThrowAsync<ApiException>()).Which;
+        exception.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        exception.Message.Should().Be(NotAuthorizedMessage);
 
         mocks.PaymentRepository.Verify(
             x => x.GetHistoryPageAsync(It.IsAny<StorePaymentHistoryFilter>(), It.IsAny<CancellationToken>()),
@@ -93,16 +98,17 @@ public class GetStorePaymentsHistoryQueryTests
         var result = await handler.Handle(new GetStorePaymentsHistoryQuery(), CancellationToken.None);
 
         // Assert
-        mocks.CapturedFilter!.IsCup.Should().BeFalse();
+        mocks.CapturedFilter!.Currency.Should().Be(StorePaymentCurrency.Usd);
         result.Data!.Currency.Should().Be("USD");
     }
 
     [Fact]
-    public async Task Handle_usdTab_mapsAmountFromPriceAndLeavesRateAndUsdOwedNull()
+    public async Task Handle_usdTab_mapsTheRepositoryAmountAndLeavesRateAndUsdOwedNull()
     {
-        // Arrange
+        // Arrange: the repository already chose the money per currency. The handler copies it and
+        // never re-derives a value from Price (which travels only for the CUP row's USD reference).
         var mocks = CreateMocks(BuildPage(
-            items: [Row(price: 25m, amountPaid: null, commission: 3m, exchangeRate: null)],
+            items: [Row(amount: 25m, price: 25m, commission: 3m, exchangeRate: null)],
             total: 1, usdCount: 1));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
 
@@ -110,11 +116,11 @@ public class GetStorePaymentsHistoryQueryTests
 
         // Act
         var result = await handler.Handle(
-            new GetStorePaymentsHistoryQuery(Currency: StorePaymentHistoryCurrency.Usd),
+            new GetStorePaymentsHistoryQuery(Currency: StorePaymentCurrency.Usd),
             CancellationToken.None);
 
         // Assert
-        mocks.CapturedFilter!.IsCup.Should().BeFalse();
+        mocks.CapturedFilter!.Currency.Should().Be(StorePaymentCurrency.Usd);
 
         var item = result.Data!.Items.Single();
         item.Amount.Should().Be(25m);
@@ -125,11 +131,33 @@ public class GetStorePaymentsHistoryQueryTests
     }
 
     [Fact]
-    public async Task Handle_cupTab_mapsAmountFromAmountPaidAndExposesRateAndUsdOwed()
+    public async Task Handle_mapsTheRowAmountVerbatim_withoutAnyCurrencyBranch()
     {
-        // Arrange: a CUP payment is ONE charge — AmountPaid is the CUP total, Price stays the USD amount.
+        // The row carries the amount the repository selected for this currency. A mismatch between
+        // Amount and Price must NOT be "fixed" here: that is exactly the fabrication this design
+        // removed (a broken invariant has to surface, not turn into a plausible number).
         var mocks = CreateMocks(BuildPage(
-            items: [Row(price: 25m, amountPaid: 12_500m, commission: 3_125m, exchangeRate: 500m)],
+            items: [Row(amount: 41.5m, price: 25m, commission: 3m)],
+            total: 1, usdCount: 1));
+        mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+
+        var handler = CreateHandler(mocks);
+
+        // Act
+        var result = await handler.Handle(
+            new GetStorePaymentsHistoryQuery(Currency: StorePaymentCurrency.Usd),
+            CancellationToken.None);
+
+        // Assert
+        result.Data!.Items.Single().Amount.Should().Be(41.5m);
+    }
+
+    [Fact]
+    public async Task Handle_cupTab_mapsTheRepositoryAmountAndExposesRateAndUsdOwed()
+    {
+        // Arrange: a CUP payment is ONE charge — Amount is the CUP total, Price stays the USD amount.
+        var mocks = CreateMocks(BuildPage(
+            items: [Row(amount: 12_500m, price: 25m, commission: 3_125m, exchangeRate: 500m)],
             total: 1, cupCount: 1));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
 
@@ -137,11 +165,11 @@ public class GetStorePaymentsHistoryQueryTests
 
         // Act
         var result = await handler.Handle(
-            new GetStorePaymentsHistoryQuery(Currency: StorePaymentHistoryCurrency.Cup),
+            new GetStorePaymentsHistoryQuery(Currency: StorePaymentCurrency.Cup),
             CancellationToken.None);
 
         // Assert
-        mocks.CapturedFilter!.IsCup.Should().BeTrue();
+        mocks.CapturedFilter!.Currency.Should().Be(StorePaymentCurrency.Cup);
 
         var item = result.Data!.Items.Single();
         item.Amount.Should().Be(12_500m);
@@ -158,7 +186,7 @@ public class GetStorePaymentsHistoryQueryTests
         // S10: the CUP row's amount is the CUP total only. Price is exposed exclusively as
         // the USD reference (AmountOwedUsd), never added into Amount or the totals.
         var mocks = CreateMocks(BuildPage(
-            items: [Row(price: 25m, amountPaid: 12_500m, commission: 3_125m, exchangeRate: 500m)],
+            items: [Row(amount: 12_500m, price: 25m, commission: 3_125m, exchangeRate: 500m)],
             total: 1, cupCount: 1, totalAmount: 12_500m, totalCommission: 3_125m));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
 
@@ -166,7 +194,7 @@ public class GetStorePaymentsHistoryQueryTests
 
         // Act
         var result = await handler.Handle(
-            new GetStorePaymentsHistoryQuery(Currency: StorePaymentHistoryCurrency.Cup),
+            new GetStorePaymentsHistoryQuery(Currency: StorePaymentCurrency.Cup),
             CancellationToken.None);
 
         // Assert
@@ -185,7 +213,7 @@ public class GetStorePaymentsHistoryQueryTests
         // The repository page holds 2 rows; the filter-wide totals and count come from the repo
         // aggregate. The handler must forward them untouched — never re-add the page rows.
         var mocks = CreateMocks(BuildPage(
-            items: [Row(price: 25m), Row(price: 40m)],
+            items: [Row(amount: 25m, price: 25m), Row(amount: 40m, price: 40m)],
             total: 37, usdCount: 37, cupCount: 88,
             totalAmount: 12_345m, totalCommission: 678m));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
@@ -213,7 +241,7 @@ public class GetStorePaymentsHistoryQueryTests
 
         // Act
         var usd = await handler.Handle(
-            new GetStorePaymentsHistoryQuery(Currency: StorePaymentHistoryCurrency.Usd),
+            new GetStorePaymentsHistoryQuery(Currency: StorePaymentCurrency.Usd),
             CancellationToken.None);
 
         // Assert
@@ -240,7 +268,7 @@ public class GetStorePaymentsHistoryQueryTests
         // Act
         var result = await handler.Handle(
             new GetStorePaymentsHistoryQuery(
-                Currency: StorePaymentHistoryCurrency.Cup,
+                Currency: StorePaymentCurrency.Cup,
                 From: from,
                 To: to,
                 StoreId: _storeId,
@@ -251,7 +279,7 @@ public class GetStorePaymentsHistoryQueryTests
         result.Succeeded.Should().BeTrue();
 
         var filter = mocks.CapturedFilter!;
-        filter.IsCup.Should().BeTrue();
+        filter.Currency.Should().Be(StorePaymentCurrency.Cup);
         filter.From.Should().Be(from);
         filter.To.Should().Be(to);
         filter.StoreId.Should().Be(_storeId);
@@ -259,10 +287,11 @@ public class GetStorePaymentsHistoryQueryTests
     }
 
     [Fact]
-    public async Task Handle_pageBelowOne_isClampedToOne()
+    public async Task Handle_doesNotClampThePage_andEchoesTheRepositoryResult()
     {
-        // Arrange
-        var mocks = CreateMocks(BuildPage());
+        // S5: the clamp lives in the repository, ONCE. The handler forwards the requested page
+        // untouched and reports the effective page the repository used — never its own arithmetic.
+        var mocks = CreateMocks(BuildPage(page: 1, pageSize: 50));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
 
         var handler = CreateHandler(mocks);
@@ -271,15 +300,16 @@ public class GetStorePaymentsHistoryQueryTests
         var result = await handler.Handle(new GetStorePaymentsHistoryQuery(Page: 0), CancellationToken.None);
 
         // Assert
-        mocks.CapturedFilter!.Page.Should().Be(1);
+        mocks.CapturedFilter!.Page.Should().Be(0);
         result.Data!.Page.Should().Be(1);
+        result.Data.PageSize.Should().Be(50);
     }
 
     [Fact]
     public async Task Handle_pageSizeIsFixedAtFifty()
     {
         // Arrange
-        var mocks = CreateMocks(BuildPage());
+        var mocks = CreateMocks(BuildPage(page: 2, pageSize: 50));
         mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
 
         var handler = CreateHandler(mocks);
@@ -327,7 +357,7 @@ public class GetStorePaymentsHistoryQueryTests
     private TestMocks CreateMocks(StorePaymentHistoryPage page)
     {
         var localizer = new Mock<IStringLocalizer<I18n>>();
-        localizer.Setup(x => x["UserNotFound"]).Returns(new LocalizedString("UserNotFound", "User not found"));
+        localizer.Setup(x => x["NotAuthorized"]).Returns(new LocalizedString("NotAuthorized", "No autorizado"));
 
         var mocks = new TestMocks
         {
@@ -344,18 +374,32 @@ public class GetStorePaymentsHistoryQueryTests
         return mocks;
     }
 
+    /// <summary>
+    /// Parameter order mirrors <see cref="StorePaymentHistoryPage"/> exactly, and the page is
+    /// constructed with NAMED arguments, so a reshuffle cannot silently swap two values.
+    /// </summary>
     private static StorePaymentHistoryPage BuildPage(
         IReadOnlyList<StorePaymentHistoryRow>? items = null,
         int total = 0,
+        decimal totalAmount = 0m,
+        decimal totalCommission = 0m,
         int usdCount = 0,
         int cupCount = 0,
-        decimal totalAmount = 0m,
-        decimal totalCommission = 0m)
-        => new(items ?? Array.Empty<StorePaymentHistoryRow>(), total, totalAmount, totalCommission, usdCount, cupCount);
+        int page = 1,
+        int pageSize = GetStorePaymentsHistoryQuery.PageSize)
+        => new(
+            Items: items ?? Array.Empty<StorePaymentHistoryRow>(),
+            Total: total,
+            TotalAmount: totalAmount,
+            TotalCommission: totalCommission,
+            UsdCount: usdCount,
+            CupCount: cupCount,
+            Page: page,
+            PageSize: pageSize);
 
     private static StorePaymentHistoryRow Row(
+        decimal amount = 25m,
         decimal price = 25m,
-        decimal? amountPaid = null,
         decimal commission = 3m,
         decimal? exchangeRate = null)
         => new(
@@ -364,10 +408,10 @@ public class GetStorePaymentsHistoryQueryTests
             OwnerName: "Propietario Historia",
             PaidDate: new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
             PaymentBeforeDate: new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero),
-            Price: price,
-            AmountPaid: amountPaid,
+            Amount: amount,
             Commission: commission,
-            ExchangeRate: exchangeRate);
+            ExchangeRate: exchangeRate,
+            Price: price);
 
     private sealed class TestMocks
     {

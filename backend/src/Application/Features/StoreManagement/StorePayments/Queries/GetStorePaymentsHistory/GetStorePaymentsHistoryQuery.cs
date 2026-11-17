@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -11,20 +12,13 @@ using System.Net;
 
 namespace Application.Features.StoreManagement.StorePayments.Queries.GetStorePaymentsHistory;
 
-/// <summary>Currency tab of the payments-history screen. The tab IS the currency filter (S4).</summary>
-public enum StorePaymentHistoryCurrency
-{
-    Usd = 0,
-    Cup = 1,
-}
-
 /// <summary>
 /// Registered store payments ("cobros realizados") for one currency tab.
-/// <see cref="Page"/> is clamped to >= 1 by the handler; the page size is fixed at
-/// <see cref="PageSize"/> for v1 (S5).
+/// <see cref="Page"/> is clamped to >= 1 by the repository — the single clamp — and the effective
+/// page/page-size come back on the response; the page size is fixed at <see cref="PageSize"/> for v1 (S5).
 /// </summary>
 public sealed record GetStorePaymentsHistoryQuery(
-    StorePaymentHistoryCurrency Currency = StorePaymentHistoryCurrency.Usd,
+    StorePaymentCurrency Currency = StorePaymentCurrency.Usd,
     DateOnly? From = null,
     DateOnly? To = null,
     Guid? StoreId = null,
@@ -37,9 +31,6 @@ public sealed record GetStorePaymentsHistoryQuery(
 internal sealed class GetStorePaymentsHistoryQueryHandler
     : IQueryHandler<GetStorePaymentsHistoryQuery, StorePaymentsHistoryDto>
 {
-    private const string UsdCurrency = "USD";
-    private const string CupCurrency = "CUP";
-
     private readonly IStorePaymentRepository _paymentRepository;
     private readonly IHttpContextService _httpContextService;
     private readonly IStringLocalizer<I18n> _localizer;
@@ -57,38 +48,44 @@ internal sealed class GetStorePaymentsHistoryQueryHandler
     public async Task<ResponseResult<StorePaymentsHistoryDto>> Handle(
         GetStorePaymentsHistoryQuery request, CancellationToken cancellationToken)
     {
-        // S2 — role guard: only SuperAdmin (every store) and ReSeller (its own stores) may read this.
+        // S2 — role guard. This is a BACKSTOP, not the primary check: `[HasPermission]` on the action
+        // admits exactly SuperAdmin and ReSeller for StoreRoleFeatures.StorePaymentAdmin, which
+        // declares [HasRoles(SuperAdmin, ReSeller)]. The branch exists so the handler cannot serve
+        // data on a future path that forgets the attribute — and it reports the real cause (403, not
+        // a 400 "user not found", which would name a condition that is not the problem).
         bool isSuperAdmin = _httpContextService.IsSuperAdmin;
         bool isReSeller = _httpContextService.IsReSeller;
 
         if (!isSuperAdmin && !isReSeller)
-            throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+            throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
-        var isCup = request.Currency == StorePaymentHistoryCurrency.Cup;
-        var page = request.Page < 1 ? 1 : request.Page;
-
-        // S2 — the ReSeller scope is a query argument, never a post-filter in memory.
+        // S2 — the ReSeller scope is a query argument, never a post-filter in memory. Page clamping
+        // happens in the repository, once (see the repository's GetHistoryPageAsync).
         var filter = new StorePaymentHistoryFilter(
-            IsCup: isCup,
+            Currency: request.Currency,
             From: request.From,
             To: request.To,
             StoreId: request.StoreId,
             ReSellerUserId: isSuperAdmin ? null : _httpContextService.UserExternalId.ToGuid(),
-            Page: page,
+            Page: request.Page,
             PageSize: GetStorePaymentsHistoryQuery.PageSize);
 
         // S9 — the repository aggregates the WHOLE filter in the database; this handler only maps.
         var history = await _paymentRepository.GetHistoryPageAsync(filter, cancellationToken);
 
-        var currency = isCup ? CupCurrency : UsdCurrency;
+        // S13 — the wire string is produced in exactly one place: StorePaymentCurrency.ToWireValue().
+        var currency = request.Currency.ToWireValue();
 
         var result = new StorePaymentsHistoryDto
         {
             Currency = currency,
-            Items = history.Items.Select(row => MapRow(row, isCup, currency)).ToList(),
+            Items = history.Items
+                .Select(row => MapRow(row, request.Currency, currency))
+                .ToList(),
             Total = history.Total,
-            Page = page,
-            PageSize = GetStorePaymentsHistoryQuery.PageSize,
+            // The repository's effective values, echoed — this handler does no page arithmetic.
+            Page = history.Page,
+            PageSize = history.PageSize,
             TotalAmount = history.TotalAmount,
             TotalCommission = history.TotalCommission,
             UsdCount = history.UsdCount,
@@ -99,12 +96,12 @@ internal sealed class GetStorePaymentsHistoryQueryHandler
     }
 
     /// <summary>
-    /// S7/S10 — a row carries exactly ONE money value, in the tab's currency: <c>Price</c> on USD,
-    /// <c>AmountPaid</c> on CUP. The exchange-rate detail exists only on CUP rows, because a USD row
-    /// has nothing to explain.
+    /// S7/S10 — a row carries exactly ONE money value, already selected for the tab's currency by the
+    /// repository. Nothing is defaulted or derived here. The exchange-rate detail exists only on CUP
+    /// rows, because a USD row has nothing to explain.
     /// </summary>
     private static StorePaymentHistoryItemDto MapRow(
-        StorePaymentHistoryRow row, bool isCup, string currency)
+        StorePaymentHistoryRow row, StorePaymentCurrency currency, string wireCurrency)
         => new()
         {
             StoreId = row.StoreId,
@@ -112,13 +109,10 @@ internal sealed class GetStorePaymentsHistoryQueryHandler
             OwnerName = row.OwnerName,
             PaidDate = row.PaidDate,
             PaymentBeforeDate = row.PaymentBeforeDate,
-            // The currency filter guarantees AmountPaid has a value on the CUP tab. The zero below is
-            // UNREACHABLE and deliberately not `Price`: falling back to Price would render a USD figure
-            // under a CUP label, which is the one mistake this screen must never make (S7/S10).
-            Amount = isCup ? (row.AmountPaid ?? 0m) : row.Price,
+            Amount = row.Amount,
             Commission = row.Commission,
-            Currency = currency,
-            ExchangeRate = isCup ? row.ExchangeRate : null,
-            AmountOwedUsd = isCup ? row.Price : null,
+            Currency = wireCurrency,
+            ExchangeRate = currency == StorePaymentCurrency.Cup ? row.ExchangeRate : null,
+            AmountOwedUsd = currency == StorePaymentCurrency.Cup ? row.Price : null,
         };
 }

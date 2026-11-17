@@ -41,8 +41,7 @@ public sealed class GetStorePaymentsHistoryTests
         Guid OwnerUserId,
         Guid? ReSellerId = null,
         Guid? ReSellerUserId = null,
-        string? ReSellerLogin = null,
-        Guid? UsdPaymentId = null);
+        string? ReSellerLogin = null);
 
     // ------------------------------------------------------------------
     // Seeding
@@ -83,10 +82,9 @@ public sealed class GetStorePaymentsHistoryTests
 
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var payments = await AddPaymentsAsync(db, storeId, DataUtils.DefaultTenant.Id, reSellerId: null);
-        await db.SaveChangesAsync();
+        await AddPaymentsAsync(db, storeId, DataUtils.DefaultTenant.Id, reSellerId: null);
 
-        return new SeededStore(storeId, ownerId, ownerUserId, UsdPaymentId: payments.UsdPaymentId);
+        return new SeededStore(storeId, ownerId, ownerUserId);
     }
 
     /// <summary>A store owned by an owner who belongs to a ReSeller, plus the same three payments.</summary>
@@ -113,7 +111,6 @@ public sealed class GetStorePaymentsHistoryTests
         await db.SaveChangesAsync();
 
         await AddPaymentsAsync(db, storeId, tenantId, reSeller.Id);
-        await db.SaveChangesAsync();
 
         return new SeededStore(storeId, ownerId, ownerUserId, reSeller.Id, reSellerUser.Id, reSellerLogin);
     }
@@ -148,7 +145,11 @@ public sealed class GetStorePaymentsHistoryTests
         return new SeededStore(storeId, ownerId, ownerUserId);
     }
 
-    private static async Task<(Guid UsdPaymentId, Guid CupPaymentId)> AddPaymentsAsync(
+    /// <summary>
+    /// Adds the three fixture payments and PERSISTS them, like every sibling seeding helper in this
+    /// suite (GetReSellerCommissionsTests, GetStoresToCollectTests): callers never save its entities.
+    /// </summary>
+    private static async Task AddPaymentsAsync(
         ApplicationDbContext db, Guid storeId, Guid tenantId, Guid? reSellerId)
     {
         var usdPayment = StorePayment.Create(
@@ -206,9 +207,7 @@ public sealed class GetStorePaymentsHistoryTests
         notifiedPayment.PaidDate = new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero);
         db.Set<StorePayment>().Add(notifiedPayment);
 
-        await Task.CompletedTask;
-
-        return (usdPayment.Id, cupPayment.Id);
+        await db.SaveChangesAsync();
     }
 
     /// <summary>Adds one extra USD PAID payment (AmountPaid null) and returns its id.</summary>
@@ -234,6 +233,38 @@ public sealed class GetStorePaymentsHistoryTests
             exchangeRate: null,
             amountPaid: null);
         payment.PaidDate = paidDate;
+        db.Set<StorePayment>().Add(payment);
+        await db.SaveChangesAsync();
+
+        return payment.Id;
+    }
+
+    /// <summary>
+    /// Adds one more USD PAID payment that has NO <c>PaidDate</c> — a state the column allows and
+    /// production can reach. Used to pin two things: such a row is excluded as soon as a date bound
+    /// is applied, and without bounds it sorts LAST, never first.
+    /// </summary>
+    private async Task<Guid> AddUsdPaymentWithoutPaidDateAsync(Guid storeId, float price = 7f)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var payment = StorePayment.Create(
+            storeId: storeId,
+            storePaymentStatusId: (int)StorePaymentStatusType.Paid,
+            price: price,
+            paymentBeforeDate: new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero),
+            year: 2026,
+            month: 11,
+            tenantId: DataUtils.DefaultTenant.Id,
+            reSellerId: null,
+            reSellerPercentDiscountPrice: 0f,
+            reSellerDiscountPrice: 0f,
+            reSellerAmount: 1f,
+            byReSeller: false,
+            exchangeRate: null,
+            amountPaid: null);
+        payment.PaidDate = null;
         db.Set<StorePayment>().Add(payment);
         await db.SaveChangesAsync();
 
@@ -296,8 +327,8 @@ public sealed class GetStorePaymentsHistoryTests
         {
             // Two extra USD rows that tie on BOTH date keys, with different amounts so the Id
             // tie-break is observable, plus one newest row and one later-period row on the tie date.
-            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 3, 10), D(2026, 11, 20), price: 10f);
-            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 3, 10), D(2026, 11, 20), price: 11f);
+            var tiedPrice10Id = await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 3, 10), D(2026, 11, 20), price: 10f);
+            var tiedPrice11Id = await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 3, 10), D(2026, 11, 20), price: 11f);
             await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 5, 10), D(2026, 12, 1), price: 20f);
             await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 3, 10), D(2026, 12, 15), price: 30f);
 
@@ -316,7 +347,12 @@ public sealed class GetStorePaymentsHistoryTests
             items[1].PaymentBeforeDate.Should().Be(D(2026, 12, 15));
             items[2].PaymentBeforeDate.Should().Be(D(2026, 11, 20));
             items[3].PaymentBeforeDate.Should().Be(D(2026, 11, 20));
-            // S11 key 3: the fixture's own USD payment has the oldest PaidDate → last.
+            // S11 key 3: the fully tied pair is ordered by Id — WHICH one comes first is asserted,
+            // not merely that the order is stable, so an inverted tie-break direction fails here.
+            var smallerIdPrice = IdOrdersBefore(tiedPrice10Id, tiedPrice11Id) ? 10m : 11m;
+            items[2].Amount.Should().Be(smallerIdPrice);
+            items[3].Amount.Should().Be(smallerIdPrice == 10m ? 11m : 10m);
+            // S11 key 1 again: the fixture's own USD payment has the oldest PaidDate → last.
             items[4].PaidDate.Should().Be(D(2026, 11, 1, 10));
 
             // Stable tie-break: the tied pair keeps its relative order across identical requests.
@@ -332,6 +368,15 @@ public sealed class GetStorePaymentsHistoryTests
 
     private static DateTimeOffset D(int year, int month, int day, int hour = 0)
         => new(year, month, day, hour, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// The repository's third ordering key is <c>Id</c>, and PostgreSQL compares a <c>uuid</c> over
+    /// its 16 stored bytes — the same order <see cref="Guid.ToByteArray"/> returns (Npgsql writes the
+    /// Guid's own byte layout). This predicts which of two tied rows the server must put first,
+    /// instead of assuming that whatever the server answered is correct.
+    /// </summary>
+    private static bool IdOrdersBefore(Guid candidate, Guid other)
+        => candidate.ToByteArray().AsSpan().SequenceCompareTo(other.ToByteArray()) < 0;
 
     [Fact]
     public async Task SuperAdmin_USD_tab_returns_usd_payments_with_both_tab_counts()
@@ -456,6 +501,155 @@ public sealed class GetStorePaymentsHistoryTests
         finally
         {
             await CleanupAsync(own, foreign);
+        }
+    }
+
+    /// <summary>
+    /// S5: `from`/`to` are BOTH inclusive over <c>PaidDate</c>, and a payment with no PaidDate is
+    /// excluded the moment a bound is applied (a null can satisfy neither comparison).
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_from_and_to_bounds_are_both_inclusive_and_hide_null_paid_dates()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("daterange");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            // The fixture's own USD payment sits on 2026-11-01, OUTSIDE the window queried below.
+            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 10, 0), D(2026, 11, 20), price: 10f);   // exactly `from`
+            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 20, 23), D(2026, 11, 20), price: 20f);  // late on the `to` day
+            await AddUsdPaymentAsync(seeded.StoreId, D(2026, 11, 21, 0), D(2026, 11, 20), price: 40f);   // the instant AFTER `to`
+            await AddUsdPaymentWithoutPaidDateAsync(seeded.StoreId, price: 80f);                        // undated
+
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            var response = await client.GetAsync(
+                $"/api/v1/stores/payments?currency=USD&storeId={seeded.StoreId}&from=2026-11-10&to=2026-11-20");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(ApiResponse.Json);
+            var data = body!.Data!;
+
+            // Both bounds inclusive: the `from` day and the whole `to` day are in. The day after is
+            // out, and so is the fixture payment that predates `from`.
+            data.Items.Select(i => i.PaidDate!.Value)
+                .Should().BeEquivalentTo(new[] { D(2026, 11, 10, 0), D(2026, 11, 20, 23) });
+
+            // A row with no PaidDate cannot satisfy either bound → excluded.
+            data.Items.Should().OnlyContain(i => i.PaidDate != null);
+
+            // Counts and money totals obey the same bounds (the aggregates run on the same filter).
+            data.Total.Should().Be(2);
+            data.UsdCount.Should().Be(2);
+            data.TotalAmount.Should().Be(30m);
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    /// <summary>
+    /// R3-empty-filter-sum: a filter that matches no PAID payment still reaches the database, so this
+    /// pins that the SQL aggregates over an EMPTY set answer 0 (not null, not a 500) with both counts
+    /// at 0 — the zero-row path never short-circuits in memory.
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_filter_matching_nothing_returns_zero_totals_from_the_database()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("emptyfilter");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            // The store HAS CUP payments, but none in this 2020 window.
+            var response = await client.GetAsync(
+                $"/api/v1/stores/payments?currency=CUP&storeId={seeded.StoreId}&from=2020-01-01&to=2020-01-31");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            var data = body.Data!;
+
+            data.Items.Should().BeEmpty();
+            data.Total.Should().Be(0);
+            data.TotalAmount.Should().Be(0m);
+            data.TotalCommission.Should().Be(0m);
+            data.UsdCount.Should().Be(0);
+            data.CupCount.Should().Be(0);
+            data.Page.Should().Be(1);
+            data.PageSize.Should().Be(50);
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    /// <summary>
+    /// R3-null-paidate-order: PostgreSQL's DESC default is NULLS FIRST, which would float an undated
+    /// payment to the top of a money screen. The endpoint must sort it LAST.
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_places_a_payment_with_no_paid_date_after_every_dated_row()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("nulldate");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            await AddUsdPaymentWithoutPaidDateAsync(seeded.StoreId, price: 7f);
+
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            var response = await client.GetAsync(
+                $"/api/v1/stores/payments?currency=USD&storeId={seeded.StoreId}");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(ApiResponse.Json);
+            var data = body!.Data!;
+
+            // With no date bound the undated row IS part of the tab — it must be visible, and last.
+            data.Items.Should().HaveCount(2);
+            data.Items[0].PaidDate.Should().Be(D(2026, 11, 1, 10));
+            data.Items[^1].PaidDate.Should().BeNull();
+            data.Total.Should().Be(2);
+            data.TotalAmount.Should().Be(32m); // 25 (fixture) + 7 (undated)
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    /// <summary>
+    /// R2-7/R3-currency-silent-coercion: `currency` is enum-bound, so an unrecognised value is a 400
+    /// from model binding — never a silent USD answer for a CUP request.
+    /// </summary>
+    [Fact]
+    public async Task SuperAdmin_unknown_currency_is_rejected_by_model_binding_not_coerced()
+    {
+        var seeded = await SeedStoreWithPaymentsAsync("badcurrency");
+        var login = $"admin-payments-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            var response = await client.GetAsync(
+                $"/api/v1/stores/payments?currency=EUR&storeId={seeded.StoreId}");
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PaymentsHistoryDto>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
     }
 

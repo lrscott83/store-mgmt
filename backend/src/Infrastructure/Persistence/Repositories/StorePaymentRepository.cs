@@ -99,7 +99,7 @@ namespace Infrastructure.Persistence.Repositories
 
             // S4/S10: the tab IS the currency. AmountPaid null = USD, a value = CUP. A tab never
             // holds rows of the other currency, so its totals are single-currency by construction.
-            var currencyQuery = filter.IsCup
+            var currencyQuery = filter.Currency == StorePaymentCurrency.Cup
                 ? query.Where(sp => sp.AmountPaid != null)
                 : query.Where(sp => sp.AmountPaid == null);
 
@@ -107,7 +107,7 @@ namespace Infrastructure.Persistence.Repositories
             // selected currency and of the page (COUNT in the database, no rows loaded).
             var usdCount = await query.CountAsync(sp => sp.AmountPaid == null, cancellationToken);
             var cupCount = await query.CountAsync(sp => sp.AmountPaid != null, cancellationToken);
-            var total = filter.IsCup ? cupCount : usdCount;
+            var total = filter.Currency == StorePaymentCurrency.Cup ? cupCount : usdCount;
 
             // S9: the totals aggregate the WHOLE filter (SUM in the database), never the page.
             //
@@ -117,7 +117,7 @@ namespace Infrastructure.Persistence.Repositories
             // granularity of the money this screen shows. Converting per row would only carry the
             // float binary noise (25.000000596…) into every figure.
             decimal totalAmount;
-            if (filter.IsCup)
+            if (filter.Currency == StorePaymentCurrency.Cup)
             {
                 totalAmount = (await currencyQuery.SumAsync(sp => sp.AmountPaid, cancellationToken)) ?? 0m;
             }
@@ -129,12 +129,17 @@ namespace Infrastructure.Persistence.Repositories
 
             var commissionTotal = await currencyQuery.SumAsync(sp => sp.ReSellerAmount, cancellationToken);
 
-            // S11: newest first, with stable tie-breaks.
+            // S5: the ONLY clamp of page/pageSize. The effective values travel back on the page so
+            // the handler echoes them instead of re-deriving its own.
             var page = filter.Page < 1 ? 1 : filter.Page;
             var pageSize = filter.PageSize < 1 ? 1 : filter.PageSize;
 
+            // S11: newest first, with stable tie-breaks. PostgreSQL orders DESC as NULLS FIRST, which
+            // would put a payment with no PaidDate at the very top of a money screen, so the leading
+            // boolean key (`PaidDate is null`, false first) sorts the undated ones LAST explicitly.
             var rows = await currencyQuery
-                .OrderByDescending(sp => sp.PaidDate)
+                .OrderBy(sp => sp.PaidDate == null)
+                .ThenByDescending(sp => sp.PaidDate)
                 .ThenByDescending(sp => sp.PaymentBeforeDate)
                 .ThenBy(sp => sp.Id)
                 .Skip((page - 1) * pageSize)
@@ -149,10 +154,16 @@ namespace Infrastructure.Persistence.Repositories
                     OwnerName: r.OwnerName ?? string.Empty,
                     PaidDate: r.PaidDate,
                     PaymentBeforeDate: r.PaymentBeforeDate,
-                    Price: ToMoney(r.Price),
-                    AmountPaid: r.AmountPaid,
+                    // The amount is chosen HERE, once, per currency — and it is never a fabricated
+                    // fallback. On the CUP tab the currency filter guarantees AmountPaid has a value,
+                    // so a null would mean the invariant is broken and it surfaces as an exception
+                    // instead of a plausible 0.00 on a money screen.
+                    Amount: filter.Currency == StorePaymentCurrency.Cup
+                        ? r.AmountPaid.Value
+                        : ToMoney(r.Price),
                     Commission: ToMoney(r.ReSellerAmount),
-                    ExchangeRate: r.ExchangeRate))
+                    ExchangeRate: r.ExchangeRate,
+                    Price: ToMoney(r.Price)))
                 .ToList();
 
             return new StorePaymentHistoryPage(
@@ -161,7 +172,9 @@ namespace Infrastructure.Persistence.Repositories
                 TotalAmount: ToMoney(totalAmount),
                 TotalCommission: ToMoney(commissionTotal),
                 UsdCount: usdCount,
-                CupCount: cupCount);
+                CupCount: cupCount,
+                Page: page,
+                PageSize: pageSize);
         }
 
         /// <summary>

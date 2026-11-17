@@ -434,6 +434,14 @@ namespace SMCA.WebApi.Controllers.v1
         /// Cobros realizados (store-payments-history): one page of PAID payments for the selected
         /// currency tab, plus the totals over the WHOLE filter and both tab counts. A payment is one
         /// charge in one currency, so the tab — and only the tab — decides the currency.
+        ///
+        /// <para>
+        /// <c>currency</c> is an enum-bound query parameter, matched case-insensitively by name
+        /// (<c>USD</c>/<c>CUP</c>). Omitting it selects the USD tab. A value the enum does not
+        /// recognise (e.g. <c>EUR</c>) is rejected by ASP.NET Core model binding with a 400 BEFORE
+        /// this action runs — the 400 does not come from the handler, which never sees a bad value
+        /// and never coerces one to another tab.
+        /// </para>
         /// </summary>
         [HttpGet("payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
@@ -442,21 +450,12 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStorePaymentsHistoryAsync(
-            [FromQuery] string? currency = null,
+            [FromQuery] StorePaymentCurrency? currency = null,
             [FromQuery] DateOnly? from = null,
             [FromQuery] DateOnly? to = null,
             [FromQuery] Guid? storeId = null,
             [FromQuery] int page = 1)
             => Ok(await Sender.Send(new GetStorePaymentsHistoryQuery(
-                ParsePaymentsHistoryCurrency(currency), from, to, storeId, page)));
-
-        /// <summary>
-        /// The tab is the currency filter; USD is the default (S5). Anything that is not CUP is USD,
-        /// so a typo can never silently switch tabs to an unexpected currency mix.
-        /// </summary>
-        private static StorePaymentHistoryCurrency ParsePaymentsHistoryCurrency(string? currency)
-            => string.Equals(currency, "CUP", StringComparison.OrdinalIgnoreCase)
-                ? StorePaymentHistoryCurrency.Cup
-                : StorePaymentHistoryCurrency.Usd;
+                currency ?? StorePaymentCurrency.Usd, from, to, storeId, page)));
     }
 }

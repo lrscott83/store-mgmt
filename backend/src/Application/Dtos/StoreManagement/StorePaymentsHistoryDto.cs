@@ -1,3 +1,5 @@
+using Domain.Common.Enums;
+
 namespace Application.Dtos.StoreManagement;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Application.Dtos.StoreManagement;
 public sealed class StorePaymentsHistoryDto
 {
     /// <summary>Selected tab: <c>USD</c> or <c>CUP</c>. Every item shares it.</summary>
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = StorePaymentCurrency.Usd.ToWireValue();
 
     public IReadOnlyList<StorePaymentHistoryItemDto> Items { get; set; } = [];
 
@@ -50,7 +52,7 @@ public sealed class StorePaymentHistoryItemDto
     public decimal Commission { get; set; }
 
     /// <summary>Currency of <see cref="Amount"/> and <see cref="Commission"/>: <c>USD</c> or <c>CUP</c>.</summary>
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = StorePaymentCurrency.Usd.ToWireValue();
 
     /// <summary>CUP per 1 USD. CUP rows only; null on USD rows.</summary>
     public decimal? ExchangeRate { get; set; }

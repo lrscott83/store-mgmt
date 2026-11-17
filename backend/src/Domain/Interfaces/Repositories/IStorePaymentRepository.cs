@@ -1,4 +1,5 @@
-﻿using Domain.Common.Repositories;
+﻿using Domain.Common.Enums;
+using Domain.Common.Repositories;
 using Domain.Entities.StorePayments;
 
 namespace Domain.Interfaces.Repositories
@@ -23,15 +24,17 @@ namespace Domain.Interfaces.Repositories
     }
 
     /// <summary>
-    /// Filters of the payments-history read. <see cref="IsCup"/> is the tab discriminator:
-    /// a payment is CUP when <c>AmountPaid</c> has a value and USD when it is null — one charge,
-    /// one currency, never both.
+    /// Filters of the payments-history read. <see cref="Currency"/> is the tab discriminator:
+    /// a payment is CUP (<see cref="StorePaymentCurrency.Cup"/>) when <c>AmountPaid</c> has a value
+    /// and USD (<see cref="StorePaymentCurrency.Usd"/>) when it is null — one charge, one currency,
+    /// never both. <see cref="Page"/> is clamped to >= 1 HERE and nowhere else; the effective values
+    /// travel back on <see cref="StorePaymentHistoryPage"/>.
     /// </summary>
     /// <param name="ReSellerUserId">Null for SuperAdmin (every store). A value restricts the query
     /// to the stores that ReSeller owns, using the same predicate as
     /// <c>GetPaidWithReSellerByReSellerUserAsync</c>.</param>
     public sealed record StorePaymentHistoryFilter(
-        bool IsCup,
+        StorePaymentCurrency Currency,
         DateOnly? From,
         DateOnly? To,
         Guid? StoreId,
@@ -41,9 +44,10 @@ namespace Domain.Interfaces.Repositories
 
     /// <summary>
     /// A single payments-history row, already normalised to money at 2-decimal granularity.
-    /// Both money bases travel: <see cref="Price"/> is the USD charged amount (the "Debía" of a CUP
-    /// row) and <see cref="AmountPaid"/> is the CUP total actually paid. The consumer picks one per
-    /// tab; nothing here sums them.
+    /// <see cref="Amount"/> is NON-NULL and already selected for the requested currency
+    /// (<c>AmountPaid</c> on CUP, <c>Price</c> on USD), so no consumer ever has to invent a value.
+    /// <see cref="Price"/> travels alongside only because a CUP row needs it as the USD "Debía";
+    /// nothing here sums the two.
     /// </summary>
     public sealed record StorePaymentHistoryRow(
         Guid StoreId,
@@ -51,15 +55,16 @@ namespace Domain.Interfaces.Repositories
         string OwnerName,
         DateTimeOffset? PaidDate,
         DateTimeOffset PaymentBeforeDate,
-        decimal Price,
-        decimal? AmountPaid,
+        decimal Amount,
         decimal Commission,
-        decimal? ExchangeRate);
+        decimal? ExchangeRate,
+        decimal Price);
 
     /// <summary>
     /// One page plus the filter-wide aggregates. <see cref="Total"/> is the row count of the SELECTED
     /// currency; <see cref="UsdCount"/> and <see cref="CupCount"/> are both always present so the tab
-    /// labels need no second request (S6).
+    /// labels need no second request (S6). <see cref="Page"/> and <see cref="PageSize"/> are the
+    /// EFFECTIVE values the repository used — the caller echoes them instead of re-doing the math.
     /// </summary>
     public sealed record StorePaymentHistoryPage(
         IReadOnlyList<StorePaymentHistoryRow> Items,
@@ -67,5 +72,7 @@ namespace Domain.Interfaces.Repositories
         decimal TotalAmount,
         decimal TotalCommission,
         int UsdCount,
-        int CupCount);
+        int CupCount,
+        int Page,
+        int PageSize);
 }
