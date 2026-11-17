@@ -92,6 +92,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
             // StoreModules contribute, each at its effective price — the same number
             // RegisterStorePaymentCommand charges.
             float amount = ModulePriceCalculator.CalculateTotal(store.StoreModules);
+            float baseAmount = ModulePriceCalculator.CalculateBaseTotal(store.StoreModules);
 
             result.Add(new StoreToCollectDto
             {
@@ -99,6 +100,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
                 StoreName = store.Name,
                 OwnerName = store.Owner?.User?.FullName ?? "",
                 Amount = amount,
+                BaseAmount = baseAmount,
                 NextDueDate = nextDueDate,
                 Status = status.ToString(),
             });

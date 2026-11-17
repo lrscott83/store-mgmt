@@ -203,6 +203,7 @@ public class GetStoresToCollectQueryHandlerTests
         data[0].StoreName.Should().Be("Store Vencido");
         data[0].OwnerName.Should().Be("Test Owner");
         data[0].Amount.Should().Be(3000f);
+        data[0].BaseAmount.Should().Be(3000f);
         data[0].Status.Should().Be("Vencido");
 
         // Store1 (PorVencer) still included, ordered after the overdue store.
@@ -210,7 +211,44 @@ public class GetStoresToCollectQueryHandlerTests
         data[1].StoreName.Should().Be("Store PorVencer");
         data[1].OwnerName.Should().Be("Test Owner");
         data[1].Amount.Should().Be(2000f);
+        data[1].BaseAmount.Should().Be(2000f);
         data[1].Status.Should().Be("PorVencer");
+    }
+
+    [Fact]
+    public async Task Handle_superAdmin_returnsBaseAmountAboveAmount_whenBillableModuleHasDiscount()
+    {
+        // Arrange
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        var owner = CreateOwnerWithUser("Discount Owner");
+        var storeId = Guid.NewGuid();
+        var store = CreateStoreWithId(storeId, "Discounted Store", owner, Today.AddMonths(-6));
+
+        // Billable module with a 10% percent discount: base 3000, effective 2700.
+        store.StoreModules.Add(StoreModule.Create(storeId, 1, 3000f, false, 3000f, 0f, 10f, TenantId));
+        // Price-included module: contributes to neither column.
+        store.StoreModules.Add(CreatePriceIncludedStoreModule(2));
+
+        _mockStoreRepository
+            .Setup(x => x.GetPaidStoresAsync())
+            .ReturnsAsync(new[] { store });
+
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(storeId))
+            .ReturnsAsync((StorePayment?)null);
+
+        // Act
+        var result = await _handler.Handle(new GetStoresToCollectQuery(), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        var row = result.Data.Should().ContainSingle().Subject;
+        row.StoreId.Should().Be(storeId);
+        row.Status.Should().Be("Vencido");
+        row.Amount.Should().Be(2700f);
+        row.BaseAmount.Should().Be(3000f);
     }
 
     [Fact]
