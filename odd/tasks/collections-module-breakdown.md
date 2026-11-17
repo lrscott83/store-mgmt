@@ -26,7 +26,7 @@ Mientras carga muestra el spinner con texto traducido; si falla, un `role="alert
 ## Tasks
 
 T1 — Backend: `BaseAmount` en `StoreToCollectDto` + cálculo en el handler + test unitario. Route: delegated worker. Status: done — commit hash registrado al cierre de la feature. RED: `error CS1061` (BaseAmount inexistente); GREEN: `Passed: 6, Failed: 0`, cero `error MSB`/`error CS`.
-T2 — Frontend: `baseAmount` en `StoreToCollect`, columna Monto con tachado, botón "i" SuperAdmin, modal de desglose, i18n, tests. Route: delegated worker. Status: pending.
+T2 — Frontend: `baseAmount` en `StoreToCollect`, columna Monto con tachado, botón "i" SuperAdmin, modal de desglose, i18n, tests. Route: delegated worker. Status: done — commit hash registrado al cierre de la feature. RED: 4 tests fallando (import del modal inexistente y testids ausentes); GREEN: `Test Files 15 passed (15)`, `Tests 207 passed (207)`, typecheck y lint en 0.
 
 ## Log
 

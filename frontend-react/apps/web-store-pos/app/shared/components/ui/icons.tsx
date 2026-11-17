@@ -411,6 +411,23 @@ export function HelpIcon({ className = '' }: IconProps) {
   );
 }
 
+/** Info glyph for read-only breakdown triggers — NOT `HelpIcon` (question mark ≠ info). */
+export function InfoIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" strokeWidth={2} />
+      <path strokeLinecap="round" strokeWidth={2} d="M12 11v5" />
+      <path strokeLinecap="round" strokeWidth={2} d="M12 8h.01" />
+    </svg>
+  );
+}
+
 /** Material `payments` (cash glyph — action-menu `pay` intent, same path as `PaymentMethodIcon` kind='cash', promoted to `BASE` size). */
 export function PayIcon({ className = '' }: IconProps) {
   return (

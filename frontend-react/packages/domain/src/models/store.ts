@@ -220,6 +220,11 @@ export interface StoreToCollect {
   storeName: string;
   ownerName: string;
   amount: number;
+  // The PRE-discount total, computed server-side by
+  // `ModulePriceCalculator.CalculateBaseTotal` over the same billable rows `amount` sums, so
+  // a discount exists exactly when `baseAmount > amount`. The client only compares the two
+  // fields; it never recomputes either.
+  baseAmount: number;
   nextDueDate: string | null;
   status: StoreToCollectStatus;
 }

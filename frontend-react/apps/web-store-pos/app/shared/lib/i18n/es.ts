@@ -1952,6 +1952,15 @@ const messages: Record<string, string> = {
   'BILLING.COLLECTIONS.EXCHANGE_RATE': 'Tasa de cambio (CUP por 1 USD)',
   'BILLING.COLLECTIONS.TOTAL_PAID': 'Total pagado',
   'BILLING.COLLECTIONS.CONFIRM_PAYMENT': 'Registrar el pago',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_OPEN': 'Ver el precio de cada módulo',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_TITLE': 'Precios de módulos',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_HINT':
+    'Solo los módulos activos que suman el monto a cobrar.',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_LOADING': 'Cargando módulos...',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_EMPTY':
+    'Esta tienda no tiene módulos que sumen al monto.',
+  'BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR':
+    'No se pudieron cargar los módulos. Intente de nuevo.',
 
   // Billing — reseller commissions view
   'BILLING.COMMISSIONS.TITLE': 'Comisiones',

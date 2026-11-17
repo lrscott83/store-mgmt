@@ -4,11 +4,14 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { PaymentConfirmModal } from '~/management/stores/components/payment-confirm-modal';
+import { CollectionModuleBreakdownModal } from '~/management/stores/components/collection-module-breakdown-modal';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatDateOnly } from '~/shared/lib/date-utils';
 import { Button } from '~/shared/components/ui/button';
-import type { StoreToCollect } from '@store-mgmt/domain';
+import { InfoIcon } from '~/shared/components/ui/icons';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import type { StoreModulePricingReadRow, StoreToCollect } from '@store-mgmt/domain';
 
 // Req: Route Gating is Reseller Feature Loader, Not Admin Feature Loader — mirrors
 // backend [HasPermission(StoreRoleFeatures.StorePaymentAdmin)] (roles {SuperAdmin,
@@ -36,6 +39,10 @@ function toMoney(value: number): number {
  */
 export function CollectionsPage() {
   const intl = useIntl();
+  const user = useAuthStore((s) => s.user);
+  // The breakdown is the SuperAdmin's audit view of a store's module prices — the endpoint it
+  // reuses is SuperAdmin-only, so every other role keeps the plain amount column (S4).
+  const canSeeBreakdown = user?.isSuperAdmin === true;
   const [rows, setRows] = useState<StoreToCollect[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   // Register-payment popup. The row under confirmation owns the amount; the route owns
@@ -45,6 +52,12 @@ export function CollectionsPage() {
   const [totalPaid, setTotalPaid] = useState('');
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
+  // Module-breakdown popup. Same split: the row names the store, the route owns the fetch
+  // and its loading/error state.
+  const [breakdownRow, setBreakdownRow] = useState<StoreToCollect | null>(null);
+  const [breakdownRows, setBreakdownRows] = useState<StoreModulePricingReadRow[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownError, setBreakdownError] = useState<string | undefined>(undefined);
 
   const loadRows = useCallback(async () => {
     try {
@@ -75,6 +88,38 @@ export function CollectionsPage() {
     if (saving) return;
     setConfirmRow(null);
     setModalError('');
+  }
+
+  async function openBreakdown(row: StoreToCollect) {
+    setBreakdownRow(row);
+    setBreakdownRows([]);
+    setBreakdownError(undefined);
+    setBreakdownLoading(true);
+    try {
+      const res = await storeHttpService.getStoreModulePricing(row.storeId);
+      if (!res.succeeded) {
+        setBreakdownError(
+          intl.formatMessage({ id: 'BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR' }),
+        );
+        return;
+      }
+      setBreakdownRows(res.data.modules);
+    } catch (error) {
+      setBreakdownError(
+        intl.formatMessage({
+          id: httpErrorKey(error, 'BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR'),
+        }),
+      );
+    } finally {
+      setBreakdownLoading(false);
+    }
+  }
+
+  function closeBreakdown() {
+    setBreakdownRow(null);
+    setBreakdownRows([]);
+    setBreakdownError(undefined);
+    setBreakdownLoading(false);
   }
 
   /**
@@ -163,7 +208,34 @@ export function CollectionsPage() {
                 <tr key={row.storeId} className="hover:bg-background">
                   <td className="px-4 py-3 font-medium text-text">{row.storeName}</td>
                   <td className="px-4 py-3 text-text">{row.ownerName}</td>
-                  <td className="px-4 py-3 text-right text-text">{formatCurrency(row.amount)}</td>
+                  <td className="px-4 py-3 text-right text-text">
+                    <div className="flex items-center justify-end gap-2">
+                      {row.baseAmount > row.amount && (
+                        <span
+                          className="text-danger line-through"
+                          data-testid={`collection-amount-base-${row.storeId}`}
+                        >
+                          {formatCurrency(row.baseAmount)}
+                        </span>
+                      )}
+                      <span data-testid={`collection-amount-${row.storeId}`}>
+                        {formatCurrency(row.amount)}
+                      </span>
+                      {canSeeBreakdown && (
+                        <button
+                          type="button"
+                          onClick={() => openBreakdown(row)}
+                          aria-label={intl.formatMessage({
+                            id: 'BILLING.COLLECTIONS.MODULE_BREAKDOWN_OPEN',
+                          })}
+                          data-testid={`collection-breakdown-${row.storeId}`}
+                          className="text-text-muted hover:text-text"
+                        >
+                          <InfoIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-text">{formatDateOnly(row.nextDueDate)}</td>
                   <td className="px-4 py-3 text-text">
                     {intl.formatMessage({ id: `BILLING.STATUS.${row.status}` })}
@@ -192,6 +264,16 @@ export function CollectionsPage() {
         onTotalPaidChange={setTotalPaid}
         onConfirm={handleConfirm}
         onClose={closeConfirm}
+      />
+
+      <CollectionModuleBreakdownModal
+        open={breakdownRow !== null}
+        storeId={breakdownRow?.storeId ?? null}
+        storeName={breakdownRow?.storeName ?? ''}
+        rows={breakdownRows}
+        loading={breakdownLoading}
+        error={breakdownError}
+        onClose={closeBreakdown}
       />
     </div>
   );

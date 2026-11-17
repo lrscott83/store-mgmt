@@ -18,11 +18,28 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
     getStoresToCollect: vi.fn(),
     registerStorePayment: vi.fn(),
+    getStoreModulePricing: vi.fn(),
   },
 }));
 
+// ─── auth-store mock ──────────────────────────────────────────────────────────
+// The breakdown trigger is gated on `user.isSuperAdmin`, so the session must be
+// controllable per test. Default is no user (the trigger stays hidden).
+
+let mockAuthUser: { isSuperAdmin: boolean } | null = null;
+
+vi.mock('~/shared/lib/stores/auth-store', () => {
+  const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
+    const state = { user: mockAuthUser, isAuthenticated: mockAuthUser !== null };
+    if (typeof selector === 'function') return selector(state);
+    return state;
+  });
+  return { useAuthStore };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mockAuthUser = null;
 });
 
 function makeRow(overrides: Partial<StoreToCollect> = {}): StoreToCollect {
@@ -31,6 +48,7 @@ function makeRow(overrides: Partial<StoreToCollect> = {}): StoreToCollect {
     storeName: 'Store One',
     ownerName: 'Owner One',
     amount: 25,
+    baseAmount: 25,
     nextDueDate: '2026-08-15',
     status: 'PorVencer',
     ...overrides,
@@ -351,5 +369,165 @@ describe('CollectionsPage — getStoresToCollect succeeded:false', () => {
       expect(screen.getByText(esMessages['BILLING.COLLECTIONS.ERROR'])).toBeInTheDocument();
     });
     expect(screen.queryByText('Store One')).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S1 — Monto column shows the pre-discount total struck through when discounted
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('CollectionsPage — amount with discount', () => {
+  async function renderRows(rows: StoreToCollect[]) {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: rows,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+  }
+
+  it('renders the struck-through base total first, then the amount, when baseAmount > amount', async () => {
+    await renderRows([makeRow({ amount: 2700, baseAmount: 3000 })]);
+
+    expect(screen.getByTestId('collection-amount-s1')).toHaveTextContent('$2 700');
+    const base = screen.getByTestId('collection-amount-base-s1');
+    expect(base).toHaveTextContent('$3 000');
+    expect(base.className).toContain('line-through');
+    expect(base.className).toContain('text-danger');
+  });
+
+  it('renders no base element when baseAmount equals amount (no discount)', async () => {
+    await renderRows([makeRow({ amount: 25, baseAmount: 25 })]);
+
+    expect(screen.getByTestId('collection-amount-s1')).toHaveTextContent('$25');
+    expect(screen.queryByTestId('collection-amount-base-s1')).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S3/S4/S6 — SuperAdmin-only "i" trigger opening the read-only breakdown popup
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('CollectionsPage — module breakdown popup', () => {
+  const PRICING_MODULES = [
+    {
+      moduleId: 1,
+      name: 'Ventas',
+      isActive: true,
+      priceIncluded: false,
+      price: 100,
+      discountPrice: 0,
+      percentDiscountPrice: 0,
+      currentPrice: 100,
+    },
+  ];
+
+  async function renderSuperAdminRow() {
+    mockAuthUser = { isSuperAdmin: true };
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: [makeRow({ storeId: 's1', storeName: 'Store One' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(storeHttpService.getStoreModulePricing).mockResolvedValue({
+      succeeded: true,
+      data: { storeId: 's1', modules: PRICING_MODULES, totalCurrentPrice: 100 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+    return storeHttpService;
+  }
+
+  it('shows the trigger for a SuperAdmin, fetches the pricing on click and opens the dialog', async () => {
+    const svc = await renderSuperAdminRow();
+
+    const trigger = screen.getByTestId('collection-breakdown-s1');
+    expect(trigger).toHaveAttribute(
+      'aria-label',
+      esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_OPEN'],
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(svc.getStoreModulePricing).toHaveBeenCalledWith('s1');
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store One');
+    expect(screen.getByText('Ventas')).toBeInTheDocument();
+    expect(screen.getByTestId('collection-breakdown-total')).toHaveTextContent('$100');
+  });
+
+  it('shows no breakdown trigger for a non-SuperAdmin session', async () => {
+    mockAuthUser = { isSuperAdmin: false };
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: [makeRow({ storeId: 's1' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('collection-breakdown-s1')).toBeNull();
+  });
+
+  it('surfaces the translated error inside the dialog when the pricing call fails', async () => {
+    const svc = await renderSuperAdminRow();
+    vi.mocked(svc.getStoreModulePricing).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-s1'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(
+        screen.getByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR']),
+      ).toBeInTheDocument();
+    });
   });
 });
