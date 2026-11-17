@@ -139,6 +139,9 @@ export default [
     // Management â€” Stores â€” Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),
     route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx'),
+    // Cobros realizados (store-payments-history): the registered-payments history, one tab
+    // per currency. Gated inside the module by resellerFeatureLoader([EFeatures.StorePayment]).
+    route('management/stores/payments', 'management/stores/routes/store-payments-history.tsx'),
 
     // Management - Channel rates (multipayments): append-only register of the
     // rate per channel (method + currency); same guard as Configurations.

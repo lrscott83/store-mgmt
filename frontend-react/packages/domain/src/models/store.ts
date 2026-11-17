@@ -371,6 +371,62 @@ export interface RegisterStorePaymentPayload {
   amountPaid?: number | null;
 }
 
+/**
+ * Currency of ONE registered store payment, as a STRING — deliberately not the numeric
+ * `Currency` enum: a payment is charged in exactly one currency at a time and the wire
+ * (`GET /v1/stores/payments`, currency=USD|CUP) speaks this two-value vocabulary.
+ *
+ * `USD` when `AmountPaid` is null (the charge is `Price`); `CUP` when it has a value (the
+ * total actually paid at the captured rate). There is no mixed-currency row.
+ */
+export type StorePaymentCurrency = 'USD' | 'CUP';
+
+/**
+ * One registered ("cobro realizado") store payment — mirror of the backend
+ * `StorePaymentHistoryItemDto` (GET /v1/stores/payments).
+ *
+ * `amount`/`commission` are ALREADY expressed in `currency` by the server (`Price` on the
+ * USD tab, `AmountPaid` on the CUP tab; `ReSellerAmount` follows whichever base was used),
+ * so the client never converts and never mixes the two.
+ */
+export interface StorePaymentHistoryItem {
+  storeId: string;
+  storeName: string;
+  ownerName: string;
+  /** ISO instant of `PaidDate` — may be null for a payment with no recorded paid date. */
+  paidDate: string | null;
+  /** ISO instant of `PaymentBeforeDate`: the period this payment covers. */
+  paymentBeforeDate: string;
+  amount: number;
+  commission: number;
+  currency: StorePaymentCurrency;
+  /** CUP per 1 USD, captured at registration. CUP rows only; null on USD rows. */
+  exchangeRate: number | null;
+  /** What was owed in USD (`Price`). CUP rows only; null on USD rows. */
+  amountOwedUsd: number | null;
+}
+
+/**
+ * One page of registered store payments plus the whole-filter totals computed by the
+ * SERVER. `totalAmount`/`totalCommission` cover every page of the current filter — the
+ * client renders them verbatim and performs no billing arithmetic (S9).
+ *
+ * `usdCount`/`cupCount` are always both present so each tab label can carry its count
+ * without a second request (S6).
+ */
+export interface StorePaymentHistoryPage {
+  currency: StorePaymentCurrency;
+  items: StorePaymentHistoryItem[];
+  /** Rows matching the filter for the selected currency. */
+  total: number;
+  page: number;
+  pageSize: number;
+  totalAmount: number;
+  totalCommission: number;
+  usdCount: number;
+  cupCount: number;
+}
+
 export interface OwnerStoreModule {
   storeId: string;
   storeName: string;

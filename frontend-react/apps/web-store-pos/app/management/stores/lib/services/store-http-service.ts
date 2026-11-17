@@ -10,6 +10,8 @@ import type {
   StoreToCollect,
   ReSellerCommission,
   RegisterStorePaymentPayload,
+  StorePaymentCurrency,
+  StorePaymentHistoryPage,
   SwitchMyStoreResult,
   StoreModulePricingPayload,
   StoreModulePricingResult,
@@ -19,6 +21,21 @@ import type {
   OpeningHoursEntry,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
+
+/**
+ * Query of the registered-payments read (`GET /v1/stores/payments`). Every optional
+ * field is omitted from the request when absent, so the server keeps its defaults
+ * (`page` 1, fixed page size 50, no date/store narrowing).
+ */
+export interface StorePaymentHistoryQuery {
+  currency: StorePaymentCurrency;
+  /** Inclusive lower bound of `PaidDate`, as a `YYYY-MM-DD` date-only value. */
+  from?: string;
+  /** Inclusive upper bound of `PaidDate`, as a `YYYY-MM-DD` date-only value. */
+  to?: string;
+  storeId?: string;
+  page?: number;
+}
 
 /** Plantilla (vista) + slug público del catálogo de una tienda (SuperAdmin). */
 export interface StoreCatalogTemplate {
@@ -398,6 +415,37 @@ export const storeHttpService = {
   async getReSellerCommissions(): Promise<BaseResponseModel<ReSellerCommission[]>> {
     const response = await apiClient.get<BaseResponseModel<ReSellerCommission[]>>(
       '/v1/stores/reseller-commissions',
+    );
+    return response.data;
+  },
+
+  /**
+   * Registered store payments ("cobros realizados") of the current user's scope
+   * (GET /v1/stores/payments): every store for a SuperAdmin, only its own for a
+   * ReSeller — the server, never this query, decides that.
+   *
+   * Filters combine with AND and are sent only when present: `from`/`to` are
+   * inclusive `DateOnly` values (`YYYY-MM-DD`) applied to `PaidDate`, and
+   * `storeId` narrows to one store. `page` is clamped to >= 1 by the server and
+   * the page size is fixed there (50), so no `pageSize` is sent.
+   *
+   * The response already carries the totals over the WHOLE filter plus both tab
+   * counts; the caller renders them as-is (no client-side arithmetic).
+   */
+  async getStorePayments(
+    query: StorePaymentHistoryQuery,
+  ): Promise<BaseResponseModel<StorePaymentHistoryPage>> {
+    const params: Record<string, string | number> = {
+      currency: query.currency,
+      page: query.page ?? 1,
+    };
+    if (query.from) params['from'] = query.from;
+    if (query.to) params['to'] = query.to;
+    if (query.storeId) params['storeId'] = query.storeId;
+
+    const response = await apiClient.get<BaseResponseModel<StorePaymentHistoryPage>>(
+      '/v1/stores/payments',
+      { params },
     );
     return response.data;
   },
