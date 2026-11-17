@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store, StorePaymentHistoryItem, StorePaymentHistoryPage } from '@store-mgmt/domain';
+import { EFeatures } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  Store,
+  StorePaymentHistoryItem,
+  StorePaymentHistoryPage,
+} from '@store-mgmt/domain';
 
 // ─── loader mock (Req: Route Gating — must be resellerFeatureLoader) ─────────
 
@@ -69,10 +75,52 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Re-imported per test: `vi.resetModules()` gives a fresh mocked service object. */
+/**
+ * Reads the payment service object out of the module registry. It does NOT reset modules:
+ * re-imports return the SAME mocked singleton every test, whose call history is wiped by the
+ * global `beforeEach` (`vi.clearAllMocks`). Implementations set here therefore survive into the
+ * test that sets them, and only the loader-wiring test (which calls `vi.resetModules()` itself)
+ * hands later readers a fresh factory instance.
+ */
 async function httpMock() {
   const mod = await import('~/management/stores/lib/services/store-http-service');
   return mod.storeHttpService;
+}
+
+/** Success envelope, matching `BaseResponseModel<T>`'s `succeeded: true` branch. */
+function ok<T>(data: T): BaseResponseModel<T> {
+  return { succeeded: true, data, message: '', actionCode: 0, errors: [] };
+}
+
+/** Failure envelope, matching `BaseResponseModel<T>`'s `succeeded: false` branch. */
+function failed(): BaseResponseModel<StorePaymentHistoryPage> {
+  return {
+    succeeded: false,
+    data: null,
+    message: null,
+    actionCode: null,
+    errors: [{ code: 'E01', description: 'failed' }],
+  };
+}
+
+/** A promise whose settlement the test controls, to force an out-of-order response. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+/**
+ * Lets a resolved mock promise's continuation run (inside `act`, so React flushes the render it
+ * schedules) before the assertions read the DOM.
+ */
+async function settle() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 async function mockStores(stores: Partial<Store>[] = [{ id: 's1', name: 'Store One' }]) {
@@ -148,7 +196,7 @@ describe('StorePaymentsHistoryPage — route gating wiring', () => {
 
     expect(after).not.toBe(before);
     expect(mockResellerFeatureLoader).toHaveBeenCalled();
-    expect(mockResellerFeatureLoader).toHaveBeenCalledWith([91]);
+    expect(mockResellerFeatureLoader).toHaveBeenCalledWith([EFeatures.StorePayment]);
 
     const lastCallResult = mockResellerFeatureLoader.mock.results.at(-1)?.value;
     expect(after.clientLoader).toBe(lastCallResult);
@@ -397,6 +445,48 @@ describe('StorePaymentsHistoryPage — CUP information control', () => {
     expect(screen.queryByTestId('history-info-0')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Detalle del cobro de Store One' })).toBeNull();
   });
+
+  it('a CUP row with nothing to disclose (null rate or null owed USD) renders no dead control', async () => {
+    await mockPages([
+      makePage({
+        currency: 'CUP',
+        items: [
+          makeItem({
+            currency: 'CUP',
+            amount: 12500,
+            commission: 1250,
+            exchangeRate: null,
+            amountOwedUsd: 25,
+          }),
+          makeItem({
+            storeId: 's2',
+            storeName: 'Store Two',
+            currency: 'CUP',
+            amount: 100,
+            commission: 10,
+            exchangeRate: 50,
+            amountOwedUsd: null,
+          }),
+        ],
+        total: 2,
+      }),
+    ]);
+    await renderPage();
+    await waitFor(() => expect(screen.getByTestId('history-tab-cup')).toHaveTextContent('CUP (88)'));
+    fireEvent.click(screen.getByTestId('history-tab-cup'));
+    await waitFor(() => expect(screen.getByTestId('history-amount-0')).toHaveTextContent('CUP'));
+
+    // No focusable button that expands into nothing: the `i` exists only when the
+    // detail line it reveals can actually be rendered (S8).
+    expect(screen.queryByTestId('history-info-0')).toBeNull();
+    expect(screen.queryByTestId('history-info-1')).toBeNull();
+    expect(screen.queryByTestId('history-detail-0')).toBeNull();
+    expect(screen.queryByTestId('history-detail-1')).toBeNull();
+
+    // The rows themselves are still on screen — the money is not what was removed.
+    expect(screen.getByTestId('history-amount-0')).toBeInTheDocument();
+    expect(screen.getByTestId('history-amount-1')).toBeInTheDocument();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -531,5 +621,197 @@ describe('StorePaymentsHistoryPage — error state', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['BILLING.HISTORY.ERROR']);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// A FAILED RE-REQUEST leaves exactly ONE truthful state: no rows, no totals, no
+// pagination from the filter the user already left — only the error (money truth).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('StorePaymentsHistoryPage — a failed re-request clears the previous filter’s data', () => {
+  /** Succeeds once with USD rows + server totals + pagination, then fails every later call. */
+  async function succeedOnceThenFailEveryLaterCall() {
+    const svc = await mockStores();
+    const getStorePayments = vi.mocked(svc.getStorePayments);
+    getStorePayments.mockReset();
+    getStorePayments.mockResolvedValueOnce(
+      ok(
+        makePage({
+          currency: 'USD',
+          items: [makeItem({ storeName: 'Store Paid Once', amount: 999, commission: 111 })],
+          total: 120,
+          totalAmount: 300,
+          totalCommission: 36,
+        }),
+      ),
+    );
+
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('history-total-amount')).toHaveTextContent('300 USD');
+    });
+    // Precondition: the previous filter really is on screen, pagination included.
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: esMessages['BILLING.HISTORY.NEXT_PAGE'] }),
+    ).toBeInTheDocument();
+    return getStorePayments;
+  }
+
+  /** Nothing from the abandoned filter may survive: rows, totals, pagination, store names. */
+  function expectNoTraceOfPreviousFilter() {
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByTestId('history-amount-0')).toBeNull();
+    expect(screen.queryByTestId('history-commission-0')).toBeNull();
+    expect(screen.queryByTestId('history-total-amount')).toBeNull();
+    expect(screen.queryByTestId('history-total-commission')).toBeNull();
+    expect(screen.queryByText('Store Paid Once')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: esMessages['BILLING.HISTORY.NEXT_PAGE'] }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: esMessages['BILLING.HISTORY.PREV_PAGE'] }),
+    ).toBeNull();
+    // Error view and empty state stay mutually exclusive.
+    expect(screen.queryByText(esMessages['BILLING.HISTORY.EMPTY_STATE'])).toBeNull();
+  }
+
+  it('clears them when the tab change returns succeeded:false', async () => {
+    const getStorePayments = await succeedOnceThenFailEveryLaterCall();
+    getStorePayments.mockResolvedValue(failed());
+
+    fireEvent.click(screen.getByTestId('history-tab-cup'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['BILLING.HISTORY.ERROR']);
+    });
+    expect(getStorePayments).toHaveBeenLastCalledWith({ currency: 'CUP', page: 1 });
+    expectNoTraceOfPreviousFilter();
+  });
+
+  it('clears them when the tab change REJECTS (network failure path)', async () => {
+    const getStorePayments = await succeedOnceThenFailEveryLaterCall();
+    getStorePayments.mockRejectedValue(new Error('boom'));
+
+    fireEvent.click(screen.getByTestId('history-tab-cup'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['BILLING.HISTORY.ERROR']);
+    });
+    expectNoTraceOfPreviousFilter();
+  });
+
+  it('clears them when a PAGE change fails, not just a tab change', async () => {
+    const getStorePayments = await succeedOnceThenFailEveryLaterCall();
+    getStorePayments.mockResolvedValue(failed());
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['BILLING.HISTORY.NEXT_PAGE'] }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['BILLING.HISTORY.ERROR']);
+    });
+    expect(getStorePayments).toHaveBeenLastCalledWith({ currency: 'USD', page: 2 });
+    expectNoTraceOfPreviousFilter();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Request race: only the response of the LATEST request may touch state
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('StorePaymentsHistoryPage — out-of-order responses', () => {
+  it('discards a slow earlier response that lands after the newer one', async () => {
+    const svc = await mockStores();
+    const getStorePayments = vi.mocked(svc.getStorePayments);
+    getStorePayments.mockReset();
+
+    const slowUsd = deferred<BaseResponseModel<StorePaymentHistoryPage>>();
+    const fastCup = deferred<BaseResponseModel<StorePaymentHistoryPage>>();
+    getStorePayments.mockReturnValueOnce(slowUsd.promise).mockReturnValueOnce(fastCup.promise);
+
+    await renderPage();
+    await waitFor(() => expect(getStorePayments).toHaveBeenCalledTimes(1));
+    // Precondition: the store directory read landed, so the store filter is populated before
+    // anything is clicked (the same precondition other cases in this file pin).
+    await waitFor(() =>
+      expect(screen.getByTestId('history-store').querySelectorAll('option').length).toBe(2),
+    );
+
+    fireEvent.click(screen.getByTestId('history-tab-cup'));
+    await waitFor(() => expect(getStorePayments).toHaveBeenCalledTimes(2));
+    expect(getStorePayments).toHaveBeenLastCalledWith({ currency: 'CUP', page: 1 });
+
+    // The NEWER request (CUP) answers first and owns the screen.
+    fastCup.resolve(
+      ok(
+        makePage({
+          currency: 'CUP',
+          items: [makeItem({ currency: 'CUP', amount: 12500, commission: 1250 })],
+          totalAmount: 12500,
+          totalCommission: 1250,
+        }),
+      ),
+    );
+    await settle();
+    expect(screen.getByTestId('history-amount-0').textContent).toBe(`12${NBSP}500 CUP`);
+    expect(screen.getByTestId('history-total-amount').textContent).toBe(`12${NBSP}500 CUP`);
+
+    // The STALE response for the abandoned USD tab lands afterwards.
+    slowUsd.resolve(
+      ok(
+        makePage({
+          currency: 'USD',
+          items: [makeItem({ currency: 'USD', amount: 999, commission: 111 })],
+          totalAmount: 300,
+          totalCommission: 36,
+        }),
+      ),
+    );
+    await settle();
+
+    // The screen still shows the CUP answer: no USD figure can be read under the CUP tab.
+    expect(screen.getByTestId('history-amount-0').textContent).toBe(`12${NBSP}500 CUP`);
+    expect(screen.getByTestId('history-total-amount').textContent).toBe(`12${NBSP}500 CUP`);
+    expect(screen.getByTestId('history-commission-0').textContent).toBe(`1${NBSP}250 CUP`);
+    expect(screen.queryByText('999 USD')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('discards a stale FAILURE so it cannot blank a newer successful answer', async () => {
+    const svc = await mockStores();
+    const getStorePayments = vi.mocked(svc.getStorePayments);
+    getStorePayments.mockReset();
+
+    const slowUsd = deferred<BaseResponseModel<StorePaymentHistoryPage>>();
+    const fastCup = deferred<BaseResponseModel<StorePaymentHistoryPage>>();
+    getStorePayments.mockReturnValueOnce(slowUsd.promise).mockReturnValueOnce(fastCup.promise);
+
+    await renderPage();
+    await waitFor(() => expect(getStorePayments).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId('history-store').querySelectorAll('option').length).toBe(2),
+    );
+
+    fireEvent.click(screen.getByTestId('history-tab-cup'));
+    await waitFor(() => expect(getStorePayments).toHaveBeenCalledTimes(2));
+
+    fastCup.resolve(
+      ok(
+        makePage({
+          currency: 'CUP',
+          items: [makeItem({ currency: 'CUP', amount: 12500, commission: 1250 })],
+        }),
+      ),
+    );
+    await settle();
+    expect(screen.getByTestId('history-amount-0').textContent).toBe(`12${NBSP}500 CUP`);
+
+    // The abandoned request fails after the newer one already succeeded.
+    slowUsd.resolve(failed());
+    await settle();
+
+    expect(screen.getByTestId('history-amount-0').textContent).toBe(`12${NBSP}500 CUP`);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

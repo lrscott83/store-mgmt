@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import type {
@@ -85,7 +85,18 @@ export function StorePaymentsHistoryPage() {
     };
   }, []);
 
+  /**
+   * Every tab / filter / page change starts a new request, so responses can land out of order.
+   * Only the response of the LATEST request may touch state: a slow earlier answer for a filter
+   * the user already left must never overwrite the current one. Same discipline as the `active`
+   * flag guarding the directory read above.
+   */
+  const latestRequestRef = useRef(0);
+
   const load = useCallback(async () => {
+    latestRequestRef.current += 1;
+    const requestId = latestRequestRef.current;
+
     const query: StorePaymentHistoryQuery = { currency: tab, page };
     if (from !== '') query.from = from;
     if (to !== '') query.to = to;
@@ -93,7 +104,11 @@ export function StorePaymentsHistoryPage() {
 
     try {
       const result = await storeHttpService.getStorePayments(query);
+      if (requestId !== latestRequestRef.current) return;
       if (!result.succeeded) {
+        // ONE truthful state per failure: the previous filter's rows, totals and pagination
+        // are dropped with `data`, so no figure can be read under a tab it does not belong to.
+        setData(null);
         setError(intl.formatMessage({ id: 'BILLING.HISTORY.ERROR' }));
         return;
       }
@@ -101,6 +116,8 @@ export function StorePaymentsHistoryPage() {
       setExpandedRow(null);
       setError(undefined);
     } catch (err) {
+      if (requestId !== latestRequestRef.current) return;
+      setData(null);
       setError(intl.formatMessage({ id: httpErrorKey(err, 'BILLING.HISTORY.ERROR') }));
     }
   }, [tab, from, to, storeId, page, intl]);
@@ -341,9 +358,12 @@ interface RowGroupProps {
  */
 function RowGroup({ item, index, expanded, onToggle, money, formatDay }: RowGroupProps) {
   const intl = useIntl();
-  const isCup = item.currency === 'CUP';
   const rate = item.exchangeRate;
   const owed = item.amountOwedUsd;
+  // The `i` exists only when the detail line it reveals can actually render: a CUP row with a
+  // null rate or null owed amount would otherwise expose a focusable control that expands into
+  // nothing (S8 — no dead control).
+  const canExplain = item.currency === 'CUP' && rate !== null && owed !== null;
 
   return (
     <>
@@ -359,7 +379,7 @@ function RowGroup({ item, index, expanded, onToggle, money, formatDay }: RowGrou
           {money(item.commission, item.currency)}
         </td>
         <td className="px-4 py-3 text-right">
-          {isCup && (
+          {canExplain && (
             <button
               type="button"
               aria-label={intl.formatMessage(
@@ -376,7 +396,7 @@ function RowGroup({ item, index, expanded, onToggle, money, formatDay }: RowGrou
           )}
         </td>
       </tr>
-      {isCup && expanded && rate !== null && owed !== null && (
+      {canExplain && expanded && (
         <tr data-testid={`history-detail-${index}`}>
           <td colSpan={7} className="bg-background px-4 py-2 text-xs text-text-muted">
             {intl.formatMessage(
