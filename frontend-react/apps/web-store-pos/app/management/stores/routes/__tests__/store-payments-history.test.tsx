@@ -196,6 +196,22 @@ describe('StorePaymentsHistoryPage — route gating wiring', () => {
 
     expect(after).not.toBe(before);
     expect(mockResellerFeatureLoader).toHaveBeenCalled();
+
+    // The gating contract is asserted with TWO oracles, deliberately. Two reviews of this file
+    // disagreed about which single oracle is right, and both of them were right about the other
+    // one's failure mode — so neither half below may be "simplified" away.
+    //
+    //  1. `EFeatures.StorePayment` — the symbol the component actually passes. It ties the test
+    //     to the domain constant instead of duplicating it, and it is the half that fails if the
+    //     gate is ever repointed to a different feature: the loader would receive another
+    //     member and the `toHaveBeenCalledWith` assertion below would no longer match.
+    //  2. `91` — the numeric contract of that enum member (mirror of the backend's
+    //     `FeatureType.StorePayment = 91`). It is the half that fails on a SILENT RENUMBERING of
+    //     `EFeatures.StorePayment`: symbol-to-symbol comparison keeps both sides in sync and
+    //     would stay green, while the feature id the backend understands would have moved.
+    //
+    // Repointing the gate breaks (1); renumbering the enum breaks (2). Keep both.
+    expect(EFeatures.StorePayment).toBe(91);
     expect(mockResellerFeatureLoader).toHaveBeenCalledWith([EFeatures.StorePayment]);
 
     const lastCallResult = mockResellerFeatureLoader.mock.results.at(-1)?.value;
