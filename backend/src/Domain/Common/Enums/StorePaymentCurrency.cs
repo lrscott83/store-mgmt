@@ -37,16 +37,17 @@ namespace Domain.Common.Enums
             };
 
         /// <summary>
-        /// Is this a currency the API actually serves? Query-string model binding turns ANY numeric
-        /// text into an enum value (<c>?currency=7</c> binds to <c>(StorePaymentCurrency)7</c>), so
-        /// the request pipeline must ask this before such a value reaches the query — otherwise the
-        /// repository's <c>== Cup</c> test reads it as USD and answers 200 on the wrong tab.
+        /// Is this a currency the API actually serves? A caller that builds the query without the
+        /// HTTP binder can hand over an out-of-range value, and the repository's <c>== Cup</c> test
+        /// would read it as USD and answer on the wrong tab.
         /// </summary>
         /// <remarks>
-        /// Every member is listed, so adding a currency is a visible decision here rather than a
-        /// value that quietly answers 400 until someone notices.
+        /// Derived from the enum itself rather than a hand-kept member list, so a currency added
+        /// later cannot be silently rejected (or silently mapped) until someone notices. Over the
+        /// wire the HTTP enum binder already answers 400 for an undefined value; this is the
+        /// guard for every path that does not pass through it.
         /// </remarks>
         public static bool IsDefinedCurrency(this StorePaymentCurrency currency)
-            => currency is StorePaymentCurrency.Usd or StorePaymentCurrency.Cup;
+            => Enum.IsDefined(currency);
     }
 }

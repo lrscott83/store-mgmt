@@ -441,7 +441,8 @@ namespace SMCA.WebApi.Controllers.v1
         /// </para>
         ///
         /// <para>
-        /// An unrecognised value is a 400 on BOTH paths, because neither can reach a tab:
+        /// An unrecognised value is a 400 on BOTH paths, and the two 400s come from different
+        /// places. This is MEASURED behaviour of this app configuration, not an assumption:
         /// </para>
         /// <list type="bullet">
         /// <item><description>
@@ -449,12 +450,18 @@ namespace SMCA.WebApi.Controllers.v1
         /// this action runs; and
         /// </description></item>
         /// <item><description>
-        /// an unknown NUMBER (<c>?currency=7</c>) binds successfully — model binding accepts any
-        /// numeric text for an enum — so the query handler rejects it with the same 400
-        /// (<c>ApiRequestInvalid</c>) before the repository is asked. Neither the action nor the
-        /// handler ever coerces a value to another tab.
+        /// an unknown NUMBER (<c>?currency=7</c>) is ALSO rejected by model binding - the enum
+        /// binder does not accept an undefined numeric value here - answering a validation envelope
+        /// whose error is keyed by the parameter name. Removing the handler's guard leaves this
+        /// request a 400, which is how the behaviour was verified.
         /// </description></item>
         /// </list>
+        /// <para>
+        /// The query handler therefore keeps a defined-value guard as a BACKSTOP, not as the wire
+        /// gate: it protects any future caller that builds the query without going through the
+        /// binder, and it is covered by unit tests rather than end-to-end. Neither the action nor
+        /// the handler ever coerces a value to another tab.
+        /// </para>
         /// </summary>
         [HttpGet("payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
