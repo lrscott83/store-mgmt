@@ -8,6 +8,7 @@ using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
 using Application.Features.StoreManagement.Stores.Commands.ToggleStorePlan;
 using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
 using Application.Features.StoreManagement.StorePayments.Queries.GetReSellerCommissions;
+using Application.Features.StoreManagement.StorePayments.Queries.GetStorePaymentsHistory;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
 using Application.Features.StoreManagement.Stores.Commands.ApproveStore;
 using Application.Features.StoreManagement.Stores.Commands.ChangeStorePlan;
@@ -428,5 +429,34 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetReSellerCommissionsAsync()
             => Ok(await Sender.Send(new GetReSellerCommissionsQuery()));
+
+        /// <summary>
+        /// Cobros realizados (store-payments-history): one page of PAID payments for the selected
+        /// currency tab, plus the totals over the WHOLE filter and both tab counts. A payment is one
+        /// charge in one currency, so the tab — and only the tab — decides the currency.
+        /// </summary>
+        [HttpGet("payments")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StorePaymentsHistoryDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetStorePaymentsHistoryAsync(
+            [FromQuery] string? currency = null,
+            [FromQuery] DateOnly? from = null,
+            [FromQuery] DateOnly? to = null,
+            [FromQuery] Guid? storeId = null,
+            [FromQuery] int page = 1)
+            => Ok(await Sender.Send(new GetStorePaymentsHistoryQuery(
+                ParsePaymentsHistoryCurrency(currency), from, to, storeId, page)));
+
+        /// <summary>
+        /// The tab is the currency filter; USD is the default (S5). Anything that is not CUP is USD,
+        /// so a typo can never silently switch tabs to an unexpected currency mix.
+        /// </summary>
+        private static StorePaymentHistoryCurrency ParsePaymentsHistoryCurrency(string? currency)
+            => string.Equals(currency, "CUP", StringComparison.OrdinalIgnoreCase)
+                ? StorePaymentHistoryCurrency.Cup
+                : StorePaymentHistoryCurrency.Usd;
     }
 }
