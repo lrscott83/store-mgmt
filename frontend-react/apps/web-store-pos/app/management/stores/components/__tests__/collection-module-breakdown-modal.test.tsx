@@ -35,7 +35,6 @@ function renderModal(
   return render(
     <Wrapper>
       <CollectionModuleBreakdownModal
-        open
         storeId="s1"
         storeName="Store One"
         rows={[]}
@@ -149,14 +148,16 @@ describe('CollectionModuleBreakdownModal — dismissal', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    // Two controls share the translated "close" name: the header icon button (aria-label)
-    // and the footer button (visible text). The header one comes first in DOM order.
-    const closeButtons = screen.getAllByRole('button', {
-      name: esMessages['GENERAL.CLOSE'],
-    });
-    expect(closeButtons).toHaveLength(2);
+    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
 
-    fireEvent.click(closeButtons[0]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onClose from the footer dismiss button', () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-dismiss'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });

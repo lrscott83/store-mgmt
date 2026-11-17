@@ -64,6 +64,22 @@ export function currentModulePrice(
 }
 
 /**
+ * The ONE "discounted" predicate: a base amount is discounted exactly when the effective
+ * amount beside it is LOWER. Both screens that show a strike-through ask this function, so the
+ * struck-through price can never appear in one place and not the other for the same money:
+ *
+ *   - the collections row (`collections.tsx`), comparing the server's `baseAmount` with `amount`;
+ *   - the breakdown popup (`collection-module-breakdown-modal.tsx`), comparing the
+ *     `totalModulePricing` columns `price` and `currentPrice`.
+ *
+ * Strictly lower on purpose: equal amounts mean no discount and no strike-through, and a
+ * "higher current price" is not a discount either.
+ */
+export function hasModuleDiscount(basePrice: number, currentPrice: number): boolean {
+  return currentPrice < basePrice;
+}
+
+/**
  * The two columns a plan (or any module collection) is displayed with: the BASE sum and the
  * EFFECTIVE sum. The shape mirrors the backend's `PlanPricingUtils.Sum` tuple
  * (`(float Price, float CurrentPrice)`), named here because JavaScript has no tuples.

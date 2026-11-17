@@ -74,10 +74,12 @@ function makePricingRow(
 /** A promise whose settlement this test controls — no timers involved. */
 function deferredResponse<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -650,5 +652,110 @@ describe('CollectionsPage — module breakdown popup', () => {
     expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
     expect(screen.queryByText('Modulo A')).toBeNull();
     expect(screen.getByText('Modulo B')).toBeInTheDocument();
+  });
+
+  /** Store A's pricing answer is deferred; store B's answers immediately. */
+  async function renderTwoStores() {
+    mockAuthUser = { isSuperAdmin: true };
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeRow({ storeId: 'sA', storeName: 'Store A' }),
+        makeRow({ storeId: 'sB', storeName: 'Store B' }),
+      ],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const storeAResponse = deferredResponse<BaseResponseModel<StoreModulePricingReadResult>>();
+    vi.mocked(storeHttpService.getStoreModulePricing).mockImplementation((storeId: string) => {
+      if (storeId === 'sA') return storeAResponse.promise;
+      return Promise.resolve({
+        succeeded: true,
+        data: {
+          storeId: 'sB',
+          modules: [makePricingRow({ moduleId: 2, name: 'Modulo B' })],
+          totalCurrentPrice: 100,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Store A')).toBeInTheDocument();
+      expect(screen.getByText('Store B')).toBeInTheDocument();
+    });
+
+    return { storeAResponse };
+  }
+
+  it('discards a stale REJECTION: store A failing after the operator left for store B shows no error', async () => {
+    const { storeAResponse } = await renderTwoStores();
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+    // Leave A for B before A settles — B answers at once.
+    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
+    fireEvent.click(screen.getByTestId('collection-breakdown-sB'));
+    await waitFor(() => {
+      expect(screen.getByText('Modulo B')).toBeInTheDocument();
+    });
+
+    // A finally REJECTS. That failure belongs to a store the dialog no longer shows.
+    await act(async () => {
+      storeAResponse.reject(new Error('network down'));
+      await storeAResponse.promise.catch(() => undefined);
+    });
+
+    expect(
+      screen.queryByText(esMessages['BILLING.COLLECTIONS.MODULE_BREAKDOWN_ERROR']),
+    ).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Modulo B')).toBeInTheDocument();
+    expect(screen.getByTestId('collection-breakdown-store')).toHaveTextContent('Store B');
+  });
+
+  it('a response for a CLOSED dialog cannot repopulate it', async () => {
+    const { storeAResponse } = await renderTwoStores();
+
+    fireEvent.click(screen.getByTestId('collection-breakdown-sA'));
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('collection-breakdown-close'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    // The abandoned store finally answers, with a distinctive module name of its own.
+    await act(async () => {
+      storeAResponse.resolve({
+        succeeded: true,
+        data: {
+          storeId: 'sA',
+          modules: [makePricingRow({ moduleId: 9, name: 'Modulo A Tardio' })],
+          totalCurrentPrice: 100,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
+      await storeAResponse.promise;
+    });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Modulo A Tardio')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

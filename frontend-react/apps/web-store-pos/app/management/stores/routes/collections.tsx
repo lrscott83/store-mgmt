@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, hasModuleDiscount } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { PaymentConfirmModal } from '~/management/stores/components/payment-confirm-modal';
@@ -218,7 +218,7 @@ export function CollectionsPage() {
                   <td className="px-4 py-3 text-text">{row.ownerName}</td>
                   <td className="px-4 py-3 text-right text-text">
                     <div className="flex items-center justify-end gap-2">
-                      {row.baseAmount > row.amount && (
+                      {hasModuleDiscount(row.baseAmount, row.amount) && (
                         <span
                           className="text-danger line-through"
                           data-testid={`collection-amount-base-${row.storeId}`}
@@ -275,7 +275,6 @@ export function CollectionsPage() {
       />
 
       <CollectionModuleBreakdownModal
-        open={breakdownRow !== null}
         storeId={breakdownRow?.storeId ?? null}
         storeName={breakdownRow?.storeName ?? ''}
         rows={breakdownRows}

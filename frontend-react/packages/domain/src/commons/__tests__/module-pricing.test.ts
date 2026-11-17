@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   currentModulePrice,
+  hasModuleDiscount,
   isBillableModule,
   totalModulePricing,
   type ModulePricingRow,
@@ -52,6 +53,23 @@ describe('isBillableModule', () => {
     expect(isBillableModule({ isActive: true, priceIncluded: true })).toBe(false);
     // Both flags failing still reads false, never a truthy accident.
     expect(isBillableModule({ isActive: false, priceIncluded: true })).toBe(false);
+  });
+});
+
+describe('hasModuleDiscount — the ONE "discounted" predicate', () => {
+  it('is true when the effective amount is LOWER than the base amount', () => {
+    expect(hasModuleDiscount(300, 270)).toBe(true);
+    // Clamped-to-zero totals are still discounted, not "free of discount".
+    expect(hasModuleDiscount(50, 0)).toBe(true);
+  });
+
+  it('is false when the two amounts are equal — no discount, so no strike-through', () => {
+    expect(hasModuleDiscount(100, 100)).toBe(false);
+    expect(hasModuleDiscount(0, 0)).toBe(false);
+  });
+
+  it('is false when the effective amount is HIGHER than the base amount', () => {
+    expect(hasModuleDiscount(100, 120)).toBe(false);
   });
 });
 

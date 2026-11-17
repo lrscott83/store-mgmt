@@ -1,13 +1,12 @@
 import { useIntl } from 'react-intl';
 import type { StoreModulePricingReadRow } from '@store-mgmt/domain';
-import { isBillableModule, totalModulePricing } from '@store-mgmt/domain';
+import { hasModuleDiscount, isBillableModule, totalModulePricing } from '@store-mgmt/domain';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface CollectionModuleBreakdownModalProps {
-  open: boolean;
-  /** Store being reviewed (null = closed). */
+  /** Store being reviewed — the ONE closed gate: null means the popup is not shown. */
   storeId: string | null;
   storeName: string;
   /** The pricing read for that store — the same payload the pricing editor seeds from. */
@@ -30,7 +29,6 @@ const COLUMN_CLASS = 'py-1.5 px-2';
  * contract.
  */
 export function CollectionModuleBreakdownModal({
-  open,
   storeId,
   storeName,
   rows,
@@ -41,11 +39,11 @@ export function CollectionModuleBreakdownModal({
   const intl = useIntl();
   const t = (id: string) => intl.formatMessage({ id });
 
-  if (!open || !storeId) return null;
+  if (!storeId) return null;
 
   const billable = rows.filter(isBillableModule);
   const totals = totalModulePricing(billable);
-  const hasDiscount = totals.currentPrice < totals.price;
+  const hasDiscount = hasModuleDiscount(totals.price, totals.currentPrice);
 
   return (
     <div
@@ -67,6 +65,7 @@ export function CollectionModuleBreakdownModal({
             onClick={onClose}
             className="text-text-muted hover:text-text"
             aria-label={t('GENERAL.CLOSE')}
+            data-testid="collection-breakdown-close"
           >
             <CloseIcon />
           </button>
@@ -171,6 +170,7 @@ export function CollectionModuleBreakdownModal({
             type="button"
             onClick={onClose}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text hover:bg-background"
+            data-testid="collection-breakdown-dismiss"
           >
             {t('GENERAL.CLOSE')}
           </button>
