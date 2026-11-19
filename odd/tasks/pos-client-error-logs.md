@@ -69,12 +69,26 @@ Existing test suites stay green.
 
 | ID | Spec | Route | Status |
 | --- | --- | --- | --- |
-| T1 | S5, S4 | delegated worker | pending |
-| T2 | S1-S4 | delegated worker | pending |
-| T3 | S6, S7 | delegated worker | pending |
-| T4 | S1-S3 | delegated worker | pending |
-| T5 | S8, S7 | delegated worker | pending |
-| T6 | S9 | parent | pending |
+| T1 | S5, S4 | delegated worker | done — split into `db1c42d0` (entity + EF mapping) and `dccfb45d` (generated migration + script) |
+| T2 | S1-S4 | delegated worker | done — `01bedf43` (ingest endpoint + 6 handler tests) |
+| T3 | S6, S7 | delegated worker | done — `8fd91522` (read endpoint + handler tests + 2 E2E) |
+| T4 | S1-S3 | delegated worker | done — `30dfd2c7` (publisher + hook + 13 tests) |
+| T5 | S8, S7 | delegated worker (aborted, completed by parent) | done — `b57fe41e` (route + service + menu + i18n + 6 tests) |
+| T6 | S9 | parent | done — backend 202 + 1893 + 979 passed, frontend 6542 passed / 6 skipped |
+
+## RDD per commit
+
+- `db1c42d0` — reviewed, approved, acknowledged (`review-d7a2002486080c71`).
+- `dccfb45d` — **not reviewable by the native engine**: `lens_context_budget_exceeded` at preflight
+  (its `Designer.cs` alone is 4258 generated lines). No authority was created.
+- `01bedf43` — reviewed, approved, acknowledged (`review-cbe13560a27c270b`).
+- `8fd91522` — reviewed, approved, acknowledged (`review-1f2c2579771e2e0f`).
+- `30dfd2c7` — reviewed, approved, acknowledged (`review-925e41279237563f`).
+- `b57fe41e` — reviewed, approved, acknowledged (`review-946eab1b0bde4e2a`).
+
+Advisory findings left as follow-up work (non-blocking, none reopened a review): the ingest endpoint
+trusts a caller-supplied `StoreId`, the server does not re-redact `Context`, `OwnerId`/`StoreId`
+filtering is only proven at unit level, and the publisher's hook trigger has no test.
 
 ## Log
 
