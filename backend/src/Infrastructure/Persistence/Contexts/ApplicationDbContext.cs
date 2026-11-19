@@ -41,6 +41,7 @@ using Domain.Entities.ProductSalesCommissions;
 using Domain.Entities.OrderSalesCommissions;
 using Domain.Entities.OrderSalesManagers;
 using Domain.Entities.StoreSyncFiles;
+using Domain.Entities.StoreClientErrors;
 
 namespace Infrastructure.Persistence.Contexts
 {
@@ -171,6 +172,7 @@ namespace Infrastructure.Persistence.Contexts
             // Repositorio de backups del POS: fichero (bytes opacos en disco) + marcas de descarga.
             builder.ApplyConfiguration(new StoreSyncFileEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreSyncFileDownloadEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new StoreClientErrorEntityTypeConfiguration());
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -196,6 +198,7 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
 
         internal DbSet<SiteEvent> SiteEvent { get; set; }
+        internal DbSet<StoreClientError> StoreClientError { get; set; }
         internal DbSet<CatalogEvent> CatalogEvent { get; set; }
         internal DbSet<SalesManager> SalesManager { get; set; }
         internal DbSet<ProductSalesCommission> ProductSalesCommission { get; set; }
