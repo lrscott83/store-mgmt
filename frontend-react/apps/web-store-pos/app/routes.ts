@@ -184,6 +184,10 @@ export default [
     // Admin — Catalog stats (SuperAdmin only): visitas anónimas del catálogo público.
     route('admin/catalog-stats', 'admin/catalog-stats/routes/catalog-stats.tsx'),
 
+    // Admin — Errores del cliente POS (SuperAdmin only, superAdminLoader en el módulo de ruta):
+    // el backend publica la lectura solo para SuperAdmin y los datos pueden no tener tienda.
+    route('admin/client-errors', 'admin/client-errors/routes/client-errors.tsx'),
+
     // Admin â€” Messages (SuperAdmin-only ownerâ†”admin inbox)
     route('admin/messages', 'admin/messages/routes/messages.tsx'),
 

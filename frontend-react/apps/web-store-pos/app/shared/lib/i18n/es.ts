@@ -254,6 +254,7 @@ const messages: Record<string, string> = {
   // Menu items — Admin (Angular MENU.ADMIN.*)
   'MENU.ADMIN_DASHBOARD': 'Dashboard',
   'MENU.ADMIN_CATALOG_STATS': 'Estadísticas del catálogo',
+  'MENU.ADMIN_CLIENT_ERRORS': 'Errores del cliente',
   'MENU.ADMIN_STORES': 'Tiendas',
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
@@ -2073,6 +2074,28 @@ const messages: Record<string, string> = {
   'ADMIN_CATALOG_STATS.SOURCE_OTHER_SEARCH': 'Otros buscadores',
   'ADMIN_CATALOG_STATS.SOURCE_REFERRAL': 'Referidos',
   'ADMIN_CATALOG_STATS.SOURCE_CAMPAIGN': 'Campañas',
+
+  // Admin — Errores del cliente POS (SuperAdmin only, `pos-client-error-logs` S7/S8).
+  // El rango por defecto es el día local del navegador; el backend compara instantes absolutos.
+  'ADMIN_CLIENT_ERRORS.HEADER': 'Errores del cliente POS',
+  'ADMIN_CLIENT_ERRORS.FILTERS': 'Propietario, tienda y fechas',
+  'ADMIN_CLIENT_ERRORS.OWNER': 'Propietario',
+  'ADMIN_CLIENT_ERRORS.ALL_OWNERS': 'Todos los propietarios',
+  'ADMIN_CLIENT_ERRORS.STORE': 'Tienda',
+  'ADMIN_CLIENT_ERRORS.ALL_STORES': 'Todas las tiendas',
+  'ADMIN_CLIENT_ERRORS.FROM': 'Desde',
+  'ADMIN_CLIENT_ERRORS.TO': 'Hasta',
+  'ADMIN_CLIENT_ERRORS.COL_OWNER': 'Propietario',
+  'ADMIN_CLIENT_ERRORS.COL_STORE': 'Tienda',
+  'ADMIN_CLIENT_ERRORS.COL_LOG': 'Registro',
+  'ADMIN_CLIENT_ERRORS.COUNT': 'Veces: {count}',
+  'ADMIN_CLIENT_ERRORS.TOTAL': 'Errores encontrados: {total}',
+  'ADMIN_CLIENT_ERRORS.PAGE': 'Página {page} de {last}',
+  'ADMIN_CLIENT_ERRORS.PREV_PAGE': 'Anterior',
+  'ADMIN_CLIENT_ERRORS.NEXT_PAGE': 'Siguiente',
+  'ADMIN_CLIENT_ERRORS.EMPTY_STATE': 'No hay errores registrados con estos filtros.',
+  'ADMIN_CLIENT_ERRORS.ERROR': 'No se pudieron cargar los errores.',
+  'ADMIN_CLIENT_ERRORS.NONE': '—',
 
   // Admin — Resellers
   // admin-owners-resellers-parity (Stage 5 Admin), Phase 4 — LIST_TITLE/CREATE_TITLE

@@ -76,6 +76,17 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Estadísticas del catálogo público. Consulta visitas, visitantes únicos, páginas vistas, pedidos y conversión por tienda, además del origen del tráfico y los productos más vistos.',
       },
+      // SuperAdmin-only: errores publicados por el cliente POS (spec S8). La ruta usa
+      // superAdminLoader y el endpoint de lectura exige SuperAdmin; sin featureIds porque
+      // ningún `StoreRoleFeatures` respalda esta capacidad.
+      {
+        label: 'MENU.ADMIN_CLIENT_ERRORS',
+        path: '/admin/client-errors',
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin,
+        helpContent:
+          'Errores del cliente POS. Consulta los errores que reportaron los dispositivos de las tiendas, con el propietario, la tienda y el detalle de cada registro. Filtra por propietario, tienda y rango de fechas.',
+      },
       {
         label: 'MENU.ADMIN_STORES',
         path: '/admin/stores',
