@@ -18,6 +18,7 @@ import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { flushStartupPolyfillDiagnostics } from '~/shared/lib/browser-compat/startup-diagnostics';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
+import { useClientErrorPublisher } from '~/shared/lib/diagnostics/use-client-error-publisher';
 import { useSitePageView } from '~/shared/lib/telemetry/use-site-page-view';
 import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
@@ -154,6 +155,11 @@ export default function App() {
   // Angular's `StoreUsageTrackerService` nav hook (see
   // `~/shared/lib/usage/store-usage-tracker.ts`).
   useStoreUsageTracker();
+
+  // pos-client-error-logs S2/S3: publish the buffered POS errors to the backend
+  // while the device is online with a live session. Offline/pre-login entries
+  // stay in the local buffer and go out on the next run.
+  useClientErrorPublisher();
 
   // Telemetría de páginas públicas del sitio (landing, /login, /register y legales): beacon
   // anónimo fire-and-forget, con la misma política de privacidad que el catálogo. La lista
