@@ -43,8 +43,8 @@ namespace Application.Features.StoreClientErrors.Queries.GetClientErrors
             if (!_httpContextService.IsSuperAdmin)
                 throw new ApiException(_localizer["Unauthorized"], HttpStatusCode.Forbidden);
 
-            int page = query.Page < 1 ? 1 : query.Page;
-            int pageSize = Math.Clamp(query.PageSize, 1, StoreClientErrorsPageSize.Max);
+            int page = Math.Clamp(query.Page, 1, StoreClientErrorsPagination.MaxPage);
+            int pageSize = Math.Clamp(query.PageSize, 1, StoreClientErrorsPagination.MaxPageSize);
 
             StoreClientErrorsPage result = await _storeClientErrorRepository.GetPageAsync(
                 new StoreClientErrorsFilter(query.OwnerId, query.StoreId, query.From, query.To, page, pageSize),

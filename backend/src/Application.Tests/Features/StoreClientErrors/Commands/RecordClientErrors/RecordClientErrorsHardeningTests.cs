@@ -139,6 +139,47 @@ public class RecordClientErrorsHardeningTests
             x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_AsSuperAdmin_AttributesToAnyExistingStore()
+    {
+        // El SuperAdmin no tiene tienda seleccionada, así que el ámbito de un usuario normal le
+        // devuelve vacío: exigirle pertenencia descartaría sus errores (y los del POS que usa).
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
+        _storeRepository
+            .Setup(x => x.GetStoreByIdAsync(_otherStore.Id))
+            .ReturnsAsync(_otherStore);
+        var saved = CaptureSaved();
+        var command = new RecordClientErrorsCommand(_otherStore.Id, new[] { Entry() });
+
+        // Act
+        var result = await Handler().Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Data.Should().BeTrue();
+        saved.Should().ContainSingle();
+        saved[0].StoreId.Should().Be(_otherStore.Id);
+    }
+
+    [Fact]
+    public async Task Handle_AsSuperAdmin_WithAStoreThatDoesNotExist_DropsTheBatch()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(false);
+        _storeRepository
+            .Setup(x => x.GetStoreByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Store?)null);
+        var command = new RecordClientErrorsCommand(Guid.NewGuid(), new[] { Entry() });
+
+        // Act
+        var result = await Handler().Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Data.Should().BeFalse();
+        _repository.Verify(
+            x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreClientError>>()), Times.Never);
+    }
+
     #endregion
 
     #region Redacción del servidor

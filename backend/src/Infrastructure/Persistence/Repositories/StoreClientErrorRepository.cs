@@ -1,3 +1,4 @@
+using Application.Features.StoreClientErrors.Queries.GetClientErrors;
 using Domain.Entities.StoreClientErrors;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
@@ -25,7 +26,8 @@ namespace Infrastructure.Persistence.Repositories
         /// El rango de fechas es INCLUSIVO en ambos extremos y compara `OccurredAt`, el instante del
         /// cliente (S7) — no `ReceivedAt`, la llegada al servidor. Npgsql rechaza un
         /// `timestamp with time zone` con `Kind` distinto de UTC, así que las cotas se normalizan
-        /// aquí: el cliente manda instantes absolutos y el binder puede entregarlos sin `Kind`.
+        /// con <see cref="StoreClientErrorsDateBounds.ToUtc"/> — CONVERSIÓN, no reetiquetado: una
+        /// cota en local se traslada a su instante universal en vez de conservar la hora de pared.
         /// </summary>
         public async Task<StoreClientErrorsPage> GetPageAsync(StoreClientErrorsFilter filter,
             CancellationToken cancellationToken = default)
@@ -40,13 +42,13 @@ namespace Infrastructure.Persistence.Repositories
 
             if (filter.From is { } from)
             {
-                DateTime fromUtc = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+                DateTime fromUtc = StoreClientErrorsDateBounds.ToUtc(from);
                 query = query.Where(e => e.OccurredAt >= fromUtc);
             }
 
             if (filter.To is { } to)
             {
-                DateTime toUtc = DateTime.SpecifyKind(to, DateTimeKind.Utc);
+                DateTime toUtc = StoreClientErrorsDateBounds.ToUtc(to);
                 query = query.Where(e => e.OccurredAt <= toUtc);
             }
 

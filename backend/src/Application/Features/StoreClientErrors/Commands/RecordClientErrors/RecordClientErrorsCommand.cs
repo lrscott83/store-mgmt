@@ -127,12 +127,23 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
         /// La tienda que el llamador puede usar, o `null` cuando la pedida queda fuera de su ámbito.
         /// `null` de entrada significa "sin tienda" y no consulta nada: el error es anterior a una
         /// sesión (spec S4) y no hay atribución que comprobar.
+        ///
+        /// El SuperAdmin es la excepción explícita: no tiene tienda seleccionada, así que el ámbito
+        /// de tiendas de un usuario normal le devuelve vacío y sus errores atribuidos se perderían
+        /// —incluido el uso normal del POS por quien ve todas las tiendas—. Para él la comprobación
+        /// es que la tienda exista, no que pertenezca a un ámbito que por definición no tiene.
         /// </summary>
         private async Task<Guid?> ResolveStoreIdAsync(Guid? requestedStoreId,
             CancellationToken cancellationToken)
         {
             if (requestedStoreId is null)
                 return null;
+
+            if (_httpContextService.IsSuperAdmin)
+            {
+                Store? existing = await _storeRepository.GetStoreByIdAsync(requestedStoreId.Value);
+                return existing?.Id;
+            }
 
             Store? allowed = await StoreSyncStoreScope.TryResolveAsync(
                 requestedStoreId.Value, _httpContextService, _storeRepository, cancellationToken);

@@ -54,7 +54,7 @@ namespace SMCA.WebApi.Controllers.v1
         /// <param name="storeId">Solo los errores de esa tienda.</param>
         /// <param name="from">Cota inferior inclusive de `OccurredAt`, instante absoluto (ISO 8601).</param>
         /// <param name="to">Cota superior inclusive de `OccurredAt`, instante absoluto (ISO 8601).</param>
-        /// <param name="page">Página, 1-based. Valores menores se recortan a 1.</param>
+        /// <param name="page">Página, 1-based. Valores menores se recortan a 1 y mayores que 10000 a 10000.</param>
         /// <param name="pageSize">Tamaño de página. Valores mayores que 200 se recortan a 200.</param>
         [HttpGet("~/api/v1/store-client-errors")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
@@ -64,7 +64,7 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetAsync([FromQuery] Guid? ownerId, [FromQuery] Guid? storeId,
             [FromQuery] DateTime? from, [FromQuery] DateTime? to,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = StoreClientErrorsPageSize.Default)
+            [FromQuery] int pageSize = StoreClientErrorsPagination.Default)
         {
             return Ok(await Sender.Send(new GetClientErrorsQuery(ownerId, storeId, from, to, page, pageSize)));
         }
