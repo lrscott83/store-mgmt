@@ -40,7 +40,8 @@ namespace Domain.Entities.StoreClientErrors
 
         /// <summary>
         /// Número de repeticiones de este error dentro de su ventana en el buffer del cliente. Nace
-        /// en 1: una fila nunca representa cero ocurrencias.
+        /// en 1 y nunca baja de ahí: <see cref="Create"/> lo garantiza, así que una fila jamás
+        /// representa cero ocurrencias.
         /// </summary>
         public int Count { get; set; } = 1;
 
@@ -75,11 +76,49 @@ namespace Domain.Entities.StoreClientErrors
             ReceivedAt = receivedAt;
         }
 
-        /// <summary>Un error del cliente POS. `count` ya viene agregado por el buffer del navegador.</summary>
-        public static StoreClientError Create(Guid? storeId, string message, string? route, string? location,
-            int count, string? context, string? appVersion, string? device, DateTime occurredAt,
-            DateTime receivedAt)
-            => new(Guid.NewGuid(), storeId, message, route, location, count, context, appVersion, device,
-                occurredAt, receivedAt);
+        /// <summary>
+        /// Datos de un error recién capturado. Es un objeto con nombre en vez de diez posicionales:
+        /// seis campos seguidos son del mismo tipo (`string?`), así que un `route`/`location`
+        /// traspuesto compila y se guarda en la columna equivocada.
+        /// </summary>
+        public sealed record NewStoreClientError(
+            Guid? StoreId,
+            string Message,
+            string? Route,
+            string? Location,
+            int Count,
+            string? Context,
+            string? AppVersion,
+            string? Device,
+            DateTime OccurredAt,
+            DateTime ReceivedAt);
+
+        /// <summary>
+        /// Un error del cliente POS. Las dos reglas que la tabla documenta se cumplen AQUÍ, no en un
+        /// comentario: el mensaje vacío se rechaza (es un error de programación: el handler ya
+        /// descarta las entradas en blanco) y `Count` nunca baja de 1, porque una fila no puede
+        /// representar cero ocurrencias.
+        /// </summary>
+        public static StoreClientError Create(NewStoreClientError payload)
+        {
+            ArgumentNullException.ThrowIfNull(payload);
+
+            string message = payload.Message?.Trim() ?? string.Empty;
+            if (message.Length == 0)
+                throw new ArgumentException("A client error needs a message.", nameof(payload));
+
+            return new StoreClientError(
+                Guid.NewGuid(),
+                payload.StoreId,
+                message,
+                payload.Route,
+                payload.Location,
+                Math.Max(1, payload.Count),
+                payload.Context,
+                payload.AppVersion,
+                payload.Device,
+                payload.OccurredAt,
+                payload.ReceivedAt);
+        }
     }
 }

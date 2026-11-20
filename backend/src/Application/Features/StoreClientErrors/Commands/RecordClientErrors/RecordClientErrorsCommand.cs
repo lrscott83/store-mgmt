@@ -98,7 +98,7 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
                         out string message))
                     continue;
 
-                errors.Add(StoreClientError.Create(
+                errors.Add(StoreClientError.Create(new StoreClientError.NewStoreClientError(
                     storeId,
                     message,
                     TruncateOptional(ClientLogRedactor.RedactText(item.Route),
@@ -112,7 +112,7 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
                     TruncateOptional(ClientLogRedactor.RedactText(item.Device),
                         StoreClientError.DeviceMaxLength),
                     DateTime.SpecifyKind(item.OccurredAt, DateTimeKind.Utc),
-                    receivedAt));
+                    receivedAt)));
             }
 
             if (errors.Count == 0)

@@ -14,7 +14,10 @@
 --
 -- GENERATED from the EF migration with
 --   dotnet ef migrations script 20261105230228_Normalize-OrderType-And-Add-OrderItem-WholesaleSnapshot
--- (single new migration -> -From the PREVIOUS one, no -To). Only this header, the
+-- (single new migration -> -From the PREVIOUS one, no -To). Its source is
+--   backend/src/Infrastructure/Migrations/20261119193711_Add-StoreClientErrors.cs
+-- (plus the Designer file of the same name); that pair is the source of truth and this script is
+-- only its generated output, so any review of the DDL belongs on those two files. Only this header, the
 -- __EFMigrationsHistory guard, the manual ROLLBACK note and the verification queries were
 -- added by hand. The DDL body is EF's output, unchanged.
 --
