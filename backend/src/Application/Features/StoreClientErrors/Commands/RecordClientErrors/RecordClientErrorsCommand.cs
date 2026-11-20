@@ -106,7 +106,7 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
                     TruncateOptional(ClientLogRedactor.RedactText(item.Location),
                         StoreClientError.LocationMaxLength),
                     NormalizeCount(item.Count),
-                    SerializeContext(ClientLogRedactor.RedactContext(item.Context)),
+                    SerializeContext(item.Context),
                     TruncateOptional(ClientLogRedactor.RedactText(item.AppVersion),
                         StoreClientError.AppVersionMaxLength),
                     TruncateOptional(ClientLogRedactor.RedactText(item.Device),
@@ -145,10 +145,11 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
             => count is > 0 ? count.Value : 1;
 
         /// <summary>
-        /// El contexto ya viene redactado y acotado; solo se serializa. Si la serialización falla
-        /// —un valor que System.Text.Json no soporta, un getter que lanza— la fila se guarda SIN
-        /// contexto en vez de perder el error entero: es un endpoint de mejor esfuerzo y el
-        /// `catch` es amplio a propósito, porque el dato lo elige el cliente.
+        /// El contexto se redacta Y se serializa DENTRO del mismo guard: la redacción también puede
+        /// fallar (un <c>JsonElement</c> con claves repetidas, un valor que lanza al recorrerlo), y
+        /// una redacción evaluada fuera del <c>try</c> dejaría escapar la excepción y se llevaría el
+        /// lote entero, justo lo que este método promete que no pasa. Si algo falla, la fila se
+        /// guarda SIN contexto en vez de perderse: es un endpoint de mejor esfuerzo.
         /// </summary>
         private static string? SerializeContext(Dictionary<string, object?>? context)
         {
@@ -157,7 +158,9 @@ namespace Application.Features.StoreClientErrors.Commands.RecordClientErrors
 
             try
             {
-                return TruncateOptional(JsonSerializer.Serialize(context),
+                Dictionary<string, object?>? redacted = ClientLogRedactor.RedactContext(context);
+
+                return TruncateOptional(JsonSerializer.Serialize(redacted),
                     StoreClientError.ContextMaxLength);
             }
             catch (Exception)

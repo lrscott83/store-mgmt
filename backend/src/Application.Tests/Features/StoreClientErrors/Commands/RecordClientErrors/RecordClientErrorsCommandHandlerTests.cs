@@ -32,6 +32,7 @@ public class RecordClientErrorsCommandHandlerTests
             .ReturnsAsync(1);
 
         _httpContextService.Setup(x => x.UserExternalId).Returns(_ownerId.ToString());
+        _httpContextService.Setup(x => x.TenantId).Returns(Guid.NewGuid().ToString());
         _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(true);
         _httpContextService.Setup(x => x.IsReSeller).Returns(false);
 

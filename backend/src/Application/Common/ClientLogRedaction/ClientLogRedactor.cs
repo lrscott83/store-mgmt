@@ -87,13 +87,27 @@ namespace Application.Common.ClientLogRedaction
             => element.ValueKind switch
             {
                 JsonValueKind.String => RedactText(element.GetString()),
-                JsonValueKind.Object => element.EnumerateObject().ToDictionary(
-                    property => property.Name,
-                    property => RedactValue(property.Value, IsSensitiveKey(property.Name))),
+                JsonValueKind.Object => RedactObject(element),
                 JsonValueKind.Array => element.EnumerateArray()
                     .Select(item => RedactValue(item, false))
                     .ToList(),
                 _ => element,
             };
+
+        /// <summary>
+        /// Un JSON con la MISMA clave repetida hace que <c>ToDictionary</c> lance
+        /// <see cref="ArgumentException"/>. El binding de <c>Dictionary&lt;string, object?&gt;</c> se
+        /// queda con la última aparición, así que aquí también: una clave repetida no puede costar
+        /// el lote entero, que es justo lo que el guard del handler promete evitar.
+        /// </summary>
+        private static Dictionary<string, object?> RedactObject(JsonElement element)
+        {
+            var redacted = new Dictionary<string, object?>();
+
+            foreach (JsonProperty property in element.EnumerateObject())
+                redacted[property.Name] = RedactValue(property.Value, IsSensitiveKey(property.Name));
+
+            return redacted;
+        }
     }
 }

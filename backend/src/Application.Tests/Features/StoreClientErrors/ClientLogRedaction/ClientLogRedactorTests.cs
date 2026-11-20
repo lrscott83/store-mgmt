@@ -183,5 +183,39 @@ public class ClientLogRedactorTests
         ClientLogRedactor.RedactContext(new Dictionary<string, object?>()).Should().BeEmpty();
     }
 
+    [Fact]
+    public void RedactContext_WithAnArrayValue_ScrubsEverySeededElement()
+    {
+        // El binding puede entregar arrays (una entrada del buffer con varias muestras): las ramas
+        // de lista nunca se ejercitaban y un secreto dentro de un elemento pasaba tal cual.
+        Dictionary<string, object?> context = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            """{"samples":[{"accessToken":"abc.def"},{"note":"Bearer xyz"},{"note":"limpio"}]}""")!;
+
+        // Act
+        string json = JsonSerializer.Serialize(ClientLogRedactor.RedactContext(context));
+
+        // Assert
+        json.Should().Contain("[REDACTED]");
+        json.Should().NotContain("abc.def");
+        json.Should().NotContain("xyz");
+        json.Should().Contain("limpio");
+    }
+
+    [Fact]
+    public void RedactContext_WithADuplicatedNestedKey_DoesNotThrow()
+    {
+        // `ToDictionary` lanzaba ArgumentException con la MISMA clave repetida dentro de un objeto
+        // anidado; el binding se queda con la última, así que la redacción no puede costar el lote.
+        Dictionary<string, object?> context = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            """{"nested":{"token":"a","token":"b"}}""")!;
+
+        // Act
+        Action act = () => ClientLogRedactor.RedactContext(context);
+
+        // Assert
+        act.Should().NotThrow();
+        JsonSerializer.Serialize(ClientLogRedactor.RedactContext(context)).Should().NotContain("\"a\"");
+    }
+
     #endregion
 }

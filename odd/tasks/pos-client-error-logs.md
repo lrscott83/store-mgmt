@@ -94,7 +94,7 @@ filtering is only proven at unit level, and the publisher's hook trigger has no 
 
 | ID | Group | Findings closed |
 | --- | --- | --- |
-| U1 | ingest hardening | store-ownership check, server-side redaction, serialize guard, cap-after-filter, truncate helper, DI placement, route/version note, test cleanup, ingestion rate limit |
+| U1 | ingest hardening | store-ownership check, server-side redaction, serialize guard, cap-after-filter, truncate helper, DI placement, route/version note, test cleanup. Ingestion rate limit NOT closed: `RateLimitPolicies` only exposes IP partitions (`Login`, `Register`, `PublicCatalog`, `OnlineOrder`); reusing one would push every POS behind one NAT into a single bucket, so no policy was invented |
 | U2 | entity + schema | count CHECK constraint, enforced invariants or reworded docs, payload parameter object, script provenance header |
 | U3 | read query | UTC conversion instead of relabel, page upper clamp, inclusive-bounds test, TotalCount-independence test, pageSize lower clamp test, E2E owner/store filter test, E2E 403 pin |
 | U4 | publisher | entry identity (idempotency), explicit ordering, hook-trigger test, mutex test, cursor-corruption tests, cursor counter rename, shared device/appVersion helper, test setup dedupe |
