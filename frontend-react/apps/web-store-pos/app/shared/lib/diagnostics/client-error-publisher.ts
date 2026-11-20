@@ -1,5 +1,4 @@
 import { apiClient } from '~/shared/lib/http/api-client';
-import { sha256Base64 } from '~/shared/lib/offline/offline-crypto';
 import {
   formatClientDeviceDescriptor,
   getClientAppVersion,
@@ -22,10 +21,8 @@ import {
  * - `skipLoading` + `skipDiagnostics`: a publish failure must not drive the
  *   global overlay, and must never be written back into the buffer it reads
  *   from (that would be a self-feeding loop).
- * - Publication order is explicit — `ts`, then `message` — never the ring
+ * - Publication order is explicit - `ts`, then `message` - never the ring
  *   buffer's own order, so the cursor means the same thing on every device.
- * - Every entry carries a stable `entryId` derived from the entry itself, so
- *   the at-least-once delivery can be deduplicated server-side later.
  * - A cursor in its own localStorage key stops republishing. It advances ONLY
  *   after the backend accepted the chunk, so a failed chunk is retried. A
  *   corrupt or unwritable cursor degrades to "resend", never to "lose".
@@ -56,8 +53,6 @@ interface PublishCursor {
 }
 
 interface ErrorEntryPayload {
-  /** Stable identity of the buffered entry — see `entryIdOf`. */
-  entryId: string;
   occurredAt: string;
   message: string;
   route?: string;
@@ -139,34 +134,8 @@ function advanceCursor(published: ClientLogEntry[]): void {
   }
 }
 
-/**
- * Deterministic per-entry identity: SHA-256 of the entry's identifying fields.
- * The server can deduplicate an at-least-once re-delivery by `entryId`; it is
- * derived from the entry ONLY, so the same buffered entry always yields the
- * same id across publishes, devices and reloads.
- */
-async function entryIdOf(entry: ClientLogEntry): Promise<string> {
-  const source = [
-    entry.ts,
-    entry.level,
-    entry.message,
-    entry.location ?? '',
-    entry.route ?? '',
-    entry.count ?? 1,
-  ].join('|');
-  try {
-    return await sha256Base64(source);
-  } catch {
-    // Web Crypto unavailable (insecure context): fall back to the very same
-    // canonical string — still deterministic and unique per entry, and every
-    // field in it is already travelling in the payload.
-    return source;
-  }
-}
-
-async function toWireEntry(entry: ClientLogEntry): Promise<ErrorEntryPayload> {
+function toWireEntry(entry: ClientLogEntry): ErrorEntryPayload {
   return {
-    entryId: await entryIdOf(entry),
     occurredAt: new Date(entry.ts).toISOString(),
     message: entry.message,
     route: entry.route,
@@ -201,8 +170,8 @@ export async function publishClientErrorLogs(
 
     for (let i = 0; i < pending.length; i += MAX_ERRORS_PER_REQUEST) {
       const chunk = pending.slice(i, i + MAX_ERRORS_PER_REQUEST);
-      const errors = await Promise.all(chunk.map(toWireEntry));
       try {
+        const errors = chunk.map(toWireEntry);
         await apiClient.post(
           CLIENT_ERROR_PUBLISH_ENDPOINT,
           { storeId, errors },

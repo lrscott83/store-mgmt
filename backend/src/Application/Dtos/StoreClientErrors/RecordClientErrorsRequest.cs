@@ -6,7 +6,9 @@ namespace Application.Dtos.StoreClientErrors
     /// está online. `StoreId` es NULLABLE a propósito: un error anterior a una sesión (login
     /// fallido, clave de dispositivo) se publica igual y su tienda no existe (spec S4).
     ///
-    /// El contexto llega ya redactado por el cliente; el servidor no intenta limpiarlo.
+    /// El contexto llega redactado por el cliente y el servidor lo VUELVE A REDACTAR
+    /// (`ClientLogRedactor`): la redacción del navegador es una promesa del cliente, no una
+    /// garantía del servidor.
     /// </summary>
     public sealed class RecordClientErrorsRequest
     {

@@ -9,8 +9,6 @@ import { GlobalConfig } from '~/shared/lib/config/global-config';
 //  - offline / unauthenticated runs send nothing (entries wait for the next run)
 //  - entries are published oldest-first, sorted by `ts` then `message`, no
 //    matter what order the ring buffer happens to hold them in
-//  - every entry carries a stable `entryId` derived from the entry itself, so
-//    an at-least-once delivery can be deduplicated server-side later
 //  - at most 50 entries per request, sequential chunks
 //  - `skipLoading` + `skipDiagnostics`, so a failed publish never feeds the
 //    diagnostic buffer it reads from (no feedback loop)
@@ -152,7 +150,6 @@ describe('publishClientErrorLogs — wire body', () => {
         count: 1,
         context: { attempt: 2 },
         appVersion: GlobalConfig.APP_VERSION,
-        entryId: expect.any(String),
       }),
     );
   });
@@ -196,37 +193,7 @@ describe('publishClientErrorLogs — wire body', () => {
   });
 });
 
-describe('publishClientErrorLogs — U1: stable per-entry identity', () => {
-  it('gives the same buffered entry the same entryId on every publish', async () => {
-    logClientError({ level: 'error', message: 'stable-entry', ts: T0 });
-
-    await publishClientErrorLogs(ONLINE_AUTHENTICATED);
-    const firstId = bodyOf(0).errors[0]!['entryId'];
-
-    // Simulate a lost cursor: the entry is published again, unchanged.
-    localStorage.removeItem(CLIENT_ERROR_PUBLISH_CURSOR_KEY);
-    await publishClientErrorLogs(ONLINE_AUTHENTICATED);
-
-    expect(post).toHaveBeenCalledTimes(2);
-    expect(bodyOf(1).errors[0]!['entryId']).toBe(firstId);
-    expect(typeof firstId).toBe('string');
-    expect(firstId).not.toBe('');
-    // A digest, not the entry echoed back — so it stays a pure identity key.
-    expect(String(firstId)).not.toContain('stable-entry');
-  });
-
-  it('gives two different entries different entryIds', async () => {
-    logClientError({ level: 'error', message: 'first-entry', ts: T0 });
-    logClientError({ level: 'error', message: 'second-entry', ts: T0 + 1 });
-
-    await publishClientErrorLogs(ONLINE_AUTHENTICATED);
-
-    const [first, second] = bodyOf().errors;
-    expect(first!['entryId']).not.toBe(second!['entryId']);
-  });
-});
-
-describe('publishClientErrorLogs — U2: explicit ordering', () => {
+describe('publishClientErrorLogs - U2: explicit ordering', () => {
   it('posts entries sorted by ts ascending, then by message', async () => {
     seedBuffer([
       { ts: T0 + 3, level: 'error', message: 'd' },
