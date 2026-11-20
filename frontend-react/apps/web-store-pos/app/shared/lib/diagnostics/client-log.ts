@@ -34,7 +34,7 @@ export interface ClientLogEntry {
   context?: Record<string, string | number | boolean | null>;
 }
 
-const LOG_KEY = 'lizoft.client-log-v1';
+export const CLIENT_LOG_STORAGE_KEY = 'lizoft.client-log-v1';
 const MAX_ENTRIES = 200;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_MESSAGE_LENGTH = 500;
@@ -69,7 +69,7 @@ function redactContext(
 
 function readFromStorage(): ClientLogEntry[] {
   try {
-    const raw = localStorage.getItem(LOG_KEY);
+    const raw = localStorage.getItem(CLIENT_LOG_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? (parsed as ClientLogEntry[]) : [];
@@ -79,7 +79,7 @@ function readFromStorage(): ClientLogEntry[] {
 }
 
 function writeToStorage(entries: ClientLogEntry[]): void {
-  localStorage.setItem(LOG_KEY, JSON.stringify(entries));
+  localStorage.setItem(CLIENT_LOG_STORAGE_KEY, JSON.stringify(entries));
 }
 
 /** Evict-oldest-and-retry-once policy for quota failures. */
@@ -169,7 +169,7 @@ export function getClientLogs(): ClientLogEntry[] {
 export function clearClientLogs(): void {
   inMemoryBuffer = null;
   try {
-    localStorage.removeItem(LOG_KEY);
+    localStorage.removeItem(CLIENT_LOG_STORAGE_KEY);
   } catch {
     // best-effort
   }
@@ -197,17 +197,41 @@ export interface ClientLogExport {
   entries: ClientLogEntry[];
 }
 
+/**
+ * The device signals every diagnostics payload reports. One reader so the
+ * manual export and the error publisher cannot describe the same device
+ * differently (`exportClientLogs` embeds it, the publisher folds it into a
+ * one-line descriptor).
+ */
+export function readClientDeviceInfo(): Pick<ClientLogExport['device'], 'userAgent' | 'onLine' | 'language'> {
+  return {
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    onLine: typeof navigator !== 'undefined' ? navigator.onLine : false,
+    language: typeof navigator !== 'undefined' ? navigator.language : '',
+  };
+}
+
+/** `userAgent | lang=… | online=…` — the publisher's one-line device field. */
+export function formatClientDeviceDescriptor(
+  info: ReturnType<typeof readClientDeviceInfo> = readClientDeviceInfo(),
+): string {
+  return `${info.userAgent} | lang=${info.language} | online=${info.onLine}`;
+}
+
+/** Single source for the app version reported by every diagnostics payload. */
+export function getClientAppVersion(): string {
+  return GlobalConfig.APP_VERSION;
+}
+
 /** Pretty JSON with a device-metadata header — the shareable artifact. */
 export function exportClientLogs(
   selectedStoreId?: string,
   pwa?: ClientLogExport['pwa'],
 ): string {
   const payload: ClientLogExport = {
-    appVersion: GlobalConfig.APP_VERSION,
+    appVersion: getClientAppVersion(),
     device: {
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-      onLine: typeof navigator !== 'undefined' ? navigator.onLine : false,
-      language: typeof navigator !== 'undefined' ? navigator.language : '',
+      ...readClientDeviceInfo(),
       timestamp: new Date().toISOString(),
     },
     ...(selectedStoreId ? { selectedStoreId } : {}),

@@ -1,6 +1,11 @@
 import { apiClient } from '~/shared/lib/http/api-client';
-import { GlobalConfig } from '../config/global-config';
-import { getClientLogs, type ClientLogEntry } from './client-log';
+import { sha256Base64 } from '~/shared/lib/offline/offline-crypto';
+import {
+  formatClientDeviceDescriptor,
+  getClientAppVersion,
+  getClientLogs,
+  type ClientLogEntry,
+} from './client-log';
 
 /**
  * Client side of `POST /api/v1/store-client-errors` (pos-client-error-logs
@@ -17,18 +22,22 @@ import { getClientLogs, type ClientLogEntry } from './client-log';
  * - `skipLoading` + `skipDiagnostics`: a publish failure must not drive the
  *   global overlay, and must never be written back into the buffer it reads
  *   from (that would be a self-feeding loop).
+ * - Publication order is explicit — `ts`, then `message` — never the ring
+ *   buffer's own order, so the cursor means the same thing on every device.
+ * - Every entry carries a stable `entryId` derived from the entry itself, so
+ *   the at-least-once delivery can be deduplicated server-side later.
  * - A cursor in its own localStorage key stops republishing. It advances ONLY
- *   after the backend accepted the chunk, so a failed chunk is retried.
+ *   after the backend accepted the chunk, so a failed chunk is retried. A
+ *   corrupt or unwritable cursor degrades to "resend", never to "lose".
  * - Publishing never throws: the caller is a fire-and-forget effect.
  */
 
 export const CLIENT_ERROR_PUBLISH_INTERVAL_MS = 60_000;
 export const MAX_ERRORS_PER_REQUEST = 50;
-
-const ENDPOINT = '/v1/store-client-errors';
-const CURSOR_KEY = 'lizoft.client-error-publish-cursor-v1';
+export const CLIENT_ERROR_PUBLISH_ENDPOINT = '/v1/store-client-errors';
+export const CLIENT_ERROR_PUBLISH_CURSOR_KEY = 'lizoft.client-error-publish-cursor-v1';
 // Same all-zero sentinel store-usage-tracker.ts uses for "no store assigned".
-const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+export const EMPTY_STORE_ID = '00000000-0000-0000-0000-000000000000';
 
 export interface PublishClientErrorLogsOptions {
   /** `useOnlineStatus()` — entries buffered offline go out on the next online run. */
@@ -47,6 +56,8 @@ interface PublishCursor {
 }
 
 interface ErrorEntryPayload {
+  /** Stable identity of the buffered entry — see `entryIdOf`. */
+  entryId: string;
   occurredAt: string;
   message: string;
   route?: string;
@@ -62,7 +73,7 @@ let publishing = false;
 
 function readCursor(): PublishCursor {
   try {
-    const raw = localStorage.getItem(CURSOR_KEY);
+    const raw = localStorage.getItem(CLIENT_ERROR_PUBLISH_CURSOR_KEY);
     if (!raw) return { ts: 0, count: 0 };
     const parsed = JSON.parse(raw) as Partial<PublishCursor>;
     return {
@@ -76,22 +87,37 @@ function readCursor(): PublishCursor {
 
 function writeCursor(cursor: PublishCursor): void {
   try {
-    localStorage.setItem(CURSOR_KEY, JSON.stringify(cursor));
+    localStorage.setItem(CLIENT_ERROR_PUBLISH_CURSOR_KEY, JSON.stringify(cursor));
   } catch {
     // Quota/private mode: the entries get retried, which is the safe direction.
   }
 }
 
-/** Error entries past the cursor, oldest first. */
+/** Locale-independent ordering: `ts` first, then `message`. */
+function compareEntries(a: ClientLogEntry, b: ClientLogEntry): number {
+  if (a.ts !== b.ts) return a.ts - b.ts;
+  if (a.message === b.message) return 0;
+  return a.message < b.message ? -1 : 1;
+}
+
+/** Error entries in publication order — `getClientLogs()` order is NOT relied on. */
+function sortedErrorEntries(): ClientLogEntry[] {
+  return getClientLogs()
+    .filter((entry) => entry.level === 'error')
+    .sort(compareEntries);
+}
+
+/** Error entries past the cursor, in publication order. */
 function pendingErrorEntries(cursor: PublishCursor): ClientLogEntry[] {
   const pending: ClientLogEntry[] = [];
-  let skippedAtCursorTs = 0;
+  let skippedAtCursorCount = 0;
 
-  for (const entry of getClientLogs()) {
-    if (entry.level !== 'error') continue;
+  for (const entry of sortedErrorEntries()) {
     if (entry.ts < cursor.ts) continue;
-    if (entry.ts === cursor.ts && skippedAtCursorTs < cursor.count) {
-      skippedAtCursorTs += 1;
+    // Only the cursor's OWN count of same-`ts` entries is skipped; the sorted
+    // order makes this independent of the order the buffer happens to hold.
+    if (entry.ts === cursor.ts && skippedAtCursorCount < cursor.count) {
+      skippedAtCursorCount += 1;
       continue;
     }
     pending.push(entry);
@@ -114,30 +140,46 @@ function advanceCursor(published: ClientLogEntry[]): void {
 }
 
 /**
- * Same source `exportClientLogs()` uses for its device header — the module is a
- * leaf and cannot import that file without pulling the whole export payload, so
- * the fields are read from `navigator` here directly.
+ * Deterministic per-entry identity: SHA-256 of the entry's identifying fields.
+ * The server can deduplicate an at-least-once re-delivery by `entryId`; it is
+ * derived from the entry ONLY, so the same buffered entry always yields the
+ * same id across publishes, devices and reloads.
  */
-function currentDevice(): string {
-  if (typeof navigator === 'undefined') return '';
-  return `${navigator.userAgent} | lang=${navigator.language} | online=${navigator.onLine}`;
+async function entryIdOf(entry: ClientLogEntry): Promise<string> {
+  const source = [
+    entry.ts,
+    entry.level,
+    entry.message,
+    entry.location ?? '',
+    entry.route ?? '',
+    entry.count ?? 1,
+  ].join('|');
+  try {
+    return await sha256Base64(source);
+  } catch {
+    // Web Crypto unavailable (insecure context): fall back to the very same
+    // canonical string — still deterministic and unique per entry, and every
+    // field in it is already travelling in the payload.
+    return source;
+  }
 }
 
-function toWireEntry(entry: ClientLogEntry): ErrorEntryPayload {
+async function toWireEntry(entry: ClientLogEntry): Promise<ErrorEntryPayload> {
   return {
+    entryId: await entryIdOf(entry),
     occurredAt: new Date(entry.ts).toISOString(),
     message: entry.message,
     route: entry.route,
     location: entry.location,
     count: entry.count ?? 1,
     context: entry.context,
-    appVersion: GlobalConfig.APP_VERSION,
-    device: currentDevice(),
+    appVersion: getClientAppVersion(),
+    device: formatClientDeviceDescriptor(),
   };
 }
 
 function normalizeStoreId(storeId: string | null | undefined): string | null {
-  if (!storeId || storeId === EMPTY_GUID) return null;
+  if (!storeId || storeId === EMPTY_STORE_ID) return null;
   return storeId;
 }
 
@@ -159,10 +201,11 @@ export async function publishClientErrorLogs(
 
     for (let i = 0; i < pending.length; i += MAX_ERRORS_PER_REQUEST) {
       const chunk = pending.slice(i, i + MAX_ERRORS_PER_REQUEST);
+      const errors = await Promise.all(chunk.map(toWireEntry));
       try {
         await apiClient.post(
-          ENDPOINT,
-          { storeId, errors: chunk.map(toWireEntry) },
+          CLIENT_ERROR_PUBLISH_ENDPOINT,
+          { storeId, errors },
           { skipLoading: true, skipDiagnostics: true },
         );
       } catch {
