@@ -105,6 +105,21 @@ Accepted tradeoff, not fixed: `OnDelete(Cascade)` on the `Store` FK is required 
 
 Task table above records the original delivery; this follow-up is tracked per group id U1-U5.
 
+## Open follow-ups opened by the fix reviews (non-blocking, none reopened a review)
+
+- U4: `entryId` travels but the backend does not persist or dedupe on it yet (needs a second
+  migration, which by the rule above is again unreviewable); a same-`ts` entry arriving after the
+  cursor advanced can be skipped; `toWireEntry` runs before the per-chunk `try`.
+- U5: the route test pins the process time zone at runtime; the authz assertion is
+  function-identity based rather than an observable redirect.
+- U3: the E2E header still describes the pre-fix SuperAdmin ingest boundary; the `Local`-kind test
+  is guarded by a non-zero offset; `page` boundary pairs are untested.
+- U2: both `NewStoreClientError` call sites still pass positional arguments.
+- U1: no test drives a redaction failure through the handler to prove the row survives.
+
+Ingestion rate limit remains unimplemented by design: no existing policy keys on an authenticated
+caller, and an IP bucket would collapse every POS behind one NAT.
+
 ## Log
 
 - L1 (2026-11-19, verbatim): "necesito un modo de que los logs de errores en el POS y las excepciones del POS, no las que ocurren al tratar de enviar los usages sin conexion, se publiquen en el backend cuando el dispositivo este conectado a internet."
