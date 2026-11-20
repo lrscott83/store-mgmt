@@ -68,25 +68,61 @@ export function localDateInputValue(at: Date): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
-function parseLocalDate(value: string): { year: number; month: number; day: number } | null {
+interface LocalDateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+function parseLocalDate(value: string): LocalDateParts | null {
   const [year, month, day] = value.split('-').map(Number);
   if (!year || !month || !day) return null;
   return { year, month, day };
 }
 
+function todayParts(): LocalDateParts {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+
+/** Orden cronológico de dos fechas locales (el offset no importa: se comparan las partes). */
+function compareLocalDates(a: LocalDateParts, b: LocalDateParts): number {
+  return a.year * 10_000 + a.month * 100 + a.day - (b.year * 10_000 + b.month * 100 + b.day);
+}
+
+/**
+ * Normaliza los dos límites del input date antes de convertirlos en instantes absolutos:
+ *
+ * - Ambos vacíos → el día local ACTUAL del navegador (spec S7).
+ * - Un solo límite vacío → ese día completo, el que sí eligió el operador. Devolver "hoy" en el
+ *   lado vacío consultaría un período que nadie pidió (y, con un valor viejo, un rango invertido).
+ * - Invertidos (`to` < `from`) → se intercambian.
+ *
+ * Los límites son INCLUSIVOS en el backend, por eso el fin no es la medianoche siguiente.
+ */
+function normalizeBounds(
+  fromParts: LocalDateParts | null,
+  toParts: LocalDateParts | null,
+): { start: LocalDateParts; end: LocalDateParts } {
+  if (fromParts === null && toParts === null) {
+    const today = todayParts();
+    return { start: today, end: today };
+  }
+  const start = fromParts ?? (toParts as LocalDateParts);
+  const end = toParts ?? (fromParts as LocalDateParts);
+  return compareLocalDates(start, end) <= 0 ? { start, end } : { start: end, end: start };
+}
+
 /**
  * Convierte dos valores `YYYY-MM-DD` (input date) al rango de instantes absolutos que el backend
- * compara: medianoche local del día inicial y el ÚLTIMO milisegundo local del día final. Ambos
- * límites son INCLUSIVOS en el backend, así que el fin del día no puede ser la medianoche
- * siguiente.
+ * compara: medianoche local del día inicial y el ÚLTIMO milisegundo local del día final. El rango
+ * se normaliza antes (ver `normalizeBounds`) para que un rango invertido o a medio llenar no
+ * consulte en silencio un período distinto del que el operador ve.
  */
 export function localDateRange(fromValue: string, toValue: string): { from: string; to: string } {
-  const now = new Date();
-  const today = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
-  const fromParts = parseLocalDate(fromValue) ?? today;
-  const toParts = parseLocalDate(toValue) ?? today;
-  const from = new Date(fromParts.year, fromParts.month - 1, fromParts.day, 0, 0, 0, 0);
-  const to = new Date(toParts.year, toParts.month - 1, toParts.day, 23, 59, 59, 999);
+  const { start, end } = normalizeBounds(parseLocalDate(fromValue), parseLocalDate(toValue));
+  const from = new Date(start.year, start.month - 1, start.day, 0, 0, 0, 0);
+  const to = new Date(end.year, end.month - 1, end.day, 23, 59, 59, 999);
   return { from: toOffsetIsoString(from), to: toOffsetIsoString(to) };
 }
 

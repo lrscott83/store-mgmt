@@ -26,6 +26,10 @@ const INPUT_CLASSES = 'rounded border border-border bg-surface px-3 py-2 text-sm
  * los instantes absolutos con su offset a partir de las partes locales, así que el rango sigue
  * siendo "hoy" para el operador aunque el servidor viva en otra zona. Filtrar por un `Z`
  * asumido o por una fecha desnuda cambiaría el día consultado.
+ *
+ * El rango se normaliza al consultar (`localDateRange`): un rango invertido se intercambia y un
+ * límite vacío usa el día del otro límite, de modo que nunca se consulta en silencio un período
+ * distinto del que el operador ve. Solo cuando ambos están vacíos se cae al día local actual.
  */
 export function AdminClientErrorsPage() {
   const intl = useIntl();
@@ -141,7 +145,6 @@ export function AdminClientErrorsPage() {
               className={INPUT_CLASSES}
               value={ownerId}
               onChange={(event) => selectOwner(event.target.value)}
-              data-testid="client-errors-owner"
             >
               <option value="">{formatMessage({ id: 'ADMIN_CLIENT_ERRORS.ALL_OWNERS' })}</option>
               {owners.map((owner) => (
@@ -161,7 +164,6 @@ export function AdminClientErrorsPage() {
               onChange={(event) =>
                 changeFilter(() => setStoreId(event.target.value))
               }
-              data-testid="client-errors-store"
             >
               <option value="">{formatMessage({ id: 'ADMIN_CLIENT_ERRORS.ALL_STORES' })}</option>
               {storeOptions.map((store) => (
@@ -179,7 +181,6 @@ export function AdminClientErrorsPage() {
               className={INPUT_CLASSES}
               value={fromDate}
               onChange={(event) => changeFilter(() => setFromDate(event.target.value))}
-              data-testid="client-errors-from"
             />
           </label>
 
@@ -190,7 +191,6 @@ export function AdminClientErrorsPage() {
               className={INPUT_CLASSES}
               value={toDate}
               onChange={(event) => changeFilter(() => setToDate(event.target.value))}
-              data-testid="client-errors-to"
             />
           </label>
         </div>

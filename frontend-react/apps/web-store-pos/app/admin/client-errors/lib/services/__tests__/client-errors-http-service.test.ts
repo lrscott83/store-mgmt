@@ -82,6 +82,24 @@ describe('clientErrorsHttpService.getErrors', () => {
     expect(params.get('to')).toMatch(OFFSET_INSTANT);
   });
 
+  it('omits ownerId and storeId when no filter is selected', async () => {
+    const { clientErrorsHttpService } = await import('../client-errors-http-service');
+
+    await clientErrorsHttpService.getErrors({
+      from: FROM,
+      to: TO,
+      page: 1,
+      pageSize: 50,
+    });
+
+    const params = await lastQueryParams();
+    // "No owner" is the ABSENCE of the parameter, never `ownerId=`.
+    expect(params.has('ownerId')).toBe(false);
+    expect(params.has('storeId')).toBe(false);
+    expect(params.get('from')).toBe(FROM);
+    expect(params.get('to')).toBe(TO);
+  });
+
   it('returns response.data as the paged result', async () => {
     const { clientErrorsHttpService } = await import('../client-errors-http-service');
 
@@ -96,5 +114,59 @@ describe('clientErrorsHttpService.getErrors', () => {
     if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.totalCount).toBe(0);
     expect(result.data.items).toEqual([]);
+  });
+});
+
+describe('localDateRange normalization', () => {
+  /** Local midnight / last millisecond of a local calendar day, computed independently. */
+  function localDayBounds(value: string): { from: number; to: number } {
+    const [year, month, day] = value.split('-').map(Number);
+    return {
+      from: new Date(year, month - 1, day, 0, 0, 0, 0).getTime(),
+      to: new Date(year, month - 1, day, 23, 59, 59, 999).getTime(),
+    };
+  }
+
+  function localToday(): string {
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  }
+
+  it('swaps an inverted range instead of querying the wrong period', async () => {
+    const { localDateRange } = await import('../client-errors-http-service');
+
+    const range = localDateRange('2026-11-20', '2026-11-10');
+
+    const start = localDayBounds('2026-11-10');
+    const end = localDayBounds('2026-11-20');
+    expect(new Date(range.from).getTime()).toBe(start.from);
+    expect(new Date(range.to).getTime()).toBe(end.to);
+    expect(new Date(range.from).getTime()).toBeLessThan(new Date(range.to).getTime());
+  });
+
+  it('uses the remaining bound for the whole day when one input is cleared', async () => {
+    const { localDateRange } = await import('../client-errors-http-service');
+
+    const expected = localDayBounds('2026-11-10');
+    for (const range of [
+      localDateRange('2026-11-10', ''),
+      localDateRange('', '2026-11-10'),
+    ]) {
+      expect(new Date(range.from).getTime()).toBe(expected.from);
+      expect(new Date(range.to).getTime()).toBe(expected.to);
+    }
+  });
+
+  it("falls back to the SuperAdmin's current local day only when both inputs are empty", async () => {
+    const { localDateRange } = await import('../client-errors-http-service');
+
+    const range = localDateRange('', '');
+
+    const expected = localDayBounds(localToday());
+    expect(new Date(range.from).getTime()).toBe(expected.from);
+    expect(new Date(range.to).getTime()).toBe(expected.to);
+    expect(range.from).toMatch(OFFSET_INSTANT);
+    expect(range.to).toMatch(OFFSET_INSTANT);
   });
 });
