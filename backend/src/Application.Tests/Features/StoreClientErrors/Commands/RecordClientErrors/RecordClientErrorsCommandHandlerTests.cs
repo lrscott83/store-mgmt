@@ -1,6 +1,8 @@
+using Application.Abstractions.HttpContext;
 using Application.Dtos.StoreClientErrors;
 using Application.Features.StoreClientErrors.Commands.RecordClientErrors;
 using Application.UnitOfWorks;
+using Domain.Entities.Stores;
 using Domain.Entities.StoreClientErrors;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
@@ -15,16 +17,39 @@ public class RecordClientErrorsCommandHandlerTests
 
     private readonly Mock<IStoreClientErrorRepository> _repository = new();
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IHttpContextService> _httpContextService = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
+
+    /// <summary>Las tiendas que el llamador puede tocar. El alta verifica la atribución.</summary>
+    private readonly List<Store> _allowedStores = [];
+
+    private readonly Guid _ownerId = Guid.NewGuid();
 
     public RecordClientErrorsCommandHandlerTests()
     {
         _unitOfWork
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
+
+        _httpContextService.Setup(x => x.UserExternalId).Returns(_ownerId.ToString());
+        _httpContextService.Setup(x => x.IsOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        _storeRepository
+            .Setup(x => x.GetActiveStoresByUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .ReturnsAsync(() => _allowedStores);
     }
 
     private RecordClientErrorsCommandHandler Handler() =>
-        new(_repository.Object, _unitOfWork.Object);
+        new(_repository.Object, _unitOfWork.Object, _httpContextService.Object, _storeRepository.Object);
+
+    /// <summary>Da de alta una tienda del llamador con el id que usará la prueba.</summary>
+    private void AllowStore(Guid storeId)
+    {
+        Store store = Store.Create($"Store-{storeId:N}", _ownerId, true, Guid.NewGuid());
+        typeof(Store).GetProperty("Id")!.SetValue(store, storeId);
+        _allowedStores.Add(store);
+    }
 
     private static ClientErrorEntryRequest Entry(string message = "boom") => new()
     {
@@ -51,6 +76,7 @@ public class RecordClientErrorsCommandHandlerTests
         // Arrange
         var saved = CaptureSaved();
         var storeId = Guid.NewGuid();
+        AllowStore(storeId);
         var command = new RecordClientErrorsCommand(storeId, new[]
         {
             new ClientErrorEntryRequest
@@ -109,8 +135,10 @@ public class RecordClientErrorsCommandHandlerTests
     {
         // Arrange
         var saved = CaptureSaved();
+        var storeId = Guid.NewGuid();
+        AllowStore(storeId);
         var command = new RecordClientErrorsCommand(
-            Guid.NewGuid(),
+            storeId,
             Enumerable.Range(1, 60).Select(i => Entry($"error {i}")).ToList());
 
         // Act
@@ -144,10 +172,9 @@ public class RecordClientErrorsCommandHandlerTests
     {
         // Arrange
         var saved = CaptureSaved();
-        var occurredAt = new DateTime(2026, 11, 19, 10, 30, 0, DateTimeKind.Utc);
         var command = new RecordClientErrorsCommand(
-            Guid.NewGuid(),
-            new[] { new ClientErrorEntryRequest { OccurredAt = occurredAt, Message = "boom" } });
+            null,
+            new[] { new ClientErrorEntryRequest { OccurredAt = OccurredAt, Message = "boom" } });
 
         var before = DateTime.UtcNow;
 
@@ -158,7 +185,7 @@ public class RecordClientErrorsCommandHandlerTests
 
         // Assert
         saved.Should().ContainSingle();
-        saved[0].OccurredAt.Should().Be(occurredAt);
+        saved[0].OccurredAt.Should().Be(OccurredAt);
         saved[0].OccurredAt.Kind.Should().Be(DateTimeKind.Utc);
         saved[0].ReceivedAt.Kind.Should().Be(DateTimeKind.Utc);
         saved[0].ReceivedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);

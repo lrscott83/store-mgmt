@@ -26,6 +26,9 @@ namespace SMCA.WebApi.Controllers.v1
     /// RUTA ABSOLUTA A PROPÓSITO (`~/api/v1/store-client-errors`): `BaseApiController` fija
     /// `[Route("api/v1/[controller]")]` y una ruta de action sin `~/` se COMBINARÍA con ella,
     /// publicando además `api/v1/StoreClientErrors`.
+    ///
+    /// `v1` está escrito a mano: un salto de versión de la API debe actualizar este literal (y el
+    /// de `GetAsync`), porque la ruta absoluta no pasa por la plantilla del controlador base.
     /// </summary>
     [ApiVersion("1.0")]
     [Authorize]

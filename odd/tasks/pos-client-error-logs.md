@@ -90,6 +90,21 @@ Advisory findings left as follow-up work (non-blocking, none reopened a review):
 trusts a caller-supplied `StoreId`, the server does not re-redact `Context`, `OwnerId`/`StoreId`
 filtering is only proven at unit level, and the publisher's hook trigger has no test.
 
+## Follow-up: closing every advisory finding
+
+| ID | Group | Findings closed |
+| --- | --- | --- |
+| U1 | ingest hardening | store-ownership check, server-side redaction, serialize guard, cap-after-filter, truncate helper, DI placement, route/version note, test cleanup, ingestion rate limit |
+| U2 | entity + schema | count CHECK constraint, enforced invariants or reworded docs, payload parameter object, script provenance header |
+| U3 | read query | UTC conversion instead of relabel, page upper clamp, inclusive-bounds test, TotalCount-independence test, pageSize lower clamp test, E2E owner/store filter test, E2E 403 pin |
+| U4 | publisher | entry identity (idempotency), explicit ordering, hook-trigger test, mutex test, cursor-corruption tests, cursor counter rename, shared device/appVersion helper, test setup dedupe |
+| U5 | admin view | deterministic timezone test, error-branch tests, page/store reset tests, inverted date range handling, empty-filter test, label-based queries, route/menu auth test |
+
+Accepted tradeoff, not fixed: `OnDelete(Cascade)` on the `Store` FK is required so the untouched E2E
+`ResetDataAsync` keeps working; store-scoped error history dies with its store.
+
+Task table above records the original delivery; this follow-up is tracked per group id U1-U5.
+
 ## Log
 
 - L1 (2026-11-19, verbatim): "necesito un modo de que los logs de errores en el POS y las excepciones del POS, no las que ocurren al tratar de enviar los usages sin conexion, se publiquen en el backend cuando el dispositivo este conectado a internet."

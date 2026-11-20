@@ -97,6 +97,7 @@ namespace Infrastructure
             services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();
+            services.AddScoped<IStoreClientErrorRepository, StoreClientErrorRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IMessageRepository, MessageRepository>();
             services.AddScoped<INotificationRepository, NotificationRepository>();
@@ -108,7 +109,6 @@ namespace Infrastructure
             // Telemetría anónima del catálogo público (page views, productos, carrito, checkout).
             services.AddScoped<ICatalogEventRepository, CatalogEventRepository>();
             services.AddScoped<ISiteEventRepository, SiteEventRepository>();
-        services.AddScoped<IStoreClientErrorRepository, StoreClientErrorRepository>();
             // Módulo Gestores de ventas (Owner-level): gestor, configuración por producto y comisión.
             services.AddScoped<ISalesManagerRepository, SalesManagerRepository>();
             services.AddScoped<IProductSalesCommissionRepository, ProductSalesCommissionRepository>();
